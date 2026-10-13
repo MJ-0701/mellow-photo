@@ -120,7 +120,7 @@ platform :ios do
     quiet_command('/usr/bin/ditto', '-x', '-k', ipa, unpacked)
     verify_bundle(Dir[File.join(unpacked, 'Payload/*.app')].fetch(0), team, version, build)
     upload_to_app_store(api_key: api_key, app_identifier: 'com.mj.mellowphoto', ipa: ipa,
-      app_version: version, build_number: build, skip_metadata: true, skip_screenshots: true,
+      app_version: version, skip_metadata: true, skip_screenshots: true,
       submit_for_review: false, precheck_include_in_app_purchases: false, force: true)
     # deliver ignores automatic_release when skip_metadata is true. Change only
     # releaseType explicitly, preserving the user's store text and screenshots.
