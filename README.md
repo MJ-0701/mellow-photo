@@ -13,6 +13,8 @@ open "dist/Mellow Photo.app"
 
 빌드된 앱을 응용 프로그램 폴더에 복사하면 이후에는 더블클릭으로 실행할 수 있습니다. 현재 버전은 로컬 실행용 임시 서명만 사용하며 배포·공증하지 않았습니다.
 
+다른 Mac으로 전달할 때는 `bash scripts/package-mac.sh`로 Apple Silicon·Intel 통합 앱과 설치 안내가 포함된 `dist/Mellow-Photo-Mac.zip`을 만듭니다. [Mac 설치와 사용 안내](docs/MAC_INSTALL.md)를 확인하세요. Intel 실행 파일은 빌드 검증 대상이며 Intel 실기기 검증은 별도입니다.
+
 ## 첫 보정
 
 1. **사진 가져오기** 또는 드래그로 HEIC·JPEG·PNG를 추가합니다. 한 번에 최대 40장을 편집합니다.

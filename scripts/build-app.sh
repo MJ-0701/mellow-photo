@@ -2,8 +2,14 @@
 set -euo pipefail
 MELLOW_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$MELLOW_ROOT"
-swift build -c release
-MELLOW_BIN="$(swift build -c release --show-bin-path)"
+MELLOW_BUILD_ARGS=(-c release)
+case "${1:-native}" in
+  native) ;;
+  universal) MELLOW_BUILD_ARGS+=(--arch arm64 --arch x86_64) ;;
+  *) echo 'Usage: scripts/build-app.sh [native|universal]' >&2; exit 2 ;;
+esac
+swift build "${MELLOW_BUILD_ARGS[@]}"
+MELLOW_BIN="$(swift build "${MELLOW_BUILD_ARGS[@]}" --show-bin-path)"
 MELLOW_APP="$MELLOW_ROOT/dist/Mellow Photo.app"
 mkdir -p "$MELLOW_APP/Contents/MacOS" "$MELLOW_APP/Contents/Resources"
 cp "$MELLOW_BIN/MellowPhoto" "$MELLOW_APP/Contents/MacOS/MellowPhoto"
@@ -28,5 +34,6 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$MELLOW_ROOT/dist/AppIcon.iconset" -o "$MELLOW_APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$MELLOW_APP"
+codesign --verify --deep --strict "$MELLOW_APP"
 echo "Built: $MELLOW_APP"
 echo "Run: open \"$MELLOW_APP\""
