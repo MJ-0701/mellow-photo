@@ -1,6 +1,18 @@
 # iPhone 정식 출시와 자동 배포
 
-현재 소스에는 iPhone 앱과 GitHub Actions 배포 경로가 들어 있습니다. 개발자 결제 완료와 Apple 계정 활성화는 다릅니다. 계정 활성화, 인증서, App Store Connect 앱 등록, 실기기 검증, 스토어 자료를 완료해야 출시할 수 있습니다. CI 구성만으로 출시 완료나 Apple 심사 승인을 의미하지 않습니다.
+현재 소스에는 iPhone 앱과 GitHub Actions 배포 경로가 들어 있습니다. 2026-10-13 개인 개발자 계정 활성화, 인증서·프로필, App Store Connect 앱 등록과 GitHub 자격증명 연결을 완료했습니다. 서명 업로드·스토어 자료·심사 제출 결과는 별도로 확인해야 하며, CI 구성만으로 출시 완료나 Apple 심사 승인을 의미하지 않습니다.
+
+## 연결 현황 (2026-10-13)
+
+- 비공개 저장소 `MJ-0701/mellow-photo`, 배포 환경 `production`.
+- 환경 배포 허용 대상: `main` 브랜치와 `ios-v*` 태그.
+- 아래 일곱 Secrets 모두 저장 완료. Apple ID 비밀번호는 저장하지 않았습니다.
+- 첫 업로드는 심사 제출·자동 공개를 끈 수동 실행으로 진행했습니다. 이후 사용자가 후속 태그의 자동 심사 제출과 승인 후 자동 공개를 명시적으로 승인해, `IOS_RELEASE_ENABLED`, `IOS_AUTO_SUBMIT`, `IOS_AUTO_RELEASE` 세 repository variables를 모두 `true`로 설정했습니다. 이미 올라간 최초 버전 1.0.0은 수동 공개로 유지합니다.
+- App Store 앱 ID `6822201639`, bundle ID `com.mj.mellowphoto`.
+- 첫 실행 `38367871570`은 테스트 통과 후 서명 준비 단계에서 실패했습니다. PKCS#12 파일을 macOS 호환 형식으로 다시 묶고 Apple WWDR G3 중간 인증서를 포함했습니다. 기존 인증서·개인키·프로필의 일치를 유지하며 임시 키체인의 import, partition, 유효한 서명 identity 검증을 통과한 뒤 P12 Secret 하나만 갱신했습니다.
+- [첫 성공 실행 38369395464](https://github.com/MJ-0701/mellow-photo/actions/runs/38369395464): 버전 1.0.0 / 빌드 4.1. 테스트, 서명 archive·IPA export, 두 bundle의 서명·버전·entitlement 검증, App Store Connect 업로드와 임시 자료 정리가 모두 통과했습니다. Fastlane의 IPA 업로드 호출과 빌드 선택 전용 호출에서 충돌하는 옵션도 분리했습니다. Apple의 최종 심사 결과는 이 실행 성공에 포함되지 않습니다.
+- 2026-10-13 17:35 KST, 1.0.0 (4.1)을 정식 심사에 제출했고 **심사 대기 중**을 확인했습니다. [제출 상세](https://appstoreconnect.apple.com/apps/6822201639/distribution/reviewsubmissions/details/75504532-3e29-4067-95e2-bf92fda3ed75). 최초 버전은 승인 후 수동 공개입니다.
+- 배포 성공과 심사 접수 후 로컬의 임시 개인키·P12·암호·API 키 파일은 정리했습니다. GitHub production Secrets와 Apple 인증서/API 키 등록은 유지합니다.
 
 ## 자동화 범위
 
@@ -35,9 +47,11 @@
 | `DISTRIBUTION_P12_PASSWORD` | `.p12` 암호, 비어 있지 않은 값 |
 | `APPSTORE_PROFILE_BASE64` | `.mobileprovision`의 줄바꿈 없는 base64 |
 
+PKCS#12를 직접 만들 때 최신 OpenSSL의 기본 PBES2/AES 포맷은 macOS `security import`에서 인증 오류를 낼 수 있습니다. 이 설정은 기존 인증서·개인키와 공식 WWDR G3 중간 인증서를 3DES/SHA-1 MAC 호환 P12로 묶어 검증했습니다. 이는 암호가 걸린 전송용 컨테이너 포맷이며 앱 서명 키나 인증서 알고리즘을 변경하지 않습니다. 로컬 파일은 제한된 권한으로 보관하고, 반드시 임시 키체인의 실제 import와 유효한 identity를 확인한 뒤 Secrets를 갱신하세요. 원본 비밀키와 암호를 로그에 출력하지 마세요.
+
 Mac에서 파일을 변환하려면 `base64 -i /path/to/file | tr -d '\n' | pbcopy`로 클립보드에 복사한 후 GitHub Secret 입력란에 붙여넣습니다. 작업 후 클립보드를 지웁니다. 이메일/Apple ID 암호는 CI에 필요 없습니다.
 
-`production` 환경에 required reviewer를 설정하여 첫 공개 승인 단계를 두는 것을 권장합니다. 환경 이름만 YAML에 작성하는 것으로 승인이 강제되지는 않습니다. **비공개 저장소의 required reviewer 지원은 GitHub 플랜에 따라 제한됩니다.** 사용할 수 없는 플랜에서는 심사 제출/자동 공개 변수를 끈 채 App Store Connect에서 직접 제출·공개합니다. 태그 배포와 workflow_dispatch에 허용할 ref도 환경 배포 규칙으로 제한하세요. secrets와 변수는 아직 이 코드에서 원격 설정하지 않습니다.
+`production` 환경에 required reviewer를 설정하여 첫 공개 승인 단계를 두는 것을 권장합니다. 환경 이름만 YAML에 작성하는 것으로 승인이 강제되지는 않습니다. **비공개 저장소의 required reviewer 지원은 GitHub 플랜에 따라 제한됩니다.** 사용할 수 없는 플랜에서는 심사 제출/자동 공개 변수를 끈 채 App Store Connect에서 직접 제출·공개합니다. 태그 배포와 workflow_dispatch에 허용할 ref도 환경 배포 규칙으로 제한하세요. 현재 연결 현황은 위 기록을 따르며, 이 문서 자체는 원격 설정을 변경하지 않습니다.
 
 ## 첫 업로드
 
@@ -47,14 +61,14 @@ GitHub Actions → `iOS App Store release` → Run workflow에서 `version=1.0.0
 
 ## 첫 출시 이후
 
-새 버전의 App Store Connect 메타데이터/변경사항을 준비한 후 다음 태그를 push합니다.
+실제 변경사항을 `fastlane/release_notes/1.0.1.json`처럼 버전별 파일로 작성해 앱 수정과 함께 main에 push합니다. 현재 언어는 `ko`이며 [형식과 검증 규칙](../fastlane/release_notes/README.md)을 따릅니다. CI 통과 후 다음 태그를 push합니다.
 
 ```sh
 git tag ios-v1.0.1
 git push origin ios-v1.0.1
 ```
 
-자동 업로드 후 직접 심사 제출할 수 있습니다. 완전한 후속 자동화를 원하면 repository variables를 설정합니다.
+현재는 사용자의 명시적 승인에 따라 아래 세 변수가 모두 `true`입니다. 태그 배포는 테스트, 서명, 업로드, 해당 버전 변경사항 반영, 심사 제출, Apple 승인 후 자동 공개까지 진행합니다. 최초 1.0.0의 공개 설정은 별도로 수동을 유지했습니다.
 
 | 변수 | `true`일 때 |
 |---|---|
@@ -62,9 +76,9 @@ git push origin ios-v1.0.1
 | `IOS_AUTO_SUBMIT` | 태그 빌드를 업로드한 뒤 Apple 심사 제출 |
 | `IOS_AUTO_RELEASE` | Apple이 승인한 뒤 자동 공개 |
 
-수동 실행은 위 두 AUTO 변수 대신 입력 체크박스를 사용합니다. `automatic_release`는 `submit_for_review=true`와 함께 사용하세요. 최초 공개나 승인 자동화 여부는 설정자가 선택하며, 이 저장소는 기본으로 활성화하지 않습니다. 심사 거절 시 수정 후 새 빌드를 올려야 합니다.
+수동 실행은 위 두 AUTO 변수 대신 입력 체크박스를 사용합니다. `automatic_release`는 `submit_for_review=true`와 함께 사용하세요. 심사 거절 시 수정 후 새 빌드를 올려야 합니다.
 
-기존 스토어 메타데이터를 자동 덮어쓰지 않도록 fastlane에 `skip_metadata`/`skip_screenshots`를 지정했습니다. 새 버전 심사에 필요한 필드가 누락되면 제출이 실패합니다. 스토어 자료까지 자동화하려면 검토 완료된 별도 메타데이터 관리가 필요합니다.
+기존 스토어 설명·스크린샷·심사 연락처·개인정보는 유지하고, 버전별 JSON에서 해당 버전의 What's New만 갱신합니다. 변경사항이 없거나 언어가 일치하지 않거나 다른 편집 중 버전이 있으면 archive 전에 중단합니다. 새 기능으로 개인정보·소개·스크린샷 등의 변경이 필요하면 해당 자료도 제출 전에 갱신해야 합니다. 후속 버전 경로는 고정 fastlane 소스 대조와 독립 검수, 로컬 테스트 6개/검증 항목 18개를 통과했으나 실제 두 번째 버전의 업로드·제출·자동 공개를 실행한 것은 아닙니다.
 
 서명 파일은 임시 runner 폴더와 임시 keychain에서만 사용하고 성공·실패 시 정리합니다. IPA/인증서를 Actions artifact로 공개하지 않습니다. GitHub-hosted runner에서만 실행하도록 구성했으며 self-hosted runner 전환 시 정리 정책을 다시 검토해야 합니다.
 

@@ -1,6 +1,19 @@
 # App Store 첫 제출 자료
 
-이 문서는 계정 활성화 전 준비한 제출 초안입니다. `fastlane/metadata/ko/`의 이름·부제·소개·키워드·URL과 `fastlane/metadata/review_information/notes.txt`의 영문 심사 안내를 App Store Connect에 입력할 수 있습니다. 현재 release lane은 메타데이터 자동 업로드를 끄고 있으므로 이 파일이 생성되거나 push되어도 스토어 설명이 변경되지 않습니다.
+이 문서는 첫 제출 자료와 검증 기록입니다. `fastlane/metadata/ko/`의 이름·부제·소개·키워드·URL과 `fastlane/metadata/review_information/notes.txt`의 영문 심사 안내를 App Store Connect에 입력합니다. 현재 release lane은 메타데이터 자동 업로드를 끄고 있으므로 이 파일이 생성되거나 push되어도 스토어 설명이 변경되지 않습니다.
+
+## 2026-10-13 준비 및 검증 기록
+
+- **정식 심사 제출 완료:** 2026-10-13 17:35 KST, 버전 1.0.0 / 빌드 4.1, **심사 대기 중**. [제출 상세](https://appstoreconnect.apple.com/apps/6822201639/distribution/reviewsubmissions/details/75504532-3e29-4067-95e2-bf92fda3ed75). 승인·공개 완료를 의미하지 않으며 최초 버전은 승인 후 수동 공개합니다.
+- 활성화된 개인 개발자 계정에 `com.mj.mellowphoto`, App Store 앱 `6822201639`를 등록했습니다.
+- Apple Distribution 인증서와 App Store 배포 프로필을 만들고 앱·팀·인증서 일치를 확인했습니다. 배포에 필요한 일곱 자격증명은 비공개 GitHub 저장소의 `production` Secrets에 저장했습니다.
+- 사진 분석 실패가 사진 가져오기 전체를 막는 문제를 수정했습니다. iPhone XCTest 11개와 보정 엔진 테스트 8개가 통과했습니다.
+- iPhone 18 Pro Max / iOS 27 시뮬레이터에서 생성한 가상 성인 인물 사진 가져오기, 얼굴 한 명 감지, 프리셋, 실행 취소·다시 실행, 사진 추가 권한과 새 JPEG 저장, 종료 후 사진·보정값 복원을 확인했습니다. 사진 선택과 저장 메뉴 열기는 사용자가 직접 조작하고 이후 결과를 확인했습니다.
+- 실제 앱 색감·인물·잡티 화면을 1320×2868 JPEG 세 장으로 준비했습니다. 알파채널이 없음을 확인했으며, 사진 출처는 [store-assets/README.md](store-assets/README.md)에 기록했습니다.
+- 한국어 소개·부제·키워드·홍보 문구, 지원/개인정보 URL, 비공개 심사 연락처·메모를 App Store Connect에 저장했습니다. 사진 및 비디오 카테고리, 버전 1.0.0, 무료, 대한민국 한정, 수동 출시로 설정했습니다. JPEG 세 장은 대형 iPhone 슬롯에 등록됐으며 중형 슬롯에도 기존 자산으로 연결됐고 제출 검증을 통과했습니다. 연령 등급은 글로벌 4+ / 대한민국 전체입니다.
+- 사용자가 게시 동의 문구를 승인한 뒤 개인정보의 데이터 미수집 표시를 게시했습니다. Mac·Vision Pro 스토어 사용 가능 여부는 껐습니다. Mac 버전은 개인 Mac에서 저장소로 설치하는 별도 경로를 유지합니다.
+- 실제 iPhone의 HEIC·48MP·권한 거절·백그라운드 동작은 아직 확인하지 않았습니다. 시뮬레이터 검증을 실기기 검증으로 간주하지 않습니다.
+- [GitHub Actions 38369395464](https://github.com/MJ-0701/mellow-photo/actions/runs/38369395464)에서 1.0.0 / 빌드 4.1의 테스트, 서명 archive·IPA export, 양쪽 앱 bundle·버전·서명 검증, App Store Connect 업로드와 임시 서명 자료 정리가 모두 성공했습니다. 공식 API의 읽기 전용 조회로 `processingState=VALID`, `expired=false`, `usesNonExemptEncryption=false`를 확인했습니다. App Store 제출 상세 화면에서도 1.0.0 (4.1)의 심사 대기 상태를 직접 확인했습니다.
 
 ## 기능과 설명의 근거
 
@@ -39,11 +52,8 @@
 
 ## 공개 전 남은 항목
 
-- 멤버십 Active 확인, 앱 레코드·bundle ID 등록, 인증서와 프로필 설정
 - 실제 iPhone HEIC·48MP·회전·얼굴 0/1/여러 명·권한 허용/거절·저장·복원·백그라운드 점검
-- 앱명 가용성, 권리자/저작권, 심사 연락처, 국가/가격 결정
-- 실제 스크린샷과 개인정보·연령등급·수출 관련 응답 완료
-- 지원/개인정보 URL 확인, 서명된 빌드 업로드와 Apple 처리 결과 확인
-- [IOS_RELEASE.md](IOS_RELEASE.md)에 따라 최초 심사 제출·공개 설정 선택
+- Apple 심사 결과 확인 및 필요 시 보완
+- 심사 승인 후 [IOS_RELEASE.md](IOS_RELEASE.md)에 따라 최초 버전 수동 공개
 
-위 항목은 아직 완료되었다고 주장하지 않습니다. 최초 버전의 검토된 설명/스크린샷/권한 안내와 실제 동작이 일치해야 합니다.
+완료 항목은 상단 기록을 따릅니다. 최초 버전의 검토된 설명/스크린샷/권한 안내와 실제 동작이 일치해야 합니다.
