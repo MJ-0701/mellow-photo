@@ -98,6 +98,10 @@ public final class ImageEngine: @unchecked Sendable {
             case .warp(let stroke):
                 guard stroke.radius > 0 else { continue }
                 if warpKernel == nil {
+                    // Supported on iOS 8+ and macOS 10.10+, although deprecated since iOS 12.
+                    // Keep this compatibility path: runtime Metal kernels require devices supporting
+                    // dynamic libraries, which is narrower than our iOS 16 deployment target.
+                    // Initialization/application failures are reported instead of dropping the edit.
                     warpKernel = CIWarpKernel(source: "kernel vec2 localWarp(vec2 center, vec2 delta, float radius) { vec2 p = destCoord(); float t = clamp(1.0 - distance(p, center) / radius, 0.0, 1.0); float w = t*t*(3.0-2.0*t); return p - delta*w; }")
                 }
                 guard let kernel = warpKernel else { throw ImageEngineError.message("얼굴·체형 보정 기능을 초기화하지 못했습니다.") }

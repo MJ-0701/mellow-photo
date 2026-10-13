@@ -1,0 +1,53 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		000000000000000000000064 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MellowPhotoApp.swift"; sourceTree = "<group>"; };
+		000000000000000000000065 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileStore.swift"; sourceTree = "<group>"; };
+		000000000000000000000066 = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "MobileEditor.swift"; sourceTree = "<group>"; };
+		000000000000000000000067 = { isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = "<group>"; };
+		000000000000000000000068 = { isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		000000000000000000000069 = { isa = PBXFileReference; lastKnownFileType = text.xml; path = "PrivacyInfo.xcprivacy"; sourceTree = "<group>"; };
+		0000000000000000000000C8 = { isa = PBXBuildFile; fileRef = 000000000000000000000064; };
+		0000000000000000000000C9 = { isa = PBXBuildFile; fileRef = 000000000000000000000065; };
+		0000000000000000000000CA = { isa = PBXBuildFile; fileRef = 000000000000000000000066; };
+		0000000000000000000000CB = { isa = PBXBuildFile; fileRef = 000000000000000000000067; };
+		0000000000000000000000CC = { isa = PBXBuildFile; fileRef = 000000000000000000000069; };
+		0000000000000000000000CD = { isa = PBXBuildFile; fileRef = 00000000000000000000006E; };
+		00000000000000000000006E = { isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileStoreTests.swift; sourceTree = "<group>"; };
+		000000000000000000000078 = { isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MellowPhotoIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000079 = { isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MellowPhotoIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000001 = { isa = PBXGroup; children = (000000000000000000000002, 000000000000000000000003, 000000000000000000000004); sourceTree = "<group>"; };
+		000000000000000000000002 = { isa = PBXGroup; children = (000000000000000000000064, 000000000000000000000065, 000000000000000000000066, 000000000000000000000067, 000000000000000000000068, 000000000000000000000069); path = MellowPhoto; sourceTree = "<group>"; };
+		000000000000000000000003 = { isa = PBXGroup; children = (00000000000000000000006E); path = MellowPhotoTests; sourceTree = "<group>"; };
+		000000000000000000000004 = { isa = PBXGroup; children = (000000000000000000000078, 000000000000000000000079); name = Products; sourceTree = "<group>"; };
+		00000000000000000000000A = { isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = YES; LastSwiftUpdateCheck = 2600; LastUpgradeCheck = 2600; TargetAttributes = { 000000000000000000000014 = { CreatedOnToolsVersion = 26.0; }; 000000000000000000000015 = { CreatedOnToolsVersion = 26.0; TestTargetID = 000000000000000000000014; }; }; }; buildConfigurationList = 000000000000000000000028; compatibilityVersion = "Xcode 14.0"; developmentRegion = ko; hasScannedForEncodings = 0; knownRegions = (ko, en, Base); mainGroup = 000000000000000000000001; productRefGroup = 000000000000000000000004; packageReferences = (000000000000000000000046); projectDirPath = ""; projectRoot = ""; targets = (000000000000000000000014, 000000000000000000000015); };
+		000000000000000000000014 = { isa = PBXNativeTarget; buildConfigurationList = 000000000000000000000029; buildPhases = (00000000000000000000001E, 00000000000000000000001F, 000000000000000000000020); buildRules = (); dependencies = (); name = MellowPhotoIOS; packageProductDependencies = (000000000000000000000047); productName = MellowPhotoIOS; productReference = 000000000000000000000078; productType = "com.apple.product-type.application"; };
+		000000000000000000000015 = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000002A; buildPhases = (000000000000000000000021, 000000000000000000000022, 000000000000000000000023); buildRules = (); dependencies = (000000000000000000000051); name = MellowPhotoIOSTests; packageProductDependencies = (000000000000000000000048); productName = MellowPhotoIOSTests; productReference = 000000000000000000000079; productType = "com.apple.product-type.bundle.unit-test"; };
+		00000000000000000000001E = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (0000000000000000000000C8, 0000000000000000000000C9, 0000000000000000000000CA); runOnlyForDeploymentPostprocessing = 0; };
+		00000000000000000000001F = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (000000000000000000000049); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000020 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (0000000000000000000000CB, 0000000000000000000000CC); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000021 = { isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (0000000000000000000000CD); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000022 = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (00000000000000000000004A); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000023 = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		000000000000000000000028 = { isa = XCConfigurationList; buildConfigurations = (000000000000000000000032, 000000000000000000000033); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		000000000000000000000029 = { isa = XCConfigurationList; buildConfigurations = (000000000000000000000034, 000000000000000000000035); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		00000000000000000000002A = { isa = XCConfigurationList; buildConfigurations = (000000000000000000000036, 000000000000000000000037); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		000000000000000000000032 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; }; name = Debug; };
+		000000000000000000000033 = { isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; SDKROOT = iphoneos; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; VALIDATE_PRODUCT = YES; }; name = Release; };
+		000000000000000000000034 = { isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.2.0; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MellowPhoto/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; TARGETED_DEVICE_FAMILY = 1; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
+		000000000000000000000035 = { isa = XCBuildConfiguration; buildSettings = { ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; MARKETING_VERSION = 0.2.0; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = MellowPhoto/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto; PRODUCT_NAME = "$(TARGET_NAME)"; SUPPORTED_PLATFORMS = "iphoneos iphonesimulator"; SUPPORTS_MACCATALYST = NO; SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO; TARGETED_DEVICE_FAMILY = 1; LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
+		000000000000000000000036 = { isa = XCBuildConfiguration; buildSettings = { GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MellowPhotoIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MellowPhotoIOS"; BUNDLE_LOADER = "$(TEST_HOST)"; }; name = Debug; };
+		000000000000000000000037 = { isa = XCBuildConfiguration; buildSettings = { GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.tests; PRODUCT_NAME = "$(TARGET_NAME)"; TARGETED_DEVICE_FAMILY = 1; CODE_SIGN_STYLE = Automatic; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MellowPhotoIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MellowPhotoIOS"; BUNDLE_LOADER = "$(TEST_HOST)"; }; name = Release; };
+		000000000000000000000046 = { isa = XCLocalSwiftPackageReference; relativePath = ..; };
+		000000000000000000000047 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000046; productName = MellowCore; };
+		000000000000000000000048 = { isa = XCSwiftPackageProductDependency; package = 000000000000000000000046; productName = MellowCore; };
+		000000000000000000000049 = { isa = PBXBuildFile; productRef = 000000000000000000000047; };
+		00000000000000000000004A = { isa = PBXBuildFile; productRef = 000000000000000000000048; };
+		000000000000000000000050 = { isa = PBXContainerItemProxy; containerPortal = 00000000000000000000000A; proxyType = 1; remoteGlobalIDString = 000000000000000000000014; remoteInfo = MellowPhotoIOS; };
+		000000000000000000000051 = { isa = PBXTargetDependency; target = 000000000000000000000014; targetProxy = 000000000000000000000050; };
+	};
+	rootObject = 00000000000000000000000A;
+}

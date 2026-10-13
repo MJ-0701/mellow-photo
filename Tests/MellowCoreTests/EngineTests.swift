@@ -107,6 +107,23 @@ struct EngineTests {
         }
         expect(rgba[0] > rgba[2])
     }
+    func testPortraitFilterPipeline() throws {
+        let input = gradient()
+        let face = FaceRegion(rect:CGRect(x:0.15,y:0.05,width:0.7,height:0.9))
+        var recipe = EditRecipe()
+        recipe.adjustments.skin = 0.5
+        recipe.adjustments.faceSlim = 0.7
+        recipe.adjustments.contrast = 1.05
+        recipe.adjustments.saturation = 0.8
+        recipe.adjustments.warmth = -0.3
+        let result = try engine.render(input,recipe:recipe,faces:[face])
+        expect(result.extent == input.extent)
+        try expect(try bytes(result) != bytes(input))
+        var noFaces = EditRecipe()
+        noFaces.adjustments.skin = 1
+        noFaces.adjustments.faceSlim = 1
+        try expect(try bytes(engine.render(input,recipe:noFaces,faces:[])) == bytes(input))
+    }
     func testInvalidRecipeRejected() throws {
         var recipe = EditRecipe(); recipe.adjustments.skin = .nan
         expectThrow { try engine.render(gradient(),recipe:recipe,faces:[]) }
@@ -124,7 +141,8 @@ struct EngineTests {
         try tests.testInvalidRecipeRejected()
         try tests.testWarmthDirection()
         try tests.testLocalEditOrder()
-        print("PASS: 7 engine tests (identity/color, local warp/clone, export/collision/metadata, orientation/thumbnail, invalid input, warmth direction, chronological edits)")
+        try tests.testPortraitFilterPipeline()
+        print("PASS: 8 engine tests (identity/color, local warp/clone, export/collision/metadata, orientation/thumbnail, invalid input, warmth direction, chronological edits, portrait filters)")
     }
 }
 #else
@@ -138,6 +156,7 @@ final class EngineXCTests: XCTestCase {
         try tests.testInvalidRecipeRejected()
         try tests.testWarmthDirection()
         try tests.testLocalEditOrder()
+        try tests.testPortraitFilterPipeline()
     }
 }
 #endif

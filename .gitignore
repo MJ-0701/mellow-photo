@@ -1,7 +1,23 @@
 .build/
 dist/
 .DS_Store
-*.xcodeproj/
 .swiftpm/
 test-output/
 *.log
+
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Signing credentials and release output
+*.p12
+*.p8
+*.mobileprovision
+*.keychain-db
+.env*
+!.env.example
+vendor/bundle/
+.bundle/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/

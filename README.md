@@ -53,3 +53,9 @@ open "dist/Mellow Photo.app"
 XCTest가 없는 Command Line Tools 환경에서도 독립 실행하는 실제 렌더링 테스트입니다. 이미지 방향, no-op, 색감과 따뜻함 방향, 국소 변형·복제, 원본 해상도 저장 및 이름 충돌을 검사합니다. macOS 그래픽 서비스가 차단된 CI/샌드박스에서는 Core Image GPU 테스트에 접근 가능한 실행 환경이 필요합니다.
 
 코어: `Sources/MellowCore` · UI: `Sources/MellowApp`. `CIWarpKernel(source:)`는 기존 Core Image API라 현재 SDK에서 deprecation 경고가 발생합니다. 지원이 제거되는 OS에 대응할 때 Metal 커널로 교체해야 합니다.
+
+## iPhone 버전
+
+`iOS/MellowPhoto.xcodeproj`의 **MellowPhotoIOS** 스킴으로 빌드합니다. iOS 17 이상에서 사진 선택, 터치 보정, 사진 앱 저장, 작업 기록 복원을 제공하도록 구현했습니다. Mac의 AppKit UI와 별도로 네이티브 iPhone 화면을 사용합니다.
+
+[아이폰 실행·검증 안내](docs/IOS.md) · [App Store CI/CD 설정](docs/IOS_RELEASE.md)
