@@ -96,6 +96,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     @Published var presets: [SavedPreset] = []
     @Published var presetName = ""
     @Published var presetSheet = false
+    @Published var infoSheet = false
     @Published var resetConfirmation = false
     @Published var removeConfirmation = false
     @Published var fullResolution = false

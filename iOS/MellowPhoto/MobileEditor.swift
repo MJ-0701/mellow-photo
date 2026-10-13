@@ -34,7 +34,10 @@ struct MobileEditor: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    picker.labelStyle(.iconOnly).disabled(store.busy || store.photos.count >= 12)
+                    HStack {
+                        Button { store.infoSheet = true } label: { Image(systemName: "info.circle") }.accessibilityLabel("도움말과 개인정보")
+                        picker.labelStyle(.iconOnly).disabled(store.busy || store.photos.count >= 12)
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -62,6 +65,22 @@ struct MobileEditor: View {
         .confirmationDialog("편집에서 사진을 뺄까요?", isPresented: $store.removeConfirmation, titleVisibility: .visible) {
             Button("편집에서 빼기", role: .destructive) { store.removeSelected() }
         } message: { Text("이 앱의 작업 사본과 보정 기록이 삭제됩니다. 사진 앱의 원본은 남아 있습니다.") }
+        .sheet(isPresented: $store.infoSheet) {
+            NavigationStack {
+                List {
+                    Section("Mellow Photo") {
+                        Text("사진과 얼굴 분석은 기기 내부에서 처리합니다. 작업 기록은 앱에 저장되고, 사진 앱의 원본은 변경하지 않습니다.")
+                        Text("앱 삭제 시 내부 작업 기록은 사라집니다. 완성한 사진은 사진 앱에 저장해 주세요.")
+                    }
+                    Section("도움말") {
+                        Link("지원 페이지", destination: URL(string: "https://mj-0701.github.io/mellow-photo-support/")!)
+                        Link("개인정보 안내", destination: URL(string: "https://mj-0701.github.io/mellow-photo-support/privacy.html")!)
+                        Link("이메일 문의", destination: URL(string: "mailto:jack2718@naver.com")!)
+                    }
+                }.navigationTitle("도움말과 개인정보").navigationBarTitleDisplayMode(.inline)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("닫기") { store.infoSheet = false } } }
+            }
+        }
         .sheet(isPresented: $store.presetSheet) {
             NavigationStack {
                 Form {
