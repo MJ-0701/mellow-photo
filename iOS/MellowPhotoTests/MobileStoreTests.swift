@@ -67,6 +67,79 @@ final class MobileStoreTests: XCTestCase {
         let restored = makeStore(root)
         XCTAssertTrue(restored.photos.isEmpty)
     }
+    @MainActor func testMalformedSessionIsPreservedBeforeNewSessionIsSaved() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let malformed = Data("{ interrupted session".utf8)
+        let working = root.appendingPathComponent("previous-photo.heic")
+        let photoBytes = Data([4, 5, 6])
+        try malformed.write(to: root.appendingPathComponent("session.json"))
+        try photoBytes.write(to: working)
+        let store = makeStore(root)
+        let backup = try XCTUnwrap(store.recoverySessionURL)
+        XCTAssertNotNil(store.error)
+        XCTAssertEqual(try Data(contentsOf: backup), malformed)
+        XCTAssertEqual(try Data(contentsOf: store.sessionURL), malformed)
+        XCTAssertTrue(store.persist())
+        XCTAssertEqual(try Data(contentsOf: backup), malformed)
+        XCTAssertEqual(try Data(contentsOf: working), photoBytes)
+        let restored = try JSONDecoder().decode(MobileSession.self, from: Data(contentsOf: store.sessionURL))
+        XCTAssertTrue(restored.photos.isEmpty)
+    }
+    @MainActor func testFailedSessionSaveDoesNotRemovePhotoOrUndoHistory() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = makeStore(root)
+        var photo = MobilePhoto(id: UUID(), filename: "working.png", name: "보존할 사진")
+        photo.recipe.adjustments.exposure = 0.5
+        let bytes = Data([7, 8, 9])
+        try bytes.write(to: store.url(photo))
+        store.photos = [photo]; store.selectedID = photo.id
+        store.undoHistory[photo.id] = [EditRecipe()]
+        XCTAssertTrue(store.persist())
+        // A directory at the session destination causes a real atomic-write error, even as root.
+        try FileManager.default.removeItem(at: store.sessionURL)
+        try FileManager.default.createDirectory(at: store.sessionURL, withIntermediateDirectories: false)
+        store.removeSelected()
+        XCTAssertEqual(store.photos.map(\.id), [photo.id])
+        XCTAssertEqual(store.selectedID, photo.id)
+        XCTAssertEqual(store.recipe, photo.recipe)
+        XCTAssertTrue(store.canUndo)
+        XCTAssertTrue(store.ready)
+        XCTAssertEqual(try Data(contentsOf: store.url(photo)), bytes)
+        XCTAssertNotNil(store.error)
+        // Once storage works again, the same removal can complete normally.
+        try FileManager.default.removeItem(at: store.sessionURL)
+        store.removeSelected()
+        XCTAssertTrue(store.photos.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.url(photo).path))
+    }
+    @MainActor func testUnreadablePhotoCanBeRemovedWhileNotReady() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = makeStore(root)
+        let photo = MobilePhoto(id: UUID(), filename: "unreadable.png", name: "손상된 사진")
+        try Data([0, 1, 2]).write(to: store.url(photo))
+        store.photos = [photo]
+        store.select(photo.id)
+        let deadline = Date().addingTimeInterval(5)
+        while store.selectionError == nil && Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertNotNil(store.selectionError)
+        XCTAssertFalse(store.ready)
+        XCTAssertFalse(store.rendering)
+        XCTAssertTrue(store.canRemoveSelected)
+        XCTAssertFalse(store.busy)
+        store.removeSelected()
+        XCTAssertTrue(store.photos.isEmpty)
+        XCTAssertNil(store.selectionError)
+        XCTAssertNil(store.selectedID)
+        XCTAssertFalse(store.busy) // The welcome photo picker is available to import again.
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.url(photo).path))
+        store.stopWork()
+    }
     func testPortraitEngineOnIOS() throws {
         let engine = ImageEngine()
         let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 256, height: 256))

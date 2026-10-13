@@ -83,6 +83,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     @Published var exporting = false
     @Published var rendering = false
     @Published var ready = false
+    @Published private(set) var selectionError: String?
     @Published var restoring = true
     @Published var compare = false
     @Published var tool = MobileTool.color
@@ -107,6 +108,8 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     private var selectionTask: Task<Void, Never>?
     private var generation = 0
     private var sliding = false
+    private var sessionNeedsRecovery = false
+    private(set) var recoverySessionURL: URL?
     let root: URL
     var sessionURL: URL { root.appendingPathComponent("session.json") }
     var selectedIndex: Int? { photos.firstIndex { $0.id == selectedID } }
@@ -115,6 +118,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     var busy: Bool { importing || exporting || restoring }
     var canUndo: Bool { selectedID.map { !(undoHistory[$0] ?? []).isEmpty } ?? false }
     var canRedo: Bool { selectedID.map { !(redoHistory[$0] ?? []).isEmpty } ?? false }
+    var canRemoveSelected: Bool { !busy && selected != nil }
     var geometryLocked: Bool { !recipe.operations.isEmpty }
     var displayImage: UIImage? { compare ? original : (preview ?? original) }
     func url(_ photo: MobilePhoto) -> URL { root.appendingPathComponent(photo.filename) }
@@ -128,14 +132,36 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
             var values = URLResourceValues(); values.isExcludedFromBackup = true
             try folder.setResourceValues(values)
             if FileManager.default.fileExists(atPath: sessionURL.path) {
-                let session = try JSONDecoder().decode(MobileSession.self, from: Data(contentsOf: sessionURL))
-                photos = session.photos
-                presets = session.presets
-                undoHistory = session.undoHistory ?? [:]
-                redoHistory = session.redoHistory ?? [:]
-                selectedID = photos.contains(where: { $0.id == session.selectedID }) ? session.selectedID : photos.first?.id
+                do {
+                    let session = try JSONDecoder().decode(MobileSession.self, from: Data(contentsOf: sessionURL))
+                    photos = session.photos
+                    presets = session.presets
+                    undoHistory = session.undoHistory ?? [:]
+                    redoHistory = session.redoHistory ?? [:]
+                    selectedID = photos.contains(where: { $0.id == session.selectedID }) ? session.selectedID : photos.first?.id
+                } catch {
+                    // Preserve the exact unreadable bytes before allowing a new session to replace them.
+                    sessionNeedsRecovery = true
+                    do {
+                        try preserveUnreadableSession()
+                        self.error = "작업 기록을 읽지 못해 복구용 사본을 보관했습니다. 기존 작업 사진도 보존됩니다. 사진을 다시 골라 편집할 수 있어요."
+                    } catch {
+                        self.error = "기존 작업 기록을 보관하지 못했습니다. 기록을 보호하기 위해 저장을 중단합니다: \(error.localizedDescription)"
+                    }
+                }
             }
-        } catch { self.error = "작업 기록을 불러오지 못했습니다: \(error.localizedDescription)" }
+        } catch { self.error = "작업 폴더를 열지 못했습니다: \(error.localizedDescription)" }
+    }
+    private func preserveUnreadableSession() throws {
+        guard sessionNeedsRecovery else { return }
+        let backup = root.appendingPathComponent("session-recovery-\(UUID().uuidString).json")
+        try FileManager.default.copyItem(at: sessionURL, to: backup)
+        recoverySessionURL = backup
+        sessionNeedsRecovery = false
+    }
+    private func writeSession(_ session: MobileSession) throws {
+        try preserveUnreadableSession()
+        try JSONEncoder().encode(session).write(to: sessionURL, options: [.atomic, .completeFileProtectionUnlessOpen])
     }
     func stopWork() { renderTask?.cancel(); selectionTask?.cancel(); generation += 1 }
     func restore() async {
@@ -154,11 +180,15 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
         let size = CGSize(width: CGFloat(image.width) * scale, height: CGFloat(image.height) * scale)
         return UIGraphicsImageRenderer(size: size).image { _ in UIImage(cgImage: image).draw(in: CGRect(origin: .zero, size: size)) }
     }
-    func persist() {
+    @discardableResult func persist() -> Bool {
         do {
             let session = MobileSession(photos: photos, selectedID: selectedID, presets: presets, undoHistory: undoHistory, redoHistory: redoHistory)
-            try JSONEncoder().encode(session).write(to: sessionURL, options: [.atomic, .completeFileProtectionUnlessOpen])
-        } catch { self.error = "편집 기록 저장 실패: \(error.localizedDescription)" }
+            try writeSession(session)
+            return true
+        } catch {
+            self.error = "편집 기록 저장 실패: \(error.localizedDescription)"
+            return false
+        }
     }
     func importSelected() async {
         guard !busy else { return }
@@ -196,6 +226,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     func select(_ id: UUID) {
         guard !exporting, photos.contains(where: { $0.id == id }) else { return }
         selectedID = id; preview = nil; original = nil; faces = []; ready = false
+        selectionError = nil; dimensions = ""; rendering = false
         compare = false; cloneSource = nil; choosingSource = true; sliding = false
         renderTask?.cancel(); selectionTask?.cancel(); generation += 1
         guard let photo = selected else { return }
@@ -207,7 +238,12 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
                 original = UIImage(cgImage: prepared.original); faces = prepared.faces
                 dimensions = "\(prepared.width) × \(prepared.height)"
                 ready = true; scheduleRender()
-            } catch { if selectedID == id { self.error = error.localizedDescription } }
+            } catch {
+                guard !Task.isCancelled, generation == ticket, selectedID == id else { return }
+                selectionError = "이 작업 사진을 열 수 없습니다. 다시 시도하거나 편집에서 뺀 뒤 사진을 다시 골라주세요."
+                rendering = false
+                self.error = error.localizedDescription
+            }
         }
         persist()
     }
@@ -266,14 +302,27 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
         checkpoint(); photos[i].recipe = EditRecipe(); cloneSource = nil; choosingSource = true; changed()
     }
     func removeSelected() {
-        guard !busy, let photo = selected else { return }
-        // Only the app's working copy is removed. The Photos library original is untouched.
-        photos.removeAll { $0.id == photo.id }; thumbnails[photo.id] = nil
-        undoHistory[photo.id] = nil; redoHistory[photo.id] = nil
-        selectedID = nil; preview = nil; original = nil; ready = false
+        guard canRemoveSelected, let photo = selected else { return }
+        let remaining = photos.filter { $0.id != photo.id }
+        var remainingUndo = undoHistory, remainingRedo = redoHistory
+        remainingUndo[photo.id] = nil; remainingRedo[photo.id] = nil
+        // Commit the updated record first. On failure the current photo, history and file stay intact.
+        do {
+            try writeSession(MobileSession(photos: remaining, selectedID: remaining.first?.id, presets: presets,
+                                           undoHistory: remainingUndo, redoHistory: remainingRedo))
+        } catch {
+            self.error = "사진을 빼지 못했습니다. 작업 사진과 보정 기록은 그대로 유지됩니다: \(error.localizedDescription)"
+            return
+        }
+        photos = remaining; thumbnails[photo.id] = nil
+        undoHistory = remainingUndo; redoHistory = remainingRedo
+        selectedID = nil; preview = nil; original = nil; ready = false; selectionError = nil; dimensions = ""
         generation += 1; selectionTask?.cancel(); renderTask?.cancel(); rendering = false
-        persist()
-        try? FileManager.default.removeItem(at: url(photo))
+        // Only the app's working copy is removed. The Photos library original is untouched.
+        if FileManager.default.fileExists(atPath: url(photo).path) {
+            do { try FileManager.default.removeItem(at: url(photo)) }
+            catch { self.error = "편집 목록에서 뺐지만 작업 사본을 정리하지 못했습니다: \(error.localizedDescription)" }
+        }
         if let next = photos.first { select(next.id) }
     }
     func savePreset() {

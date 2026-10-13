@@ -41,14 +41,14 @@ struct MobileEditor: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("현재 사진 저장", systemImage: "square.and.arrow.down") { Task { await store.saveToPhotos(all: false) } }
-                        Button("전체 \(store.photos.count)장 저장") { Task { await store.saveToPhotos(all: true) } }
+                        Button("현재 사진 저장", systemImage: "square.and.arrow.down") { Task { await store.saveToPhotos(all: false) } }.disabled(!store.ready)
+                        Button("전체 \(store.photos.count)장 저장") { Task { await store.saveToPhotos(all: true) } }.disabled(!store.ready)
                         Toggle("원본 해상도", isOn: $store.fullResolution)
                         Text("기본: 긴 변 최대 4096px · JPEG")
                         Divider()
                         Button("편집에서 사진 빼기", role: .destructive) { store.removeConfirmation = true }
                     } label: { Label("저장", systemImage: "square.and.arrow.down").font(.body.weight(.semibold)) }
-                    .disabled(store.busy || !store.ready)
+                    .disabled(!store.canRemoveSelected)
                 }
             }
         }
@@ -160,7 +160,18 @@ struct MobileEditor: View {
                         }
                         .accessibilityLabel(store.compare ? "원본 사진" : "보정 미리보기")
                 }
-                if !store.ready || store.rendering { ProgressView().padding(12).background(.ultraThinMaterial, in: Capsule()).allowsHitTesting(false) }
+                if let message = store.selectionError {
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo.badge.exclamationmark").font(.title)
+                        Text(message).font(.callout).multilineTextAlignment(.center)
+                        HStack {
+                            Button("다시 시도") { if let id = store.selectedID { store.select(id) } }
+                            Button("편집에서 빼기", role: .destructive) { store.removeConfirmation = true }
+                        }.buttonStyle(.bordered).disabled(store.busy)
+                    }.padding().accessibilityIdentifier("photoRecoveryActions")
+                } else if !store.ready || store.rendering {
+                    ProgressView().padding(12).background(.ultraThinMaterial, in: Capsule()).allowsHitTesting(false)
+                }
             }.overlay(alignment: .topLeading) {
                 if store.ready { Text(store.compare ? "원본" : "보정본").font(.caption2).padding(7).background(.ultraThinMaterial, in: Capsule()).padding(10) }
             }.clipped()
