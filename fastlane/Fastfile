@@ -5,6 +5,7 @@ require 'shellwords'
 require 'securerandom'
 require 'plist'
 require 'digest'
+require_relative 'release_notes'
 
 def required(name)
   value = ENV[name]
@@ -102,6 +103,8 @@ platform :ios do
     FileUtils.cp(profile_path, installed_profile)
     api_key = app_store_connect_api_key(key_id: required('ASC_KEY_ID'), issuer_id: required('ASC_ISSUER_ID'),
       key_content: required('ASC_KEY_BASE64'), is_key_content_base64: true, in_house: false)
+    app = Spaceship::ConnectAPI::App.find('com.mj.mellowphoto')
+    release_notes = MellowReleaseNotes.prepare(app: app, version: version, directory: File.join(root, 'fastlane/release_notes'))
     xcargs = {
       'DEVELOPMENT_TEAM' => team, 'CODE_SIGN_STYLE' => 'Manual',
       'CODE_SIGN_IDENTITY' => identity, 'PROVISIONING_PROFILE_SPECIFIER' => profile.fetch('UUID'),
@@ -124,9 +127,9 @@ platform :ios do
       submit_for_review: false, precheck_include_in_app_purchases: false, force: true)
     # deliver ignores automatic_release when skip_metadata is true. Change only
     # releaseType explicitly, preserving the user's store text and screenshots.
-    app = Spaceship::ConnectAPI::App.find('com.mj.mellowphoto')
     store_version = app.get_edit_app_store_version(platform: 'IOS')
     UI.user_error!('No matching editable App Store version') unless store_version && store_version.version_string == version
+    release_notes&.apply!(store_version)
     release_type = ENV['AUTOMATIC_RELEASE'] == 'true' ? 'AFTER_APPROVAL' : 'MANUAL'
     store_version.update(attributes: { releaseType: release_type })
     if ENV['SUBMIT_FOR_REVIEW'] == 'true'

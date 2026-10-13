@@ -19,6 +19,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Toolchain
         run: xcodebuild -version
+      - name: Release notes automation tests
+        run: /usr/bin/ruby fastlane/test/release_notes_test.rb
       - name: Photo engine regression tests
         run: ./scripts/test.sh
       - name: iPhone simulator tests
