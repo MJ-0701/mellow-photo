@@ -12,7 +12,7 @@ case "$MELLOW_MODE" in
   simulator) xcodebuild "${MELLOW_ARGS[@]}" -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build ;;
   test)
     : "${MELLOW_SIMULATOR_ID:?xcrun simctl list devices available 로 확인한 iPhone UUID를 MELLOW_SIMULATOR_ID에 지정하세요.}"
-    xcodebuild "${MELLOW_ARGS[@]}" -destination "platform=iOS Simulator,id=$MELLOW_SIMULATOR_ID" CODE_SIGNING_ALLOWED=NO test ;;
+    xcodebuild "${MELLOW_ARGS[@]}" -destination "platform=iOS Simulator,id=$MELLOW_SIMULATOR_ID,arch=$(uname -m)" CODE_SIGNING_ALLOWED=NO test ;;
   device) xcodebuild "${MELLOW_ARGS[@]}" -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build ;;
   archive)
     : "${APPLE_TEAM_ID:?APPLE_TEAM_ID를 지정하세요.}"
