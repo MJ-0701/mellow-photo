@@ -37,6 +37,10 @@ public final class ImageEngine: @unchecked Sendable {
     }
     public func detectFaces(in image: CIImage) throws -> [FaceRegion] {
         let request = VNDetectFaceLandmarksRequest()
+        #if targetEnvironment(simulator)
+        // Simulator inference cannot use every device backend available on a physical iPhone.
+        request.usesCPUOnly = true
+        #endif
         try VNImageRequestHandler(ciImage: image, options: [:]).perform([request])
         return (request.results ?? []).map { face in
             func bounds(_ region: VNFaceLandmarkRegion2D?) -> CGRect? {

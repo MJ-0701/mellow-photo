@@ -229,7 +229,10 @@ struct MobileEditor: View {
     }
     private var portraitControls: some View {
         Group {
-            if store.faces.isEmpty {
+            if let warning = store.faceAnalysisWarning {
+                Label("자동 얼굴 분석을 사용할 수 없어요", systemImage: "exclamationmark.triangle")
+                Text(warning).font(.caption).foregroundStyle(.secondary)
+            } else if store.faces.isEmpty {
                 Label("감지된 얼굴이 없어요", systemImage: "person.crop.rectangle.badge.questionmark")
                 Text("정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요.").font(.caption).foregroundStyle(.secondary)
             } else {

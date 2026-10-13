@@ -140,6 +140,65 @@ final class MobileStoreTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.url(photo).path))
         store.stopWork()
     }
+    func testLocalPNGCanBePreparedOnIOS() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("local.png")
+        let engine = ImageEngine()
+        let image = CIImage(color: CIColor(red:0.5,green:0.4,blue:0.3)).cropped(to:CGRect(x:0,y:0,width:256,height:256))
+        try engine.export(image,to:url,format:.png)
+        let prepared = try await MobileProcessor().prepare(url)
+        XCTAssertEqual(prepared.width,256)
+        XCTAssertEqual(prepared.height,256)
+    }
+    func testFaceAnalysisFailureDoesNotRejectReadablePhoto() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("local.png")
+        let image = CIImage(color: CIColor(red:0.5,green:0.4,blue:0.3)).cropped(to:CGRect(x:0,y:0,width:256,height:256))
+        try ImageEngine().export(image,to:url,format:.png)
+        let processor = MobileProcessor(faceDetector: { _ in throw ImageEngineError.message("테스트 얼굴 분석 불가") })
+        let prepared = try await processor.prepare(url)
+        XCTAssertEqual(prepared.width,256)
+        XCTAssertTrue(prepared.faces.isEmpty)
+        XCTAssertTrue(prepared.faceAnalysisWarning?.contains("테스트 얼굴 분석 불가") == true)
+    }
+    func testBundledPortraitHasRealFaceLandmarksAndExports() async throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource:"demo-portrait",withExtension:"png"))
+        let processor = MobileProcessor()
+        let prepared = try await processor.prepare(url)
+        XCTAssertNil(prepared.faceAnalysisWarning)
+        XCTAssertGreaterThanOrEqual(prepared.faces.count,1)
+        XCTAssertNotNil(prepared.faces.first?.leftEye)
+        XCTAssertNotNil(prepared.faces.first?.mouth)
+        var recipe = EditRecipe(); recipe.adjustments.skin = 0.3; recipe.adjustments.faceSlim = 0.25
+        let preview = try await processor.preview(url,recipe:recipe,faces:prepared.faces)
+        XCTAssertGreaterThan(preview.width,0)
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        defer { try? FileManager.default.removeItem(at:output) }
+        try await processor.export(url,recipe:recipe,output:output,fullResolution:false)
+        XCTAssertTrue(FileManager.default.fileExists(atPath:output.path))
+    }
+    func testExportNeverSilentlyDropsFaceAdjustmentsWhenAnalysisFails() async throws {
+        let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource:"demo-portrait",withExtension:"png"))
+        let processor = MobileProcessor(faceDetector: { _ in throw ImageEngineError.message("테스트 얼굴 분석 불가") })
+        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        defer { try? FileManager.default.removeItem(at:output) }
+        var recipe = EditRecipe(); recipe.adjustments.skin = 0.3
+        do {
+            try await processor.export(url,recipe:recipe,output:output,fullResolution:false)
+            XCTFail("Face adjustments must never be silently omitted")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("얼굴 보정을 적용할 수 없어"))
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath:output.path))
+        // A pure color edit does not depend on face analysis and remains exportable.
+        recipe.adjustments.skin = 0; recipe.adjustments.exposure = 0.2
+        try await processor.export(url,recipe:recipe,output:output,fullResolution:false)
+        XCTAssertTrue(FileManager.default.fileExists(atPath:output.path))
+    }
     func testPortraitEngineOnIOS() throws {
         let engine = ImageEngine()
         let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(to: CGRect(x: 0, y: 0, width: 256, height: 256))

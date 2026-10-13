@@ -38,11 +38,18 @@ struct PreparedPhoto {
     let faces: [FaceRegion]
     let width: Int
     let height: Int
+    var faceAnalysisWarning: String? = nil
 }
 
 // All expensive image work is serialized off the main actor, including export.
 actor MobileProcessor {
-    let engine = ImageEngine()
+    let engine: ImageEngine
+    private let detectFaces: @Sendable (CIImage) throws -> [FaceRegion]
+    init(faceDetector: (@Sendable (CIImage) throws -> [FaceRegion])? = nil) {
+        let engine = ImageEngine()
+        self.engine = engine
+        self.detectFaces = faceDetector ?? { try engine.detectFaces(in: $0) }
+    }
     func prepare(_ url: URL) throws -> PreparedPhoto {
         let image = try engine.load(url: url, maxDimension: 1200)
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
@@ -52,8 +59,14 @@ actor MobileProcessor {
             throw ImageEngineError.message("사진 크기를 읽을 수 없습니다.")
         }
         let orientation = (props[kCGImagePropertyOrientation] as? Int) ?? 1
-        return PreparedPhoto(original: try engine.cgImage(image), faces: try engine.detectFaces(in: image),
-                             width: orientation >= 5 ? height : width, height: orientation >= 5 ? width : height)
+        let original = try engine.cgImage(image)
+        var faces: [FaceRegion] = []
+        var warning: String?
+        do { faces = try detectFaces(image) }
+        catch { warning = "자동 얼굴 분석을 사용할 수 없습니다. 색감·수동 보정은 사용할 수 있어요. (\(error.localizedDescription))" }
+        return PreparedPhoto(original: original, faces: faces,
+                             width: orientation >= 5 ? height : width, height: orientation >= 5 ? width : height,
+                             faceAnalysisWarning: warning)
     }
     func preview(_ url: URL, recipe: EditRecipe, faces: [FaceRegion]) throws -> CGImage {
         let image = try engine.load(url: url, maxDimension: 1200)
@@ -62,8 +75,12 @@ actor MobileProcessor {
     func export(_ url: URL, recipe: EditRecipe, output: URL, fullResolution: Bool) throws {
         // A conservative default for older iPhones; original resolution is an explicit option.
         let image = try engine.load(url: url, maxDimension: fullResolution ? nil : 4096)
-        let faceImage = try engine.load(url: url, maxDimension: 1200)
-        let faces = try engine.detectFaces(in: faceImage)
+        var faces: [FaceRegion] = []
+        if recipe.adjustments.skin > 0 || recipe.adjustments.faceSlim > 0 {
+            let faceImage = try engine.load(url: url, maxDimension: 1200)
+            do { faces = try detectFaces(faceImage) }
+            catch { throw ImageEngineError.message("얼굴 보정을 적용할 수 없어 저장을 중단했습니다. 얼굴 분석을 다시 시도하거나 피부·얼굴 보정을 끄세요. (\(error.localizedDescription))") }
+        }
         try engine.export(engine.render(image, recipe: recipe, faces: faces), to: output, format: .jpeg)
     }
 }
@@ -78,6 +95,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
     @Published var original: UIImage?
     @Published var thumbnails: [UUID: UIImage] = [:]
     @Published var faces: [FaceRegion] = []
+    @Published private(set) var faceAnalysisWarning: String?
     @Published var dimensions = ""
     @Published var importing = false
     @Published var exporting = false
@@ -196,11 +214,13 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
         guard !items.isEmpty else { return }
         importing = true
         defer { importing = false }
-        var failures = 0
+        var failures: [String] = []
+        var warnings: [String] = []
         for (index, item) in items.prefix(max(0, 12 - photos.count)).enumerated() {
             status = "사진 가져오는 중 \(index + 1) / \(items.count)"
             var importedURL: URL?
             var destination: URL?
+            var stage = "사진 전달"
             do {
                 guard let imported = try await item.loadTransferable(type: ImportedPhoto.self) else { throw ImageEngineError.message("사진을 다운로드하지 못했습니다.") }
                 importedURL = imported.url
@@ -208,25 +228,30 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
                 let filename = id.uuidString + "." + (imported.url.pathExtension.isEmpty ? "image" : imported.url.pathExtension)
                 let photo = MobilePhoto(id: id, filename: filename, name: "사진 \(photos.count + 1)")
                 destination = url(photo)
+                stage = "작업 사본 저장"
                 try FileManager.default.moveItem(at: imported.url, to: url(photo))
+                stage = "사진 파일 보호 설정"
                 try FileManager.default.setAttributes([.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication], ofItemAtPath: url(photo).path)
+                stage = "사진 읽기·미리보기 준비"
                 let prepared = try await processor.prepare(url(photo))
+                if let warning = prepared.faceAnalysisWarning { warnings.append("사진 \(index + 1): \(warning)") }
                 photos.append(photo)
                 thumbnails[id] = thumbnail(prepared.original)
                 destination = nil
                 if selectedID == nil { select(id) }
                 persist()
-            } catch { failures += 1 }
+            } catch { failures.append("사진 \(index + 1) · \(stage): \(error.localizedDescription)") }
             if let importedURL { try? FileManager.default.removeItem(at: importedURL) }
             if let destination { try? FileManager.default.removeItem(at: destination) }
         }
         status = "\(photos.count)장 · 편집 기록은 이 iPhone에 저장됩니다."
-        if failures > 0 { error = "\(failures)장을 가져오지 못했습니다. iCloud 사진은 다운로드 가능한 상태에서 다시 선택해 주세요." }
+        if !failures.isEmpty { error = "\(failures.count)장을 가져오지 못했습니다.\n" + failures.prefix(3).joined(separator: "\n") }
+        else if !warnings.isEmpty { error = warnings.prefix(3).joined(separator: "\n") }
     }
     func select(_ id: UUID) {
         guard !exporting, photos.contains(where: { $0.id == id }) else { return }
         selectedID = id; preview = nil; original = nil; faces = []; ready = false
-        selectionError = nil; dimensions = ""; rendering = false
+        selectionError = nil; faceAnalysisWarning = nil; dimensions = ""; rendering = false
         compare = false; cloneSource = nil; choosingSource = true; sliding = false
         renderTask?.cancel(); selectionTask?.cancel(); generation += 1
         guard let photo = selected else { return }
@@ -236,6 +261,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
                 let prepared = try await processor.prepare(url(photo))
                 guard !Task.isCancelled, generation == ticket, selectedID == id else { return }
                 original = UIImage(cgImage: prepared.original); faces = prepared.faces
+                faceAnalysisWarning = prepared.faceAnalysisWarning
                 dimensions = "\(prepared.width) × \(prepared.height)"
                 ready = true; scheduleRender()
             } catch {
@@ -316,7 +342,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
         }
         photos = remaining; thumbnails[photo.id] = nil
         undoHistory = remainingUndo; redoHistory = remainingRedo
-        selectedID = nil; preview = nil; original = nil; ready = false; selectionError = nil; dimensions = ""
+        selectedID = nil; preview = nil; original = nil; ready = false; selectionError = nil; faceAnalysisWarning = nil; dimensions = ""
         generation += 1; selectionTask?.cancel(); renderTask?.cancel(); rendering = false
         // Only the app's working copy is removed. The Photos library original is untouched.
         if FileManager.default.fileExists(atPath: url(photo).path) {
@@ -376,7 +402,7 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
         }
         let items = all ? photos : [current], useFullResolution = fullResolution
         var saved = 0
-        var failures = 0
+        var failures: [String] = []
         for (index, photo) in items.enumerated() {
             if cancelExport || Task.isCancelled { break }
             status = "사진에 저장 중 \(index + 1) / \(items.count)"
@@ -387,11 +413,11 @@ enum MobileTool: String, CaseIterable { case color = "색감", portrait = "인�
                     PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: output)
                 }
                 saved += 1
-            } catch { failures += 1 }
+            } catch { failures.append("\(photo.name): \(error.localizedDescription)") }
             try? FileManager.default.removeItem(at: output)
             progress = Double(index + 1) / Double(items.count)
         }
         status = "\(saved)장 저장 완료 · 원본은 그대로예요."
-        if failures > 0 { error = "\(failures)장을 저장하지 못했습니다. 저장 공간을 확인하거나 원본 해상도 옵션을 끄고 다시 시도해 주세요." }
+        if !failures.isEmpty { error = "\(failures.count)장을 저장하지 못했습니다.\n" + failures.prefix(3).joined(separator: "\n") }
     }
 }
