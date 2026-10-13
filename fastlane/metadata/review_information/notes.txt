@@ -1,0 +1,13 @@
+Mellow Photo is a local photo editor for iPhone (iOS 17+). No account, invitation code, payment, or subscription is required. There is no remote feature-unlock service.
+
+Review steps:
+1. Tap “사진 고르기” or the + button and choose a portrait from the system Photos picker. Up to 12 still images can be imported. Use a near-frontal face to exercise the portrait controls.
+2. In “색감”, try exposure, contrast, saturation, warmth, and a preset. Use “원본 비교” to compare with the original.
+3. In “인물”, try skin smoothing and the subtle face-shape slider before making manual edits. Skin smoothing is a filter, not automatic blemish detection. Face controls require a detected face.
+4. In “잡티”, tap clean nearby skin as the source, then tap a small area to clone it. In “변형”, drag a small region slightly. Face-shape controls are locked after manual edits to preserve coordinates; undo those edits or reset to unlock them.
+5. Use undo/redo. Close and reopen the app to verify the saved local editing session.
+6. Open the top-right save menu and choose “현재 사진 저장” or “전체 …장 저장”. The first save requests add-only Photos permission. A new JPEG is created; the original Photos asset is not modified. If permission is denied, the app displays a message and editing remains available.
+
+Photo editing and face analysis run on device. There is no upload of photos, analytics SDK, advertising SDK, or in-app purchase. Apple may download an iCloud-only photo when the user chooses it. Support/privacy links open external pages, and the email link opens the user's email app.
+
+Output is SDR JPEG, normally up to 4096 pixels on the long edge. Original-resolution output is optional. HDR gain maps, ProRAW editing, and Live Photo video are not preserved. Working copies and edit history persist in the app container and are excluded from device backups; deleting a working photo removes the app copy only. Deleting the app removes its internal editing session.

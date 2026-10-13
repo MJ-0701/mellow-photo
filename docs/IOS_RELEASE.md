@@ -4,11 +4,14 @@
 
 ## 자동화 범위
 
-- main push/PR: 보정 엔진 회귀 테스트와 iPhone 시뮬레이터 XCTest.
+- main push/PR: 보정 엔진 회귀 테스트와 iPhone 시뮬레이터 XCTest, 최적화된 unsigned Release iPhone 빌드. arm64 실행 파일, 앱 bundle ID, iPhoneOS 플랫폼, asset catalog, 개인정보 manifest 포함 여부도 확인합니다. 인증서가 없어도 이 단계까지 실행할 수 있습니다.
+- 시뮬레이터 테스트 결과는 고유 경로의 xcresult로 남기며, 실패 시 GitHub Actions artifact에 7일간 보관합니다. 실패 로그·테스트 결과는 실기기/실사용자 사진으로 만든 자료가 아닌 CI 테스트 자료만 담아야 합니다.
 - `ios-v1.0.0` 같은 태그: 동일 테스트 → 서명된 archive/IPA 생성 → 서명·bundle·버전 검증 → App Store Connect 업로드.
 - 기본값은 업로드까지만. 심사 제출과 승인 후 자동 공개는 별도로 켤 수 있습니다.
 - Apple 심사, 계정 약관, 개인정보/수출 관련 응답은 자동으로 생략하거나 통과할 수 없습니다.
 - GitHub Actions 사용량/요금은 계정 플랜을 따릅니다. 이 저장소는 macos-15와 Xcode 26.3을 명시합니다. runner에서 해당 버전 제거 시 함께 업데이트하세요.
+
+한글 스토어 설명과 영문 심사 안내 초안은 [APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md) 및 `fastlane/metadata/`에 있습니다. 현재 파이프라인은 이 메타데이터를 자동 업로드하지 않습니다.
 
 ## 최초 한 번 필요한 설정
 
