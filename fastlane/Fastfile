@@ -13,8 +13,25 @@ def required(name)
 end
 
 def quiet_command(*args)
-  stdout, _stderr, status = Open3.capture3(*args)
-  UI.user_error!("Command failed: #{File.basename(args.first)} (sensitive output withheld)") unless status.success?
+  stdout, stderr, status = Open3.capture3(*args)
+  unless status.success?
+    # Report only fixed diagnostic labels, never raw output or command arguments:
+    # import and keychain commands can contain certificate passwords.
+    category = case stderr
+               when /password|passphrase|MAC verification/i then 'authentication-or-decryption'
+               when /already exists/i then 'already-exists'
+               when /no such file|not found|could not be found/i then 'missing-file-or-item'
+               when /interaction.*not allowed|authorization.*denied|permission denied/i then 'permission-or-interaction'
+               when /decode|malformed|invalid.*(data|format)/i then 'invalid-input-format'
+               else 'unclassified'
+               end
+    operation = File.basename(args.first)
+    if operation == 'security'
+      allowed_operations = %w[cms create-keychain set-keychain-settings unlock-keychain import set-key-partition-list list-keychains find-identity]
+      operation += " #{args[1]}" if allowed_operations.include?(args[1])
+    end
+    UI.user_error!("Command failed: #{operation}; exit=#{status.exitstatus}; category=#{category} (sensitive output withheld)")
+  end
   stdout
 end
 
