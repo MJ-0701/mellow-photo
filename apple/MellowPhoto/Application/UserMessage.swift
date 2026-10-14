@@ -15,6 +15,10 @@ enum UserMessage {
     static let photoLibraryItemName = "사진 앱 항목"
     /// 사진 앱이 새 항목을 만들지 못했을 때 저장 실패 사유.
     static let photoLibraryCouldNotCreateAsset = "사진 앱에 새 사진을 만들지 못했습니다."
+    static let toolColor = "색감"
+    static let toolPortrait = "인물"
+    static let toolRetouch = "잡티"
+    static let toolWarp = "변형"
 
     static func workingFolderUnavailable(_ reason: String) -> String {
         "작업 폴더를 열지 못했습니다: \(reason)"

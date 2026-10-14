@@ -1,10 +1,20 @@
-enum EditorTool: String, CaseIterable, Identifiable {
-    case color = "색감"
-    case portrait = "인물"
-    case retouch = "잡티"
-    case warp = "변형"
+enum EditorTool: CaseIterable, Identifiable {
+    case color
+    case portrait
+    case retouch
+    case warp
 
-    var id: String { rawValue }
+    var id: Self { self }
+
+    /// 화면에 보이는 도구 이름. 문구는 UserMessage에 둔다.
+    var title: String {
+        switch self {
+        case .color: return UserMessage.toolColor
+        case .portrait: return UserMessage.toolPortrait
+        case .retouch: return UserMessage.toolRetouch
+        case .warp: return UserMessage.toolWarp
+        }
+    }
 
     var symbol: String {
         switch self {
