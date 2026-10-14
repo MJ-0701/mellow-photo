@@ -34,7 +34,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 의존 | 없음 (Foundation, CoreGraphics) |
 | 포트 | 없음 |
 | 규칙 | 레시피는 v2로만 인코드하고 빠진 키는 기본값으로 디코드, 좌표는 방향 보정 이미지 기준 정규화(원점 왼쪽 아래), 내장 프리셋(내추럴·포근한·클린)은 `BuiltInPresets` 한 곳, 한국어 사용자 문구 없음 |
-| 테스트 | `apple/Tests/MellowSharedTests` (레시피 코딩, 얼굴 기하, `shared/recipe-schema/` 스키마 대조. GPU 불필요) |
+| 테스트 | `apple/Tests/MellowSharedTests` (레시피 코딩, 얼굴 기하, `edit-recipe.v2` 스키마 키 대조. GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:shared`, C++ `mellow_shared` |
 
 ### MellowEditing
@@ -58,7 +58,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 의존 | MellowShared, MellowEditing |
 | 포트 | `SessionStore` (`load() throws -> SessionSnapshot?`, `save(SessionSnapshot) throws`). 구현은 같은 모듈의 `JSONSessionStore` |
 | 규칙 | 세션 파일은 v1(출시본 iPhone)·v2를 읽고 v2로만 씀, 원자적 쓰기, 읽을 수 없는 파일은 `session-recovery-<uuid>.json`으로 보존한 뒤 새 세션, 사진 제거는 저장 성공 후에만 반영, 사진 수 상한은 물리 메모리 4GB 미만 12장·8GB 미만 24장·그 외 40장, 프리셋 이름 30자, 작업 사본은 `Library/<uuid>.<확장자>`이고 출시본 iPhone의 상위 폴더 사본도 찾음 |
-| 테스트 | `apple/Tests/MellowLibraryTests` (v1 픽스처 이행, 손상 세션 보존, 쓰기 실패 시 제거 중단, 사진 수 정책. GPU 불필요) |
+| 테스트 | `apple/Tests/MellowLibraryTests` (v1 픽스처 이행, `session-file.v2` 스키마 키 대조, 손상 세션 보존, 쓰기 실패 시 제거 중단, 사진 수 정책. GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:library`, C++ `mellow_library` |
 
 디스크 포맷 `SessionFile`(v2)과 `SessionFileV1`은 `Infrastructure/`의 DTO이며, `SessionFileMapper`가 `SessionSnapshot`과 변환합니다. `ProjectSession`은 DTO를 모릅니다. 형식은 [`shared/recipe-schema/`](../../shared/recipe-schema/README.md)가 기술합니다.

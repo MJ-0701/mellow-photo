@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mellow.photo/schema/session-file.v2.json",
+  "$id": "https://mellow.photo/schema/session-file.v2.schema.json",
   "title": "Mellow Photo SessionFile v2",
   "type": "object",
   "additionalProperties": false,

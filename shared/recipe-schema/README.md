@@ -7,9 +7,14 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 | `edit-recipe.v2.schema.json` | 사진 한 장의 보정 레시피 `EditRecipe` | `apple/Sources/MellowShared/API/EditRecipe.swift`, `Adjustments.swift`, `LocalEdit.swift` |
 | `session-file.v2.schema.json` | 작업 세션 파일 `session.json` 전체(사진 목록, 사진별 레시피와 실행 취소·다시 실행 기록, 선택한 사진, 사용자 프리셋) | `apple/Sources/MellowLibrary/Infrastructure/SessionFile.swift` |
 
-`session-file.v2`는 레시피 부분을 `edit-recipe.v2.schema.json`의 `$ref`로 가리킵니다. 두 파일을 같은 폴더에 두고 검증하세요.
+`session-file.v2`는 레시피 부분을 `edit-recipe.v2.schema.json`의 `$ref`로 가리킵니다. 검증기에는 두 스키마를 각자의 `$id`로 등록하거나, 같은 폴더에서 파일 이름으로 읽게 하세요. 어느 방식이든 `$ref`가 풀리도록 두 `$id`(`https://mellow.photo/schema/edit-recipe.v2.schema.json`, `…/session-file.v2.schema.json`)를 파일 이름과 같게 맞췄습니다.
 
-`apple/Tests/MellowSharedTests/RecipeSchemaTests.swift`가 샘플 레시피를 실제로 인코드해 최상위 키와 `color` 키가 스키마의 `properties`와 같은지 확인합니다. 키를 추가하거나 고치면 이 테스트가 스키마 갱신을 강제합니다.
+두 테스트가 실제 Apple 인코드 결과의 **키 집합**을 스키마의 `properties` 키 집합과 비교합니다.
+
+- `apple/Tests/MellowSharedTests/RecipeSchemaTests.swift`: `targetFace`, spot 하나, warp 하나를 넣은 레시피를 인코드해 최상위 키, `color` 키, `portrait` 키, 그리고 각 `operations` 항목의 키를 `type.const`가 같은 `oneOf` 분기의 `properties` 키와 비교합니다. `$id`도 확인합니다.
+- `apple/Tests/MellowLibraryTests/SessionSchemaTests.swift`: 사진 한 장(실행 취소·다시 실행 기록 포함)과 프리셋 하나가 든 세션을 `SessionFile.encode`로 인코드해 최상위 키, `photos` 항목 키, `presets` 항목 키, 프리셋 `values` 키를 비교합니다. `$id`도 확인합니다.
+
+값의 범위(`minimum`·`maximum`·`maxItems`·`maxLength`), 타입, `required` 목록, `$ref`가 가리키는 하위 구조의 키는 기계로 검사하지 않습니다. 키를 추가하거나 고치면 위 키 집합이 어긋나 테스트가 스키마 갱신을 요구하지만, 범위나 필수 여부를 바꿀 때는 사람이 스키마를 직접 맞춰야 합니다.
 
 ## v2 형식 요점
 
@@ -71,5 +76,5 @@ v1은 읽기만 합니다. 저장은 항상 v2로 합니다.
 1. **새 키는 반드시 기본값을 가집니다.** 키가 없는 기존 파일은 기본값으로 읽혀 지금과 같은 결과를 내야 합니다. 스키마에도 `default`를 적고 `required`에 넣지 않습니다.
 2. **키를 지우거나 이름을 바꾸지 않습니다.** 더 쓰지 않는 값도 읽기는 계속합니다. 의미를 바꿔야 하면 새 키를 만듭니다.
 3. **`schemaVersion`은 호환이 깨질 때만 올립니다.** 키 추가는 호환을 깨지 않으므로 v2를 유지합니다. 버전을 올리면 이전 버전 디코더(v1 포함)를 계속 유지하고, 새 스키마 파일(`*.v3.schema.json`)을 따로 둡니다.
-4. 스키마는 `additionalProperties: false`이므로 키를 추가하는 커밋에서 스키마도 함께 고칩니다. `RecipeSchemaTests`가 어긋남을 잡습니다.
+4. 스키마는 `additionalProperties: false`이므로 키를 추가하는 커밋에서 스키마도 함께 고칩니다. `RecipeSchemaTests`·`SessionSchemaTests`가 키 집합의 어긋남을 잡습니다.
 5. 모든 플랫폼이 같은 키 이름과 기본값을 씁니다. 다른 플랫폼은 `shared/fixtures/`의 파일로 읽기 호환을 테스트합니다.
