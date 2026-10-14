@@ -17,10 +17,18 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
-      - name: Tools
+      - name: Tools (pinned XcodeGen)
+        shell: bash
         run: |
+          set -euo pipefail
           xcodebuild -version
-          brew install xcodegen
+          version="$(tr -d '[:space:]' < apple/.xcodegen-version)"
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/${version}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          sudo mkdir -p /usr/local/bin /usr/local/share
+          sudo cp "$RUNNER_TEMP/xcodegen/xcodegen/bin/xcodegen" /usr/local/bin/xcodegen
+          sudo cp -R "$RUNNER_TEMP/xcodegen/xcodegen/share/xcodegen" /usr/local/share/
+          xcodegen --version
       - name: Release notes automation tests
         run: /usr/bin/ruby fastlane/test/release_notes_test.rb
       - name: Modules, format, package and app tests

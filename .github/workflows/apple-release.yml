@@ -37,6 +37,17 @@ jobs:
       AUTOMATIC_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.automatic_release || github.event_name == 'push' && vars.IOS_AUTO_RELEASE == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install pinned XcodeGen
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < apple/.xcodegen-version)"
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" "https://github.com/yonaskolb/XcodeGen/releases/download/${version}/xcodegen.zip"
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP/xcodegen"
+          sudo mkdir -p /usr/local/bin /usr/local/share
+          sudo cp "$RUNNER_TEMP/xcodegen/xcodegen/bin/xcodegen" /usr/local/bin/xcodegen
+          sudo cp -R "$RUNNER_TEMP/xcodegen/xcodegen/share/xcodegen" /usr/local/share/
+          xcodegen --version
       - name: Validate release and test
         shell: bash
         run: |
@@ -47,10 +58,10 @@ jobs:
             version="$VERSION_INPUT"
           fi
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Expected version X.Y.Z'; exit 1; }
+          grep -qx "MARKETING_VERSION = $version" apple/Config/Version.xcconfig || { echo "apple/Config/Version.xcconfig의 MARKETING_VERSION이 $version과 다릅니다. scripts/release.sh apple $version 으로 태그를 만드세요."; exit 1; }
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
           echo "APP_BUILD=${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
           /usr/bin/ruby fastlane/test/release_notes_test.rb
-          brew install xcodegen
           ./scripts/test-apple.sh
       - name: Preserve failing iPhone test results
         if: failure()
@@ -61,6 +72,13 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
+      # App Store 업로드는 되돌릴 수 없으므로 Mac 패키지를 먼저 만든다. 업로드가 실패해도 산출물은 남는다.
+      - name: Mac package (ad-hoc signed)
+        run: MELLOW_BUILD_NUMBER="$APP_BUILD" ./scripts/package-mac.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mellow-photo-mac-${{ env.APP_VERSION }}
+          path: dist/Mellow-Photo-Mac.zip*
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3'
@@ -84,9 +102,3 @@ jobs:
           # This is an ephemeral GitHub-hosted runner, never a developer's keychain.
           rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/mellow-ci.mobileprovision"
           rm -f "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/mellow-ci.mobileprovision"
-      - name: Mac package (ad-hoc signed)
-        run: ./scripts/package-mac.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mellow-photo-mac-${{ env.APP_VERSION }}
-          path: dist/Mellow-Photo-Mac.zip*
