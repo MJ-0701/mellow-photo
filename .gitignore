@@ -25,3 +25,7 @@ fastlane/screenshots/
 # Claude Code worktrees and SDD scratch
 .claude/worktrees/
 .superpowers/
+
+# MellowKit package
+apple/.build/
+apple/*.xcodeproj/xcuserdata/
