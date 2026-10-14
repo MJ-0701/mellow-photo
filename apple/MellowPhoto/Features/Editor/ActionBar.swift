@@ -26,9 +26,10 @@ struct ActionBar: View {
                     .foregroundStyle(.secondary)
             }
             if showsZoom {
-                Button("−") { zoom = max(1, zoom - 0.5) }
-                Text(zoom == 1 ? "화면에 맞춤" : "\(Int(zoom * 100))%").font(.caption2).frame(width: 75)
-                Button("+") { zoom = min(4, zoom + 0.5) }
+                Button("−") { zoom = Theme.clampedZoom(zoom - Theme.zoomStep) }
+                Text(zoom == Theme.zoomRange.lowerBound ? "화면에 맞춤" : "\(Int(zoom * 100))%").font(.caption2)
+                    .frame(width: 75)
+                Button("+") { zoom = Theme.clampedZoom(zoom + Theme.zoomStep) }
             }
             Button {
                 model.isComparing.toggle()

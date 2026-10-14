@@ -1,12 +1,17 @@
 import MellowShared
 import SwiftUI
 
-/// 미리보기 표시, 잡티 탭, 변형 드래그, 샘플 위치 표시. 좌표는 정규화·원점 왼쪽 아래로 넘긴다.
+/// 미리보기 표시, 핀치 확대, 잡티 탭, 변형 드래그, 샘플 위치 표시. 좌표는 정규화·원점 왼쪽 아래로 넘긴다.
 struct PhotoCanvasView: View {
     @Environment(AppModel.self) private var model
-    var zoom: Double = 1
+    @Binding var zoom: Double
     /// 복구 화면의 "편집에서 빼기"도 툴바와 같은 확인 대화상자를 거친다.
     @Binding var removeConfirmation: Bool
+    /// 핀치를 시작할 때의 배율. 핀치 중이 아니면 nil.
+    @State private var pinchBase: Double?
+    @State private var isDragging = false
+    /// 진행 중인 드래그 도중 핀치가 있었으면 손을 뗄 때 잡티·변형으로 처리하지 않는다.
+    @State private var dragSawPinch = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -24,7 +29,8 @@ struct PhotoCanvasView: View {
                             .overlay { touchLayer(in: size) }
                             .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                     }
-                    .scrollDisabled(zoom == 1)
+                    .scrollDisabled(zoom == Theme.zoomRange.lowerBound)
+                    .simultaneousGesture(magnify)
                     .accessibilityLabel(model.isComparing ? "원본 사진" : "보정 미리보기")
                 }
                 if let message = model.selectionFailure {
@@ -47,6 +53,22 @@ struct PhotoCanvasView: View {
         }
     }
 
+    /// 어느 도구에서든 쓸 수 있다. 드래그 층은 그대로 두고 동시에 인식한다.
+    private var magnify: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                let base = pinchBase ?? zoom
+                pinchBase = base
+                if isDragging {
+                    dragSawPinch = true
+                }
+                zoom = Theme.clampedZoom(base * value.magnification)
+            }
+            .onEnded { _ in
+                pinchBase = nil
+            }
+    }
+
     @ViewBuilder
     private func cloneSourceMarker(in size: CGSize) -> some View {
         if let source = model.cloneSource, model.tool == .retouch, !model.isComparing {
@@ -63,8 +85,17 @@ struct PhotoCanvasView: View {
         if model.tool.usesCanvasTouch, !model.isComparing {
             Color.clear.contentShape(Rectangle())
                 .gesture(
-                    DragGesture(minimumDistance: 0).onEnded { value in
-                        guard size.width > 0, size.height > 0 else { return }
+                    DragGesture(minimumDistance: 0).onChanged { _ in
+                        if !isDragging {
+                            isDragging = true
+                            dragSawPinch = pinchBase != nil
+                        }
+                    }
+                    .onEnded { value in
+                        let pinched = dragSawPinch
+                        isDragging = false
+                        dragSawPinch = false
+                        guard !pinched, size.width > 0, size.height > 0 else { return }
                         func normalized(_ point: CGPoint) -> NormalizedPoint {
                             NormalizedPoint(
                                 x: max(0, min(1, point.x / size.width)), y: max(0, min(1, 1 - point.y / size.height)))

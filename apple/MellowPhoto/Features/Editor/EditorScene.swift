@@ -84,7 +84,7 @@ struct EditorScene: View {
     private var compactLayout: some View {
         VStack(spacing: 0) {
             PhotoStripView()
-            PhotoCanvasView(removeConfirmation: $removeConfirmation)
+            PhotoCanvasView(zoom: $zoom, removeConfirmation: $removeConfirmation)
                 .frame(maxHeight: .infinity).frame(minHeight: 130)
             ActionBar(zoom: $zoom)
             compactControls
@@ -121,7 +121,7 @@ struct EditorScene: View {
             LibrarySidebar()
             Divider()
             VStack(spacing: 0) {
-                PhotoCanvasView(zoom: zoom, removeConfirmation: $removeConfirmation)
+                PhotoCanvasView(zoom: $zoom, removeConfirmation: $removeConfirmation)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 ActionBar(zoom: $zoom, showsZoom: true).padding(.vertical, 6)
                 StatusBar()
