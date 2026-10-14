@@ -23,6 +23,8 @@ public final class ProjectSession {
     public private(set) var presets: [Preset] = []
     /// 편집 중 저장 실패. 상태는 유지되고 다음 저장에서 다시 시도한다.
     public private(set) var lastPersistenceError: MellowError?
+    /// true인 동안 조용한 저장(`edit`, 선택 변경 등)은 미룬다. `endDeferredPersistence()`가 한 번 저장한다.
+    public private(set) var isPersistenceDeferred = false
 
     private var selection: PhotoID?
     private let store: any SessionStore
@@ -105,12 +107,24 @@ public final class ProjectSession {
         persistQuietly()
     }
 
+    /// 슬라이더 드래그처럼 짧은 간격으로 이어지는 변경은 끝날 때 한 번만 저장한다.
+    public func beginDeferredPersistence() {
+        isPersistenceDeferred = true
+    }
+
+    /// 미룬 동안 바뀐 것이 없어도 저장한다. 실패는 `lastPersistenceError`로 남긴다.
+    public func endDeferredPersistence() {
+        isPersistenceDeferred = false
+        persistQuietly()
+    }
+
     public func save() throws {
         try store.save(SessionSnapshot(photos: photos, selectedPhotoID: selection, presets: presets))
         lastPersistenceError = nil
     }
 
     private func persistQuietly() {
+        guard !isPersistenceDeferred else { return }
         do {
             try save()
         } catch let error as MellowError {

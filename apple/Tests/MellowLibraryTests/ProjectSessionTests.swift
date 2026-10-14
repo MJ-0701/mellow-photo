@@ -66,6 +66,25 @@ final class ProjectSessionTests: XCTestCase {
         }
     }
 
+    func testDeferredPersistenceSavesOnceAtEnd() throws {
+        let store = MemorySessionStore()
+        let session = ProjectSession(store: store, maxPhotos: 40)
+        let photo = entry("A")
+        try session.add(photo)
+        let before = store.saveCount
+        session.beginDeferredPersistence()
+        for step in 1...5 {
+            session.edit(photo.id) { document in document.set(.exposure(Double(step) / 10)) }
+        }
+        XCTAssertEqual(store.saveCount, before)
+        session.endDeferredPersistence()
+        XCTAssertEqual(store.saveCount, before + 1)
+        XCTAssertEqual(store.saved?.photos.first?.document.recipe.color.exposure, 0.5)
+        session.beginDeferredPersistence()
+        session.endDeferredPersistence()
+        XCTAssertEqual(store.saveCount, before + 2, "바뀐 것이 없어도 끝낼 때 저장한다")
+    }
+
     func testEditAppliesRulesAndPersists() throws {
         let store = MemorySessionStore()
         let session = ProjectSession(store: store, maxPhotos: 40)
