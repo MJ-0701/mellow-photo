@@ -11,6 +11,12 @@ enum UserMessage {
     static let sessionUnreadable = "작업 기록을 읽지 못해 복구용 사본을 보관했습니다. 기존 작업 사진도 보존됩니다. 사진을 다시 골라 편집할 수 있어요."
     static let somePhotosUnreadable = "일부 작업 사진을 열지 못했습니다. 해당 사진을 다시 가져오세요."
     static let selectionUnreadable = "이 작업 사진을 열 수 없습니다. 다시 시도하거나 편집에서 뺀 뒤 사진을 다시 골라주세요."
+    /// 사진 앱에서 고른 항목은 파일 이름을 알 수 없어 오류 문구에 이 이름을 쓴다.
+    static let photoLibraryItemName = "사진 앱 항목"
+
+    static func workingFolderUnavailable(_ reason: String) -> String {
+        "작업 폴더를 열지 못했습니다: \(reason)"
+    }
 
     static func photosStatus(count: Int) -> String {
         "\(count)장 · 편집 기록은 이 기기에 저장됩니다."
