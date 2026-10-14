@@ -1,0 +1,184 @@
+import CoreGraphics
+import Foundation
+import MellowEditing
+import MellowExport
+import MellowLibrary
+import MellowRendering
+import MellowShared
+import Observation
+
+struct PresentedError: Identifiable, Equatable {
+    let id = UUID()
+    let message: String
+}
+
+/// composition root. 세션·파이프라인·어댑터를 묶고 화면이 읽는 상태를 가진다.
+@MainActor
+@Observable
+final class AppModel {
+    struct PhotoInfo {
+        var pixelSize: CGSize
+        var faces: [FaceGeometry]
+        var faceAnalysisFailure: MellowError?
+    }
+
+    enum Policy {
+        static let brushRadiusRange = 0.008...0.07
+        static let defaultBrushRadius = 0.025
+        static let warpRadiusMultiplier = 3.0
+        static let warpMaxDelta = 0.08
+        static let warpMinimumDelta = 0.001
+        static let renderDebounce = Duration.milliseconds(100)
+        /// 알림에 나열하는 실패·경고 줄 수. 나머지는 개수로만 알린다.
+        static let listedIssueLimit = 3
+    }
+
+    let session: ProjectSession
+    let pipeline: PhotoPipeline
+    let copies: WorkingCopyStore
+    let importer: any PhotoImporter
+    let exporter: Exporter
+
+    var thumbnails: [PhotoID: CGImage] = [:]
+    var photoInfo: [PhotoID: PhotoInfo] = [:]
+    var preview: CGImage?
+    var original: CGImage?
+    var isReady = false
+    var isRendering = false
+    var isImporting = false
+    var isExporting = false
+    var isRestoring = false
+    var exportProgress = 0.0
+    var statusMessage = UserMessage.welcomeStatus
+    var presentedError: PresentedError?
+    var selectionFailure: String?
+
+    var tool: EditorTool = .color
+    var brushRadius = Policy.defaultBrushRadius
+    var cloneSource: NormalizedPoint?
+    var isChoosingCloneSource = true
+    var isComparing = false
+    var exportOptions = ExportOptions()
+
+    let renderScheduler: RenderScheduler
+    private var selectionTask: Task<Void, Never>?
+    var exportTask: Task<Void, Never>?
+
+    init(
+        session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
+        exporter: Exporter, renderDebounce: Duration = Policy.renderDebounce
+    ) {
+        self.session = session
+        self.pipeline = pipeline
+        self.copies = copies
+        self.importer = importer
+        self.exporter = exporter
+        renderScheduler = RenderScheduler(debounce: renderDebounce)
+    }
+
+    var isBusy: Bool { isImporting || isExporting || isRestoring }
+    var currentRecipe: EditRecipe { session.selected?.document.recipe ?? EditRecipe() }
+    var canUndo: Bool { session.selected?.document.canUndo ?? false }
+    var canRedo: Bool { session.selected?.document.canRedo ?? false }
+    var isGeometryLocked: Bool { session.selected?.document.isGeometryLocked ?? false }
+    var displayImage: CGImage? { isComparing ? original : (preview ?? original) }
+    var selectedInfo: PhotoInfo? { session.selectedPhotoID.flatMap { photoInfo[$0] } }
+    var faces: [FaceGeometry] { selectedInfo?.faces ?? [] }
+
+    func present(_ error: Error) {
+        presentedError = PresentedError(message: UserMessage.text(for: error))
+    }
+
+    func present(message: String) {
+        presentedError = PresentedError(message: message)
+    }
+
+    /// 앱 시작. 세션을 읽고 모든 사진의 썸네일·얼굴을 다시 준비한다.
+    func restore() async {
+        isRestoring = true
+        defer { isRestoring = false }
+        do {
+            try session.restore()
+        } catch {
+            present(error)
+        }
+        for entry in session.photos {
+            do {
+                let prepared = try await pipeline.prepare(entry.id, at: copies.url(for: entry.filename))
+                remember(entry.id, prepared)
+            } catch {
+                present(message: UserMessage.somePhotosUnreadable)
+            }
+        }
+        if !session.photos.isEmpty {
+            statusMessage = UserMessage.photosStatus(count: session.photos.count)
+        }
+        if let id = session.selectedPhotoID {
+            select(id)
+        }
+    }
+
+    func remember(_ id: PhotoID, _ prepared: PreparedPhoto) {
+        thumbnails[id] = prepared.thumbnail
+        photoInfo[id] = PhotoInfo(
+            pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure)
+    }
+
+    func select(_ id: PhotoID) {
+        guard !isExporting, session.index(of: id) != nil else { return }
+        selectionTask?.cancel()
+        renderScheduler.cancel()
+        session.selectedPhotoID = id
+        preview = nil
+        original = nil
+        isReady = false
+        isRendering = false
+        selectionFailure = nil
+        isComparing = false
+        cloneSource = nil
+        isChoosingCloneSource = true
+        guard let entry = session.selected else { return }
+        selectionTask = Task {
+            do {
+                try await pipeline.reprepareIfEvicted(id, at: copies.url(for: entry.filename))
+                let base = try await pipeline.preview(id, recipe: EditRecipe())
+                guard !Task.isCancelled, session.selectedPhotoID == id else { return }
+                original = base
+                isReady = true
+                scheduleRender()
+            } catch {
+                guard !Task.isCancelled, session.selectedPhotoID == id else { return }
+                selectionFailure = UserMessage.selectionUnreadable
+                present(error)
+            }
+        }
+    }
+
+    func scheduleRender() {
+        guard let entry = session.selected, isReady else { return }
+        isRendering = true
+        let pipeline = self.pipeline
+        let recipe = entry.document.recipe
+        let id = entry.id
+        renderScheduler.schedule {
+            try await pipeline.preview(id, recipe: recipe)
+        } completion: { [weak self] result in
+            guard let self, session.selectedPhotoID == id else { return }
+            isRendering = false
+            switch result {
+            case .success(let image): preview = image
+            case .failure(let error): present(error)
+            }
+        }
+    }
+
+    func cancelSelectionWork() {
+        selectionTask?.cancel()
+        renderScheduler.cancel()
+    }
+
+    func stopWork() {
+        cancelSelectionWork()
+        exportTask?.cancel()
+    }
+}

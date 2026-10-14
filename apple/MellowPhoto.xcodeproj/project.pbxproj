@@ -7,17 +7,31 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0CD761468E304A218D226C61 /* ExportPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505F21DC7A15D7DBC745704E /* ExportPhotos.swift */; };
+		0FA73B0DF5725C84F333FF05 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E1FD227433ABB414F380E /* AppModelTests.swift */; };
+		102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */; };
+		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
 		2BF138DBA2985AF7A3B3A78E /* MellowLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E104DB4C3683E0F5CABAB0BD /* MellowLibrary */; };
+		2D128DF7E8DAC981A4578867 /* Ports.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */; };
 		3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */ = {isa = PBXBuildFile; productRef = 213FE2825489D6DA1E427B12 /* MellowRendering */; };
-		488B6115DC2ECB574B00F218 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */; };
 		48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0604580F74993079C348EBA /* MellowPhotoApp.swift */; };
 		49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */; };
+		4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D630A842DBDB0FFBAB08678 /* UserMessage.swift */; };
 		73148254538FB7A0C74B8C8F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE1246D6DEF7E9378829940 /* RootView.swift */; };
 		7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E1DB811347F53AB847DE61D2 /* Assets.xcassets */; };
+		88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0DE03B3D7090AE3713F35C /* AppModel.swift */; };
 		8B0070F52E5A1F0150111794 /* MellowEditing in Frameworks */ = {isa = PBXBuildFile; productRef = 2D215632597C957E5592C85D /* MellowEditing */; };
+		8BBE3FCB108100426FA44D97 /* ExportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D882DADCF0E8575966450368 /* ExportPhotosTests.swift */; };
+		8D84CF1378E138B0D0E29826 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7503240254DB929DE6204 /* TestSupport.swift */; };
+		993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41FC59ED8903FB97642854A /* AppModel+Editing.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */; };
+		CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */; };
+		D02081D49122EB40B5C8E7DA /* AppModel+Export.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */; };
+		DD0689E1788B77A8E4BCE98C /* ImportPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4711AEF3097752E578444CB /* ImportPhotos.swift */; };
+		E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370CF7443944DB02164CF8DD /* RenderScheduler.swift */; };
+		EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,16 +45,30 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0CC7503240254DB929DE6204 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
+		0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotosTests.swift; sourceTree = "<group>"; };
 		0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MellowPhoto-macOS.entitlements"; sourceTree = "<group>"; };
 		14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
-		8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		2F0DE03B3D7090AE3713F35C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
+		370CF7443944DB02164CF8DD /* RenderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderScheduler.swift; sourceTree = "<group>"; };
+		3D630A842DBDB0FFBAB08678 /* UserMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserMessage.swift; sourceTree = "<group>"; };
+		505F21DC7A15D7DBC745704E /* ExportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPhotos.swift; sourceTree = "<group>"; };
+		6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderSchedulerTests.swift; sourceTree = "<group>"; };
+		73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Library.swift"; sourceTree = "<group>"; };
+		898E1FD227433ABB414F380E /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		8CE1246D6DEF7E9378829940 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		C1219E8E2E4AA4621805C516 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		C4711AEF3097752E578444CB /* ImportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotos.swift; sourceTree = "<group>"; };
 		CDC8069CC675408C9A682CA6 /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
 		D0604580F74993079C348EBA /* MellowPhotoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MellowPhotoApp.swift; sourceTree = "<group>"; };
+		D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTool.swift; sourceTree = "<group>"; };
+		D41FC59ED8903FB97642854A /* AppModel+Editing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Editing.swift"; sourceTree = "<group>"; };
+		D882DADCF0E8575966450368 /* ExportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPhotosTests.swift; sourceTree = "<group>"; };
+		DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Export.swift"; sourceTree = "<group>"; };
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ports.swift; sourceTree = "<group>"; };
 		FA07672648D544B650764001 /* MellowPhoto.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MellowPhoto.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -101,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				234C56F9AC1E84E4DC7784FB /* App */,
+				E659B5E36D2A402C0EC50A01 /* Application */,
 				7C4A63785FEF7C5F430A19B4 /* Resources */,
 			);
 			path = MellowPhoto;
@@ -109,7 +138,11 @@
 		B311DFE7F5F714F4C9CFA1E6 /* MellowPhotoTests */ = {
 			isa = PBXGroup;
 			children = (
-				8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */,
+				898E1FD227433ABB414F380E /* AppModelTests.swift */,
+				D882DADCF0E8575966450368 /* ExportPhotosTests.swift */,
+				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
+				6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */,
+				0CC7503240254DB929DE6204 /* TestSupport.swift */,
 			);
 			path = MellowPhotoTests;
 			sourceTree = "<group>";
@@ -120,6 +153,23 @@
 				C1219E8E2E4AA4621805C516 /* Version.xcconfig */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		E659B5E36D2A402C0EC50A01 /* Application */ = {
+			isa = PBXGroup;
+			children = (
+				2F0DE03B3D7090AE3713F35C /* AppModel.swift */,
+				D41FC59ED8903FB97642854A /* AppModel+Editing.swift */,
+				DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */,
+				73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */,
+				D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */,
+				505F21DC7A15D7DBC745704E /* ExportPhotos.swift */,
+				C4711AEF3097752E578444CB /* ImportPhotos.swift */,
+				F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */,
+				370CF7443944DB02164CF8DD /* RenderScheduler.swift */,
+				3D630A842DBDB0FFBAB08678 /* UserMessage.swift */,
+			);
+			path = Application;
 			sourceTree = "<group>";
 		};
 		E991FCB4329561E67BFAB59B = {
@@ -237,7 +287,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				488B6115DC2ECB574B00F218 /* SmokeTests.swift in Sources */,
+				0FA73B0DF5725C84F333FF05 /* AppModelTests.swift in Sources */,
+				8BBE3FCB108100426FA44D97 /* ExportPhotosTests.swift in Sources */,
+				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
+				102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */,
+				8D84CF1378E138B0D0E29826 /* TestSupport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,8 +299,18 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */,
+				D02081D49122EB40B5C8E7DA /* AppModel+Export.swift in Sources */,
+				CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */,
+				88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */,
+				EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */,
+				0CD761468E304A218D226C61 /* ExportPhotos.swift in Sources */,
+				DD0689E1788B77A8E4BCE98C /* ImportPhotos.swift in Sources */,
 				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
+				2D128DF7E8DAC981A4578867 /* Ports.swift in Sources */,
+				E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */,
 				73148254538FB7A0C74B8C8F /* RootView.swift in Sources */,
+				4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,7 +367,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
@@ -328,7 +392,7 @@
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
-				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
