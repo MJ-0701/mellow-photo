@@ -113,4 +113,24 @@ final class PhotoPipelineTests: XCTestCase {
         let rendered = try await pipeline.renderOriginal(id, at: url, recipe: recipe, maxDimension: 128)
         XCTAssertEqual(rendered.extent.size, CGSize(width: 128, height: 128), "분석은 성공했고 얼굴만 없으면 색감만 적용해 저장한다")
     }
+
+    func testRenderOriginalOfUnpreparedPhotoRefusesFaceEditsButAllowsColor() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        var faceRecipe = EditRecipe()
+        faceRecipe.portrait.skinSmoothing = 0.3
+        do {
+            _ = try await pipeline.renderOriginal(id, at: url, recipe: faceRecipe, maxDimension: nil)
+            XCTFail("준비되지 않은 사진의 얼굴 보정이 조용히 빠지면 안 된다")
+        } catch {
+            guard case .faceAnalysisUnavailable = error as? MellowError else {
+                return XCTFail("faceAnalysisUnavailable이어야 한다: \(error)")
+            }
+        }
+        var colorRecipe = EditRecipe()
+        colorRecipe.color.exposure = 0.2
+        let rendered = try await pipeline.renderOriginal(id, at: url, recipe: colorRecipe, maxDimension: nil)
+        XCTAssertEqual(rendered.extent.size, CGSize(width: 256, height: 256), "색감만이면 준비 없이도 저장한다")
+    }
 }

@@ -8,10 +8,19 @@ public struct PreparedPhoto: Sendable {
     public let faces: [FaceGeometry]
     /// 분석이 실패했으면 그 이유. 얼굴이 없는 것과 구분한다.
     public let faceAnalysisFailure: MellowError?
+
+    public init(pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?) {
+        self.pixelSize = pixelSize
+        self.thumbnail = thumbnail
+        self.faces = faces
+        self.faceAnalysisFailure = faceAnalysisFailure
+    }
 }
 
 /// 무거운 이미지 작업을 메인 액터 밖에서 직렬로 수행한다. 미리보기는 캐시에서 렌더한다.
 public actor PhotoPipeline {
+    private static let unpreparedReason = "사진이 아직 준비되지 않았습니다"
+
     private struct Entry {
         var faces: [FaceGeometry]
         var faceAnalysisFailure: MellowError?
@@ -22,6 +31,7 @@ public actor PhotoPipeline {
     private let pipeline = RenderPipeline.standard
     private let analyzer: any FaceAnalyzer
     private let tuning: RenderTuning
+    /// 미리보기 이미지가 LRU로 밀려나도 일부러 남긴다. renderOriginal이 얼굴 좌표를 써야 한다.
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
@@ -69,12 +79,22 @@ public actor PhotoPipeline {
 
     /// 준비 때 얻은 정규화 얼굴 좌표를 원본 해상도에 그대로 쓴다. 얼굴을 다시 분석하지 않는다.
     public func renderOriginal(_ id: PhotoID, at url: URL, recipe: EditRecipe, maxDimension: Int?) throws -> CIImage {
-        let entry = entries[id] ?? Entry(faces: [], faceAnalysisFailure: nil)
+        guard let entry = entries[id] else {
+            // 얼굴 정보 없이 얼굴 보정을 저장하면 조용히 빠진다. 색감만이면 그대로 렌더한다.
+            if recipe.dependsOnFaces {
+                throw MellowError.faceAnalysisUnavailable(reason: Self.unpreparedReason)
+            }
+            return try render(url: url, recipe: recipe, faces: [], maxDimension: maxDimension)
+        }
         if recipe.dependsOnFaces, entry.faces.isEmpty, let failure = entry.faceAnalysisFailure {
             throw failure
         }
+        return try render(url: url, recipe: recipe, faces: entry.faces, maxDimension: maxDimension)
+    }
+
+    private func render(url: URL, recipe: EditRecipe, faces: [FaceGeometry], maxDimension: Int?) throws -> CIImage {
         let image = try loader.load(url: url, maxDimension: maxDimension)
-        let context = RenderContext(extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning)
+        let context = RenderContext(extent: image.extent, recipe: recipe, faces: faces, tuning: tuning)
         return try pipeline.render(image, context: context)
     }
 
