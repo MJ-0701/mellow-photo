@@ -1,0 +1,125 @@
+import MellowShared
+
+/// 사진 한 장의 편집 상태. 체크포인트·잠금·보존 규칙은 전부 여기에만 있다.
+public struct EditDocument: Equatable, Sendable {
+    public enum Rejection: Equatable, Sendable {
+        case geometryLocked
+    }
+
+    public private(set) var recipe: EditRecipe
+    public private(set) var undoStack: [EditRecipe]
+    public private(set) var redoStack: [EditRecipe]
+    private var isContinuousChange = false
+
+    public init(recipe: EditRecipe = EditRecipe(), undoStack: [EditRecipe] = [], redoStack: [EditRecipe] = []) {
+        self.recipe = recipe
+        self.undoStack = undoStack
+        self.redoStack = redoStack
+    }
+
+    /// 연속 변경 중인지는 편집 상태가 아니므로 비교에서 뺀다.
+    public static func == (lhs: EditDocument, rhs: EditDocument) -> Bool {
+        lhs.recipe == rhs.recipe && lhs.undoStack == rhs.undoStack && lhs.redoStack == rhs.redoStack
+    }
+
+    public var canUndo: Bool { !undoStack.isEmpty }
+    public var canRedo: Bool { !redoStack.isEmpty }
+    public var hasEdits: Bool { !recipe.isDefault }
+    /// 수동 편집 좌표가 어긋나지 않도록 얼굴 형태와 대상 얼굴을 고정한다.
+    public var isGeometryLocked: Bool { recipe.hasLocalEdits }
+
+    public mutating func beginContinuousChange() {
+        checkpoint()
+        isContinuousChange = true
+    }
+
+    public mutating func endContinuousChange() {
+        isContinuousChange = false
+    }
+
+    @discardableResult
+    public mutating func set(_ change: EditChange) -> Rejection? {
+        if change.affectsGeometry, isGeometryLocked {
+            return .geometryLocked
+        }
+        var updated = recipe
+        switch change {
+        case .exposure(let value): updated.color.exposure = value
+        case .contrast(let value): updated.color.contrast = value
+        case .saturation(let value): updated.color.saturation = value
+        case .warmth(let value): updated.color.warmth = value
+        case .skinSmoothing(let value): updated.portrait.skinSmoothing = value
+        case .faceSlim(let value): updated.portrait.faceSlim = value
+        case .targetFace(let index): updated.portrait.targetFace = index
+        }
+        // 값이 그대로면 실행 취소 단계를 만들지 않는다.
+        guard updated != recipe else { return nil }
+        checkpointUnlessContinuous()
+        recipe = updated
+        return nil
+    }
+
+    /// 사용자가 고른 프리셋. 잠긴 사진은 얼굴 형태 값을 유지한다.
+    public mutating func apply(_ values: PresetValues) {
+        checkpoint()
+        var portrait = values.portrait
+        if isGeometryLocked {
+            portrait.faceSlim = recipe.portrait.faceSlim
+            portrait.targetFace = recipe.portrait.targetFace
+        }
+        recipe.color = values.color
+        recipe.portrait = portrait
+    }
+
+    /// 다른 사진의 설정을 일괄 복사. 잠기지 않은 사진은 대상 얼굴을 전체로 되돌린다.
+    public mutating func applyFromBatch(_ values: PresetValues) {
+        checkpoint()
+        var portrait = values.portrait
+        if isGeometryLocked {
+            portrait.faceSlim = recipe.portrait.faceSlim
+            portrait.targetFace = recipe.portrait.targetFace
+        } else {
+            portrait.targetFace = nil
+        }
+        recipe.color = values.color
+        recipe.portrait = portrait
+    }
+
+    public mutating func appendLocalEdit(_ edit: LocalEdit) {
+        checkpoint()
+        recipe.operations.append(edit)
+    }
+
+    public mutating func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        redoStack.append(recipe)
+        recipe = previous
+    }
+
+    public mutating func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(recipe)
+        recipe = next
+    }
+
+    public mutating func reset() {
+        checkpoint()
+        recipe = EditRecipe()
+    }
+
+    private mutating func checkpointUnlessContinuous() {
+        if !isContinuousChange {
+            checkpoint()
+        }
+    }
+
+    private mutating func checkpoint() {
+        if undoStack.last != recipe {
+            undoStack.append(recipe)
+        }
+        if undoStack.count > EditingPolicy.historyLimit {
+            undoStack.removeFirst(undoStack.count - EditingPolicy.historyLimit)
+        }
+        redoStack.removeAll()
+    }
+}
