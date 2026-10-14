@@ -48,6 +48,8 @@ final class AppModel {
     var isImporting = false
     var isExporting = false
     var isRestoring = false
+    /// 창을 새로 열 때마다 화면의 `.task`가 restore()를 다시 부르므로 한 번만 실행한다.
+    private(set) var hasRestored = false
     var exportProgress = 0.0
     var statusMessage = UserMessage.welcomeStatus
     var presentedError: PresentedError?
@@ -98,6 +100,8 @@ final class AppModel {
 
     /// 앱 시작. 세션을 읽고 모든 사진의 썸네일·얼굴을 다시 준비한다.
     func restore() async {
+        guard !hasRestored else { return }
+        hasRestored = true
         isRestoring = true
         defer { isRestoring = false }
         do {
@@ -132,6 +136,7 @@ final class AppModel {
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
         renderScheduler.cancel()
+        endContinuousChangeOnSelected()
         session.selectedPhotoID = id
         preview = nil
         original = nil
@@ -155,6 +160,19 @@ final class AppModel {
                 selectionFailure = UserMessage.selectionUnreadable
                 present(error)
             }
+        }
+    }
+
+    /// 드래그가 끝나지 않은 채 사진을 바꾸면 이전 사진의 연속 변경과 미룬 저장을 마무리한다.
+    private func endContinuousChangeOnSelected() {
+        if let previous = session.selectedPhotoID {
+            session.edit(previous) { document in
+                document.endContinuousChange()
+                return nil
+            }
+        }
+        if session.isPersistenceDeferred {
+            session.endDeferredPersistence()
         }
     }
 

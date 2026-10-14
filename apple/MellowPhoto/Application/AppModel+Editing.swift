@@ -14,8 +14,10 @@ extension AppModel {
         scheduleRender()
     }
 
+    /// 드래그하는 동안은 세션 파일을 쓰지 않고 끝날 때 한 번 저장한다.
     func beginSliderEdit() {
         guard let id = session.selectedPhotoID else { return }
+        session.beginDeferredPersistence()
         session.edit(id) { document in
             document.beginContinuousChange()
             return nil
@@ -23,10 +25,15 @@ extension AppModel {
     }
 
     func endSliderEdit() {
-        guard let id = session.selectedPhotoID else { return }
-        session.edit(id) { document in
-            document.endContinuousChange()
-            return nil
+        if let id = session.selectedPhotoID {
+            session.edit(id) { document in
+                document.endContinuousChange()
+                return nil
+            }
+        }
+        session.endDeferredPersistence()
+        if let error = session.lastPersistenceError {
+            present(error)
         }
     }
 
@@ -70,9 +77,11 @@ extension AppModel {
         }
     }
 
+    /// 프리셋은 얼굴을 고르지 않는다. 대상 얼굴 번호는 사진마다 의미가 달라 저장하지 않는다.
     func savePreset(named name: String) {
-        session.addPreset(
-            named: name, values: PresetValues(color: currentRecipe.color, portrait: currentRecipe.portrait))
+        var portrait = currentRecipe.portrait
+        portrait.targetFace = nil
+        session.addPreset(named: name, values: PresetValues(color: currentRecipe.color, portrait: portrait))
     }
 
     func resetCloneSource() {

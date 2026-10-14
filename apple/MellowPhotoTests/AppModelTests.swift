@@ -155,6 +155,71 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.session.selectedPhotoID, id)
     }
 
+    func testRestoreRunsOnlyOnceAndKeepsSelection() async throws {
+        let store = MemorySessionStore()
+        let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
+        try copies.prepareDirectory()
+        let first = PhotoID()
+        let second = PhotoID()
+        let firstName = try copies.adopt(temporaryFile: try TestSupport.solidPNG(in: root), as: first)
+        let secondName = try copies.adopt(temporaryFile: try TestSupport.solidPNG(in: root), as: second)
+        store.saved = SessionSnapshot(
+            photos: [
+                PhotoEntry(id: first, filename: firstName, displayName: "A"),
+                PhotoEntry(id: second, filename: secondName, displayName: "B"),
+            ],
+            selectedPhotoID: first, presets: [])
+        let analyzer = StubFaceAnalyzer()
+        let model = TestSupport.makeModel(root: root, analyzer: analyzer, store: store)
+        await model.restore()
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.select(second)
+        try await waitUntil { model.isReady && model.preview != nil }
+        let preview = try XCTUnwrap(model.preview)
+        let analyzed = analyzer.log.calls
+        XCTAssertEqual(analyzed, 2, "사진마다 한 번씩 준비한다")
+        // 새 창을 열면 화면의 .task가 다시 restore()를 부른다.
+        await model.restore()
+        XCTAssertEqual(analyzer.log.calls, analyzed, "두 번째 restore는 사진을 다시 준비하지 않는다")
+        XCTAssertEqual(model.session.selectedPhotoID, second)
+        XCTAssertTrue(model.isReady)
+        XCTAssertTrue(model.preview === preview, "선택과 미리보기를 초기화하지 않는다")
+    }
+
+    func testSavedPresetNeverCarriesTargetFace() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        await model.importFromFiles([staged])
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.edit(.faceSlim(0.4))
+        model.edit(.targetFace(1))
+        XCTAssertEqual(model.currentRecipe.portrait.targetFace, 1)
+        model.savePreset(named: "대상 얼굴")
+        let saved = try XCTUnwrap(model.session.presets.last)
+        XCTAssertNil(saved.values.portrait.targetFace, "프리셋은 얼굴을 고르지 않는다")
+        XCTAssertEqual(saved.values.portrait.faceSlim, 0.4)
+    }
+
+    func testSliderDragSavesSessionOnceAtEnd() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let store = MemorySessionStore()
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]),
+            store: store)
+        await model.importFromFiles([staged])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let before = store.saveCount
+        model.beginSliderEdit()
+        model.edit(.exposure(0.1))
+        model.edit(.exposure(0.2))
+        model.edit(.exposure(0.3))
+        XCTAssertEqual(store.saveCount, before, "드래그 중에는 세션을 쓰지 않는다")
+        model.endSliderEdit()
+        XCTAssertEqual(store.saveCount, before + 1, "드래그가 끝날 때 한 번 저장한다")
+        XCTAssertEqual(store.saved?.photos.first?.document.recipe.color.exposure, 0.3)
+    }
+
     func testLegacyPresetImportRunsAfterSessionRestoreAndKeepsPhotos() async throws {
         let store = MemorySessionStore()
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))

@@ -13,13 +13,26 @@ import XCTest
 
 final class MemorySessionStore: SessionStore, @unchecked Sendable {
     var saved: SessionSnapshot?
+    var saveCount = 0
     func load() throws -> SessionSnapshot? { saved }
-    func save(_ snapshot: SessionSnapshot) throws { saved = snapshot }
+    func save(_ snapshot: SessionSnapshot) throws {
+        saveCount += 1
+        saved = snapshot
+    }
+}
+
+/// 얼굴 분석 호출 횟수. 값 타입인 StubFaceAnalyzer가 복사돼도 같은 기록을 공유한다.
+final class AnalysisLog: @unchecked Sendable {
+    var calls = 0
 }
 
 struct StubFaceAnalyzer: FaceAnalyzer {
     var result: Result<[FaceGeometry], MellowError> = .success([])
-    func analyze(_ image: CIImage) throws -> [FaceGeometry] { try result.get() }
+    var log = AnalysisLog()
+    func analyze(_ image: CIImage) throws -> [FaceGeometry] {
+        log.calls += 1
+        return try result.get()
+    }
 }
 
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
