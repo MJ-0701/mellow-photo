@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mellow.photo/schema/edit-recipe.v2.json",
+  "title": "Mellow Photo EditRecipe v2",
+  "description": "사진 한 장의 보정 레시피. 좌표는 방향 보정된 이미지 기준 정규화(0~1), 원점은 왼쪽 아래. 모든 플랫폼 구현이 같은 파일을 읽고 쓴다.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "color": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exposure": { "type": "number", "default": 0, "minimum": -3, "maximum": 3 },
+        "contrast": { "type": "number", "default": 1, "minimum": 0, "maximum": 2 },
+        "saturation": { "type": "number", "default": 1, "minimum": 0, "maximum": 2 },
+        "warmth": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 }
+      }
+    },
+    "portrait": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skinSmoothing": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+        "faceSlim": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+        "targetFace": { "type": ["integer", "null"], "default": null, "description": "왼쪽부터 센 얼굴 인덱스. null이면 모든 얼굴." }
+      }
+    },
+    "operations": {
+      "type": "array",
+      "description": "사용자가 기록한 순서대로 재생한다.",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object", "additionalProperties": false,
+            "required": ["type", "x", "y", "sourceX", "sourceY", "radius"],
+            "properties": {
+              "type": { "const": "spot" },
+              "x": { "type": "number" }, "y": { "type": "number" },
+              "sourceX": { "type": "number" }, "sourceY": { "type": "number" },
+              "radius": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          },
+          {
+            "type": "object", "additionalProperties": false,
+            "required": ["type", "x", "y", "dx", "dy", "radius"],
+            "properties": {
+              "type": { "const": "warp" },
+              "x": { "type": "number" }, "y": { "type": "number" },
+              "dx": { "type": "number" }, "dy": { "type": "number" },
+              "radius": { "type": "number", "exclusiveMinimum": 0 }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

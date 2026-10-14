@@ -1,0 +1,77 @@
+# Apple 앱 (iPhone·iPad·Mac)
+
+SwiftUI 멀티플랫폼 앱 하나가 iPhone·iPad(iOS 17 이상)와 Mac(macOS 14 이상)을 모두 지원합니다. 번들 ID는 세 기기 모두 `com.mj.mellowphoto`입니다. 보정 엔진과 편집 규칙은 `apple/Sources/`의 Swift 모듈 다섯 개에 있고, 앱 타깃(`apple/MellowPhoto/`)은 화면과 플랫폼 어댑터만 담습니다. 구조는 [모듈 캔버스](architecture/modules.md)를 참조하세요.
+
+## 준비 및 실행
+
+1. Xcode 전체 버전과 iOS 플랫폼/시뮬레이터를 설치합니다. Command Line Tools만으로는 앱과 XCTest를 빌드할 수 없습니다. 현재 App Store 제출에는 Xcode 26 / iOS 26 SDK 이상이 필요합니다.
+2. XcodeGen을 설치합니다: `brew install xcodegen`. 버전은 `apple/.xcodegen-version`(현재 2.46.0)에 고정되어 있고, `scripts/test-apple.sh`는 다른 버전이 설치되어 있으면 멈춥니다. 앱 타깃의 진실의 원천은 `apple/project.yml`이며, 이 파일을 고치면 `apple/`에서 `xcodegen generate`를 실행하고 생성된 `apple/MellowPhoto.xcodeproj`를 함께 커밋합니다.
+3. `apple/MellowPhoto.xcodeproj`를 열고 **MellowPhoto** 스킴을 선택한 뒤 iPhone·iPad 시뮬레이터 또는 My Mac을 골라 실행합니다. 실제 iPhone·iPad는 Signing & Capabilities에서 본인 Team을 고른 뒤 연결합니다.
+
+명령줄에서는 다음 스크립트를 씁니다. 모두 `scripts/env.sh`를 읽어 `DEVELOPER_DIR`이 Command Line Tools면 `/Applications/Xcode.app`으로 바꿉니다.
+
+```sh
+./scripts/build-apple.sh ios-simulator   # 서명 없는 Release 시뮬레이터 빌드
+./scripts/build-apple.sh ios-device      # 서명 없는 Release iPhone·iPad 빌드 + 번들 ID·arm64·에셋·개인정보 manifest 검사
+./scripts/build-apple.sh mac             # Release Mac 빌드(arm64·x86_64) + 서명 검사
+open apple/build/Build/Products/Release/Mellow\ Photo.app
+./scripts/package-mac.sh                 # dist/Mellow-Photo-Mac.zip (임시 서명, 공증 전)
+./scripts/test-apple.sh                  # 모듈 검사·포맷·XcodeGen 동기화·패키지 테스트·iPhone·iPad·Mac 앱 테스트
+```
+
+환경 변수 `MELLOW_BUILD_NUMBER`를 주면 `build-apple.sh`가 `CURRENT_PROJECT_VERSION`(CFBundleVersion)을 그 값으로 덮어씁니다. 릴리스 워크플로가 씁니다. `scripts/tools/make-icon.swift`와 `make-ios-icon.swift`는 앱 아이콘 PNG를 다시 만들 때만 씁니다. 생성된 아이콘은 에셋에 커밋되어 있습니다.
+
+## 사용
+
+공통:
+
+- 색감 프리셋(내추럴·포근한·클린), 노출·대비·채도·따뜻함을 조정합니다. 슬라이더 값은 프리셋으로 저장해 다시 쓸 수 있습니다.
+- 얼굴 형태를 먼저 조정한 뒤 잡티나 부분 변형을 사용하세요. 수동 작업이 있으면 얼굴 형태·대상 선택은 좌표 보호를 위해 잠깁니다.
+- 잡티: 깨끗한 부분을 샘플로 한 번 누른 뒤 보정할 부분을 누릅니다. 변형: 필요한 부분을 조금 드래그합니다. iPad·Mac은 −/+ 버튼으로 화면을 100~400% 확대합니다.
+- 실행 취소·다시 실행은 사진마다 최대 40단계입니다.
+- 기본 출력은 긴 변 최대 4096px, 8bit sRGB SDR JPEG입니다. PNG도 고를 수 있습니다. *원본 해상도*를 켜면 크기 제한 없이 저장하며 메모리 사용량이 크게 늘 수 있습니다. HDR·ProRAW·Live Photo 영상 보존은 지원하지 않습니다.
+- ‘편집에서 사진 빼기’는 앱 내부 사본만 삭제합니다. 사진 앱이나 사용자 폴더의 원본은 변경하거나 삭제하지 않습니다.
+- 앱을 백그라운드로 보내면 일괄 저장은 현재 사진까지만 마치고 멈춥니다.
+
+| | iPhone·iPad | Mac |
+|---|---|---|
+| 가져오기 | 사진 앱(PhotosPicker), 파일 선택. iPad는 드래그 앤 드롭도 가능 | 사진 앱(PhotosPicker), 파일 선택, 드래그 앤 드롭 |
+| 저장 | 사진 앱에 새 사진으로 추가. 최초 저장 때 사진 추가 권한 요청 | 폴더를 고르면 `<이름>_mellow.<확장자>`로 저장, 같은 이름이 있으면 `_2`, `_3`…을 붙임 |
+| 복제 샘플 바꾸기 | *샘플 위치 다시 고르기* 버튼 | 버튼 또는 Option+클릭 |
+| 화면 | iPhone 세로는 상단 사진 띠·캔버스·실행 취소 바·하단 도구 패널(색감·인물·잡티·변형), iPad는 라이브러리·캔버스·인스펙터 3단 | 라이브러리·캔버스·인스펙터 3단 |
+| 키보드 | 하드웨어 키보드에서 ⌘O·⌘Z·⇧⌘Z·⇧⌘S | ⌘O 가져오기, ⌘Z 실행 취소, ⇧⌘Z 다시 실행, ⇧⌘S 현재 사진 저장 |
+
+iCloud에만 있는 원본은 가져오는 동안 네트워크가 필요할 수 있습니다. 보정은 기기 내부에서 처리합니다. 사진 앱에 저장을 다시 누르면 새 사본이 추가되므로 중복 저장에 주의하세요.
+
+## 기기별 한도
+
+| 항목 | 기준 |
+|---|---|
+| 한 번에 편집할 사진 수 | 물리 메모리 4GB 미만 12장, 8GB 미만 24장, 그 이상 40장 |
+| 미리보기 긴 변 | 메모리 8GB 이상 1600px, 미만 1200px |
+| 저장 긴 변 | 기본 4096px, *원본 해상도*를 켜면 제한 없음 |
+
+## 작업 사본과 편집 기록
+
+- 가져온 사진은 `Application Support/MellowPhoto/Library/<uuid>.<확장자>`에 작업 사본으로 복사합니다. 작업 폴더는 기기 백업에서 제외하고, iOS에서는 파일 보호를 겁니다. 출시된 iPhone 앱(v1)이 `MellowPhoto/` 바로 아래에 두었던 사본도 그대로 찾습니다.
+- 사진 목록, 보정값, 실행 취소·다시 실행 기록, 프리셋은 `Application Support/MellowPhoto/session.json`에 저장합니다. 형식은 v2이며 출시본 iPhone의 v1 파일도 읽어 이어서 편집합니다. 형식 계약은 [shared/recipe-schema](../shared/recipe-schema/README.md)에 있습니다. 읽을 수 없는 기록은 `session-recovery-<uuid>.json`으로 보존한 뒤 새로 시작합니다.
+- iPhone·iPad·Mac 모두 앱을 다시 열면 지난 작업을 복원합니다. 기기 사이에 편집 기록을 동기화하지는 않습니다.
+- 앱을 삭제하면 작업 사본과 기록이 사라지므로 완성한 사진은 먼저 저장하세요.
+
+### Mac 샌드박스와 이전 버전 데이터
+
+Mac 앱은 App Sandbox(사용자가 고른 파일 읽기·쓰기)에서 실행됩니다. 위 경로는 실제로 앱 컨테이너 안(`~/Library/Containers/com.mj.mellowphoto/Data/Library/Application Support/MellowPhoto`)에 있습니다.
+
+- 첫 실행 때 `apple/MellowPhoto/Resources/container-migration.plist`에 따라 macOS가 샌드박스 밖의 이전 폴더 `~/Library/Application Support/MellowPhoto`를 컨테이너로 옮깁니다.
+- 이전 Mac 앱이 남긴 `presets.json`은 세션을 복원한 뒤 세션 프리셋으로 가져오고 `presets.json.imported`로 이름을 바꿉니다. 다음 실행에서는 다시 읽지 않습니다.
+
+## 검증 상태
+
+2026-10-14 로컬 기준: 패키지 `swift test` 68개, 앱 테스트 iPhone 시뮬레이터 23개 · iPad 시뮬레이터 23개 · Mac 24개 통과. CI(`.github/workflows/apple-checks.yml`)는 PR과 main push에서 `scripts/test-apple.sh`와 서명 없는 iPhone·Mac Release 빌드를 실행합니다.
+
+기기에서 반드시 확인할 항목: 최초 권한 허용/거절, HEIC 및 방향 회전, iCloud 사진 가져오기, 얼굴 0/1/여러 명, 잡티·변형 후 실행 취소, 재실행 복원(출시본 v1 기록 포함), 전체 사진 저장, 48MP 메모리, 작은 화면과 큰 글자, 백그라운드 전환, Mac의 이전 폴더 이전과 프리셋 가져오기. 핀치 확대는 아직 없습니다.
+
+App Store 자동화는 [IOS_RELEASE.md](IOS_RELEASE.md), 제출 자료는 [APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md), Mac 전달본은 [MAC_INSTALL.md](MAC_INSTALL.md)를 참조하세요.
+
+공개 지원: https://mj-0701.github.io/mellow-photo-support/
+개인정보 안내: https://mj-0701.github.io/mellow-photo-support/privacy.html

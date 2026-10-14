@@ -124,9 +124,9 @@ final class PhotoPipelineTests: XCTestCase {
             _ = try await pipeline.renderOriginal(id, at: url, recipe: faceRecipe, maxDimension: nil)
             XCTFail("준비되지 않은 사진의 얼굴 보정이 조용히 빠지면 안 된다")
         } catch {
-            guard case .faceAnalysisUnavailable = error as? MellowError else {
-                return XCTFail("faceAnalysisUnavailable이어야 한다: \(error)")
-            }
+            // 앱이 이 식별자를 사용자 문구로 바꾼다. 모듈은 한국어 문구를 갖지 않는다.
+            XCTAssertEqual(error as? MellowError, .faceAnalysisUnavailable(reason: "photo-not-prepared"))
+            XCTAssertEqual(PhotoPipeline.unpreparedReason, "photo-not-prepared")
         }
         var colorRecipe = EditRecipe()
         colorRecipe.color.exposure = 0.2

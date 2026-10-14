@@ -19,7 +19,8 @@ public struct PreparedPhoto: Sendable {
 
 /// 무거운 이미지 작업을 메인 액터 밖에서 직렬로 수행한다. 미리보기는 캐시에서 렌더한다.
 public actor PhotoPipeline {
-    private static let unpreparedReason = "사진이 아직 준비되지 않았습니다"
+    /// 준비 전 사진에 얼굴 보정을 저장하려 할 때의 사유 식별자. 사용자 문구는 앱이 정한다.
+    public static let unpreparedReason = "photo-not-prepared"
 
     private struct Entry {
         var faces: [FaceGeometry]

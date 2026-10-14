@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mellow.photo/schema/session-file.v2.json",
+  "title": "Mellow Photo SessionFile v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "photos", "presets"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "selectedPhotoID": { "type": ["string", "null"], "format": "uuid" },
+    "photos": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "filename", "displayName", "recipe", "undo", "redo"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "filename": { "type": "string", "description": "작업 사본 파일 이름. 폴더는 플랫폼이 정한다." },
+          "displayName": { "type": "string" },
+          "recipe": { "$ref": "edit-recipe.v2.schema.json" },
+          "undo": { "type": "array", "items": { "$ref": "edit-recipe.v2.schema.json" }, "maxItems": 40 },
+          "redo": { "type": "array", "items": { "$ref": "edit-recipe.v2.schema.json" } }
+        }
+      }
+    },
+    "presets": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "name", "values"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "maxLength": 30 },
+          "values": {
+            "type": "object", "additionalProperties": false,
+            "required": ["color", "portrait"],
+            "properties": {
+              "color": { "$ref": "edit-recipe.v2.schema.json#/properties/color" },
+              "portrait": { "$ref": "edit-recipe.v2.schema.json#/properties/portrait" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

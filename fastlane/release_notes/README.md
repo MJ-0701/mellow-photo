@@ -1,6 +1,6 @@
 # 후속 버전 변경사항
 
-첫 1.0.0 심사 빌드에는 이 설정을 적용하지 않습니다. 이미 공개된 iOS 버전이 있을 때, 다음 배포 버전 이름의 JSON 파일을 이 폴더에 커밋하세요. 예를 들어 `ios-v1.0.1` 태그는 `1.0.1.json`을 읽습니다.
+첫 1.0.0 심사 빌드에는 이 설정을 적용하지 않습니다. 이미 공개된 iOS 버전이 있을 때, 다음 배포 버전 이름의 JSON 파일을 이 폴더에 커밋하세요. 예를 들어 `apple-v1.0.1` 태그는 `1.0.1.json`을 읽습니다.
 
 형식 예시만 다음과 같습니다. 실제 변경사항으로 작성해야 하며, 이 예시는 배포 파일이 아닙니다.
 
@@ -16,7 +16,7 @@ App Store Connect 버전의 모든 언어 코드를 정확히 포함해야 합�
 
 1. 실제 앱 수정과 해당 버전 JSON을 함께 커밋하고 main에 push합니다.
 2. CI 통과와 변경사항을 확인합니다.
-3. `ios-vX.Y.Z` 태그를 생성하여 push합니다.
+3. `scripts/release.sh apple X.Y.Z`로 `apple/Config/Version.xcconfig`의 버전을 올려 커밋하고 `apple-vX.Y.Z` 태그를 만든 뒤 `git push origin main apple-vX.Y.Z`로 push합니다. `.github/workflows/apple-release.yml`이 실행됩니다.
 4. CI는 기존 live/editable 버전을 읽어 notes 누락·형식·언어를 서명 archive 전에 검증합니다.
 5. fastlane이 새 editable 버전을 생성/선택한 후 JSON을 해당 버전의 What's New 필드에만 반영합니다.
 6. 설정된 자동화 정책에 따라 빌드를 심사 제출하고, Apple 승인 후 공개합니다.

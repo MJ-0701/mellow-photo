@@ -11,13 +11,21 @@
 - iPhone 18 Pro Max / iOS 27 시뮬레이터에서 생성한 가상 성인 인물 사진 가져오기, 얼굴 한 명 감지, 프리셋, 실행 취소·다시 실행, 사진 추가 권한과 새 JPEG 저장, 종료 후 사진·보정값 복원을 확인했습니다. 사진 선택과 저장 메뉴 열기는 사용자가 직접 조작하고 이후 결과를 확인했습니다.
 - 실제 앱 색감·인물·잡티 화면을 1320×2868 JPEG 세 장으로 준비했습니다. 알파채널이 없음을 확인했으며, 사진 출처는 [store-assets/README.md](store-assets/README.md)에 기록했습니다.
 - 한국어 소개·부제·키워드·홍보 문구, 지원/개인정보 URL, 비공개 심사 연락처·메모를 App Store Connect에 저장했습니다. 사진 및 비디오 카테고리, 버전 1.0.0, 무료, 대한민국 한정, 수동 출시로 설정했습니다. JPEG 세 장은 대형 iPhone 슬롯에 등록됐으며 중형 슬롯에도 기존 자산으로 연결됐고 제출 검증을 통과했습니다. 연령 등급은 글로벌 4+ / 대한민국 전체입니다.
-- 사용자가 게시 동의 문구를 승인한 뒤 개인정보의 데이터 미수집 표시를 게시했습니다. Mac·Vision Pro 스토어 사용 가능 여부는 껐습니다. Mac 버전은 개인 Mac에서 저장소로 설치하는 별도 경로를 유지합니다.
+- 사용자가 게시 동의 문구를 승인한 뒤 개인정보의 데이터 미수집 표시를 게시했습니다. Mac·Vision Pro 스토어 사용 가능 여부는 껐습니다. Mac 버전은 개인 Mac에서 저장소로 설치하는 별도 경로를 유지합니다([MAC_INSTALL.md](MAC_INSTALL.md)).
 - 실제 iPhone의 HEIC·48MP·권한 거절·백그라운드 동작은 아직 확인하지 않았습니다. 시뮬레이터 검증을 실기기 검증으로 간주하지 않습니다.
 - [GitHub Actions 38369395464](https://github.com/MJ-0701/mellow-photo/actions/runs/38369395464)에서 1.0.0 / 빌드 4.1의 테스트, 서명 archive·IPA export, 양쪽 앱 bundle·버전·서명 검증, App Store Connect 업로드와 임시 서명 자료 정리가 모두 성공했습니다. 공식 API의 읽기 전용 조회로 `processingState=VALID`, `expired=false`, `usesNonExemptEncryption=false`를 확인했습니다. App Store 제출 상세 화면에서도 1.0.0 (4.1)의 심사 대기 상태를 직접 확인했습니다.
 
 ## 기능과 설명의 근거
 
 소개 문구는 현재 iPhone 화면과 보정 엔진에 있는 기능만 포함합니다: 색감 슬라이더, 프리셋, 얼굴 감지 기반 피부 정돈·미세 조정, 수동 복제 브러시, 부분 변형, 최대 12장, 설정 전체 적용, 실행 취소·복귀, 작업 기록 저장, JPEG 출력. AI 자동 잡티 제거, 생성형 보정, Evoto와 동일한 성능, HDR 보존, 무제한 고해상도 성능은 약속하지 않습니다. 실제 빌드의 기능이 바뀌면 문구도 함께 수정하세요.
+
+### 저장소 재구성(2026-10-14) 이후 다음 제출 전에 확인할 점
+
+- 앱 소스는 `apple/`로 옮겼습니다. Xcode 프로젝트는 `apple/MellowPhoto.xcodeproj`(스킴 `MellowPhoto`, 정의는 `apple/project.yml`), 버전은 `apple/Config/Version.xcconfig`, 배포 태그는 `apple-vX.Y.Z`입니다. 안내는 [APPLE.md](APPLE.md)와 [IOS_RELEASE.md](IOS_RELEASE.md)에 있습니다.
+- 같은 앱이 iPad도 지원합니다(`TARGETED_DEVICE_FAMILY = 1,2`). App Store Connect가 요구하는 iPad 스크린샷을 실제 iPad 화면으로 준비해야 합니다.
+- 한 번에 편집할 수 있는 사진 수가 기기 메모리에 따라 12·24·40장으로 바뀌었습니다. `fastlane/metadata/ko/description.txt`, `fastlane/metadata/ko/release_notes.txt`, `fastlane/metadata/review_information/notes.txt`의 "최대 12장"/"Up to 12" 문구는 아직 출시본 기준이므로 다음 제출 전에 실제 동작에 맞게 고칩니다.
+- 사진 앱 선택 외에 파일 선택으로도 가져올 수 있고, PNG 저장을 고를 수 있습니다. 소개 문구를 바꿀 때 반영할 수 있습니다.
+- Mac App Store 사용 가능 여부는 계속 끈 상태로 둡니다. Mac 앱은 임시 서명 zip으로만 전달합니다.
 
 앱 이름 사용 가능 여부와 권리 확인은 App Store Connect에서 진행합니다. 첫 버전은 release notes가 표시되지 않거나 불필요할 수 있습니다. 저작권 표기에는 계정 소유자가 사용할 실제 권리자 이름을 입력해야 하므로 저장소에서 이름을 추측하지 않습니다.
 

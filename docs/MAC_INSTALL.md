@@ -4,16 +4,16 @@ macOS 14 이상이 필요합니다. 전달용 앱에는 Apple Silicon(M1 이상)
 
 ## 개인 맥북에서 GitHub 소스로 실행하기
 
-이미 GitHub 소스 접근 권한이 있는 개인 맥북에서는 정식 배포나 Apple Developer 활성화 없이 로컬로 빌드할 수 있습니다. 최초 빌드에는 Xcode 또는 Apple Command Line Tools가 필요합니다. 아래 명령은 GitHub CLI로 로그인된 환경을 기준으로 합니다.
+이미 GitHub 소스 접근 권한이 있는 개인 맥북에서는 정식 배포나 Apple Developer 활성화 없이 로컬로 빌드할 수 있습니다. 빌드에는 Xcode 전체 버전이 필요합니다(Command Line Tools만으로는 빌드할 수 없습니다). 아래 명령은 GitHub CLI로 로그인된 환경을 기준으로 합니다.
 
 ```sh
 gh repo clone MJ-0701/mellow-photo
 cd mellow-photo
-bash scripts/build-app.sh
-open "dist/Mellow Photo.app"
+./scripts/package-mac.sh
+open "apple/build/Build/Products/Release/Mellow Photo.app"
 ```
 
-최신 소스를 받으려면 해당 폴더에서 `git pull --ff-only` 후 다시 빌드합니다. GitHub 비공개 저장소이므로 접근 권한이 있는 계정으로 받아야 합니다. 빌드 후에는 앱을 응용 프로그램 폴더에 복사해 더블클릭으로 실행할 수 있습니다. 아래 압축 파일 전달 방식은 선택 사항입니다.
+`scripts/package-mac.sh`는 Apple Silicon·Intel 통합 Release 앱을 빌드해 임시 서명하고, 이 안내를 포함한 전달용 `dist/Mellow-Photo-Mac.zip`과 SHA-256 파일도 만듭니다. 최신 소스를 받으려면 해당 폴더에서 `git pull --ff-only` 후 다시 실행합니다. GitHub 비공개 저장소이므로 접근 권한이 있는 계정으로 받아야 합니다. 빌드 후에는 앱을 응용 프로그램 폴더에 복사해 더블클릭으로 실행할 수 있습니다. 아래 압축 파일 전달 방식은 선택 사항입니다.
 
 ## 빌드된 앱을 복사해서 설치하기
 
@@ -27,16 +27,20 @@ Apple의 공식 안내: https://support.apple.com/ko-kr/102445
 
 ## 아이폰 사진을 보정하기
 
-1. 아이폰에서 사진을 AirDrop으로 Mac에 보냅니다. 또는 Mac 사진 앱에서 사진을 파일로 내보냅니다.
-2. Mellow Photo에서 ‘사진 가져오기’를 누르고 HEIC·JPEG·PNG 파일을 선택합니다.
+1. 아이폰에서 사진을 AirDrop으로 Mac에 보내거나, iCloud 사진으로 Mac 사진 앱에 동기화합니다.
+2. Mellow Photo에서 ‘사진 가져오기’를 누르고 ‘사진 앱에서 고르기’ 또는 ‘파일에서 고르기’로 HEIC·JPEG·PNG를 선택합니다. 파일을 편집 화면으로 끌어다 놓아도 됩니다. 한 번에 편집할 수 있는 사진 수는 Mac 메모리에 따라 12·24·40장입니다.
 3. 색감 프리셋이나 슬라이더를 조정합니다. 인물 탭에서 피부 정돈과 얼굴 미세 조정을 사용할 수 있습니다.
-4. 잡티 보정은 깨끗한 피부를 클릭해 샘플을 정한 다음 잡티를 클릭합니다. 부분 변형은 조금씩 드래그합니다.
-5. 원본과 비교한 뒤 ‘내보내기’로 JPEG 또는 PNG를 저장합니다. 저장한 사진을 AirDrop으로 아이폰에 보내면 됩니다.
+4. 잡티 보정은 깨끗한 피부를 클릭해 샘플을 정한 다음 잡티를 클릭합니다. 샘플 위치는 Option+클릭으로 바꿉니다. 부분 변형은 조금씩 드래그합니다.
+5. 원본과 비교한 뒤 ‘저장’ 메뉴에서 형식을 고르고 저장할 폴더를 선택합니다. 파일은 `<이름>_mellow.jpg`처럼 새 이름으로 저장되며 기존 파일을 덮어쓰지 않습니다. 저장한 사진을 AirDrop으로 아이폰에 보내면 됩니다.
+
+⌘O 가져오기, ⌘Z 실행 취소, ⇧⌘Z 다시 실행, ⇧⌘S 현재 사진 저장입니다.
 
 사진 원본은 수정하지 않습니다. 로그인·초대코드·구독 없이 사용할 수 있으며 사진 보정은 Mac 내부에서 처리됩니다.
 
-현재 Mac 버전은 앱을 종료하면 편집 기록이 사라집니다. 종료 전에 사진을 내보내세요. 저장한 프리셋은 다음 실행에도 유지됩니다. iPhone 앱과 편집 기록을 동기화하지 않습니다.
+Mac 버전도 편집 기록을 복원합니다. 가져온 사진은 앱 안의 작업 사본으로 보관하므로, 앱을 다시 열면 사진 목록·보정값·실행 취소 기록·프리셋이 그대로 남아 있습니다. iPhone 앱과 편집 기록을 동기화하지는 않습니다. ‘편집에서 사진 빼기’는 작업 사본만 지우며 원래 파일은 그대로입니다.
 
-출력은 8bit sRGB SDR입니다. HDR·Live Photo 영상·RAW/ProRAW 편집과 원본 GPS/카메라 정보 보존은 지원하지 않습니다. 피부 정돈은 필터이며 자동 잡티 제거 기능은 아닙니다.
+앱은 macOS App Sandbox 안에서 실행되며 사용자가 고른 파일과 폴더만 읽고 씁니다. 작업 사본과 기록은 `~/Library/Containers/com.mj.mellowphoto/Data/Library/Application Support/MellowPhoto`에 있습니다. 이전 버전의 Mac 앱을 쓰던 경우, 새 버전을 처음 실행할 때 macOS가 예전 `~/Library/Application Support/MellowPhoto` 폴더를 이 위치로 옮기고, 앱이 그 안의 저장 프리셋(`presets.json`)을 가져온 뒤 `presets.json.imported`로 이름을 바꿉니다.
+
+출력은 8bit sRGB SDR이며 기본은 긴 변 최대 4096픽셀입니다. ‘원본 해상도’를 켜면 크기 제한 없이 저장합니다. HDR·Live Photo 영상·RAW/ProRAW 편집과 원본 GPS/카메라 정보 보존은 지원하지 않습니다. 피부 정돈은 필터이며 자동 잡티 제거 기능은 아닙니다.
 
 문의: jack2718@naver.com

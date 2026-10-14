@@ -1,4 +1,5 @@
 import Foundation
+import MellowRendering
 import MellowShared
 
 /// 모든 한국어 사용자 문구. 모듈은 문구를 모른다.
@@ -15,6 +16,8 @@ enum UserMessage {
     static let photoLibraryItemName = "사진 앱 항목"
     /// 사진 앱이 새 항목을 만들지 못했을 때 저장 실패 사유.
     static let photoLibraryCouldNotCreateAsset = "사진 앱에 새 사진을 만들지 못했습니다."
+    /// PhotoPipeline.unpreparedReason을 사용자에게 보여줄 때의 문구.
+    static let photoNotPrepared = "사진이 아직 준비되지 않았습니다"
     static let toolColor = "색감"
     static let toolPortrait = "인물"
     static let toolRetouch = "잡티"
@@ -85,7 +88,8 @@ enum UserMessage {
         case .fileAlreadyExists: return "같은 이름의 파일이 이미 있습니다. 다른 이름을 선택하세요."
         case .exportFailed(let reason): return "사진을 저장하지 못했습니다: \(reason)"
         case .faceAnalysisUnavailable(let reason):
-            return "얼굴 분석을 사용할 수 없습니다. 색감·수동 보정은 사용할 수 있어요. (\(reason))"
+            let detail = reason == PhotoPipeline.unpreparedReason ? photoNotPrepared : reason
+            return "얼굴 분석을 사용할 수 없습니다. 색감·수동 보정은 사용할 수 있어요. (\(detail))"
         case .sessionUnreadable: return sessionUnreadable
         case .sessionWriteFailed(let reason): return "편집 기록 저장 실패: \(reason)"
         case .photoLibraryAccessDenied:
