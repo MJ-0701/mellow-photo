@@ -52,6 +52,7 @@
 - 앱 XCTest: iPhone 18 Pro 시뮬레이터 23개, iPad Pro 13-inch (M5) 시뮬레이터 23개, macOS 24개 모두 통과.
 - `./scripts/build-apple.sh ios-device`: 서명 없는 Release iPhone/iPad arm64 빌드, Info.plist·PrivacyInfo plist 검사, 번들 ID·iPhoneOS·Assets.car 검사 통과.
 - `./scripts/build-apple.sh mac`: Release 빌드 arm64·x86_64 포함, `codesign --verify --deep --strict` 통과. 경고는 기존 `WarpKernel.swift:15` `init(source:)` 지원 중단 경고뿐.
+- 전체 리뷰 후속 수정(커밋 `da3348f` 기준)에서 자동 검증을 다시 실행: `./scripts/test-apple.sh` 종료 코드 0, 패키지 `swift test` 71개 통과(MellowShared 8, MellowRendering 22, MellowLibrary 26, MellowExport 4, MellowEditing 11), 앱 XCTest iPhone 18 Pro 시뮬레이터 26개·iPad Pro 13-inch (M5) 시뮬레이터 26개·macOS 27개 통과, `./scripts/build-apple.sh ios-device`·`mac` 통과. 후속 수정의 화면 동작(핀치 줌, Finder 열기, 입력 중 ⌘Z)은 실기동으로 확인하지 않음.
 
 ### 출시본 v1 세션 복원 (iPhone 18 Pro 시뮬레이터)
 
@@ -90,3 +91,4 @@
 - iPad 가로 방향(시뮬레이터 회전 불가), 드래그 앤 드롭, Option+클릭 샘플 재지정, ⌘O.
 - 이번 Mac 실행에서 파일 가져오기와 잡티 탭: 전역 키 입력으로 한 첫 가져오기 시도가 실패했고, 사용자가 같은 Mac을 쓰는 중이라 이후 전역 키 입력·클릭을 다시 쓰지 않음.
 - 실제 Mac의 구 앱 폴더 → 샌드박스 컨테이너 이전.
+- iOS 대화형 실기동(가져오기→편집→실행 취소→사진 앱 저장)은 셸에서 시뮬레이터 탭이 불가하고 네이티브 시뮬레이터 도구는 `sudo xcode-select` 전환이 필요해 미실시. 첫 `apple-v*` 태그 전 사용자가 수행해야 함.

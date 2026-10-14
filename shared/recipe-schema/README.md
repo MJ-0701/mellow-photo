@@ -26,6 +26,21 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 - Apple 구현은 값이 없는 선택 키(`portrait.targetFace`, `selectedPhotoID`)를 `null`로 쓰지 않고 키 자체를 생략합니다. 읽는 쪽은 생략과 `null`을 같은 뜻으로 받아야 합니다.
 - 읽을 때는 빠진 키를 기본값으로 채웁니다. 기본값은 스키마의 `default`와 같습니다.
 
+### 값의 범위: 스키마 한계와 UI 권장 범위
+
+스키마의 `minimum`·`maximum`은 **하드 한계**입니다. 이 밖의 값은 잘못된 파일입니다. 앱 슬라이더는 그보다 좁은 **권장 범위**만 보여 줍니다. 권장 범위는 화면 정책이지 파일 형식의 제약이 아니므로, 읽는 쪽은 권장 범위를 벗어났지만 스키마 한계 안에 있는 값(예: 다른 플랫폼이나 이후 버전이 쓴 노출 2.0)을 거부하지 말고 그대로 렌더해야 합니다.
+
+| 키 | 스키마 한계 | UI 권장 범위 (Apple 슬라이더) |
+|---|---|---|
+| `color.exposure` | −3 … 3 | −1.5 … 1.5 |
+| `color.contrast` | 0 … 2 | 0.7 … 1.3 |
+| `color.saturation` | 0 … 2 | 0 … 1.5 |
+| `color.warmth` | −1 … 1 | −1 … 1 |
+| `portrait.skinSmoothing` | 0 … 1 | 0 … 1 |
+| `portrait.faceSlim` | 0 … 1 | 0 … 1 |
+
+Apple의 권장 범위는 `apple/MellowPhoto/Features/Editor/ColorPanel.swift`와 `PortraitPanel.swift`의 슬라이더 `range`입니다. 다른 플랫폼도 같은 권장 범위를 쓰는 것을 원칙으로 합니다.
+
 ## v1: 출시된 iPhone 앱의 형식
 
 iPhone 1.0.0이 쓰던 `session.json`은 `schemaVersion` 키가 없습니다. 이 키가 없으면 v1로 판별합니다. 실제 예시는 `shared/fixtures/session-v1.json`이며, 출시 기준 커밋의 코드로 인코드해 만든 파일입니다(손으로 쓰지 않았습니다).

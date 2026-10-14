@@ -48,7 +48,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 테스트 | `apple/Tests/MellowEditingTests` (GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:editing`, C++ `mellow_editing` |
 
-규칙은 모두 `EditDocument` 안에만 있습니다. 슬라이더 드래그는 `beginContinuousChange`/`endContinuousChange`로 시작할 때 한 번만 체크포인트합니다. 잠긴 동안의 얼굴 형태·대상 변경은 무시하고 `EditDocument.Rejection`을 돌려줍니다. 잠기지 않은 사진에 일괄 적용하면 대상 얼굴을 모든 얼굴로 되돌립니다.
+규칙은 모두 `EditDocument` 안에만 있습니다. 슬라이더 드래그는 `beginContinuousChange`/`endContinuousChange`로 시작할 때 한 번만 체크포인트하고, 실행 취소·다시 실행·초기화는 진행 중이던 연속 변경을 끝냅니다. 프리셋은 얼굴을 고르지 않으므로 적용해도 사진의 대상 얼굴을 유지합니다(앱은 사용자 프리셋에 대상 얼굴을 저장하지 않습니다). 잠긴 동안의 얼굴 형태·대상 변경은 무시하고 `EditDocument.Rejection`을 돌려줍니다. 잠기지 않은 사진에 일괄 적용하면 대상 얼굴을 모든 얼굴로 되돌립니다.
 
 ### MellowLibrary
 | 항목 | 내용 |
@@ -57,7 +57,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 공개 API | `ProjectSession`, `PhotoEntry`, `SessionSnapshot`, `SessionStore`, `JSONSessionStore`, `WorkingCopyStore`, `LibraryPolicy` |
 | 의존 | MellowShared, MellowEditing |
 | 포트 | `SessionStore` (`load() throws -> SessionSnapshot?`, `save(SessionSnapshot) throws`). 구현은 같은 모듈의 `JSONSessionStore` |
-| 규칙 | 세션 파일은 v1(출시본 iPhone)·v2를 읽고 v2로만 씀, 원자적 쓰기, 읽을 수 없는 파일은 `session-recovery-<uuid>.json`으로 보존한 뒤 새 세션, 사진 제거는 저장 성공 후에만 반영, 사진 수 상한은 물리 메모리 4GB 미만 12장·8GB 미만 24장·그 외 40장, 프리셋 이름 30자, 작업 사본은 `Library/<uuid>.<확장자>`이고 출시본 iPhone의 상위 폴더 사본도 찾음 |
+| 규칙 | 세션 파일은 v1(출시본 iPhone)·v2를 읽고 v2로만 씀, 원자적 쓰기, 슬라이더 드래그 동안은 저장을 미루고 끝날 때 한 번 씀(`beginDeferredPersistence`/`endDeferredPersistence`), 읽을 수 없는 파일은 `session-recovery-<uuid>.json`으로 보존한 뒤 새 세션, 사진 제거는 저장 성공 후에만 반영, 사진 수 상한은 물리 메모리 4GB 미만 12장·8GB 미만 24장·그 외 40장, 프리셋 이름 30자, 작업 사본은 `Library/<uuid>.<확장자>`이고 출시본 iPhone의 상위 폴더 사본도 찾음 |
 | 테스트 | `apple/Tests/MellowLibraryTests` (v1 픽스처 이행, `session-file.v2` 스키마 키 대조, 손상 세션 보존, 쓰기 실패 시 제거 중단, 사진 수 정책. GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:library`, C++ `mellow_library` |
 
