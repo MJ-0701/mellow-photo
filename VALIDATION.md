@@ -40,3 +40,45 @@
 - 로컬 iOS 27 시뮬레이터 실행은 runtime path not found로 차단됨. 실행 테스트 통과로 기록하지 않음. GitHub CI의 iOS 18.5 실행 결과는 별도 확인.
 - GitHub CI `1a14f57` 최종 성공: GPU 엔진 8개, iPhone XCTest 7개와 unsigned Release iPhone 빌드·bundle 검사 통과. https://github.com/MJ-0701/mellow-photo/actions/runs/38364061937
 - 앱 소개·심사 안내 초안 준비. 초대코드 제한은 심사 위험을 고려해 제외. 서명·스토어 업로드·실기기·48MP·Apple 심사는 아직 미완료.
+
+## 구조 리팩토링 A (2026-10-14)
+
+2026-10-14, 브랜치 `apple-modulith` 커밋 `13be3db` 기준. Apple Silicon / macOS 26.6.2 / Xcode 27.0 / iOS 27.0 시뮬레이터.
+
+### 자동 검증
+
+- `./scripts/test-apple.sh` 종료 코드 0. 모듈 의존성·import 검사, `swift format lint --strict`, XcodeGen 2.46.0 재생성 후 xcodeproj 차이 없음 확인을 포함.
+- 패키지 `swift test` 69개 통과: MellowShared 8, MellowRendering 22, MellowLibrary 25, MellowExport 4, MellowEditing 10.
+- 앱 XCTest: iPhone 18 Pro 시뮬레이터 23개, iPad Pro 13-inch (M5) 시뮬레이터 23개, macOS 24개 모두 통과.
+- `./scripts/build-apple.sh ios-device`: 서명 없는 Release iPhone/iPad arm64 빌드, Info.plist·PrivacyInfo plist 검사, 번들 ID·iPhoneOS·Assets.car 검사 통과.
+- `./scripts/build-apple.sh mac`: Release 빌드 arm64·x86_64 포함, `codesign --verify --deep --strict` 통과. 경고는 기존 `WarpKernel.swift:15` `init(source:)` 지원 중단 경고뿐.
+
+### 출시본 v1 세션 복원 (iPhone 18 Pro 시뮬레이터)
+
+- 앱 컨테이너 `Library/Application Support/MellowPhoto/` 바로 아래에 `shared/fixtures/session-v1.json`과 데모 사진 사본 2장(`.heic`, `.jpg` 확장자의 PNG)을 출시본 레이아웃 그대로 두고 실행.
+- 화면 캡처로 확인: 사진 2장 복원, 첫 사진 선택, 노출 0.40 표시와 밝아진 미리보기, 두 썸네일 모두 편집 표시, 실행 취소·다시 실행 버튼 활성 모양, 프리셋 목록에 저장된 "포근한" 노출(기본 프리셋 "포근한"과 같은 이름으로 두 번 보임), 상태줄 "2장".
+- 종료 후 파일로 확인: `session.json`이 `"schemaVersion":2`로 다시 쓰임. 첫 사진 노출 0.4·피부 정돈 0.3·얼굴 형태 0.2·대상 얼굴 1, spot·warp 작업 2개, 실행 취소 2단계·다시 실행 1단계 보존. 두 번째 사진 따뜻함 -0.1. 프리셋 "포근한"(노출 0.15·채도 0.92·따뜻함 0.25·피부 0.3) 보존. 사진 사본은 옛 위치에서 그대로 읽힘.
+- 재실행 후에도 같은 화면으로 복원됨(화면 캡처).
+- 얼굴 1명 감지와 실행 취소 2단계 실제 동작은 시뮬레이터를 조작할 수 없어 iOS에서 확인하지 못함.
+
+### 플랫폼별 실기동
+
+- iPhone 시뮬레이터: 세로 compact 편집 화면(사진 줄·캔버스·동작 바·도구 탭·슬라이더 세로 배치)을 화면 캡처로 확인. 실행과 화면 캡처만 했고 탭 조작은 하지 않음.
+- iPad Pro 11-inch (M5) 시뮬레이터: v2 세션과 작업 사본을 컨테이너에 넣고 실행. 세로 방향에서 3단 레이아웃(사이드바 "내 사진 2", 캔버스, 오른쪽 조정 패널)을 화면 캡처로 확인. 탭 조작은 하지 않음.
+- Mac: 샌드박스·임시 서명된 Release 앱을 실행해 접근성 메뉴·버튼 조작으로 확인. 컨테이너의 기존 세션 복원, 메뉴의 실행 취소·다시 실행(미리보기·버튼 상태·세션 파일 반영), 인물 탭 "얼굴 1명", 잡티 보정 기록이 있는 사진에서 얼굴 미세 조정 슬라이더와 얼굴 선택 비활성·피부 정돈 활성, 노출 슬라이더 0.90, 원본 비교 전환, 폴더 저장(1254×1254 JPEG, 상태 "1장 저장 완료"), 종료 후 재실행에서 노출 0.90 복원.
+- Mac 검증 뒤 컨테이너의 세션과 사본은 검증 전 백업으로 되돌림.
+- 같은 날 적응형 화면 구현 직후(커밋 `6cb21d9`)의 Mac 실기동에서 파일 가져오기, 잡티 샘플·대상 탭, ⇧⌘S 저장을 확인한 기록이 있음. 이번에는 다시 하지 않음.
+
+### Mac 샌드박스
+
+- Release 앱 권한: `com.apple.security.app-sandbox`, `com.apple.security.files.user-selected.read-write`. 데이터는 `~/Library/Containers/com.mj.mellowphoto/`에 저장됨을 확인.
+- `container-migration.plist`가 번들에 포함됨을 확인. 구 Mac 앱 폴더를 컨테이너로 옮기는 실제 이전은 미검증(이 Mac에는 이미 컨테이너가 있음).
+- `CODE_SIGNING_ALLOWED=NO`로 만든 Debug 앱은 권한이 없어 샌드박스 밖에서 실행되고 컨테이너 세션을 읽지 않음. 테스트용 빌드의 특성이며 배포본과 다름.
+
+### 미검증
+
+- 실기기(iPhone·iPad·Intel Mac), 48MP 원본, HDR 사진, 서명·공증·스토어 업로드.
+- iOS에서 PhotosPicker·파일 가져오기, 사진 앱 저장과 권한 요청, 잡티·변형 탭, 슬라이더 조작, 원본 비교, 얼굴 감지 표시.
+- iPad 가로 방향(시뮬레이터 회전 불가), 드래그 앤 드롭, Option+클릭 샘플 재지정, ⌘O.
+- 이번 Mac 실행에서 파일 가져오기와 잡티 탭: 사용자가 같은 Mac을 쓰는 중이라 전역 키 입력·클릭을 쓰지 않음.
+- 실제 Mac의 구 앱 폴더 → 샌드박스 컨테이너 이전.
