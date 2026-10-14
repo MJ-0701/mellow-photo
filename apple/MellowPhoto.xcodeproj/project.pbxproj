@@ -33,6 +33,7 @@
 		993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41FC59ED8903FB97642854A /* AppModel+Editing.swift */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
+		C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */ = {isa = PBXBuildFile; fileRef = DD25AA90F8D05216BCD544F0 /* container-migration.plist */; };
 		CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */; };
 		CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */; };
 		D02081D49122EB40B5C8E7DA /* AppModel+Export.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */; };
@@ -80,6 +81,7 @@
 		D41FC59ED8903FB97642854A /* AppModel+Editing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Editing.swift"; sourceTree = "<group>"; };
 		D882DADCF0E8575966450368 /* ExportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPhotosTests.swift; sourceTree = "<group>"; };
 		DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Export.swift"; sourceTree = "<group>"; };
+		DD25AA90F8D05216BCD544F0 /* container-migration.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "container-migration.plist"; sourceTree = "<group>"; };
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F465BA3A1339352022E907AA /* AppModel+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Live.swift"; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -125,6 +127,7 @@
 			isa = PBXGroup;
 			children = (
 				E1DB811347F53AB847DE61D2 /* Assets.xcassets */,
+				DD25AA90F8D05216BCD544F0 /* container-migration.plist */,
 				14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */,
 				0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */,
 				8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */,
@@ -309,6 +312,7 @@
 				7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */,
 				CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */,
 				49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */,
+				C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

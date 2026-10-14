@@ -60,6 +60,9 @@ final class AppModel {
     var isComparing = false
     var exportOptions = ExportOptions()
 
+    /// 세션을 읽은 직후(읽기에 성공했을 때만) 부르는 조립용 훅. 구 데이터 흡수처럼 복원된 상태 위에 더해야 하는 일을 맡긴다.
+    var afterSessionRestored: (@MainActor (ProjectSession) -> Void)?
+
     let renderScheduler: RenderScheduler
     private var selectionTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
@@ -99,6 +102,7 @@ final class AppModel {
         defer { isRestoring = false }
         do {
             try session.restore()
+            afterSessionRestored?(session)
         } catch {
             present(error)
         }

@@ -23,4 +23,18 @@ final class LegacyMacPresetsTests: XCTestCase {
         LegacyMacPresets.importIfPresent(into: session, applicationSupport: support)
         XCTAssertEqual(session.presets.count, 1, "두 번째 실행은 아무것도 하지 않는다")
     }
+
+    func testCorruptLegacyPresetsFileIsLeftInPlace() throws {
+        let support = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: support) }
+        let legacy = support.appendingPathComponent("MellowPhoto/presets.json")
+        try FileManager.default.createDirectory(
+            at: legacy.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{ broken".utf8).write(to: legacy)
+        let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
+        LegacyMacPresets.importIfPresent(into: session, applicationSupport: support)
+        XCTAssertTrue(session.presets.isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path), "읽지 못한 파일은 그대로 둔다")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path + ".imported"))
+    }
 }

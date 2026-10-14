@@ -155,6 +155,22 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.session.selectedPhotoID, id)
     }
 
+    func testLegacyPresetImportRunsAfterSessionRestoreAndKeepsPhotos() async throws {
+        let store = MemorySessionStore()
+        let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
+        try copies.prepareDirectory()
+        let id = PhotoID()
+        let filename = try copies.adopt(temporaryFile: try TestSupport.solidPNG(in: root), as: id)
+        store.saved = SessionSnapshot(
+            photos: [PhotoEntry(id: id, filename: filename, displayName: "복원")], selectedPhotoID: id, presets: [])
+        let model = TestSupport.makeModel(root: root, store: store)
+        model.afterSessionRestored = { $0.addPreset(named: "옛날", values: PresetValues()) }
+        await model.restore()
+        XCTAssertEqual(model.session.photos.count, 1)
+        XCTAssertEqual(model.session.presets.map(\.name), ["옛날"])
+        XCTAssertEqual(store.saved?.photos.map(\.id), [id], "프리셋 흡수가 저장된 사진 목록을 덮어쓰면 안 된다")
+    }
+
     func testRestoreWithUnreadableSessionKeepsAppUsable() async throws {
         let store = JSONSessionStore(fileURL: root.appendingPathComponent("session.json"))
         try Data("{ broken".utf8).write(to: store.fileURL)

@@ -42,18 +42,22 @@ enum LegacyMacPresets {
     static func importIfPresent(into session: ProjectSession, applicationSupport: URL) {
         let file = applicationSupport.appendingPathComponent(relativePath)
         guard FileManager.default.fileExists(atPath: file.path) else { return }
-        defer { markImported(file) }
+        // 읽지 못한 파일은 그대로 둔다. 다음 버전이 다시 시도할 수 있고 사용자 데이터도 보존된다.
         guard let data = try? Data(contentsOf: file) else { return }
         guard let presets = try? JSONDecoder().decode([LegacyPreset].self, from: data) else { return }
         for preset in presets {
             session.addPreset(named: preset.name, values: preset.values)
         }
+        markImported(file)
     }
 
-    /// 지난 흡수본이 남아 있어도 이름을 바꿔, 같은 프리셋을 실행마다 다시 넣지 않게 한다.
+    /// 흡수한 파일을 옆에 보관한다. 지난 흡수본이 있으면 지우지 않고 겹치지 않는 이름을 쓴다.
     private static func markImported(_ file: URL) {
         let imported = file.appendingPathExtension(importedExtension)
-        try? FileManager.default.removeItem(at: imported)
-        try? FileManager.default.moveItem(at: file, to: imported)
+        let target =
+            FileManager.default.fileExists(atPath: imported.path)
+            ? file.appendingPathExtension(UUID().uuidString).appendingPathExtension(importedExtension)
+            : imported
+        try? FileManager.default.moveItem(at: file, to: target)
     }
 }

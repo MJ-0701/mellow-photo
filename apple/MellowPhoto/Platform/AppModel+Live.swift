@@ -25,7 +25,11 @@ extension AppModel {
             model.present(message: UserMessage.workingFolderUnavailable(error.localizedDescription))
         }
         #if os(macOS)
-            LegacyMacPresets.importIfPresent(into: session, applicationSupport: applicationSupport)
+            // 샌드박스 밖의 구 Mac 앱 폴더는 Resources/container-migration.plist가 첫 실행 때 컨테이너로 옮긴다.
+            // 복원된 세션 위에 더해야 저장된 사진 목록을 덮어쓰지 않는다.
+            model.afterSessionRestored = { session in
+                LegacyMacPresets.importIfPresent(into: session, applicationSupport: applicationSupport)
+            }
         #endif
         return model
     }
