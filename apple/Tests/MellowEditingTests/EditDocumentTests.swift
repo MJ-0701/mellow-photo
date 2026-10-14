@@ -28,6 +28,19 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.color.exposure, 0)
     }
 
+    func testUndoClearsContinuousChange() {
+        var document = EditDocument()
+        document.beginContinuousChange()
+        document.set(.exposure(0.1))
+        // 드래그가 끝나기 전에 실행 취소하면 이후 편집은 다시 단계마다 체크포인트한다.
+        document.undo()
+        document.set(.exposure(0.2))
+        document.set(.exposure(0.3))
+        XCTAssertEqual(document.undoStack.count, 2)
+        document.undo()
+        XCTAssertEqual(document.recipe.color.exposure, 0.2)
+    }
+
     func testIdenticalRecipeIsNotCheckpointedTwice() {
         var document = EditDocument()
         document.set(.exposure(0.4))
@@ -82,9 +95,9 @@ final class EditDocumentTests: XCTestCase {
     func testPresetReplacesEverythingWhenUnlocked() {
         var document = EditDocument()
         document.set(.targetFace(2))
-        document.apply(PresetValues(portrait: PortraitAdjustments(faceSlim: 0.7)))
+        document.apply(PresetValues(portrait: PortraitAdjustments(faceSlim: 0.7, targetFace: 5)))
         XCTAssertEqual(document.recipe.portrait.faceSlim, 0.7)
-        XCTAssertNil(document.recipe.portrait.targetFace, "프리셋은 대상 얼굴을 갖지 않으므로 전체 얼굴로 돌아간다")
+        XCTAssertEqual(document.recipe.portrait.targetFace, 2, "프리셋은 얼굴을 고르지 않으므로 사진의 대상 얼굴을 유지한다")
     }
 
     func testBatchApplyKeepsLockedGeometryAndResetsTargetOtherwise() {

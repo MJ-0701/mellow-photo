@@ -59,13 +59,14 @@ public struct EditDocument: Equatable, Sendable {
         return nil
     }
 
-    /// 사용자가 고른 프리셋. 잠긴 사진은 얼굴 형태 값을 유지한다.
+    /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
+    /// 잠긴 사진은 얼굴 형태 값도 유지한다.
     public mutating func apply(_ values: PresetValues) {
         checkpoint()
         var portrait = values.portrait
+        portrait.targetFace = recipe.portrait.targetFace
         if isGeometryLocked {
             portrait.faceSlim = recipe.portrait.faceSlim
-            portrait.targetFace = recipe.portrait.targetFace
         }
         recipe.color = values.color
         recipe.portrait = portrait
@@ -90,19 +91,23 @@ public struct EditDocument: Equatable, Sendable {
         recipe.operations.append(edit)
     }
 
+    /// 실행 취소·다시 실행·초기화는 진행 중이던 연속 변경을 끝낸다. 이후 편집은 다시 체크포인트한다.
     public mutating func undo() {
+        isContinuousChange = false
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(recipe)
         recipe = previous
     }
 
     public mutating func redo() {
+        isContinuousChange = false
         guard let next = redoStack.popLast() else { return }
         undoStack.append(recipe)
         recipe = next
     }
 
     public mutating func reset() {
+        isContinuousChange = false
         checkpoint()
         recipe = EditRecipe()
     }
