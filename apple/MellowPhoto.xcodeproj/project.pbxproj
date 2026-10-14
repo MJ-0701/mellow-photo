@@ -1,0 +1,552 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
+		2BF138DBA2985AF7A3B3A78E /* MellowLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E104DB4C3683E0F5CABAB0BD /* MellowLibrary */; };
+		3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */ = {isa = PBXBuildFile; productRef = 213FE2825489D6DA1E427B12 /* MellowRendering */; };
+		488B6115DC2ECB574B00F218 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */; };
+		48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0604580F74993079C348EBA /* MellowPhotoApp.swift */; };
+		49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */; };
+		73148254538FB7A0C74B8C8F /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CE1246D6DEF7E9378829940 /* RootView.swift */; };
+		7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E1DB811347F53AB847DE61D2 /* Assets.xcassets */; };
+		8B0070F52E5A1F0150111794 /* MellowEditing in Frameworks */ = {isa = PBXBuildFile; productRef = 2D215632597C957E5592C85D /* MellowEditing */; };
+		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
+		CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		991598D8797B226DCC7D5688 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7AE6D02F3A4F358C49EC2319 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 09AD9F137D276D94FA5355DD;
+			remoteInfo = MellowPhoto;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MellowPhoto-macOS.entitlements"; sourceTree = "<group>"; };
+		14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		8CE1246D6DEF7E9378829940 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		C1219E8E2E4AA4621805C516 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		CDC8069CC675408C9A682CA6 /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
+		D0604580F74993079C348EBA /* MellowPhotoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MellowPhotoApp.swift; sourceTree = "<group>"; };
+		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA07672648D544B650764001 /* MellowPhoto.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MellowPhoto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		217ADA8BF6BED9D8DA354EEA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */,
+				8B0070F52E5A1F0150111794 /* MellowEditing in Frameworks */,
+				2BF138DBA2985AF7A3B3A78E /* MellowLibrary in Frameworks */,
+				3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */,
+				23C0722E7B6702010764195B /* MellowExport in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		234C56F9AC1E84E4DC7784FB /* App */ = {
+			isa = PBXGroup;
+			children = (
+				D0604580F74993079C348EBA /* MellowPhotoApp.swift */,
+				8CE1246D6DEF7E9378829940 /* RootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		766A793DBBD3C323293C274D /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				CDC8069CC675408C9A682CA6 /* apple */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		7C4A63785FEF7C5F430A19B4 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				E1DB811347F53AB847DE61D2 /* Assets.xcassets */,
+				14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */,
+				0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */,
+				8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A3B642CBAEA2E8418738D970 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FA07672648D544B650764001 /* MellowPhoto.app */,
+				F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AE2141319CF33EFDD0DDCFB7 /* MellowPhoto */ = {
+			isa = PBXGroup;
+			children = (
+				234C56F9AC1E84E4DC7784FB /* App */,
+				7C4A63785FEF7C5F430A19B4 /* Resources */,
+			);
+			path = MellowPhoto;
+			sourceTree = "<group>";
+		};
+		B311DFE7F5F714F4C9CFA1E6 /* MellowPhotoTests */ = {
+			isa = PBXGroup;
+			children = (
+				8C8ACE4A11C44643F331D3E6 /* SmokeTests.swift */,
+			);
+			path = MellowPhotoTests;
+			sourceTree = "<group>";
+		};
+		E22553BD5EDC15F8D3681E2D /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				C1219E8E2E4AA4621805C516 /* Version.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		E991FCB4329561E67BFAB59B = {
+			isa = PBXGroup;
+			children = (
+				E22553BD5EDC15F8D3681E2D /* Config */,
+				AE2141319CF33EFDD0DDCFB7 /* MellowPhoto */,
+				B311DFE7F5F714F4C9CFA1E6 /* MellowPhotoTests */,
+				766A793DBBD3C323293C274D /* Packages */,
+				A3B642CBAEA2E8418738D970 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		09AD9F137D276D94FA5355DD /* MellowPhoto */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D694C8E7152C348896D1A35D /* Build configuration list for PBXNativeTarget "MellowPhoto" */;
+			buildPhases = (
+				75E94161BE56D8DFDF8EDD6E /* Sources */,
+				4913E8B534F1ED55641BC71B /* Resources */,
+				217ADA8BF6BED9D8DA354EEA /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MellowPhoto;
+			packageProductDependencies = (
+				D9E6C184CF7571E2417C70A8 /* MellowShared */,
+				2D215632597C957E5592C85D /* MellowEditing */,
+				E104DB4C3683E0F5CABAB0BD /* MellowLibrary */,
+				213FE2825489D6DA1E427B12 /* MellowRendering */,
+				0896D57D2160F72010B89781 /* MellowExport */,
+			);
+			productName = MellowPhoto;
+			productReference = FA07672648D544B650764001 /* MellowPhoto.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BDF3783A77B85C7877C62062 /* MellowPhotoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1BC619307FF19E31C2E191C5 /* Build configuration list for PBXNativeTarget "MellowPhotoTests" */;
+			buildPhases = (
+				4D677654CD33970CD3DCAB04 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D7B64220FB25A9EFD0ACC732 /* PBXTargetDependency */,
+			);
+			name = MellowPhotoTests;
+			packageProductDependencies = (
+			);
+			productName = MellowPhotoTests;
+			productReference = F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		7AE6D02F3A4F358C49EC2319 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					09AD9F137D276D94FA5355DD = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					BDF3783A77B85C7877C62062 = {
+						DevelopmentTeam = "";
+					};
+				};
+			};
+			buildConfigurationList = EC3DC12FFE714964201A0C18 /* Build configuration list for PBXProject "MellowPhoto" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = E991FCB4329561E67BFAB59B;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				122E30332FEE2F355A0D8C43 /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A3B642CBAEA2E8418738D970 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				09AD9F137D276D94FA5355DD /* MellowPhoto */,
+				BDF3783A77B85C7877C62062 /* MellowPhotoTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		4913E8B534F1ED55641BC71B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */,
+				CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */,
+				49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		4D677654CD33970CD3DCAB04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				488B6115DC2ECB574B00F218 /* SmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		75E94161BE56D8DFDF8EDD6E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
+				73148254538FB7A0C74B8C8F /* RootView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D7B64220FB25A9EFD0ACC732 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 09AD9F137D276D94FA5355DD /* MellowPhoto */;
+			targetProxy = 991598D8797B226DCC7D5688 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0EC5BAE952C6ABFABA88D4C2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.tests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Mellow Photo";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Contents/MacOS/Mellow Photo";
+			};
+			name = Debug;
+		};
+		29EBB4E23A61A78378B56C39 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "MellowPhoto/Resources/MellowPhoto-macOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = "MellowPhoto/Resources/Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "MellowPhoto/Resources/Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "MellowPhoto/Resources/Info-macOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto;
+				PRODUCT_NAME = "Mellow Photo";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		49947799638580FE3C428695 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "MellowPhoto/Resources/MellowPhoto-macOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				"INFOPLIST_FILE[sdk=iphoneos*]" = "MellowPhoto/Resources/Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=iphonesimulator*]" = "MellowPhoto/Resources/Info-iOS.plist";
+				"INFOPLIST_FILE[sdk=macosx*]" = "MellowPhoto/Resources/Info-macOS.plist";
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @executable_path/../Frameworks";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto;
+				PRODUCT_NAME = "Mellow Photo";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		56064142BD003D04C95B5F82 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C1219E8E2E4AA4621805C516 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		9A25E9F4E9963320B48CDBF3 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.tests;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Mellow Photo";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Contents/MacOS/Mellow Photo";
+			};
+			name = Release;
+		};
+		DEA0B0FD20C6D34A50C34B44 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = C1219E8E2E4AA4621805C516 /* Version.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1BC619307FF19E31C2E191C5 /* Build configuration list for PBXNativeTarget "MellowPhotoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0EC5BAE952C6ABFABA88D4C2 /* Debug */,
+				9A25E9F4E9963320B48CDBF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D694C8E7152C348896D1A35D /* Build configuration list for PBXNativeTarget "MellowPhoto" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				49947799638580FE3C428695 /* Debug */,
+				29EBB4E23A61A78378B56C39 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		EC3DC12FFE714964201A0C18 /* Build configuration list for PBXProject "MellowPhoto" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				56064142BD003D04C95B5F82 /* Debug */,
+				DEA0B0FD20C6D34A50C34B44 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		122E30332FEE2F355A0D8C43 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0896D57D2160F72010B89781 /* MellowExport */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MellowExport;
+		};
+		213FE2825489D6DA1E427B12 /* MellowRendering */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MellowRendering;
+		};
+		2D215632597C957E5592C85D /* MellowEditing */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MellowEditing;
+		};
+		D9E6C184CF7571E2417C70A8 /* MellowShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MellowShared;
+		};
+		E104DB4C3683E0F5CABAB0BD /* MellowLibrary */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MellowLibrary;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 7AE6D02F3A4F358C49EC2319 /* Project object */;
+}
