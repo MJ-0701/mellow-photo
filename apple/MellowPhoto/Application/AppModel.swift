@@ -160,8 +160,11 @@ final class AppModel {
         let pipeline = self.pipeline
         let recipe = entry.document.recipe
         let id = entry.id
+        let url = copies.url(for: entry.filename)
         renderScheduler.schedule {
-            try await pipeline.preview(id, recipe: recipe)
+            // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
+            try await pipeline.reprepareIfEvicted(id, at: url)
+            return try await pipeline.preview(id, recipe: recipe)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }
             isRendering = false
@@ -172,13 +175,21 @@ final class AppModel {
         }
     }
 
+    /// 취소된 렌더는 완료 콜백을 부르지 않으므로 진행 표시를 여기서 내린다.
     func cancelSelectionWork() {
         selectionTask?.cancel()
         renderScheduler.cancel()
+        isRendering = false
     }
 
     func stopWork() {
         cancelSelectionWork()
         exportTask?.cancel()
+    }
+
+    /// 앱이 다시 활성화되면 멈췄던 미리보기를 현재 레시피로 다시 그린다.
+    func resumeWork() {
+        guard isReady, session.selected != nil else { return }
+        scheduleRender()
     }
 }

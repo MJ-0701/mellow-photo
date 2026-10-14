@@ -32,13 +32,13 @@ final class ExportPhotosTests: XCTestCase {
     }
 
     private func useCase() -> ExportPhotos {
-        ExportPhotos(pipeline: pipeline, copies: copies, exporter: Exporter(renderer: Renderer()))
+        ExportPhotos(
+            pipeline: pipeline, copies: copies, exporter: Exporter(renderer: Renderer()), temporaryDirectory: root)
     }
 
+    /// 테스트 전용 임시 폴더만 본다. 다른 프로세스가 시스템 임시 폴더에 남긴 파일과 섞이지 않는다.
     private func temporaryExports() throws -> [String] {
-        try FileManager.default.contentsOfDirectory(atPath: FileManager.default.temporaryDirectory.path).filter {
-            $0.hasPrefix("mellow-export-")
-        }
+        try FileManager.default.contentsOfDirectory(atPath: root.path).filter { $0.hasPrefix("mellow-export-") }
     }
 
     func testExportPublishesEachPhotoAndReportsFailures() async throws {

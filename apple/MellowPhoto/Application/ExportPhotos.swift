@@ -21,6 +21,18 @@ struct ExportPhotos: Sendable {
     let pipeline: PhotoPipeline
     let copies: WorkingCopyStore
     let exporter: Exporter
+    /// 렌더한 사진을 공개 전에 잠시 쓰는 폴더. 테스트는 자기 폴더를 넘겨 다른 실행과 섞이지 않게 한다.
+    let temporaryDirectory: URL
+
+    init(
+        pipeline: PhotoPipeline, copies: WorkingCopyStore, exporter: Exporter,
+        temporaryDirectory: URL = FileManager.default.temporaryDirectory
+    ) {
+        self.pipeline = pipeline
+        self.copies = copies
+        self.exporter = exporter
+        self.temporaryDirectory = temporaryDirectory
+    }
 
     func run(
         entries: [PhotoEntry], options: ExportOptions, destination: any ExportDestination,
@@ -32,8 +44,8 @@ struct ExportPhotos: Sendable {
                 report.cancelled = true
                 break
             }
-            let temporary = FileManager.default.temporaryDirectory
-                .appendingPathComponent("mellow-export-\(UUID().uuidString).\(options.format.fileExtension)")
+            let temporary = temporaryDirectory.appendingPathComponent(
+                "mellow-export-\(UUID().uuidString).\(options.format.fileExtension)")
             defer { try? FileManager.default.removeItem(at: temporary) }
             do {
                 let image = try await pipeline.renderOriginal(

@@ -22,10 +22,27 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     func analyze(_ image: CIImage) throws -> [FaceGeometry] { try result.get() }
 }
 
+/// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
+final class StagingLog: @unchecked Sendable {
+    var calls = 0
+}
+
 struct FakeImporter: PhotoImporter {
     var staged: [Result<StagedPhoto, Error>] = []
-    func stage(_ items: [PhotosPickerItem]) async -> [Result<StagedPhoto, Error>] { staged }
-    func stage(fileURLs: [URL]) async -> [Result<StagedPhoto, Error>] { staged }
+    /// true면 `staged` 대신 받은 파일 URL을 그대로 스테이징 결과로 돌려준다. 여러 번 가져오기 테스트용.
+    var passesThroughFileURLs = false
+    var log = StagingLog()
+    func stage(_ items: [PhotosPickerItem]) async -> [Result<StagedPhoto, Error>] {
+        log.calls += 1
+        return staged
+    }
+    func stage(fileURLs: [URL]) async -> [Result<StagedPhoto, Error>] {
+        log.calls += 1
+        guard passesThroughFileURLs else { return staged }
+        return fileURLs.map {
+            .success(StagedPhoto(url: $0, displayName: $0.deletingPathExtension().lastPathComponent))
+        }
+    }
 }
 
 final class RecordingDestination: ExportDestination, @unchecked Sendable {

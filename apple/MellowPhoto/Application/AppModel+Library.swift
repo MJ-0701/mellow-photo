@@ -5,20 +5,27 @@ import PhotosUI
 import SwiftUI
 
 extension AppModel {
+    /// 바쁘면 스테이징 전에 거부한다. 스테이징하는 동안도 가져오기 중으로 친다.
     func importFromPicker(_ items: [PhotosPickerItem]) async {
-        guard !items.isEmpty else { return }
+        guard !items.isEmpty, !isBusy else { return }
+        isImporting = true
+        defer { isImporting = false }
         await runImport(await importer.stage(items))
     }
 
     func importFromFiles(_ urls: [URL]) async {
-        guard !urls.isEmpty else { return }
+        guard !urls.isEmpty, !isBusy else { return }
+        isImporting = true
+        defer { isImporting = false }
         await runImport(await importer.stage(fileURLs: urls))
     }
 
     private func runImport(_ staged: [Result<StagedPhoto, Error>]) async {
-        guard !isBusy else { return }
-        isImporting = true
-        defer { isImporting = false }
+        // 스테이징 중에 복원·저장이 시작됐다면 세션을 건드리지 않고 임시 파일만 지운다.
+        guard !isExporting, !isRestoring else {
+            discardStaged(staged)
+            return
+        }
         let hadSelection = session.selectedPhotoID != nil
         let useCase = ImportPhotos(session: session, pipeline: pipeline, copies: copies)
         let report = await useCase.run(staged: staged) { [weak self] index, total in
@@ -49,6 +56,12 @@ extension AppModel {
         }
     }
 
+    private func discardStaged(_ staged: [Result<StagedPhoto, Error>]) {
+        for case .success(let photo) in staged {
+            try? FileManager.default.removeItem(at: photo.url)
+        }
+    }
+
     var canRemoveSelected: Bool { !isBusy && session.selected != nil }
 
     /// 앱의 작업 사본만 지운다. 사진 앱·사용자 파일 원본은 건드리지 않는다.
@@ -72,7 +85,7 @@ extension AppModel {
         do {
             try copies.remove(filename: entry.filename)
         } catch {
-            present(message: UserMessage.workingCopyCleanupFailed(error.localizedDescription))
+            present(message: UserMessage.workingCopyCleanupFailed(UserMessage.text(for: error)))
         }
         if let next = session.selectedPhotoID {
             select(next)

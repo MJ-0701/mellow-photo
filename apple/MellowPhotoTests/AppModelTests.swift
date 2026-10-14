@@ -74,6 +74,56 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
     }
 
+    func testEditingStillRendersAfterImportsEvictPreviewCache() async throws {
+        let files = try ["A", "B", "C", "D"].map { try TestSupport.solidPNG(in: root, name: $0) }
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([files[0]])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let selected = model.session.selectedPhotoID
+        await model.importFromFiles(Array(files[1...]))
+        try await waitUntil { !model.isImporting }
+        XCTAssertEqual(model.session.photos.count, 4)
+        XCTAssertEqual(model.session.selectedPhotoID, selected, "새로 가져와도 선택은 그대로다")
+        model.edit(.exposure(0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError, "미리보기 캐시에서 밀려난 사진도 편집 렌더가 실패하지 않는다")
+        XCTAssertNotNil(model.preview)
+        XCTAssertEqual(model.currentRecipe.color.exposure, 0.5)
+        XCTAssertEqual(model.thumbnails.count, 4)
+    }
+
+    func testImportIsRejectedWhileBusyWithoutLeakingStagedFiles() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let importer = FakeImporter(passesThroughFileURLs: true)
+        let model = TestSupport.makeModel(root: root, importer: importer)
+        model.isExporting = true
+        await model.importFromFiles([staged])
+        XCTAssertTrue(model.session.photos.isEmpty)
+        XCTAssertFalse(model.isImporting)
+        // 바쁜 상태는 스테이징 전에 거부하므로 임시 파일이 만들어지지 않는다. 원본은 그대로다.
+        XCTAssertEqual(importer.log.calls, 0, "바쁠 때는 스테이징 자체를 하지 않는다")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: staged.path))
+        let library = model.copies.directory.path
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: library), [])
+    }
+
+    func testStopWorkClearsRenderingFlagAndResumeRerenders() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([staged])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let before = try XCTUnwrap(model.preview)
+        model.edit(.exposure(0.5))
+        XCTAssertTrue(model.isRendering)
+        model.stopWork()
+        XCTAssertFalse(model.isRendering, "취소된 렌더가 진행 표시를 남기지 않는다")
+        model.resumeWork()
+        XCTAssertTrue(model.isRendering)
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        XCTAssertFalse(model.preview === before, "재개하면 편집을 반영해 다시 렌더한다")
+    }
+
     func testRemoveSelectedDeletesWorkingCopyAndSelectsNext() async throws {
         let first = try TestSupport.solidPNG(in: root, name: "A")
         let second = try TestSupport.solidPNG(in: root, name: "B")
