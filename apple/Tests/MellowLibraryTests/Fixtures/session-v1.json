@@ -1,0 +1,54 @@
+{
+  "photos" : [
+    {
+      "filename" : "11111111-1111-1111-1111-111111111111.heic",
+      "id" : "11111111-1111-1111-1111-111111111111",
+      "name" : "사진 1",
+      "recipe" : {
+        "adjustments" : { "contrast" : 1, "exposure" : 0.4, "faceSlim" : 0.2, "saturation" : 1, "skin" : 0.3, "warmth" : 0 },
+        "operations" : [
+          { "spot" : { "_0" : { "radius" : 0.02, "sourceX" : 0.45, "sourceY" : 0.4, "x" : 0.5, "y" : 0.4 } } },
+          { "warp" : { "_0" : { "dx" : 0.01, "dy" : 0, "radius" : 0.08, "x" : 0.5, "y" : 0.4 } } }
+        ],
+        "selectedFace" : 1
+      }
+    },
+    {
+      "filename" : "22222222-2222-2222-2222-222222222222.jpg",
+      "id" : "22222222-2222-2222-2222-222222222222",
+      "name" : "사진 2",
+      "recipe" : {
+        "adjustments" : { "contrast" : 1, "exposure" : 0, "faceSlim" : 0, "saturation" : 1, "skin" : 0, "warmth" : -0.1 },
+        "operations" : [ ]
+      }
+    }
+  ],
+  "presets" : [
+    {
+      "adjustments" : { "contrast" : 1, "exposure" : 0.15, "faceSlim" : 0, "saturation" : 0.92, "skin" : 0.3, "warmth" : 0.25 },
+      "id" : "33333333-3333-3333-3333-333333333333",
+      "name" : "포근한"
+    }
+  ],
+  "redoHistory" : [
+    "11111111-1111-1111-1111-111111111111",
+    [
+      {
+        "adjustments" : { "contrast" : 1, "exposure" : 0.6, "faceSlim" : 0.2, "saturation" : 1, "skin" : 0.3, "warmth" : 0 },
+        "operations" : [
+          { "spot" : { "_0" : { "radius" : 0.02, "sourceX" : 0.45, "sourceY" : 0.4, "x" : 0.5, "y" : 0.4 } } },
+          { "warp" : { "_0" : { "dx" : 0.01, "dy" : 0, "radius" : 0.08, "x" : 0.5, "y" : 0.4 } } }
+        ],
+        "selectedFace" : 1
+      }
+    ]
+  ],
+  "selectedID" : "11111111-1111-1111-1111-111111111111",
+  "undoHistory" : [
+    "11111111-1111-1111-1111-111111111111",
+    [
+      { "adjustments" : { "contrast" : 1, "exposure" : 0, "faceSlim" : 0, "saturation" : 1, "skin" : 0, "warmth" : 0 }, "operations" : [ ] },
+      { "adjustments" : { "contrast" : 1, "exposure" : 0.1, "faceSlim" : 0, "saturation" : 1, "skin" : 0, "warmth" : 0 }, "operations" : [ ] }
+    ]
+  ]
+}
