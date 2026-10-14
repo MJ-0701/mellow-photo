@@ -25,11 +25,12 @@ public struct WorkingCopyStore: Sendable {
         return FileManager.default.fileExists(atPath: legacy.path) ? legacy : current
     }
 
-    /// 임시 파일을 사본 폴더로 옮기고 파일 이름을 돌려준다. iOS에서는 파일 보호를 건다.
+    /// 임시 파일을 새 사본 폴더로 옮기고 파일 이름을 돌려준다. iOS에서는 파일 보호를 건다.
+    /// 옛 위치 조회는 읽기 전용이므로 `url(for:)`를 거치지 않는다.
     public func adopt(temporaryFile: URL, as id: PhotoID) throws -> String {
         let fileExtension = temporaryFile.pathExtension.isEmpty ? "image" : temporaryFile.pathExtension
         let filename = "\(id.rawValue.uuidString).\(fileExtension)"
-        let destination = url(for: filename)
+        let destination = directory.appendingPathComponent(filename)
         try FileManager.default.moveItem(at: temporaryFile, to: destination)
         #if os(iOS)
             try FileManager.default.setAttributes(
