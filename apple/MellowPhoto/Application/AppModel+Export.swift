@@ -11,6 +11,7 @@ extension AppModel {
         let useCase = ExportPhotos(pipeline: pipeline, copies: copies, exporter: exporter)
         isExporting = true
         exportProgress = 0
+        lastExportSavedCount = 0
         exportTask = Task { [weak self] in
             let total = entries.count
             let report = await useCase.run(entries: entries, options: options, destination: destination) { progress in
@@ -20,6 +21,7 @@ extension AppModel {
                 self?.statusMessage = UserMessage.exporting(done, of: total)
             }
             guard let self else { return }
+            lastExportSavedCount = report.saved
             isExporting = false
             statusMessage = UserMessage.exported(saved: report.saved, cancelled: report.cancelled)
             if !report.failures.isEmpty {

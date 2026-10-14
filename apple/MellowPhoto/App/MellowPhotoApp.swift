@@ -22,8 +22,8 @@ struct MellowPhotoApp: App {
                     }
                     if phase == .active {
                         model.resumeWork()
-                        // 불러오다 멈춘 선택은 다시 불러온다.
-                        if !model.isReady, let id = model.session.selectedPhotoID {
+                        // 불러오다 멈춘 선택은 다시 불러온다. 읽기에 실패한 선택은 복구 화면에 맡겨 알림을 되풀이하지 않는다.
+                        if !model.isReady, model.selectionFailure == nil, let id = model.session.selectedPhotoID {
                             model.select(id)
                         }
                     }
@@ -34,12 +34,13 @@ struct MellowPhotoApp: App {
         #endif
         .commands {
             CommandGroup(replacing: .undoRedo) {
+                // 텍스트 입력 중에는 꺼서 ⌘Z가 사진 편집 대신 입력란의 실행 취소로 가게 한다.
                 Button("실행 취소") { model.undo() }
                     .keyboardShortcut("z")
-                    .disabled(!model.canUndo)
+                    .disabled(!model.canUndo || model.isTextEntryActive)
                 Button("다시 실행") { model.redo() }
                     .keyboardShortcut("z", modifiers: [.command, .shift])
-                    .disabled(!model.canRedo)
+                    .disabled(!model.canRedo || model.isTextEntryActive)
             }
         }
     }

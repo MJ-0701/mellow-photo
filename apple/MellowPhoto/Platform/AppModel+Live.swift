@@ -21,6 +21,7 @@ extension AppModel {
             exporter: Exporter(renderer: Renderer()))
         do {
             try copies.prepareDirectory()
+            try excludeFromBackup(root)
         } catch {
             model.present(message: UserMessage.workingFolderUnavailable(error.localizedDescription))
         }
@@ -32,5 +33,14 @@ extension AppModel {
             }
         #endif
         return model
+    }
+
+    /// 출시본처럼 session.json을 포함한 MellowPhoto 폴더 전체를 백업에서 뺀다. 사진 원본은 사용자 쪽에 있다.
+    private static func excludeFromBackup(_ folder: URL) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var target = folder
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try target.setResourceValues(values)
     }
 }

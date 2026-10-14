@@ -61,6 +61,10 @@ final class AppModel {
     var isChoosingCloneSource = true
     var isComparing = false
     var exportOptions = ExportOptions()
+    /// 이름 입력 시트가 떠 있는 동안 true. 메뉴의 ⌘Z/⇧⌘Z가 입력란의 실행 취소를 가로채지 않게 한다.
+    var isTextEntryActive = false
+    /// 마지막 저장 작업에서 실제로 저장된 장수. Mac 폴더 저장 뒤 Finder를 열지 판단한다.
+    var lastExportSavedCount = 0
 
     /// 세션을 읽은 직후(읽기에 성공했을 때만) 부르는 조립용 훅. 구 데이터 흡수처럼 복원된 상태 위에 더해야 하는 일을 맡긴다.
     var afterSessionRestored: (@MainActor (ProjectSession) -> Void)?

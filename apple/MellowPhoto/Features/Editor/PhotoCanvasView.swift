@@ -5,6 +5,8 @@ import SwiftUI
 struct PhotoCanvasView: View {
     @Environment(AppModel.self) private var model
     var zoom: Double = 1
+    /// 복구 화면의 "편집에서 빼기"도 툴바와 같은 확인 대화상자를 거친다.
+    @Binding var removeConfirmation: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -38,6 +40,7 @@ struct PhotoCanvasView: View {
                         .padding(7)
                         .background(.ultraThinMaterial, in: Capsule())
                         .padding(10)
+                        .allowsHitTesting(false)
                 }
             }
             .clipped()
@@ -86,7 +89,7 @@ struct PhotoCanvasView: View {
                         model.select(id)
                     }
                 }
-                Button("편집에서 빼기", role: .destructive) { model.removeSelectedPhoto() }
+                Button("편집에서 빼기", role: .destructive) { removeConfirmation = true }
             }
             .buttonStyle(.bordered).disabled(model.isBusy)
         }

@@ -25,5 +25,7 @@ struct PresetSheet: View {
         }
         .presentationDetents([.medium])
         .frame(minWidth: 360, minHeight: 200)
+        .onAppear { model.isTextEntryActive = true }
+        .onDisappear { model.isTextEntryActive = false }
     }
 }
