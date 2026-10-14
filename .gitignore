@@ -26,8 +26,10 @@ fastlane/screenshots/
 .claude/worktrees/
 .superpowers/
 
-# MellowKit package
+# Apple package and app build output
 apple/.build/
+apple/.swiftpm/
+apple/build/
 apple/*.xcodeproj/xcuserdata/
 apple/MellowPhoto.xcodeproj/xcuserdata/
 apple/MellowPhoto.xcodeproj/project.xcworkspace/xcuserdata/

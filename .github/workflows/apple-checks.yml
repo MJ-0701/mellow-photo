@@ -1,0 +1,39 @@
+name: Apple checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apple-checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tools
+        run: |
+          xcodebuild -version
+          brew install xcodegen
+      - name: Release notes automation tests
+        run: /usr/bin/ruby fastlane/test/release_notes_test.rb
+      - name: Modules, format, package and app tests
+        run: ./scripts/test-apple.sh
+      - name: Unsigned Release builds
+        run: |
+          ./scripts/build-apple.sh ios-device
+          ./scripts/build-apple.sh mac
+      - name: Preserve failing results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apple-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apple/build/Logs/Test
+          if-no-files-found: ignore
+          retention-days: 7

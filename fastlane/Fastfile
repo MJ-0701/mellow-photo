@@ -111,10 +111,10 @@ platform :ios do
       'MARKETING_VERSION' => version, 'CURRENT_PROJECT_VERSION' => build,
       'OTHER_CODE_SIGN_FLAGS' => "--keychain #{keychain}"
     }.map { |key, value| "#{key}=#{Shellwords.escape(value)}" }.join(' ')
-    archive = File.join(root, 'dist', 'MellowPhotoIOS.xcarchive')
-    ipa = build_app(project: File.join(root, 'iOS/MellowPhoto.xcodeproj'), scheme: 'MellowPhotoIOS',
+    archive = File.join(root, 'dist', 'MellowPhoto.xcarchive')
+    ipa = build_app(project: File.join(root, 'apple/MellowPhoto.xcodeproj'), scheme: 'MellowPhoto',
       configuration: 'Release', clean: true, archive_path: archive, destination: 'generic/platform=iOS',
-      output_directory: File.join(root, 'dist'), output_name: 'MellowPhotoIOS.ipa',
+      output_directory: File.join(root, 'dist'), output_name: 'MellowPhoto.ipa',
       export_method: 'app-store', skip_profile_detection: true,
       export_options: { signingStyle: 'manual', teamID: team, signingCertificate: identity,
         provisioningProfiles: { 'com.mj.mellowphoto' => profile.fetch('UUID') } }, xcargs: xcargs)

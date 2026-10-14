@@ -1,7 +1,7 @@
-name: iOS App Store release
+name: Apple App Store release
 on:
   push:
-    tags: ['ios-v*']
+    tags: ['apple-v*']
   workflow_dispatch:
     inputs:
       version:
@@ -42,7 +42,7 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            version="${GITHUB_REF_NAME#ios-v}"
+            version="${GITHUB_REF_NAME#apple-v}"
           else
             version="$VERSION_INPUT"
           fi
@@ -50,15 +50,14 @@ jobs:
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
           echo "APP_BUILD=${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
           /usr/bin/ruby fastlane/test/release_notes_test.rb
-          ./scripts/test.sh
-          export MELLOW_SIMULATOR_ID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(x["udid"] for r,ds in d["devices"].items() if "iOS" in r for x in ds if x["name"].startswith("iPhone") and x["isAvailable"]))')"
-          ./scripts/build-ios.sh test
+          brew install xcodegen
+          ./scripts/test-apple.sh
       - name: Preserve failing iPhone test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: ios-release-test-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .build/ios-tests.*/Tests.xcresult
+          path: apple/build/Logs/Test
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 7
@@ -85,3 +84,9 @@ jobs:
           # This is an ephemeral GitHub-hosted runner, never a developer's keychain.
           rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/mellow-ci.mobileprovision"
           rm -f "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/mellow-ci.mobileprovision"
+      - name: Mac package (ad-hoc signed)
+        run: ./scripts/package-mac.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mellow-photo-mac-${{ env.APP_VERSION }}
+          path: dist/Mellow-Photo-Mac.zip*
