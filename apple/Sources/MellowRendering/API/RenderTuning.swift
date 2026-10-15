@@ -14,6 +14,16 @@ public struct RenderTuning: Sendable {
     public var skinNoiseSharpness: Double = 0.3
     public var skinBlurRadiusFraction: Double = 0.0015
     public var skinBlurMinimumRadius: Double = 0.5
+    /// 눈썹 위로 이마를 덮는 높이. 얼굴 상자 높이 비율. Vision 상자 위끝은 눈썹 근처라 20%면 이마 중간이고, 머리카락은 피부색 가중치가 뺀다.
+    public var skinForeheadExtension: Double = 0.2
+    /// 눈·눈썹·입술 보호 영역을 넓히는 폭. 얼굴 폭 비율. 마스크 흐림의 3σ(4.5%)보다 넓어야 눈 안쪽이 정확히 0이 된다.
+    public var skinFeatureFeather: Double = 0.05
+    /// 볼 평균과의 Cb·Cr 거리 기준(sRGB 감마 값). 이 안은 가중치 1, 두 배에서 0. 한 얼굴 안 피부 편차는 0.02 안팎이고 무채색 머리카락·배경은 0.06 이상 떨어진다.
+    public var skinChromaSigma: Double = 0.04
+    /// 피부 마스크를 마지막에 흐리는 반지름. 얼굴 폭 비율.
+    public var skinMaskFeather: Double = 0.015
+    /// 다각형 마스크를 그리는 비트맵의 긴 변. 마스크는 흐리므로 512면 48MP에서도 계단이 보이지 않는다.
+    public var regionMaskMaxDimension: Int = 512
 
     public var faceSlimShiftFraction: Double = 0.035
     public var faceSlimRadiusFraction: Double = 0.34
