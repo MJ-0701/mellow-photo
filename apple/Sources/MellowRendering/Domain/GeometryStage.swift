@@ -39,9 +39,10 @@ struct GeometryStage: RenderStage {
                 width: crop.width * extent.width, height: crop.height * extent.height
             ).integral.intersection(extent)
             guard !pixelRect.isEmpty else { throw MellowError.invalidRecipeValues }
-            result = Self.moveToOrigin(result.cropped(to: pixelRect))
+            result = result.cropped(to: pixelRect)
         }
-        return result
+        // 반전만, 수평 보정만 한 경우에도 원점 0 계약을 지킨다.
+        return Self.moveToOrigin(result)
     }
 
     private static func moveToOrigin(_ image: CIImage) -> CIImage {
