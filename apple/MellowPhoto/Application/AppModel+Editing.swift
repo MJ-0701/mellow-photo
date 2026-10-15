@@ -146,7 +146,7 @@ extension AppModel {
                 document.appendLocalEdit(.warp(stroke))
                 return nil
             }
-        case .look, .crop, .adjust, .portrait:
+        case .look, .crop, .adjust, .beauty:
             return
         }
     }

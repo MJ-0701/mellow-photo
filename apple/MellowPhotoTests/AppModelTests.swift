@@ -440,4 +440,47 @@ final class AppModelTests: XCTestCase {
         model.undo()
         XCTAssertNil(model.currentRecipe.geometry.crop, "실행 취소 한 번에 드래그 전으로")
     }
+
+    func testBeautyToolEditsSkinOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .skin)
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.4))
+        model.edit(.skinSmoothing(0.5))
+        model.endSliderEdit()
+        model.edit(.autoBlemish(true))
+        XCTAssertEqual(model.currentRecipe.portrait.skin, SkinAdjustments(smoothing: 0.5, autoBlemish: true))
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.skin, SkinAdjustments(smoothing: 0.5))
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.isDefault)
+    }
+
+    func testAutoEnhanceWithFaceTurnsOnAutoBlemishAndKeepsFaceWidth() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.faceShape(.width, -0.4))
+        await model.autoEnhance()
+        XCTAssertEqual(
+            model.currentRecipe.portrait.skin,
+            SkinAdjustments(smoothing: RenderTuning().autoSkinSmoothing, autoBlemish: true))
+        XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.4, "자동 보정은 얼굴형을 건드리지 않는다")
+    }
+
+    func testBeautyTabSurvivesToolSwitch() {
+        let model = TestSupport.makeModel(root: root)
+        model.selectTool(.beauty)
+        model.beautyTab = .face
+        model.selectTool(.adjust)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .face)
+    }
 }

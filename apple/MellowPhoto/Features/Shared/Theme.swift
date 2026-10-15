@@ -21,6 +21,8 @@ enum Theme {
     static let cropMinimumSide = 0.1
     /// 복제 샘플 고리의 최소 지름. 브러시가 아주 작아도 보이게 한다.
     static let brushMarkerMinimumDiameter: CGFloat = 12
+    /// 가운데 0인 양방향 슬라이더가 0으로 붙는 폭.
+    static let bipolarSnapWidth = 0.05
 
     static func clampedZoom(_ value: Double) -> Double {
         min(zoomRange.upperBound, max(zoomRange.lowerBound, value))

@@ -6,6 +6,7 @@ struct AdjustmentSlider: View {
     let title: String
     let value: Double
     let range: ClosedRange<Double>
+    var snapsToZero = false
     let change: (Double) -> EditChange
 
     var body: some View {
@@ -16,7 +17,7 @@ struct AdjustmentSlider: View {
                 Text(value, format: .number.precision(.fractionLength(2))).monospacedDigit().foregroundStyle(.secondary)
             }
             .font(.caption)
-            Slider(value: Binding(get: { value }, set: { model.edit(change($0)) }), in: range) { editing in
+            Slider(value: Binding(get: { value }, set: { model.edit(change(snapped($0))) }), in: range) { editing in
                 if editing {
                     model.beginSliderEdit()
                 } else {
@@ -25,5 +26,10 @@ struct AdjustmentSlider: View {
             }
             .accessibilityLabel(title)
         }
+    }
+
+    /// 양방향 슬라이더는 0 근처에서 0으로 붙는다.
+    private func snapped(_ newValue: Double) -> Double {
+        snapsToZero && abs(newValue) < Theme.bipolarSnapWidth ? 0 : newValue
     }
 }

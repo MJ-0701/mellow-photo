@@ -67,6 +67,8 @@ final class AppModel {
     var selectionFailure: String?
 
     var tool: EditorTool = .look
+    /// 뷰티 도구에서 마지막으로 본 탭. 도구를 바꿔도 유지한다.
+    var beautyTab: BeautyTab = .skin
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true

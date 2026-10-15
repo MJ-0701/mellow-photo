@@ -29,6 +29,7 @@
 		49E4D5B8DAE722E0F58D95AC /* FolderDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F25010AC7BB2432F264435 /* FolderDestination.swift */; };
 		4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D630A842DBDB0FFBAB08678 /* UserMessage.swift */; };
 		4D92933B82A3462BC84025D1 /* AdjustPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */; };
+		505B12210B3B0B3403966121 /* BeautyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */; };
 		569EA3E6CC5B033787708596 /* EditorScenarioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39A51E7E5ED431D27897013E /* EditorScenarioTests.swift */; };
 		5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */; };
 		5BFCA6346B9B46D2B0F73FFD /* LibrarySidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF065A9DFEF0B076E76F17FD /* LibrarySidebar.swift */; };
@@ -36,7 +37,6 @@
 		61873CD9B42105AA437C882A /* LookPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB3268705F4B92286899B4B /* LookPanel.swift */; };
 		676C118D9E438D7EE534C2F1 /* PresetSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03AC7B91F35D1BE3DDBF0BB /* PresetSheet.swift */; };
 		745E7956E0512754CD7DA628 /* AdjustmentSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2538784DB91D254D98C9CA /* AdjustmentSlider.swift */; };
-		7AECACDB18BF4C6D2FB965A3 /* PortraitPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F486447BA968E93377EBF3 /* PortraitPanel.swift */; };
 		7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E1DB811347F53AB847DE61D2 /* Assets.xcassets */; };
 		7C24BB3E8309788DE6994157 /* ExportMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC98B66372F456AF761759B /* ExportMenu.swift */; };
 		81E9E3535322C86715B77D38 /* AppModel+Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */; };
@@ -64,6 +64,7 @@
 		E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370CF7443944DB02164CF8DD /* RenderScheduler.swift */; };
 		E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */; };
 		EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */; };
+		EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541985795F5FEE15374903C /* BeautyTab.swift */; };
 		F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7451F7A8E9DE87961267F974 /* Theme.swift */; };
 		F5DF1BAF787449CB212DA9A0 /* InfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540B90F0C598F262D4039570 /* InfoSheet.swift */; };
 		FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205D153168A529D037BF40EE /* ThumbnailCell.swift */; };
@@ -99,12 +100,12 @@
 		540B90F0C598F262D4039570 /* InfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoSheet.swift; sourceTree = "<group>"; };
 		5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderDestinationTests.swift; sourceTree = "<group>"; };
 		62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Geometry.swift"; sourceTree = "<group>"; };
+		66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyPanel.swift; sourceTree = "<group>"; };
 		66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoLibraryDestination.swift; sourceTree = "<group>"; };
 		67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPanel.swift; sourceTree = "<group>"; };
 		6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderSchedulerTests.swift; sourceTree = "<group>"; };
 		73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Library.swift"; sourceTree = "<group>"; };
 		7451F7A8E9DE87961267F974 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		76F486447BA968E93377EBF3 /* PortraitPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitPanel.swift; sourceTree = "<group>"; };
 		8610E11E70A395E3B9504730 /* CropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlay.swift; sourceTree = "<group>"; };
 		881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStripView.swift; sourceTree = "<group>"; };
 		88D5662CFBE9D0374BC48B21 /* looks.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = looks.v1.json; sourceTree = "<group>"; };
@@ -113,6 +114,7 @@
 		9AC98B66372F456AF761759B /* ExportMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportMenu.swift; sourceTree = "<group>"; };
 		9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustPanel.swift; sourceTree = "<group>"; };
 		A03AC7B91F35D1BE3DDBF0BB /* PresetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetSheet.swift; sourceTree = "<group>"; };
+		A541985795F5FEE15374903C /* BeautyTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyTab.swift; sourceTree = "<group>"; };
 		ADD5E80F3B80B364E7019C06 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPhotoImporter.swift; sourceTree = "<group>"; };
 		BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerButton.swift; sourceTree = "<group>"; };
@@ -222,13 +224,13 @@
 			children = (
 				E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */,
 				9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */,
+				66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */,
 				67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */,
 				8610E11E70A395E3B9504730 /* CropOverlay.swift */,
 				0D9139D4C642B3B57F110390 /* CropPanel.swift */,
 				C0C781535D14BC45ED308E3C /* EditorScene.swift */,
 				3FB3268705F4B92286899B4B /* LookPanel.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
-				76F486447BA968E93377EBF3 /* PortraitPanel.swift */,
 				0AFA6571D26629D5ED075E50 /* ToolStrip.swift */,
 			);
 			path = Editor;
@@ -318,6 +320,7 @@
 				62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */,
 				73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */,
 				DBA079D5E1B02E1A5D01910B /* AppModel+Looks.swift */,
+				A541985795F5FEE15374903C /* BeautyTab.swift */,
 				D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */,
 				505F21DC7A15D7DBC745704E /* ExportPhotos.swift */,
 				C4711AEF3097752E578444CB /* ImportPhotos.swift */,
@@ -486,6 +489,8 @@
 				1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */,
 				0E6ADDFED40162806D835BA1 /* AppModel+Looks.swift in Sources */,
 				88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */,
+				505B12210B3B0B3403966121 /* BeautyPanel.swift in Sources */,
+				EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */,
 				0A057E2AF9D0378C785F1D3F /* BrushPanel.swift in Sources */,
 				60596D9E8104A6F04F5CBC9D /* CropOverlay.swift in Sources */,
 				89D66B4D324B8DBA6E28BC23 /* CropPanel.swift in Sources */,
@@ -504,7 +509,6 @@
 				BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */,
 				3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */,
 				0A92F1EF8F2E281B8793D3CE /* PhotoStripView.swift in Sources */,
-				7AECACDB18BF4C6D2FB965A3 /* PortraitPanel.swift in Sources */,
 				2D128DF7E8DAC981A4578867 /* Ports.swift in Sources */,
 				676C118D9E438D7EE534C2F1 /* PresetSheet.swift in Sources */,
 				E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */,

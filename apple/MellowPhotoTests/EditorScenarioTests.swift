@@ -161,4 +161,36 @@ final class EditorScenarioTests: XCTestCase {
         let size = try await exportedPixelSize(model)
         XCTAssertEqual(size.width, size.height, "저장 파일이 정사각형이다")
     }
+
+    /// 공용 픽스처의 얼굴 위치를 어림한 스텁 얼굴. 특징점이 없어 피부 마스크는 타원으로 폴백한다.
+    private static let demoFace = FaceGeometry(boundingBox: NormalizedRect(x: 0.33, y: 0.36, width: 0.38, height: 0.4))
+
+    func testBeautySkinAndFaceWidthThenExportSucceeds() async throws {
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([Self.demoFace])),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([try demoPortraitCopy()])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let plain = try XCTUnwrap(model.preview)
+
+        model.selectTool(.beauty)
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.5))
+        model.endSliderEdit()
+        model.edit(.autoBlemish(true))
+        model.beautyTab = .face
+        model.beginSliderEdit()
+        model.edit(.faceShape(.width, -0.5))
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering }
+
+        let recipe = model.currentRecipe
+        XCTAssertEqual(recipe.portrait.skin, SkinAdjustments(smoothing: 0.5, autoBlemish: true))
+        XCTAssertEqual(recipe.portrait.face.width, -0.5, accuracy: 1e-9)
+        let edited = try XCTUnwrap(model.preview)
+        XCTAssertNotEqual(
+            Array(edited.dataProvider!.data! as Data), Array(plain.dataProvider!.data! as Data), "미리보기가 바뀌었다")
+        let size = try await exportedPixelSize(model)
+        XCTAssertEqual(size.width, size.height, "정사각형 원본이 그대로 저장된다")
+    }
 }

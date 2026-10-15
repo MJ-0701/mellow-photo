@@ -20,7 +20,7 @@ struct ToolStrip: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(Theme.accent)
                 .accessibilityLabel("자동 보정")
-                ForEach([EditorTool.crop, .adjust, .portrait, .retouch, .warp]) { toolButton($0) }
+                ForEach([EditorTool.crop, .adjust, .beauty, .retouch, .warp]) { toolButton($0) }
             }
             .padding(.horizontal, 8)
             #if os(macOS)
