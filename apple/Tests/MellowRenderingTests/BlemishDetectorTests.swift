@@ -34,6 +34,24 @@ final class BlemishDetectorTests: XCTestCase {
         }
     }
 
+    func testDownscaledAnalysisMapsSpotsBackToPlantedPositions() throws {
+        let synthetic = SyntheticFace.make(withBlemishes: true)
+        let analysisScale: CGFloat = 0.5
+        // 합성 얼굴의 마스크 영역은 긴 변 388px이라 256이면 배율이 0.66이다. 0.5가 되도록 긴 변의 절반을 쓴다.
+        let bounds = FaceRegions.maskBounds(
+            face: synthetic.face, extent: synthetic.image.extent, tuning: RenderTuning())
+        var tuning = RenderTuning()
+        tuning.blemishAnalysisMaxDimension = Int(max(bounds.width, bounds.height) * analysisScale)
+        let spots = try detector(tuning).detect(image: synthetic.image, faces: [synthetic.face])
+        XCTAssertEqual(spots.count, SyntheticFace.blemishes.count)
+        let tolerance = 2 / analysisScale
+        for planted in SyntheticFace.blemishes {
+            XCTAssertTrue(
+                spots.contains { hypot(pixelCenter($0).x - planted.x, pixelCenter($0).y - planted.y) < tolerance },
+                "\(planted)가 축소 분석 뒤 제자리로 돌아오지 않는다")
+        }
+    }
+
     func testCleanSkinAndNoFacesYieldNothing() throws {
         let clean = SyntheticFace.make()
         XCTAssertEqual(try detector().detect(image: clean.image, faces: [clean.face]), [])

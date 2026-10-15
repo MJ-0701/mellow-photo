@@ -50,6 +50,23 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertTrue(none.isEmpty)
     }
 
+    func testPreviewHealsDetectedBlemishes() async throws {
+        let synthetic = SyntheticFace.make(withBlemishes: true)
+        let url = try Support.writePNG(synthetic.image, name: "face")
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let plainImage = try await pipeline.preview(id, recipe: EditRecipe())
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        let healedImage = try await pipeline.preview(id, recipe: recipe)
+        let plain = PixelGrid(plainImage)
+        let healed = PixelGrid(healedImage)
+        let center = SyntheticFace.blemishes[0]
+        XCTAssertGreaterThanOrEqual(Int(healed.red(center)), Int(plain.red(center)) + 20)
+    }
+
     func testRenderOriginalRefusesAutoBlemishOnlyWhenAnalysisFailed() async throws {
         let url = try writeSolidPNG()
         let id = PhotoID()

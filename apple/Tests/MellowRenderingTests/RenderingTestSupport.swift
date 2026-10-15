@@ -165,17 +165,32 @@ enum RenderingTestSupport {
 }
 
 /// CGImage 바이트를 Core Image 좌표(원점 왼쪽 아래)로 읽는다. 행 끝 여백(bytesPerRow)을 고려한다.
+/// 보정 없는 렌더는 Core Image가 읽은 CGImage를 그대로 돌려줘 ARGB일 수 있으므로 채널을 RGBA 순서로 맞춘다.
 struct PixelGrid {
     let width: Int
     let height: Int
     let bytesPerRow: Int
     let data: [UInt8]
+    /// 메모리 안 바이트 위치. R, G, B, A 순서.
+    let channelOffsets: [Int]
 
     init(_ image: CGImage) {
         width = image.width
         height = image.height
         bytesPerRow = image.bytesPerRow
         data = Array(image.dataProvider!.data! as Data)
+        let alphaFirst = [.premultipliedFirst, .first, .noneSkipFirst].contains(image.alphaInfo)
+        let littleEndian = image.bitmapInfo.intersection(.byteOrderMask) == .byteOrder32Little
+        switch (alphaFirst, littleEndian) {
+        case (true, false):
+            channelOffsets = [1, 2, 3, 0]
+        case (true, true):
+            channelOffsets = [2, 1, 0, 3]
+        case (false, true):
+            channelOffsets = [3, 2, 1, 0]
+        case (false, false):
+            channelOffsets = [0, 1, 2, 3]
+        }
     }
 
     /// CGImage는 맨 위 행부터 저장한다.
@@ -183,7 +198,7 @@ struct PixelGrid {
         let x = Int(point.x)
         let y = Int(point.y)
         let offset = (height - 1 - y) * bytesPerRow + x * 4
-        return Array(data[offset..<(offset + 4)])
+        return channelOffsets.map { data[offset + $0] }
     }
 
     func red(_ point: CGPoint) -> UInt8 { rgba(point)[0] }

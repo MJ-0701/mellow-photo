@@ -84,7 +84,7 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     func testTargetFaceLimitsPortraitStagesToOneFace() throws {
-        let input = Support.gradient()
+        let input = Support.skinTexture(size: 256)
         let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.05, y: 0.1, width: 0.35, height: 0.8))
         let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
         var all = EditRecipe()
@@ -99,6 +99,20 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(
             try Support.bytes(Support.render(input, recipe: outOfRange, faces: [left, right])),
             try Support.bytes(input), "범위 밖 인덱스는 아무 얼굴도 고치지 않는다")
+    }
+
+    func testFaceWidthWorksInBothDirections() throws {
+        let input = Support.gradient()
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.15, y: 0.05, width: 0.7, height: 0.9))
+        var narrow = EditRecipe()
+        narrow.portrait.face.width = -1
+        var wide = EditRecipe()
+        wide.portrait.face.width = 1
+        let narrowBytes = try Support.bytes(Support.render(input, recipe: narrow, faces: [face]))
+        let wideBytes = try Support.bytes(Support.render(input, recipe: wide, faces: [face]))
+        XCTAssertNotEqual(narrowBytes, try Support.bytes(input))
+        XCTAssertNotEqual(wideBytes, try Support.bytes(input))
+        XCTAssertNotEqual(narrowBytes, wideBytes)
     }
 
     func testStageOrderMatters() throws {

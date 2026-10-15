@@ -9,10 +9,6 @@ public struct RenderTuning: Sendable {
     public var skinMaskMaxStrength: Double = 0.85
     public var skinFaceInsetX: Double = 0.08
     public var skinFaceInsetY: Double = 0.03
-    public var skinFeatureInset: Double = 0.045
-    public var skinNoiseLevel: Double = 0.06
-    public var skinNoiseSharpness: Double = 0.3
-    public var skinBlurRadiusFraction: Double = 0.0015
     public var skinBlurMinimumRadius: Double = 0.5
     /// 눈썹 위로 이마를 덮는 높이. 얼굴 상자 높이 비율. Vision 상자 위끝은 눈썹 근처라 20%면 이마 중간이고, 머리카락은 피부색 가중치가 뺀다.
     public var skinForeheadExtension: Double = 0.2
@@ -45,6 +41,10 @@ public struct RenderTuning: Sendable {
     public var blemishMaskThreshold: Double = 0.5
     /// 얼굴당 잡티 수 상한(스펙).
     public var blemishMaxPerFace: Int = 40
+    /// 잡티를 덮는 복제 원의 반지름 배수. applySpot 마스크는 반지름 65%까지만 완전히 복사하므로 1/0.65보다 커야 한다.
+    public var blemishHealRadiusScale: Double = 1.8
+    /// 복제 원본을 복제 반지름의 이 배수만큼 얼굴 가운데 쪽 옆 피부에서 가져온다. 2 이상이면 원이 겹치지 않는다.
+    public var blemishSourceOffset: Double = 2.5
 
     public var faceSlimShiftFraction: Double = 0.035
     public var faceSlimRadiusFraction: Double = 0.34
