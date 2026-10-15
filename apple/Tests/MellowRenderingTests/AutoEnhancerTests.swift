@@ -100,8 +100,8 @@ final class AutoEnhancerTests: XCTestCase {
         let image = Support.gradient()
         XCTAssertEqual(try enhancer.suggestion(for: image, hasFaces: false).portrait, PortraitAdjustments())
         let withFaces = try enhancer.suggestion(for: image, hasFaces: true).portrait
-        XCTAssertEqual(withFaces.skinSmoothing, RenderTuning().autoSkinSmoothing)
-        XCTAssertEqual(withFaces.faceSlim, RenderTuning().autoFaceSlim)
+        XCTAssertEqual(withFaces.skin.smoothing, RenderTuning().autoSkinSmoothing)
+        XCTAssertEqual(withFaces.face.width, -RenderTuning().autoFaceSlim)
         XCTAssertNil(withFaces.targetFace)
     }
 

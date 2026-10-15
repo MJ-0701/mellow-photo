@@ -102,14 +102,14 @@ final class PhotoPipelineTests: XCTestCase {
             tuning: RenderTuning())
         _ = try await pipeline.prepare(id, at: url)
         var recipe = EditRecipe()
-        recipe.portrait.skinSmoothing = 0.3
+        recipe.portrait.skin.smoothing = 0.3
         do {
             _ = try await pipeline.renderOriginal(id, at: url, recipe: recipe, maxDimension: nil)
             XCTFail("얼굴 보정이 조용히 빠지면 안 된다")
         } catch {
             XCTAssertEqual(error as? MellowError, .faceAnalysisUnavailable(reason: "test"))
         }
-        recipe.portrait.skinSmoothing = 0
+        recipe.portrait.skin.smoothing = 0
         recipe.color.exposure = 0.2
         let rendered = try await pipeline.renderOriginal(id, at: url, recipe: recipe, maxDimension: nil)
         XCTAssertEqual(rendered.extent.size, CGSize(width: 256, height: 256))
@@ -121,7 +121,7 @@ final class PhotoPipelineTests: XCTestCase {
         let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
         _ = try await pipeline.prepare(id, at: url)
         var recipe = EditRecipe()
-        recipe.portrait.skinSmoothing = 0.3
+        recipe.portrait.skin.smoothing = 0.3
         recipe.color.exposure = 0.2
         let rendered = try await pipeline.renderOriginal(id, at: url, recipe: recipe, maxDimension: 128)
         XCTAssertEqual(rendered.extent.size, CGSize(width: 128, height: 128), "분석은 성공했고 얼굴만 없으면 색감만 적용해 저장한다")
@@ -132,7 +132,7 @@ final class PhotoPipelineTests: XCTestCase {
         let id = PhotoID()
         let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
         var faceRecipe = EditRecipe()
-        faceRecipe.portrait.skinSmoothing = 0.3
+        faceRecipe.portrait.skin.smoothing = 0.3
         do {
             _ = try await pipeline.renderOriginal(id, at: url, recipe: faceRecipe, maxDimension: nil)
             XCTFail("준비되지 않은 사진의 얼굴 보정이 조용히 빠지면 안 된다")

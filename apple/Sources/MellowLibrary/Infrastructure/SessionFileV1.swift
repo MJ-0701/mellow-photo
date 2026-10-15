@@ -102,7 +102,9 @@ struct SessionFileV1: Decodable {
             color: ColorAdjustments(
                 exposure: adjustments.exposure, contrast: adjustments.contrast,
                 saturation: adjustments.saturation, warmth: adjustments.warmth),
-            portrait: PortraitAdjustments(skinSmoothing: adjustments.skin, faceSlim: adjustments.faceSlim))
+            portrait: PortraitAdjustments(
+                skin: SkinAdjustments(smoothing: adjustments.skin),
+                face: FaceShapeAdjustments(legacyFaceSlim: adjustments.faceSlim)))
     }
 
     private static func recipe(_ recipe: Recipe) -> EditRecipe {

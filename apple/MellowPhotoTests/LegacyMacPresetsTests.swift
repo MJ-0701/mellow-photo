@@ -17,7 +17,7 @@ final class LegacyMacPresetsTests: XCTestCase {
         let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
         LegacyMacPresets.importIfPresent(into: session, applicationSupport: support)
         XCTAssertEqual(session.presets.map(\.name), ["옛날"])
-        XCTAssertEqual(session.presets[0].values.portrait.skinSmoothing, 0.4)
+        XCTAssertEqual(session.presets[0].values.portrait.skin.smoothing, 0.4)
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
         XCTAssertTrue(FileManager.default.fileExists(atPath: legacy.path + ".imported"))
         LegacyMacPresets.importIfPresent(into: session, applicationSupport: support)

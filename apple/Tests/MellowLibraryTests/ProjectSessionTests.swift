@@ -149,10 +149,10 @@ final class ProjectSessionTests: XCTestCase {
         session.edit(source.id) { $0.set(.exposure(0.3)) }
         session.edit(source.id) { $0.set(.faceSlim(0.9)) }
         session.applyToAll(from: source.id)
-        XCTAssertEqual(session.photos[1].document.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 1)
         XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
-        XCTAssertEqual(session.photos[2].document.recipe.portrait.faceSlim, 0.9)
+        XCTAssertEqual(session.photos[2].document.recipe.portrait.face.width, -0.9)
         XCTAssertNil(session.photos[2].document.recipe.portrait.targetFace)
         XCTAssertEqual(session.photos[0].document.recipe.color.exposure, 0.3, "원본 사진은 바뀌지 않는다")
     }

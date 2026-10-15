@@ -62,7 +62,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.operations.count, 1)
         try await waitUntil { !model.isRendering }
         model.edit(.faceSlim(0.9))
-        XCTAssertEqual(model.currentRecipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.2)
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
     }
 
@@ -190,7 +190,7 @@ final class AppModelTests: XCTestCase {
         model.savePreset(named: "대상 얼굴")
         let saved = try XCTUnwrap(model.session.presets.last)
         XCTAssertNil(saved.values.portrait.targetFace, "프리셋은 얼굴을 고르지 않는다")
-        XCTAssertEqual(saved.values.portrait.faceSlim, 0.4)
+        XCTAssertEqual(saved.values.portrait.face.width, -0.4)
     }
 
     func testSliderDragSavesSessionOnceAtEnd() async throws {

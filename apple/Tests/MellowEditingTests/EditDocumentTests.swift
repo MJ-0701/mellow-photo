@@ -72,7 +72,7 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertTrue(document.isGeometryLocked)
         XCTAssertEqual(document.set(.faceSlim(0.9)), .geometryLocked)
         XCTAssertEqual(document.set(.targetFace(nil)), .geometryLocked)
-        XCTAssertEqual(document.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(document.recipe.portrait.targetFace, 1)
         XCTAssertNil(document.set(.skinSmoothing(0.5)))
         // 피부 보정, 수동 편집 순으로 되돌린다.
@@ -85,18 +85,21 @@ final class EditDocumentTests: XCTestCase {
         var document = EditDocument()
         document.set(.faceSlim(0.2))
         document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
-        let preset = PresetValues(color: ColorAdjustments(exposure: 0.5), portrait: PortraitAdjustments(faceSlim: 0.7))
+        let preset = PresetValues(
+            color: ColorAdjustments(exposure: 0.5),
+            portrait: PortraitAdjustments(face: FaceShapeAdjustments(width: -0.7)))
         document.apply(preset)
         XCTAssertEqual(document.recipe.color.exposure, 0.5)
-        XCTAssertEqual(document.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(document.recipe.operations.count, 1)
     }
 
     func testPresetReplacesEverythingWhenUnlocked() {
         var document = EditDocument()
         document.set(.targetFace(2))
-        document.apply(PresetValues(portrait: PortraitAdjustments(faceSlim: 0.7, targetFace: 5)))
-        XCTAssertEqual(document.recipe.portrait.faceSlim, 0.7)
+        document.apply(
+            PresetValues(portrait: PortraitAdjustments(targetFace: 5, face: FaceShapeAdjustments(width: -0.7))))
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.7)
         XCTAssertEqual(document.recipe.portrait.targetFace, 2, "프리셋은 얼굴을 고르지 않으므로 사진의 대상 얼굴을 유지한다")
     }
 
@@ -108,13 +111,14 @@ final class EditDocumentTests: XCTestCase {
         var unlocked = EditDocument()
         unlocked.set(.targetFace(0))
         let values = PresetValues(
-            color: ColorAdjustments(exposure: 0.3), portrait: PortraitAdjustments(faceSlim: 0.9, targetFace: 3))
+            color: ColorAdjustments(exposure: 0.3),
+            portrait: PortraitAdjustments(targetFace: 3, face: FaceShapeAdjustments(width: -0.9)))
         locked.applyFromBatch(values)
         unlocked.applyFromBatch(values)
-        XCTAssertEqual(locked.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(locked.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(locked.recipe.portrait.targetFace, 1)
         XCTAssertEqual(locked.recipe.color.exposure, 0.3)
-        XCTAssertEqual(unlocked.recipe.portrait.faceSlim, 0.9)
+        XCTAssertEqual(unlocked.recipe.portrait.face.width, -0.9)
         XCTAssertNil(unlocked.recipe.portrait.targetFace)
         XCTAssertTrue(locked.canUndo)
         XCTAssertTrue(unlocked.canUndo)
@@ -202,13 +206,14 @@ final class EditDocumentTests: XCTestCase {
         let suggestion = AutoEnhanceSuggestion(
             color: ColorAdjustments(exposure: 0.3, saturation: 1.08),
             detail: DetailAdjustments(highlights: -0.2),
-            portrait: PortraitAdjustments(skinSmoothing: 0.3, faceSlim: 0.15))
+            portrait: PortraitAdjustments(
+                skin: SkinAdjustments(smoothing: 0.3), face: FaceShapeAdjustments(width: -0.15)))
         document.applyAuto(suggestion)
         XCTAssertEqual(document.undoStack.count, before + 1)
         XCTAssertEqual(document.recipe.color.exposure, 0.3)
         XCTAssertEqual(document.recipe.detail.highlights, -0.2)
-        XCTAssertEqual(document.recipe.portrait.skinSmoothing, 0.3)
-        XCTAssertEqual(document.recipe.portrait.faceSlim, 0.2, "잠긴 사진은 얼굴 형태 유지")
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.3)
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.2, "잠긴 사진은 얼굴 형태 유지")
         XCTAssertEqual(document.recipe.portrait.targetFace, 1)
         XCTAssertEqual(document.recipe.look.id, "film", "자동 보정은 룩을 건드리지 않는다")
         XCTAssertEqual(document.recipe.operations.count, 1)
@@ -220,7 +225,7 @@ final class EditDocumentTests: XCTestCase {
         var document = EditDocument()
         let first = AutoEnhanceSuggestion(
             color: ColorAdjustments(exposure: 0.3), detail: DetailAdjustments(shadows: 0.2),
-            portrait: PortraitAdjustments(skinSmoothing: 0.3))
+            portrait: PortraitAdjustments(skin: SkinAdjustments(smoothing: 0.3)))
         let second = AutoEnhanceSuggestion(
             color: ColorAdjustments(exposure: 0.5), detail: DetailAdjustments(), portrait: PortraitAdjustments())
         XCTAssertTrue(document.applyAuto(first))

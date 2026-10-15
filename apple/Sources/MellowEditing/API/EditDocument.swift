@@ -48,8 +48,8 @@ public struct EditDocument: Equatable, Sendable {
         case .contrast(let value): updated.color.contrast = value
         case .saturation(let value): updated.color.saturation = value
         case .warmth(let value): updated.color.warmth = value
-        case .skinSmoothing(let value): updated.portrait.skinSmoothing = value
-        case .faceSlim(let value): updated.portrait.faceSlim = value
+        case .skinSmoothing(let value): updated.portrait.skin.smoothing = value
+        case .faceSlim(let value): updated.portrait.face.width = FaceShapeAdjustments(legacyFaceSlim: value).width
         case .targetFace(let index): updated.portrait.targetFace = index
         case .highlights(let value): updated.detail.highlights = value
         case .shadows(let value): updated.detail.shadows = value
@@ -86,7 +86,7 @@ public struct EditDocument: Equatable, Sendable {
         var portrait = values.portrait
         portrait.targetFace = recipe.portrait.targetFace
         if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
+            portrait.face = recipe.portrait.face
         }
         recipe.color = values.color
         recipe.detail = values.detail
@@ -98,7 +98,7 @@ public struct EditDocument: Equatable, Sendable {
         checkpoint()
         var portrait = values.portrait
         if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
+            portrait.face = recipe.portrait.face
             portrait.targetFace = recipe.portrait.targetFace
         } else {
             portrait.targetFace = nil
@@ -115,7 +115,7 @@ public struct EditDocument: Equatable, Sendable {
         var portrait = suggestion.portrait
         portrait.targetFace = recipe.portrait.targetFace
         if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
+            portrait.face = recipe.portrait.face
         }
         var updated = recipe
         updated.color = suggestion.color

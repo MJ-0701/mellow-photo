@@ -13,7 +13,7 @@ final class EditRecipeCodingTests: XCTestCase {
     func testRoundTripPreservesOperationsOrderAndSchemaVersion() throws {
         var recipe = EditRecipe()
         recipe.color.exposure = 0.4
-        recipe.portrait.skinSmoothing = 0.3
+        recipe.portrait.skin.smoothing = 0.3
         recipe.portrait.targetFace = 1
         recipe.operations = [
             .spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.45, sourceY: 0.4, radius: 0.02)),
@@ -49,7 +49,7 @@ final class EditRecipeCodingTests: XCTestCase {
     func testBuiltInPresetsMatchShippedIPhoneValues() {
         XCTAssertEqual(BuiltInPresets.all.map(\.name), ["내추럴", "포근한", "클린"])
         XCTAssertEqual(BuiltInPresets.cozy.values.color.warmth, 0.25)
-        XCTAssertEqual(BuiltInPresets.cozy.values.portrait.skinSmoothing, 0.3)
+        XCTAssertEqual(BuiltInPresets.cozy.values.portrait.skin.smoothing, 0.3)
         XCTAssertEqual(BuiltInPresets.clean.values.color.contrast, 1.05)
     }
 
@@ -97,5 +97,144 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(decoded.detail.vignette, 0.3)
         let legacy = #"{"color":{},"portrait":{}}"#
         XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: Data(legacy.utf8)).detail, DetailAdjustments())
+    }
+
+    func testLegacyPortraitKeysMigrateAndAreNotWritten() throws {
+        let json = #"{"schemaVersion":2,"portrait":{"skinSmoothing":0.4,"faceSlim":0.3,"targetFace":1}}"#
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.portrait.skin, SkinAdjustments(smoothing: 0.4))
+        XCTAssertEqual(decoded.portrait.face, FaceShapeAdjustments(width: -0.3))
+        XCTAssertEqual(decoded.portrait.targetFace, 1)
+        let data = try JSONEncoder().encode(decoded)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let portrait = try XCTUnwrap(encoded["portrait"] as? [String: Any])
+        XCTAssertEqual(Set(portrait.keys), ["targetFace", "skin", "face", "features"])
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), decoded)
+    }
+
+    func testNewPortraitKeysWinOverLegacyKeys() throws {
+        let json =
+            #"{"schemaVersion":2,"portrait":{"skinSmoothing":0.9,"skin":{"smoothing":0.2},"faceSlim":0.5,"face":{"jaw":0.1}}}"#
+        let portrait = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8)).portrait
+        XCTAssertEqual(portrait.skin.smoothing, 0.2)
+        XCTAssertEqual(portrait.face.width, 0)
+        XCTAssertEqual(portrait.face.jaw, 0.1)
+        XCTAssertEqual(FaceShapeAdjustments(legacyFaceSlim: 0).width.sign, .plus, "faceSlim 0은 −0이 아니라 0으로 옮긴다")
+    }
+
+    func testDependencyFlagsFollowEachGroup() {
+        let base = EditRecipe()
+        XCTAssertFalse(base.dependsOnFaces)
+        XCTAssertFalse(base.dependsOnPerson)
+        XCTAssertFalse(base.dependsOnBody)
+        var recipe = base
+        recipe.portrait.skin.autoBlemish = true
+        XCTAssertTrue(recipe.dependsOnFaces, "자동 잡티만 켜도 얼굴이 필요하다")
+        recipe = base
+        recipe.portrait.face.width = -0.1
+        XCTAssertTrue(recipe.dependsOnFaces)
+        recipe = base
+        recipe.portrait.features.teethWhiten = 0.1
+        XCTAssertTrue(recipe.dependsOnFaces)
+        recipe = base
+        recipe.makeup.lip.intensity = 0.3
+        XCTAssertTrue(recipe.dependsOnFaces)
+        recipe = base
+        recipe.makeup.lookID = "daily"
+        XCTAssertFalse(recipe.dependsOnFaces, "룩 이름만으로는 렌더가 바뀌지 않는다")
+        recipe = base
+        recipe.background.blur = 0.5
+        XCTAssertTrue(recipe.dependsOnPerson)
+        XCTAssertFalse(recipe.dependsOnFaces)
+        recipe = base
+        recipe.body.waist = -0.2
+        XCTAssertTrue(recipe.dependsOnBody)
+    }
+
+    func testEveryNewScalarIsCheckedForFiniteness() {
+        let paths: [WritableKeyPath<EditRecipe, Double>] = [
+            \.portrait.skin.smoothing, \.portrait.face.width, \.portrait.face.jaw, \.portrait.face.cheekbone,
+            \.portrait.face.eyeSize, \.portrait.face.eyeDistance, \.portrait.face.noseWidth, \.portrait.face.mouthSize,
+            \.portrait.face.smile, \.portrait.face.forehead, \.portrait.face.chinLength,
+            \.portrait.features.eyeBrighten, \.portrait.features.teethWhiten, \.portrait.features.lipVitality,
+            \.background.blur, \.body.legLength, \.body.waist, \.body.overall, \.body.arms, \.body.thighs,
+            \.body.shoulders, \.body.neck, \.makeup.lip.intensity, \.makeup.blush.intensity,
+            \.makeup.eyeshadow.intensity, \.makeup.brow.intensity, \.makeup.contour.intensity,
+        ]
+        for path in paths {
+            var recipe = EditRecipe()
+            recipe[keyPath: path] = .nan
+            XCTAssertFalse(recipe.allValuesFinite, "\(path)")
+        }
+    }
+
+    func testFullSkeletonRoundTrips() throws {
+        var recipe = EditRecipe()
+        recipe.portrait.skin = SkinAdjustments(smoothing: 0.5, autoBlemish: true)
+        for key in FaceShapeKey.allCases {
+            recipe.portrait.face[key] = -0.25
+        }
+        recipe.portrait.features = FeatureAdjustments(eyeBrighten: 0.2, teethWhiten: 0.3, lipVitality: 0.4)
+        recipe.background.blur = 0.6
+        for key in BodyShapeKey.allCases {
+            recipe.body[key] = 0.1
+        }
+        recipe.makeup = MakeupAdjustments(
+            lookID: "daily", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
+            blush: MakeupTint(colorID: "blush-peach", intensity: 0.3),
+            eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.2), brow: MakeupStrength(intensity: 0.4),
+            contour: MakeupStrength(intensity: 0.1))
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let portrait = try XCTUnwrap(json["portrait"] as? [String: Any])
+        let face = try XCTUnwrap(portrait["face"] as? [String: Any])
+        XCTAssertEqual(Set(face.keys), Set(FaceShapeKey.allCases.map(\.rawValue)))
+        let body = try XCTUnwrap(json["body"] as? [String: Any])
+        XCTAssertEqual(Set(body.keys), Set(BodyShapeKey.allCases.map(\.rawValue)))
+        XCTAssertEqual((json["makeup"] as? [String: Any])?["lookID"] as? String, "daily")
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
+        XCTAssertFalse(recipe.isDefault)
+    }
+
+    func testPresetValuesCarryNewGroups() throws {
+        var recipe = EditRecipe()
+        recipe.portrait.skin.smoothing = 0.3
+        recipe.background.blur = 0.4
+        recipe.body.waist = -0.2
+        recipe.makeup.brow.intensity = 0.5
+        recipe.look.id = "film"
+        let values = PresetValues(of: recipe)
+        XCTAssertEqual(values.portrait.skin.smoothing, 0.3)
+        XCTAssertEqual(values.background.blur, 0.4)
+        XCTAssertEqual(values.body.waist, -0.2)
+        XCTAssertEqual(values.makeup.brow.intensity, 0.5)
+        XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values)), values)
+        let legacyJSON = #"{"color":{},"portrait":{"skinSmoothing":0.2}}"#
+        let legacy = try JSONDecoder().decode(PresetValues.self, from: Data(legacyJSON.utf8))
+        XCTAssertEqual(legacy.portrait.skin.smoothing, 0.2)
+        XCTAssertEqual(legacy.background, BackgroundAdjustments())
+        XCTAssertEqual(legacy.body, BodyShapeAdjustments())
+        XCTAssertEqual(legacy.makeup, MakeupAdjustments())
+    }
+
+    func testShapeKeysAddressEveryValue() {
+        var face = FaceShapeAdjustments()
+        for (offset, key) in FaceShapeKey.allCases.enumerated() {
+            face[key] = Double(offset + 1) / 10
+        }
+        XCTAssertEqual(face.numericValues, (1...10).map { Double($0) / 10 })
+        XCTAssertEqual(face.width, Double(1) / 10)
+        XCTAssertEqual(face.chinLength, Double(10) / 10)
+        var body = BodyShapeAdjustments()
+        for key in BodyShapeKey.allCases {
+            body[key] = 0.5
+        }
+        XCTAssertEqual(body.numericValues, Array(repeating: 0.5, count: 7))
+        var features = FeatureAdjustments()
+        for key in FeatureKey.allCases {
+            features[key] = 0.2
+        }
+        XCTAssertEqual(features.numericValues, [0.2, 0.2, 0.2])
+        XCTAssertEqual(MakeupPart.allCases.filter(\.hasColor), [.lip, .blush, .eyeshadow])
     }
 }

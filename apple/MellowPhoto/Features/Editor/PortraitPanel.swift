@@ -21,8 +21,8 @@ struct PortraitPanel: View {
                 ForEach(model.faces.indices, id: \.self) { Text("왼쪽부터 \($0 + 1)번째").tag($0) }
             }
             .disabled(model.isGeometryLocked)
-            AdjustmentSlider(title: "피부 정돈", value: recipe.portrait.skinSmoothing, range: 0...1) { .skinSmoothing($0) }
-            AdjustmentSlider(title: "얼굴 미세 조정", value: recipe.portrait.faceSlim, range: 0...1) { .faceSlim($0) }
+            AdjustmentSlider(title: "피부 정돈", value: recipe.portrait.skin.smoothing, range: 0...1) { .skinSmoothing($0) }
+            AdjustmentSlider(title: "얼굴 미세 조정", value: -recipe.portrait.face.width, range: 0...1) { .faceSlim($0) }
                 .disabled(model.isGeometryLocked)
             Text(
                 model.isGeometryLocked

@@ -6,7 +6,7 @@ struct SkinStage: RenderStage {
     let name = "skin"
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let strength = context.recipe.portrait.skinSmoothing
+        let strength = context.recipe.portrait.skin.smoothing
         guard strength > 0, !context.targetFaces.isEmpty else { return image }
         let extent = context.extent
         let tuning = context.tuning

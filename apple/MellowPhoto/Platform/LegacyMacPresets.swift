@@ -25,7 +25,6 @@ enum LegacyMacPresets {
 
         var values: PresetValues {
             let color = ColorAdjustments()
-            let portrait = PortraitAdjustments()
             return PresetValues(
                 color: ColorAdjustments(
                     exposure: adjustments.exposure ?? color.exposure,
@@ -33,8 +32,8 @@ enum LegacyMacPresets {
                     saturation: adjustments.saturation ?? color.saturation,
                     warmth: adjustments.warmth ?? color.warmth),
                 portrait: PortraitAdjustments(
-                    skinSmoothing: adjustments.skin ?? portrait.skinSmoothing,
-                    faceSlim: adjustments.faceSlim ?? portrait.faceSlim))
+                    skin: SkinAdjustments(smoothing: adjustments.skin ?? 0),
+                    face: FaceShapeAdjustments(legacyFaceSlim: adjustments.faceSlim ?? 0)))
         }
     }
 

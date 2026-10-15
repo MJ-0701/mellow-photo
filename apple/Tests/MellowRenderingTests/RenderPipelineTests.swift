@@ -68,8 +68,8 @@ final class RenderPipelineTests: XCTestCase {
         let input = Support.gradient()
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.15, y: 0.05, width: 0.7, height: 0.9))
         var recipe = EditRecipe()
-        recipe.portrait.skinSmoothing = 0.5
-        recipe.portrait.faceSlim = 0.7
+        recipe.portrait.skin.smoothing = 0.5
+        recipe.portrait.face.width = -0.7
         recipe.color.contrast = 1.05
         recipe.color.saturation = 0.8
         recipe.color.warmth = -0.3
@@ -77,8 +77,8 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(withFace.extent, input.extent)
         XCTAssertNotEqual(try Support.bytes(withFace), try Support.bytes(input))
         var portraitOnly = EditRecipe()
-        portraitOnly.portrait.skinSmoothing = 1
-        portraitOnly.portrait.faceSlim = 1
+        portraitOnly.portrait.skin.smoothing = 1
+        portraitOnly.portrait.face.width = -1
         XCTAssertEqual(
             try Support.bytes(Support.render(input, recipe: portraitOnly, faces: [])), try Support.bytes(input))
     }
@@ -88,7 +88,7 @@ final class RenderPipelineTests: XCTestCase {
         let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.05, y: 0.1, width: 0.35, height: 0.8))
         let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
         var all = EditRecipe()
-        all.portrait.skinSmoothing = 1
+        all.portrait.skin.smoothing = 1
         var onlyLeft = all
         onlyLeft.portrait.targetFace = 0
         var outOfRange = all
@@ -106,7 +106,7 @@ final class RenderPipelineTests: XCTestCase {
         var recipe = EditRecipe()
         recipe.color.exposure = 0.8
         // 노출·잡티 복제는 둘 다 선형이라 서로 교환된다. 순서 차이는 자동 얼굴 변형과 수동 잡티 사이에서 드러난다.
-        recipe.portrait.faceSlim = 1
+        recipe.portrait.face.width = -1
         recipe.operations = [.spot(RetouchSpot(x: 0.5, y: 0.5, sourceX: 0.15, sourceY: 0.5, radius: 0.2))]
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.15, y: 0.05, width: 0.7, height: 0.9))
         let context = RenderContext(extent: input.extent, recipe: recipe, faces: [face], tuning: RenderTuning())
@@ -121,7 +121,7 @@ final class RenderPipelineTests: XCTestCase {
 
     func testNonFiniteRecipeIsRejected() {
         var recipe = EditRecipe()
-        recipe.portrait.skinSmoothing = .nan
+        recipe.portrait.skin.smoothing = .nan
         XCTAssertThrowsError(try Support.render(Support.gradient(), recipe: recipe)) { error in
             XCTAssertEqual(error as? MellowError, .invalidRecipeValues)
         }

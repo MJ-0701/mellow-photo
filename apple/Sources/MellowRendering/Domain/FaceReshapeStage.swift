@@ -6,7 +6,7 @@ struct FaceReshapeStage: RenderStage {
     let name = "faceReshape"
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let amount = context.recipe.portrait.faceSlim
+        let amount = -context.recipe.portrait.face.width
         guard amount > 0, !context.targetFaces.isEmpty else { return image }
         var result = image
         for face in context.targetFaces {

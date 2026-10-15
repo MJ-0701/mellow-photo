@@ -21,9 +21,29 @@ final class RecipeSchemaTests: XCTestCase {
         return Set(properties.keys)
     }
 
+    private func sectionProperties(_ object: Any?) throws -> [String: Any] {
+        try XCTUnwrap((object as? [String: Any])?["properties"] as? [String: Any])
+    }
+
+    /// deprecated로 표시한 읽기 전용 옛 키는 인코드하지 않으므로 비교에서 뺀다.
+    private func activeKeys(_ object: Any?) throws -> Set<String> {
+        let properties = try sectionProperties(object)
+        return Set(properties.filter { (($0.value as? [String: Any])?["deprecated"] as? Bool) != true }.keys)
+    }
+
     private func encodedSampleRecipe() throws -> [String: Any] {
         var recipe = EditRecipe()
         recipe.portrait.targetFace = 1
+        recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true)
+        recipe.portrait.face.width = -0.2
+        recipe.portrait.features.eyeBrighten = 0.1
+        recipe.background.blur = 0.2
+        recipe.body.legLength = 0.3
+        recipe.makeup = MakeupAdjustments(
+            lookID: "daily", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
+            blush: MakeupTint(colorID: "blush-peach", intensity: 0.3),
+            eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.2), brow: MakeupStrength(intensity: 0.4),
+            contour: MakeupStrength(intensity: 0.1))
         recipe.operations = [
             .spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.45, sourceY: 0.4, radius: 0.02)),
             .warp(WarpStroke(x: 0.5, y: 0.4, dx: 0.01, dy: 0, radius: 0.08)),
@@ -39,20 +59,36 @@ final class RecipeSchemaTests: XCTestCase {
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let encoded = try encodedSampleRecipe()
         XCTAssertEqual(Set(properties.keys), Set(encoded.keys))
-        let encodedColor = try XCTUnwrap(encoded["color"] as? [String: Any])
-        XCTAssertEqual(try propertyKeys(properties["color"]), Set(encodedColor.keys))
-        let encodedPortrait = try XCTUnwrap(encoded["portrait"] as? [String: Any])
-        XCTAssertEqual(try propertyKeys(properties["portrait"]), Set(encodedPortrait.keys))
-        for key in ["detail", "look", "geometry"] {
+        for key in ["color", "portrait", "detail", "look", "geometry", "background", "body", "makeup"] {
             let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
-            XCTAssertEqual(try propertyKeys(properties[key]), Set(encodedSection.keys), key)
+            XCTAssertEqual(try activeKeys(properties[key]), Set(encodedSection.keys), key)
         }
-        let geometrySchema = properties["geometry"] as? [String: Any]
-        let geometryProperties = try XCTUnwrap(geometrySchema?["properties"] as? [String: Any])
+        let portraitProperties = try sectionProperties(properties["portrait"])
+        let encodedPortrait = try XCTUnwrap(encoded["portrait"] as? [String: Any])
+        for key in ["skin", "face", "features"] {
+            let encodedSection = try XCTUnwrap(encodedPortrait[key] as? [String: Any], "portrait.\(key) 누락")
+            XCTAssertEqual(try activeKeys(portraitProperties[key]), Set(encodedSection.keys), "portrait.\(key)")
+        }
+        let makeupProperties = try sectionProperties(properties["makeup"])
+        let encodedMakeup = try XCTUnwrap(encoded["makeup"] as? [String: Any])
+        for key in ["lip", "blush", "eyeshadow", "brow", "contour"] {
+            let encodedSection = try XCTUnwrap(encodedMakeup[key] as? [String: Any], "makeup.\(key) 누락")
+            XCTAssertEqual(try activeKeys(makeupProperties[key]), Set(encodedSection.keys), "makeup.\(key)")
+        }
+        let geometryProperties = try sectionProperties(properties["geometry"])
         let encodedCrop = try XCTUnwrap((encoded["geometry"] as? [String: Any])?["crop"] as? [String: Any])
         XCTAssertEqual(try propertyKeys(geometryProperties["crop"]), Set(encodedCrop.keys))
         try assertOperationsMatchBranches(properties: properties, encoded: encoded)
         XCTAssertEqual(schema["$id"] as? String, "https://mellow.photo/schema/edit-recipe.v2.schema.json")
+    }
+
+    func testLegacyPortraitKeysStayInSchemaAsDeprecated() throws {
+        let properties = try XCTUnwrap(try schema(named: "edit-recipe.v2.schema")["properties"] as? [String: Any])
+        let portrait = try sectionProperties(properties["portrait"])
+        for key in ["skinSmoothing", "faceSlim"] {
+            let entry = try XCTUnwrap(portrait[key] as? [String: Any], key)
+            XCTAssertEqual(entry["deprecated"] as? Bool, true, key)
+        }
     }
 
     /// 각 수동 편집 항목의 키가 type.const가 같은 oneOf 분기의 properties와 같은지 본다.
