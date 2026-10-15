@@ -19,6 +19,12 @@
 | (E 구현 중 변경) 목 보정은 어깨선(목 아래끝과 양쪽 승모근 비탈)을 내려 목을 길게 하고(−는 올림) 얼굴·머리·턱은 움직이지 않음 | 처음 범위는 턱 끝과 입술까지 닿아 얼굴 아래쪽이 변형됨(리뷰 지적). 그 뒤 턱 아래만 위로 미는 방식은 목 아래끝까지 함께 올라가 오히려 목이 조금 짧아짐(최종 리뷰 지적). 어깨 끝은 그대로라 어깨 비탈이 조금 더 처져 보이고, 고개를 숙였거나 목이 아주 짧은 사람은 턱 아래가 조금 움직일 수 있음 | 작음 |
 | (E 구현 중 변경) 두 어깨가 모두 보여야 체형으로 인정(아니면 "전신 없음" 안내). 다리 길게는 두 엉덩이와 발목 하나 이상이 보일 때만 동작하고 거꾸로·누운 사람은 건너뜀 | 어깨 폭이 모든 체형 이동의 기준 길이라 하나만 보이면 크기를 정할 수 없음. 상반신 사진에서 다리 길게 슬라이더는 켜져 있지만 효과가 없음 | 작음 |
 | (E 구현 중 변경) 화면 이름 "전체 날씬"을 "몸 전체"로 부름 | 가운데 0인 양방향 슬라이더라 "날씬"만 가리키는 이름이 맞지 않음 | 작음 |
+| (F 구현 중 변경) 룩 적용은 편집 변경 항목(`makeupLook`)이 아니라 룩 값을 통째로 받는 별도 동작(`applyMakeupLook`) 하나로 | 편집 규칙은 메이크업 목록 파일을 몰라 룩 이름만으로 부위 값을 채울 수 없음. 앱이 목록에서 룩을 찾아 넘김 | 작음 |
+| (F 구현 중 정함) 메이크업 섞기는 Core Image 기본 섞기 모드(소프트 라이트·곱하기·스크린)를 sRGB 감마 공간에서(바탕·색 층을 감마로 바꿔 섞고 되돌림, 마스크 합성은 선형), 블러셔·쉐딩·하이라이터는 얼굴 좌표 타원 × 피부 다각형 비트맵 | 선형 공간 소프트 라이트는 누드·MLBB 같은 밝은 립이 입술을 오히려 어둡게 했음(초록 71 → 56). 새 커널 언어 경고가 없고 기울어진 얼굴을 따라가며 캐시 항목이 늘지 않음. 강도 상한은 `RenderTuning`에서 조정 | 작음 |
+| (F 구현 중 정함) 아이섀도는 눈꺼풀 띠에 흐리지 않은 눈 모양을 빼서 눈 안은 정확히 0, 띠의 눈썹은 그 눈과 같은 쪽만 씀 | 흐린 띠가 흰자로 번졌음. 눈썹 하나가 안 보일 때 반대쪽 눈썹 높이로 띠가 올라가던 문제. 대신 속눈썹 선에서 경계가 딱 끊김(기기 확인) | 작음 |
+| (F 구현 중 정함) 눈썹 진하게는 원래 눈썹 상자 전체의 평균색으로 곱함 | 렌더 중 픽셀을 읽어 오지 않음. 얇은 눈썹은 상자에 피부가 많이 섞여 효과가 약할 수 있음(기기 확인 후 조정 후보) | 작음 |
+| (F 구현 중 변경) 다각형 비트맵 캐시 상한을 32 고정에서 얼굴 수 비례(얼굴당 16, 최소 32)로 | 메이크업 비트맵이 더해져 얼굴당 해상도마다 7개가 되어, 얼굴 셋부터 미리보기·저장을 오갈 때마다 비우고 다시 그렸음 | 작음 |
+| (F 구현 중 정함) 슬라이더를 끄는 조건(사람·관절 없음)이 있어도 드래그 중에는 끄지 않음 | 드래그 도중 꺼지면 드래그 끝 신호가 오지 않아 미룬 세션 저장이 열린 채 남을 수 있음 | 작음 |
 | 얼굴 보정은 찾은 얼굴 모두(기존 대상 얼굴 선택 유지), 체형은 가장 큰 사람 한 명 | 단체 사진에서 체형 변형이 서로 간섭함 | 작음 |
 | 얼굴형·체형 슬라이더는 가운데 0인 양방향(미소·다리 길게만 한 방향) | Evoto·메이투와 같은 조작감 | 작음 |
 | 수동 잡티·변형 편집이 있으면 얼굴형·체형 슬라이더도 잠김 | 수동 편집 좌표가 변형 뒤에서 어긋남(기존 얼굴 미세 조정과 같은 규칙) | 작음 |
@@ -107,7 +113,7 @@
 - `PortraitAdjustments.dependsOnFaces`는 skin·face·features·makeup 중 하나라도 0이 아니면 true. `EditRecipe`에 `dependsOnPerson`(background.blur > 0), `dependsOnBody`(body 중 0이 아닌 값) 추가.
 - `allValuesFinite`에 새 스칼라 전부 포함.
 - `shared/recipe-schema/edit-recipe.v2.schema.json`·README 갱신, `PresetValues`에 새 그룹 포함(프리셋 저장·일괄 적용이 새 값을 나름).
-- `EditChange`에 항목별 케이스 추가(`skinSmoothing`, `autoBlemish(Bool)`, `faceShape(FaceShapeKey, Double)`, `feature(FeatureKey, Double)`, `backgroundBlur`, `bodyShape(BodyShapeKey, Double)`, `makeupLook(String?)`, `makeupColor(MakeupPart, String?)`, `makeupIntensity(MakeupPart, Double)`). `affectsGeometry`는 `faceShape`·`bodyShape`·`targetFace`가 true. 기존 `faceSlim` 케이스는 제거하고 호출부를 `faceShape(.width, …)`로 옮김.
+- `EditChange`에 항목별 케이스 추가(`skinSmoothing`, `autoBlemish(Bool)`, `faceShape(FaceShapeKey, Double)`, `feature(FeatureKey, Double)`, `backgroundBlur`, `bodyShape(BodyShapeKey, Double)`, `makeupColor(MakeupPart, String?)`, `makeupIntensity(MakeupPart, Double)`). `affectsGeometry`는 `faceShape`·`bodyShape`·`targetFace`가 true. 기존 `faceSlim` 케이스는 제거하고 호출부를 `faceShape(.width, …)`로 옮김. 룩 적용은 `EditChange`가 아니라 `EditDocument.applyMakeupLook(MakeupLook?)`(스펙 6) 한 경로. (F 구현 중 변경: 처음 문구는 `makeupLook(String?)` 케이스 — 편집 규칙은 카탈로그를 몰라 id만으로 부위 값을 채울 수 없음.)
 
 #### 1.3 파이프라인 순서
 
@@ -126,7 +132,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 3. 인물 마스크 — `PersonAnalyzer.personMask(_:) throws -> CIImage?`(회색조, 사람 1·배경 0, 미리보기 이미지로 계산). 받은 크기 그대로(원점 (0, 0)) 보관하고 렌더 시 extent로 가로·세로를 따로 확대. `VisionPersonAnalyzer`(`.balanced` 품질)의 결과는 입력 비율과 무관하게 512×384 고정이라 축마다 배율이 다르다. 마스크 픽셀 중 128/255 이상이 1% 미만이면 "사람 없음"으로 nil. (D 구현 중 변경: 처음 문구는 "미리보기 크기" 마스크를 원본 extent로 확대.)
 4. 관절점 — `BodyAnalyzer.analyze(_:) throws -> [BodyGeometry]`, 면적이 가장 큰 사람을 앞에.
 
-각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. 분석 결과는 `PhotoAnalysis`(MellowRendering/API, `faces`·`faceAnalysisFailure`·`blemishes`·`personMask`·`personAnalysisFailure`, E에서 `bodies`·`bodyAnalysisFailure` 추가) 하나로 묶어 `RenderContext.analysis`로 넘기고, `RenderContext.faces`·`blemishes`·`personMask`는 묶음을 읽는 계산 속성이다. 새 분석은 이 묶음에만 더하고 `RenderContext`·`PhotoPipeline`의 인자 목록은 늘리지 않는다. 다각형 마스크 비트맵은 묶음의 `RegionMaskCache`(다각형·extent 키, 32개 상한)가 사진마다 한 번만 그리며, 미리보기 캐시에서 밀려난 사진의 비트맵은 놓는다. 옛 생성자 `RenderContext(extent:recipe:faces:…blemishes:)`는 묶음을 만들어 넘기는 형태로 남긴다. `makeupCatalog: MakeupCatalog`는 F에서 `RenderContext`에 추가(기본값 있음). (D 구현 중 변경: 처음 문구는 `RenderContext`에 `blemishes`·`personMask`·`bodies` 개별 필드 추가.)
+각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. 분석 결과는 `PhotoAnalysis`(MellowRendering/API, `faces`·`faceAnalysisFailure`·`blemishes`·`personMask`·`personAnalysisFailure`, E에서 `bodies`·`bodyAnalysisFailure` 추가) 하나로 묶어 `RenderContext.analysis`로 넘기고, `RenderContext.faces`·`blemishes`·`personMask`는 묶음을 읽는 계산 속성이다. 새 분석은 이 묶음에만 더하고 `RenderContext`·`PhotoPipeline`의 인자 목록은 늘리지 않는다. 다각형 마스크 비트맵은 묶음의 `RegionMaskCache`(다각형·extent 키, 얼굴 수 비례 상한 — 얼굴당 16·최소 32, 실측 얼굴당 해상도마다 7개)가 사진마다 한 번만 그리며, 미리보기 캐시에서 밀려난 사진의 비트맵은 놓는다. 옛 생성자 `RenderContext(extent:recipe:faces:…blemishes:)`는 묶음을 만들어 넘기는 형태로 남긴다. `makeupCatalog: MakeupCatalog`는 F에서 `RenderContext`에 추가(기본값 있음). (D 구현 중 변경: 처음 문구는 `RenderContext`에 `blemishes`·`personMask`·`bodies` 개별 필드 추가.) (F 구현 중 변경: 처음 문구는 32개 상한.)
 
 `PhotoPipeline.init`에 `personAnalyzer`, `bodyAnalyzer` 인자 추가(테스트는 스텁). 앱 `AppModel+Live.swift`가 Vision 구현을 주입.
 
@@ -202,9 +208,10 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 - **데이터 `shared/makeup/makeup.v1.json`** (앱 번들 사본 `apple/MellowPhoto/Resources/makeup.v1.json`, 두 파일 바이트 동일, README 포함):
   - `colors`: 부위별 팔레트 — lip 6(`lip-nude`, `lip-coral`, `lip-rose`, `lip-red`, `lip-berry`, `lip-mlbb`), blush 4(`blush-peach`, `blush-pink`, `blush-coral`, `blush-rose`), eyeshadow 4(`shadow-brown`, `shadow-peach`, `shadow-pink`, `shadow-smoky`). 각 `{ id, name(한국어), rgb: [r,g,b] 0…1 }`.
   - `looks` 5개: `daily`, `cool`, `warm-peach`, `rosy`, `smoky`. 각 `{ id, name, lip: {colorID, intensity}, blush: {…}, eyeshadow: {…}, brow: {intensity}, contour: {intensity} }`.
+  - `colors`는 부위별 객체(`lip`·`blush`·`eyeshadow`)이고 읽을 때 형식 위반(모르는 부위, rgb 개수·범위, 중복 id, 다른 부위 색을 쓰는 룩, 범위 밖 강도)은 파일 전체를 거부한다(F 구현 중 정함).
 - **`MakeupCatalog(data:)`**: `LookCatalog`와 같은 패턴(`empty`, `look(id:)`, `color(id:)`), 디코드 오류는 앱에서 `UserMessage`로 매핑.
-- **룩 적용:** `EditDocument.applyMakeupLook(_:)`이 룩의 부위 값을 `makeup`에 써 넣고 `lookID` 기록, 체크포인트 1회. 이후 부위 변경은 `lookID`를 nil로.
-- **`MakeupStage`** (마스크는 `FaceRegions`):
+- **룩 적용:** `EditDocument.applyMakeupLook(_:)`이 룩의 부위 값을 `makeup`에 써 넣고 `lookID` 기록, 체크포인트 1회. 이후 부위 변경은 `lookID`를 nil로. 룩 "없음"은 메이크업을 모두 지운다. 색을 처음 고를 때 강도가 0이면 0.5로 둔다(F 구현 중 정함). 앱은 `AppModel.applyMakeupLook(id:)`에서 카탈로그로 룩을 찾아 넘기고(모르는 id는 무시), 진행 중이던 슬라이더 드래그를 먼저 끝낸다.
+- **`MakeupStage`** (마스크는 `FaceRegions`): 섞기는 sRGB 감마 공간(바탕·색 층을 `CILinearToSRGBToneCurve`로 바꿔 섞고 `CISRGBToneCurveToLinear`로 되돌림, 마스크로 원본에 합성하는 단계는 선형). 위치: 블러셔 = 눈동자 u × 1.15·입~눈 45% 높이 타원, 아이섀도 = 윗눈꺼풀~눈썹 아래 75% 띠(같은 쪽 눈썹만, 흐리지 않은 눈 모양을 빼서 눈 안 0), 눈썹 = 가로 1.15·세로 1.6배(원래 눈썹 상자 평균색으로 곱함), 쉐딩 = 광대 아래·턱선·코 옆, 하이라이터 = 콧대·이마 가운데·턱 끝, 모두 특징점이 없으면 건너뜀. 부위 순서는 쉐딩·하이라이터 → 블러셔 → 아이섀도 → 눈썹 → 립(F 구현 중 정함).
   - lip: 바깥−안쪽 입술, 색을 `CISoftLightBlendMode` + 강도 혼합(입술 질감 유지).
   - blush: 볼 타원(눈 아래·코 옆·윤곽 안쪽), 넓은 경계, soft light.
   - eyeshadow: 눈 위 눈꺼풀~눈썹 사이 다각형에서 눈을 뺀 영역, multiply.
