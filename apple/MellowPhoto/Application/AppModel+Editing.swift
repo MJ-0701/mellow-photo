@@ -101,11 +101,9 @@ extension AppModel {
 
     /// 프리셋은 얼굴을 고르지 않는다. 대상 얼굴 번호는 사진마다 의미가 달라 저장하지 않는다.
     func savePreset(named name: String) {
-        var portrait = currentRecipe.portrait
-        portrait.targetFace = nil
-        session.addPreset(
-            named: name,
-            values: PresetValues(color: currentRecipe.color, portrait: portrait, detail: currentRecipe.detail))
+        var values = PresetValues(of: currentRecipe)
+        values.portrait.targetFace = nil
+        session.addPreset(named: name, values: values)
     }
 
     func resetCloneSource() {

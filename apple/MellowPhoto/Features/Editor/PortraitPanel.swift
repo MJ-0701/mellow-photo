@@ -22,8 +22,10 @@ struct PortraitPanel: View {
             }
             .disabled(model.isGeometryLocked)
             AdjustmentSlider(title: "피부 정돈", value: recipe.portrait.skin.smoothing, range: 0...1) { .skinSmoothing($0) }
-            AdjustmentSlider(title: "얼굴 미세 조정", value: -recipe.portrait.face.width, range: 0...1) { .faceSlim($0) }
-                .disabled(model.isGeometryLocked)
+            AdjustmentSlider(title: "얼굴 미세 조정", value: -recipe.portrait.face.width, range: 0...1) {
+                .faceShape(.width, -$0)
+            }
+            .disabled(model.isGeometryLocked)
             Text(
                 model.isGeometryLocked
                     ? UserMessage.geometryLocked : "얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요. 피부 정돈은 부드러운 필터이며 자동 잡티 제거는 아닙니다."

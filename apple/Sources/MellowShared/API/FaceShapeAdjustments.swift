@@ -43,7 +43,7 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
         self.chinLength = chinLength
     }
 
-    /// B0까지의 faceSlim(0…1, 클수록 좁게)을 width로 옮긴다. 0은 −0이 아니라 0이다.
+    /// B0까지의 faceSlim 값(0…1, 클수록 좁게)을 width로 옮긴다. 0은 −0이 아니라 0이다.
     public init(legacyFaceSlim slim: Double) {
         self.init(width: slim == 0 ? 0 : -slim)
     }

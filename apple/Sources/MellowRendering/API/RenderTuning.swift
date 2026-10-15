@@ -44,7 +44,6 @@ public struct RenderTuning: Sendable {
     public var autoSaturation: Double = 1.08
     public var autoContrast: Double = 1.04
     public var autoSkinSmoothing: Double = 0.3
-    public var autoFaceSlim: Double = 0.15
     /// 상·하위 백분위 차이가 이보다 작으면 단색으로 보고 노출만 조정한다.
     public var autoFlatRange: Double = 0.05
     public var autoExposureLimit: Double = 1

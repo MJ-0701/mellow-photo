@@ -53,7 +53,7 @@ final class AppModelTests: XCTestCase {
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         await model.importFromFiles([staged])
         try await waitUntil { model.isReady && model.preview != nil }
-        model.edit(.faceSlim(0.2))
+        model.edit(.faceShape(.width, -0.2))
         try await waitUntil { !model.isRendering }
         model.tool = .retouch
         model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
@@ -61,7 +61,7 @@ final class AppModelTests: XCTestCase {
         model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
         XCTAssertEqual(model.currentRecipe.operations.count, 1)
         try await waitUntil { !model.isRendering }
-        model.edit(.faceSlim(0.9))
+        model.edit(.faceShape(.width, -0.9))
         XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.2)
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
     }
@@ -184,7 +184,7 @@ final class AppModelTests: XCTestCase {
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         await model.importFromFiles([staged])
         try await waitUntil { model.isReady && model.preview != nil }
-        model.edit(.faceSlim(0.4))
+        model.edit(.faceShape(.width, -0.4))
         model.edit(.targetFace(1))
         XCTAssertEqual(model.currentRecipe.portrait.targetFace, 1)
         model.savePreset(named: "대상 얼굴")
