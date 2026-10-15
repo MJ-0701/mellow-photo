@@ -31,7 +31,7 @@ enum UserMessage {
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
-    static let faceHint = "가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
+    static let faceHint = "미소는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
     static let noFaceDetected = "감지된 얼굴이 없어요"
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
