@@ -6,6 +6,7 @@ final class SkinKernels: @unchecked Sendable {
     static let shared = SkinKernels()
 
     private let chroma: CIColorKernel?
+    private let bands: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -21,6 +22,14 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(w, w, w, 1.0);
                 }
                 """)
+        bands = CIColorKernel(
+            source: """
+                kernel vec4 bandMix(__sample image, __sample fineBlur, __sample midBlur, float keep) {
+                    vec3 mid = fineBlur.rgb - midBlur.rgb;
+                    vec3 fine = image.rgb - fineBlur.rgb;
+                    return vec4(midBlur.rgb + mid * keep + fine, image.a);
+                }
+                """)
     }
 
     /// encoded는 sRGB 감마 값 이미지, left·right는 볼 평균을 무한 확장한 이미지. 결과는 회색 가중치.
@@ -31,5 +40,13 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [encoded, left, right, 1 / (sigma * sigma)]
         guard let weight = chroma.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return weight
+    }
+
+    /// low + mid × keep + fine. low = blur(r2), mid = blur(r1) − blur(r2), fine = 원본 − blur(r1).
+    func bandMix(image: CIImage, fineBlur: CIImage, midBlur: CIImage, keep: Double, extent: CGRect) throws -> CIImage {
+        guard let bands else { throw MellowError.renderFailed }
+        let arguments: [Any] = [image, fineBlur, midBlur, keep]
+        guard let mixed = bands.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
+        return mixed
     }
 }

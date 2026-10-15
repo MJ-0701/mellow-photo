@@ -24,6 +24,12 @@ public struct RenderTuning: Sendable {
     public var skinMaskFeather: Double = 0.015
     /// 다각형 마스크를 그리는 비트맵의 긴 변. 마스크는 흐리므로 512면 48MP에서도 계단이 보이지 않는다.
     public var regionMaskMaxDimension: Int = 512
+    /// 모공 대역의 위쪽 경계 반지름. 얼굴 폭 비율. 모공은 얼굴 폭의 0.5% 안팎이다(400px 얼굴에서 2.4px).
+    public var fineBandFraction: Double = 0.006
+    /// 얼룩·잔주름 대역의 위쪽 경계 반지름. 얼굴 폭 비율. 이보다 큰 명암(광대 그림자 등)은 남긴다.
+    public var midBandFraction: Double = 0.04
+    /// 피부 보정 1에서 중간 대역을 줄이는 비율. 15%를 남겨 플라스틱 느낌을 피한다.
+    public var midReductionMax: Double = 0.85
 
     public var faceSlimShiftFraction: Double = 0.035
     public var faceSlimRadiusFraction: Double = 0.34

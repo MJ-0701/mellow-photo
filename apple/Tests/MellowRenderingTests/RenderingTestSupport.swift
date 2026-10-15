@@ -59,6 +59,31 @@ enum RenderingTestSupport {
         PixelGrid(try renderer.makeCGImage(image))
     }
 
+    /// rect 안 휘도(선형 sRGB)의 대역별 분산. fine = 원본 − blur(r1), mid = blur(r1) − blur(r2).
+    static func bandVariances(_ image: CIImage, in rect: CGRect, fineRadius: Double, midRadius: Double) throws
+        -> (fine: Double, mid: Double)
+    {
+        let original = try luma(image.cropped(to: rect))
+        let fineBlur = try luma(FrequencySeparation.blurred(image, radius: fineRadius).cropped(to: rect))
+        let midBlur = try luma(FrequencySeparation.blurred(image, radius: midRadius).cropped(to: rect))
+        let fine = zip(original, fineBlur).map { $0 - $1 }
+        let mid = zip(fineBlur, midBlur).map { $0 - $1 }
+        return (variance(fine), variance(mid))
+    }
+
+    static func luma(_ image: CIImage) throws -> [Double] {
+        let pixels = try renderer.readPixels(image)
+        return stride(from: 0, to: pixels.count, by: 4).map { index in
+            0.2126 * Double(pixels[index]) + 0.7152 * Double(pixels[index + 1]) + 0.0722 * Double(pixels[index + 2])
+        }
+    }
+
+    static func variance(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        let mean = values.reduce(0, +) / Double(values.count)
+        return values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(values.count)
+    }
+
     /// 가장자리 폭이 반지름의 2%인 거의 단단한 타원 마스크.
     /// 단위 원을 확대하면 Core Image가 같은 그라데이션을 작은 배율로 한 번 그려 재사용해 큰 타원 가장자리가 흐려진다.
     /// 그래서 가로 반지름 크기로 그리고 세로만 늘린다.
