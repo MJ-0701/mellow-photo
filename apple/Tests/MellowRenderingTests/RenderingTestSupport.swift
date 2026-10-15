@@ -501,6 +501,18 @@ extension SyntheticFace {
     static let rolledLeftBlush = CGPoint(x: 194.2, y: 178.2)
     static let rolledRightBlush = CGPoint(x: 305.8, y: 242.6)
     static let rolledLidSkin = CGPoint(x: 145.5, y: 279.4)
+    /// 왼눈썹 가운데와, 세로로 1.6배 넓힌 눈썹 안이지만 원래 눈썹(위끝 344) 바깥인 피부.
+    static let leftBrowCenter = CGPoint(x: 200, y: 338)
+    static let aboveLeftBrow = CGPoint(x: 200, y: 345)
+    /// 광대 아래 쉐딩 중심(u ±95.2, v = −60 + 160 × 0.2).
+    static let leftHollow = CGPoint(x: 161, y: 172)
+    static let rightHollow = CGPoint(x: 351, y: 172)
+    /// 왼쪽 턱선 쉐딩 타원(윤곽점 (134.4, 105.6) 중심) 안쪽의 얼굴 피부.
+    static let leftJaw = CGPoint(x: 145, y: 110)
+    /// 콧대·이마 가운데·턱 끝 하이라이터 안.
+    static let bridge = CGPoint(x: 256, y: 245)
+    static let foreheadCenter = CGPoint(x: 256, y: 368)
+    static let chinTip = CGPoint(x: 256, y: 67)
 }
 
 extension FaceGeometry {

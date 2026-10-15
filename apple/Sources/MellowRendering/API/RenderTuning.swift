@@ -137,6 +137,18 @@ public struct RenderTuning: Sendable {
     public var makeupEyeshadowMaxOpacity: Double = 0.45
     /// 아이섀도 띠를 흐리는 반지름. 얼굴 폭 비율. 300px 얼굴에서 2.4px라 눈 안쪽까지 번지지 않는다.
     public var makeupEyeshadowFeather: Double = 0.008
+    /// 눈썹 1에서 원래 눈썹 평균색으로 곱한 결과를 섞는 비율.
+    public var makeupBrowMaxOpacity: Double = 0.5
+    /// 넓힌 눈썹을 흐리는 반지름. 얼굴 폭 비율.
+    public var makeupBrowFeather: Double = 0.006
+    /// 쉐딩 1에서 회갈색 곱하기 결과를 섞는 비율.
+    public var makeupShadeMaxOpacity: Double = 0.4
+    /// 하이라이터 1에서 스크린 결과를 섞는 비율.
+    public var makeupHighlightMaxOpacity: Double = 0.3
+    /// 쉐딩 색(sRGB 감마 값). 스펙 6의 회갈색.
+    public var makeupShadeRGB: [Double] = [0.72, 0.6, 0.52]
+    /// 하이라이터 색(sRGB 감마 값). 따뜻한 흰색.
+    public var makeupHighlightRGB: [Double] = [1, 0.97, 0.92]
     /// 관절 신뢰도가 이보다 낮으면 없는 것으로 본다(스펙 5).
     public var bodyJointMinConfidence: Double = 0.3
     /// 체형 push 항목 하나의 이동 상한. 어깨 폭 비율(스펙 0.06, "몸 폭의 6% 이내"). 항목별 최대가 이보다 크면 이 값으로 자른다.

@@ -18,8 +18,10 @@ struct MakeupStage: RenderStage {
         guard makeup.hasEffect, !context.targetFaces.isEmpty else { return image }
         var result = image
         for face in context.targetFaces {
+            result = sculpt(result, face: face, strength: makeup.contour, context: context)
             result = paintBlush(result, face: face, tint: makeup.blush, context: context)
             result = shadeEyelids(result, face: face, tint: makeup.eyeshadow, context: context)
+            result = darkenBrows(result, face: face, strength: makeup.brow, context: context)
             result = paintLips(result, face: face, tint: makeup.lip, context: context)
         }
         return result.cropped(to: context.extent)
@@ -70,6 +72,53 @@ struct MakeupStage: RenderStage {
                 "inputBVector": CIVector(x: 0, y: 0, z: amount, w: 0),
             ])
         return MaskBuilder.blend(foreground.cropped(to: mask.bounds), over: image, mask: scaled).cropped(to: extent)
+    }
+
+    /// 쉐딩 영역은 회갈색을 곱하고 하이라이터 영역은 따뜻한 흰색을 스크린으로 얹는다. 강도 하나로 함께 움직인다.
+    private func sculpt(_ image: CIImage, face: FaceGeometry, strength: MakeupStrength, context: RenderContext)
+        -> CIImage
+    {
+        let tuning = context.tuning
+        guard strength.intensity > 0,
+            let regions = FaceRegions.contourRegions(
+                face: face, extent: context.extent, tuning: tuning, cache: context.regionMasks)
+        else { return image }
+        var result = image
+        if let shade = regions.shade {
+            let darkened = Self.blended(
+                result, with: Self.solid(tuning.makeupShadeRGB), mode: Self.multiply, in: shade.bounds)
+            result = Self.mixed(
+                darkened, over: result, mask: shade, amount: strength.intensity * tuning.makeupShadeMaxOpacity,
+                extent: context.extent)
+        }
+        if let highlight = regions.highlight {
+            let brightened = Self.blended(
+                result, with: Self.solid(tuning.makeupHighlightRGB), mode: Self.screen, in: highlight.bounds)
+            result = Self.mixed(
+                brightened, over: result, mask: highlight,
+                amount: strength.intensity * tuning.makeupHighlightMaxOpacity, extent: context.extent)
+        }
+        return result
+    }
+
+    /// 넓힌 눈썹을 원래 눈썹 상자의 평균색으로 곱해 진하게 하고 비어 있던 눈썹 가장자리를 채운다.
+    /// 평균색은 CIAreaAverage로 그래프 안에서 잰다(렌더 중 픽셀을 읽어 오지 않는다).
+    private func darkenBrows(_ image: CIImage, face: FaceGeometry, strength: MakeupStrength, context: RenderContext)
+        -> CIImage
+    {
+        guard strength.intensity > 0 else { return image }
+        var result = image
+        let brows = FaceRegions.browRegions(
+            face: face, extent: context.extent, tuning: context.tuning, cache: context.regionMasks)
+        let amount = strength.intensity * context.tuning.makeupBrowMaxOpacity
+        for brow in brows where !brow.sample.isEmpty {
+            let tone = image.applyingFilter(
+                "CIAreaAverage", parameters: [kCIInputExtentKey: CIVector(cgRect: brow.sample)]
+            ).clampedToExtent()
+            let darkened = Self.blended(result, with: tone, mode: Self.multiply, in: brow.mask.bounds)
+            result = Self.mixed(darkened, over: result, mask: brow.mask, amount: amount, extent: context.extent)
+        }
+        return result
     }
 
     /// 볼에 고른 색을 소프트 라이트로 얹는다.

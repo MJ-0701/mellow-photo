@@ -221,4 +221,69 @@ final class MakeupStageTests: XCTestCase {
         XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
         XCTAssertEqual(try Support.bytes(rendered(targetFace: 7)), try Support.bytes(image), "범위 밖 얼굴은 그대로")
     }
+
+    func testBrowDarkensBrowsOnly() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(output(synthetic, MakeupAdjustments(brow: MakeupStrength(intensity: 1))))
+        XCTAssertLessThanOrEqual(
+            brightness(after.rgba(SyntheticFace.leftBrowCenter)),
+            brightness(before.rgba(SyntheticFace.leftBrowCenter)) - 10, "눈썹이 진해진다")
+        XCTAssertLessThan(
+            brightness(after.rgba(SyntheticFace.aboveLeftBrow)), brightness(before.rgba(SyntheticFace.aboveLeftBrow)),
+            "눈썹 바로 위가 눈썹 색으로 채워진다")
+        for point in [SyntheticFace.cheek, SyntheticFace.scleraPoint, SyntheticFace.lipPoint, SyntheticFace.mouth] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "눈썹 밖 \(point)")
+        }
+    }
+
+    func testContourDarkensHollowsAndBrightensForehead() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(output(synthetic, MakeupAdjustments(contour: MakeupStrength(intensity: 1))))
+        XCTAssertLessThanOrEqual(
+            brightness(after.rgba(SyntheticFace.leftHollow)), brightness(before.rgba(SyntheticFace.leftHollow)) - 6,
+            "광대 아래가 어두워진다")
+        XCTAssertGreaterThanOrEqual(
+            brightness(after.rgba(SyntheticFace.foreheadCenter)),
+            brightness(before.rgba(SyntheticFace.foreheadCenter)) + 6, "이마 가운데가 밝아진다")
+        for point in [SyntheticFace.outside, SyntheticFace.scleraPoint, SyntheticFace.lipPoint] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "쉐딩·하이라이터 밖 \(point)")
+        }
+    }
+
+    /// 눈썹·쉐딩 강도 0은 그 단계를 건너뛴다. 모르는 립 색으로 단계 반복까지는 들어가게 한다.
+    func testZeroBrowAndContourIntensityReturnInputBytes() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let makeup = MakeupAdjustments(
+            lip: MakeupTint(colorID: "nope", intensity: 1), brow: MakeupStrength(intensity: 0),
+            contour: MakeupStrength(intensity: 0))
+        XCTAssertEqual(try Support.bytes(output(synthetic, makeup)), try Support.bytes(synthetic.image))
+    }
+
+    /// BT.601 휘도(바이트).
+    private func luma(_ pixel: [UInt8]) -> Double {
+        0.299 * Double(pixel[0]) + 0.587 * Double(pixel[1]) + 0.114 * Double(pixel[2])
+    }
+
+    /// 고른 중간 톤 피부에서 쉐딩은 휘도를 낮추고 하이라이터는 높이며 색상각은 거의 그대로다(감마 공간 섞기).
+    /// 측정값: 광대 아래 휘도 156 → 138, 이마 156 → 190, 색상각 변화는 둘 다 0.3° 아래.
+    func testContourMovesMidToneSkinLuminanceWithoutHueShift() throws {
+        let minimumLumaChange = 10.0
+        let maximumHueShift = 2.0
+        let skin = CIColor(red: 0.76, green: 0.57, blue: 0.45)
+        let synthetic = SyntheticFace(
+            image: Support.solid(skin, size: SyntheticFace.size), face: SyntheticFace.make().face)
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(output(synthetic, MakeupAdjustments(contour: MakeupStrength(intensity: 1))))
+        let hollowBefore = before.rgba(SyntheticFace.leftHollow)
+        let hollowAfter = after.rgba(SyntheticFace.leftHollow)
+        XCTAssertLessThanOrEqual(luma(hollowAfter), luma(hollowBefore) - minimumLumaChange, "쉐딩은 어둡게")
+        XCTAssertLessThanOrEqual(hueDistance(hue(hollowAfter), hue(hollowBefore)), maximumHueShift, "쉐딩 색상각")
+        let foreheadBefore = before.rgba(SyntheticFace.foreheadCenter)
+        let foreheadAfter = after.rgba(SyntheticFace.foreheadCenter)
+        XCTAssertGreaterThanOrEqual(luma(foreheadAfter), luma(foreheadBefore) + minimumLumaChange, "하이라이터는 밝게")
+        XCTAssertLessThanOrEqual(
+            hueDistance(hue(foreheadAfter), hue(foreheadBefore)), maximumHueShift, "하이라이터 색상각")
+    }
 }
