@@ -94,7 +94,7 @@ final class BodyShapeRigTests: XCTestCase {
         }
     }
 
-    func testShouldersMoveOutwardAndNeckMovesUp() throws {
+    func testShouldersMoveOutwardAndNeckLowersShoulderLine() throws {
         let wider = pushes(primitives(BodyShapeAdjustments(shoulders: 1)))
         XCTAssertEqual(wider.count, 2)
         for push in wider {
@@ -106,32 +106,51 @@ final class BodyShapeRigTests: XCTestCase {
         for (out, inward) in zip(wider, narrower) {
             XCTAssertEqual(out.vector.dx, -inward.vector.dx, accuracy: 1e-9)
         }
-        let longer = try XCTUnwrap(pushes(primitives(BodyShapeAdjustments(neck: 1))).first)
-        XCTAssertEqual(longer.vector.dy, 0.03 * torsoWidth, accuracy: 1e-6, "목은 위로")
-        XCTAssertEqual(longer.vector.dx, 0, accuracy: 1e-9)
-        XCTAssertEqual(longer.center.y, 0.82 * 512 + 0.1 * torsoWidth, accuracy: 1e-6, "목 관절과 턱 사이")
-        let shorter = try XCTUnwrap(pushes(primitives(BodyShapeAdjustments(neck: -1))).first)
-        XCTAssertLessThan(shorter.vector.dy, 0, "음수는 아래로")
+        let longer = pushes(primitives(BodyShapeAdjustments(neck: 1)))
+        XCTAssertEqual(longer.count, 3, "목 관절과 양쪽 승모근 점")
+        for push in longer {
+            XCTAssertEqual(push.vector.dy, -0.03 * torsoWidth, accuracy: 1e-6, "양수는 어깨선을 아래로")
+            XCTAssertEqual(push.vector.dx, 0, accuracy: 1e-9)
+        }
+        let neckJoint = CGPoint(x: midline, y: 0.82 * 512)
+        XCTAssertTrue(longer.contains { distance($0.center, neckJoint) < 1e-6 }, "목 관절 자리")
+        let slopeY = 0.82 * 512 + (0.8 - 0.82) * 512 * 0.4
+        XCTAssertEqual(longer.filter { abs($0.center.y - slopeY) < 1e-6 }.count, 2, "목 관절~어깨 40% 지점 양쪽")
+        let shorter = pushes(primitives(BodyShapeAdjustments(neck: -1)))
+        for (down, up) in zip(longer, shorter) {
+            XCTAssertEqual(down.vector.dy, -up.vector.dy, accuracy: 1e-9, "음수는 위로")
+        }
     }
 
-    func testNeckPushStaysBelowTheChin() throws {
+    func testNeckLengthensByLoweringShoulderLineAndLeavesChin() throws {
         /// 턱 끝은 목 관절에서 어깨 폭의 약 0.25~0.3 위다.
         let chinRise: CGFloat = 0.28
+        /// 목 관절에서 어깨 쪽으로 이 비율 간 승모근 비탈 점.
+        let slopeLevel: CGFloat = 0.2
         let limit = tuning.shapeDisplacementLimit
         let skeleton = try XCTUnwrap(
             BodySkeleton(body: Support.standingBody(in: Support.standingBox), extent: extent, tuning: tuning))
-        let neckJoint = try XCTUnwrap(skeleton.point(.neck))
-        let chin = CGPoint(x: neckJoint.x, y: neckJoint.y + chinRise * torsoWidth)
-        let midway = BodySkeleton.midpoint(neckJoint, chin)
+        let neckBase = try XCTUnwrap(skeleton.point(.neck))
+        let chin = CGPoint(x: neckBase.x, y: neckBase.y + chinRise * torsoWidth)
+        let slopes = try [BodyJoint.leftShoulder, .rightShoulder].map { joint in
+            BodySkeleton.lerp(neckBase, try XCTUnwrap(skeleton.point(joint)), slopeLevel)
+        }
         let maxShift = CGFloat(tuning.bodyNeckMaxShift) * torsoWidth
         for sign in [CGFloat(-1), 1] {
             let result = primitives(BodyShapeAdjustments(neck: Double(sign)))
             let atChin = DisplacementWarp.displacement(at: chin, of: result, limit: limit)
+            let atBase = DisplacementWarp.displacement(at: neckBase, of: result, limit: limit)
+            let neckChange = atChin.dy - atBase.dy
+            XCTAssertGreaterThan(neckChange * sign, 0.9 * maxShift, "값 방향으로 목이 길어지거나 짧아진다(\(neckChange)px)")
             let chinShift = hypot(atChin.dx, atChin.dy)
             XCTAssertLessThan(chinShift, 0.1 * maxShift, "턱·입은 끌려가지 않는다(턱 이동 \(chinShift)px)")
-            let atMidway = DisplacementWarp.displacement(at: midway, of: result, limit: limit)
-            XCTAssertGreaterThan(atMidway.dy * sign, 0.5 * maxShift, "목 가운데는 값 방향으로 움직인다")
-            XCTAssertEqual(atMidway.dx, 0, accuracy: 1e-9)
+            XCTAssertEqual(atBase.dx, 0, accuracy: 1e-9, "목 아래끝은 세로로만")
+            let slopeShifts = slopes.map { DisplacementWarp.displacement(at: $0, of: result, limit: limit) }
+            for shift in slopeShifts {
+                XCTAssertLessThan(shift.dy * sign, -0.9 * maxShift, "양쪽 어깨 비탈이 함께 내려가거나 올라간다")
+            }
+            XCTAssertEqual(slopeShifts[0].dx, -slopeShifts[1].dx, accuracy: 1e-9, "좌우 대칭")
+            XCTAssertEqual(slopeShifts[0].dy, slopeShifts[1].dy, accuracy: 1e-9, "좌우 대칭")
         }
     }
 
@@ -157,11 +176,11 @@ final class BodyShapeRigTests: XCTestCase {
         let all = BodyShapeAdjustments(
             legLength: 1, waist: -1, overall: -1, arms: -1, thighs: -1, shoulders: 1, neck: 1)
         let full = Support.standingBody(in: Support.standingBox)
-        XCTAssertEqual(primitives(all, body: full).count, 1 + 2 + 6 + 8 + 4 + 2 + 1)
+        XCTAssertEqual(primitives(all, body: full).count, 1 + 2 + 6 + 8 + 4 + 2 + 3)
         let upperBody = Support.standingBody(
             in: Support.standingBox,
             omitting: [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle, .root])
-        XCTAssertEqual(primitives(all, body: upperBody).count, 8 + 2 + 1, "엉덩이가 없으면 팔·어깨·목만 남는다")
+        XCTAssertEqual(primitives(all, body: upperBody).count, 8 + 2 + 3, "엉덩이가 없으면 팔·어깨·목만 남는다")
         for key in [BodyShapeKey.legLength, .waist, .overall, .thighs] {
             var single = BodyShapeAdjustments()
             single[key] = key == .legLength ? 1 : -1
@@ -230,9 +249,12 @@ final class BodyShapeRigTests: XCTestCase {
             let alongAcross = push.vector.dx * cos(angle) + push.vector.dy * sin(angle)
             XCTAssertEqual(abs(alongAcross), length, accuracy: 1e-6, "몸통 가로축(cos 30°, sin 30°)과 평행")
         }
-        let neck = try XCTUnwrap(pushes(primitives(BodyShapeAdjustments(neck: 1), body: body)).first)
-        XCTAssertEqual(neck.vector.dx, -sin(angle) * 0.03 * torsoWidth, accuracy: 1e-6, "목은 몸통 위쪽으로")
-        XCTAssertEqual(neck.vector.dy, cos(angle) * 0.03 * torsoWidth, accuracy: 1e-6)
+        let neck = pushes(primitives(BodyShapeAdjustments(neck: 1), body: body))
+        XCTAssertEqual(neck.count, 3)
+        for push in neck {
+            XCTAssertEqual(push.vector.dx, sin(angle) * 0.03 * torsoWidth, accuracy: 1e-6, "목은 몸통 아래쪽으로")
+            XCTAssertEqual(push.vector.dy, -cos(angle) * 0.03 * torsoWidth, accuracy: 1e-6)
+        }
     }
 
     func testCombinedEditsDoNotFold() {
@@ -260,7 +282,7 @@ final class BodyShapeRigTests: XCTestCase {
     func testSymmetricBodyGetsMirroredPushes() {
         let all = BodyShapeAdjustments(waist: -1, overall: -1, arms: 1, thighs: -1, shoulders: 1, neck: 1)
         let result = pushes(primitives(all))
-        XCTAssertEqual(result.count, 2 + 6 + 8 + 4 + 2 + 1)
+        XCTAssertEqual(result.count, 2 + 6 + 8 + 4 + 2 + 3)
         for push in result {
             let mirrored = result.contains { other in
                 abs(other.center.x - (2 * midline - push.center.x)) < 1e-6 && abs(other.center.y - push.center.y) < 1e-6

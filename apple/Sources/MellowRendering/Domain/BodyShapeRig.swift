@@ -57,11 +57,12 @@ enum BodyShapeRig {
     private static let armRadius: CGFloat = 0.2
     private static let thighRadius: CGFloat = 0.3
     private static let shoulderRadius: CGFloat = 0.3
-    /// 목 push 반지름. 중심에서 이만큼 위(목 관절 위 0.25W)에서 0이 되어 턱 끝(0.25~0.3W 위)과 입에 닿지 않는다.
-    /// 목 기본 이동(0.03)의 5배라 이동 / shapeDisplacementLimit(0.12)보다 크다.
-    private static let neckRadius: CGFloat = 0.15
-    /// 목 push 중심. 목 관절(목 아래끝)에서 몸통 위쪽으로 어깨 폭 비율. 목 관절과 턱 사이 가운데쯤이다.
-    private static let neckRise: CGFloat = 0.1
+    /// 목 push 반지름. 어깨 폭 비율. 목 관절에서 0.2W 위에서 0이 되어 턱 끝(0.25~0.3W 위)과 입에 닿지 않는다.
+    /// 승모근 점과의 간격(약 0.2W)과 같아 smoothstep 대칭(s(t) + s(1 − t) = 1)으로 그 사이 어깨선이 고르게 움직인다.
+    /// 목 기본 이동(0.03)의 6.7배라 이동 / shapeDisplacementLimit(0.12)보다 크다.
+    private static let neckRadius: CGFloat = 0.2
+    /// 승모근 비탈 점. 목 관절에서 각 어깨 관절 쪽으로 간 비율. 어깨 관절까지 0.3W 남아 어깨 끝은 움직이지 않는다.
+    private static let trapeziusLevel: CGFloat = 0.4
     /// 엉덩이가 발목보다 이만큼(어깨 폭 비율) 위에 있어야 다리 띠를 만든다. 누운 사람·거꾸로 된 사진은 건너뛴다.
     private static let minimumLegSpan: CGFloat = 0.5
     /// 이보다 짧은 팔다리 선분(픽셀)은 방향을 정할 수 없어 건너뛴다.
@@ -177,11 +178,17 @@ enum BodyShapeRig {
         }
     }
 
-    /// 목 관절에서 위로 어깨 폭 × 0.1 점을 몸통 위쪽(양수, 목이 길어짐)이나 아래로 민다. 턱 아래에서 0이 된다.
+    /// 목 관절(목 아래끝)과 양쪽 승모근 비탈 점을 몸통 아래쪽(양수)이나 위쪽으로 민다.
+    /// 어깨선이 내려가 목이 길어지고 얼굴·머리는 그대로다. 턱 아래 0.2W에서 0이 된다.
     private static func neck(_ rig: Builder, shift: CGFloat) -> [ShapePrimitive] {
         guard let neck = rig.skeleton.point(.neck) else { return [] }
-        let center = offset(neck, rig.skeleton.up, neckRise * rig.width)
-        return [rig.push(center, rig.skeleton.up, shift: shift, radius: neckRadius)]
+        let down = CGVector(dx: -rig.skeleton.up.dx, dy: -rig.skeleton.up.dy)
+        let slopes = [BodyJoint.leftShoulder, .rightShoulder].compactMap(rig.skeleton.point).map { shoulder in
+            BodySkeleton.lerp(neck, shoulder, trapeziusLevel)
+        }
+        return ([neck] + slopes).map { center in
+            rig.push(center, down, shift: shift, radius: neckRadius)
+        }
     }
 
     /// 같은 쪽 어깨와 엉덩이 사이 level 높이의 점. 엉덩이가 없는 쪽은 빠진다.
