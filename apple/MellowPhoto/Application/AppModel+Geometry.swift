@@ -41,6 +41,17 @@ extension AppModel {
         return NormalizedRect(x: (1 - width) / 2, y: (1 - height) / 2, width: width, height: height)
     }
 
+    /// 시계 방향으로 90° 돌린다. 자르기 영역은 이미지와 함께 돈다.
+    /// 정사각형·원본 비율은 돌아도 그대로 맞으므로 남기고, 나머지 비율 선택은 가로세로가 바뀌므로 비운다.
+    func turnClockwise() {
+        let before = currentRecipe.geometry.normalizedQuarterTurns
+        edit(.quarterTurns(before + 1))
+        guard currentRecipe.geometry.normalizedQuarterTurns != before else { return }
+        if cropAspect != .square, cropAspect != .original {
+            cropAspect = nil
+        }
+    }
+
     func beginCropDrag() {
         beginSliderEdit()
     }

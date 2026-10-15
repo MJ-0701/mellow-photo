@@ -24,7 +24,7 @@ struct CropPanel: View {
         .scrollIndicators(.hidden)
         HStack(spacing: 16) {
             Button {
-                model.edit(.quarterTurns(geometry.quarterTurns + 1))
+                model.turnClockwise()
             } label: {
                 Label("90° 회전", systemImage: "rotate.right")
             }

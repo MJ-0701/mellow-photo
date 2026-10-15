@@ -46,25 +46,24 @@ public struct GeometryAdjustments: Codable, Equatable, Sendable {
         return turned
     }
 
-    /// 좌우 반전을 켜고 끈다. 자르기 영역과 수평 보정도 함께 거울에 비춰 같은 픽셀이 보이게 한다.
-    /// 반전은 회전보다 먼저 적용된다. 원본의 좌우 거울은 짝수 회전 뒤 프레임에서 x → 1 − x,
-    /// 홀수 회전 뒤 프레임에서는 y → 1 − y가 된다(R∘H(x, y) = (y, x) = V∘R(x, y)).
-    /// 그래서 짝수면 x → 1 − x − w, 홀수면 y → 1 − y − h. 거울에 비친 회전은 방향이 반대라 수평 보정 각도의 부호를 바꾼다.
+    /// 화면에 보이는 그대로 좌우 반전한다. 자르기 영역과 수평 보정도 함께 거울에 비춰 같은 픽셀이 보이게 한다.
+    /// 출력 공간에서 화면 거울은 Mx ∘ S ∘ T^k ∘ F다(F 반전, T 시계 방향 90°, S 수평 보정, Mx는 x → 1 − x).
+    /// Mx ∘ S(θ) = S(−θ) ∘ Mx라 수평 보정 각도의 부호를 바꾼다.
+    /// Mx ∘ T = T ∘ My이고 My = T² ∘ Mx라서 홀수 k에서는 Mx ∘ T^k = T^(k+2) ∘ Mx, 짝수 k에서는 T^k ∘ Mx다.
+    /// 원본 쪽 Mx는 F를 켜고 끄는 것이므로, 반전을 뒤집고 홀수 회전이면 반 바퀴를 더한다.
+    /// 자르기 사각형은 회전 뒤 프레임에서 늘 x → 1 − x − w로 비친다.
     public func flippedHorizontally() -> GeometryAdjustments {
         var flipped = self
         flipped.flipHorizontal.toggle()
+        if normalizedQuarterTurns % 2 == 1 {
+            flipped.quarterTurns = (normalizedQuarterTurns + 2) % 4
+        }
         // −0이 저장되지 않도록 0은 그대로 둔다.
         if straightenDegrees != 0 {
             flipped.straightenDegrees = -straightenDegrees
         }
         if let crop {
-            if normalizedQuarterTurns % 2 == 0 {
-                flipped.crop = NormalizedRect(
-                    x: 1 - crop.x - crop.width, y: crop.y, width: crop.width, height: crop.height)
-            } else {
-                flipped.crop = NormalizedRect(
-                    x: crop.x, y: 1 - crop.y - crop.height, width: crop.width, height: crop.height)
-            }
+            flipped.crop = NormalizedRect(x: 1 - crop.x - crop.width, y: crop.y, width: crop.width, height: crop.height)
         }
         return flipped
     }

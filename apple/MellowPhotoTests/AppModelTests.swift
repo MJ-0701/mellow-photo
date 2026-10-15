@@ -393,4 +393,24 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.currentRecipe.geometry.isIdentity)
         XCTAssertEqual(model.session.selected?.document.undoStack.count, before + 1)
     }
+
+    func testTurnClearsNonSquareAspectAndKeepsSquare() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.crop)
+        model.setCropAspect(.fourFive)
+        model.turnClockwise()
+        XCTAssertEqual(model.currentRecipe.geometry.quarterTurns, 1)
+        XCTAssertNil(model.cropAspect, "돌린 4:5는 5:4라 비율 선택을 비운다")
+        let transform = GeometryTransform(geometry: model.currentRecipe.geometry, sourceAspect: 1)
+        XCTAssertEqual(transform.outputAspect, 5.0 / 4.0, accuracy: 1e-9)
+        model.setCropAspect(.square)
+        model.turnClockwise()
+        XCTAssertEqual(model.cropAspect, .square)
+        model.setCropAspect(.original)
+        model.turnClockwise()
+        XCTAssertEqual(model.cropAspect, .original)
+    }
 }

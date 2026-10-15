@@ -57,14 +57,22 @@ final class GeometryAdjustmentsTests: XCTestCase {
         assertEqual(flipped.crop, NormalizedRect(x: 0.4, y: 0.2, width: 0.5, height: 0.3))
     }
 
-    func testFlipWithOddTurnsMirrorsCropY() {
-        let flipped = GeometryAdjustments(quarterTurns: 1, crop: sample).flippedHorizontally()
-        assertEqual(flipped.crop, NormalizedRect(x: 0.1, y: 0.5, width: 0.5, height: 0.3))
+    func testFlipWithOddTurnsAddsHalfTurnAndMirrorsCropX() {
+        let flipped = GeometryAdjustments(quarterTurns: 1, straightenDegrees: 5, crop: sample).flippedHorizontally()
+        XCTAssertTrue(flipped.flipHorizontal)
+        XCTAssertEqual(flipped.quarterTurns, 3, "홀수 회전에서는 반 바퀴를 더해 화면 기준 좌우 반전이 된다")
+        XCTAssertEqual(flipped.straightenDegrees, -5)
+        assertEqual(flipped.crop, NormalizedRect(x: 0.4, y: 0.2, width: 0.5, height: 0.3))
+        XCTAssertEqual(GeometryAdjustments(quarterTurns: 3).flippedHorizontally().quarterTurns, 1)
     }
 
     func testFlipTwiceIsIdentityAndKeepsZeroStraightenPositive() {
         let geometry = GeometryAdjustments(quarterTurns: 1, straightenDegrees: 3, crop: sample)
-        XCTAssertEqual(geometry.flippedHorizontally().flippedHorizontally(), geometry)
+        let twice = geometry.flippedHorizontally().flippedHorizontally()
+        XCTAssertEqual(twice.flipHorizontal, geometry.flipHorizontal)
+        XCTAssertEqual(twice.quarterTurns, geometry.quarterTurns)
+        XCTAssertEqual(twice.straightenDegrees, geometry.straightenDegrees)
+        assertEqual(twice.crop, sample)
         let unflipped = GeometryAdjustments(flipHorizontal: true).flippedHorizontally()
         XCTAssertEqual(unflipped.straightenDegrees.sign, .plus, "0을 반전해도 −0이 되지 않는다")
     }
@@ -81,21 +89,15 @@ final class GeometryAdjustmentsTests: XCTestCase {
         }
     }
 
-    /// 반전 뒤 출력에서 거울 위치의 점은 반전 전과 같은 원본 픽셀을 본다.
-    /// 반전은 회전보다 먼저라 홀수 회전에서는 화면의 위아래 거울이 된다.
+    /// 반전 뒤 출력에서 화면 좌우 거울 위치의 점은 반전 전과 같은 원본 픽셀을 본다. 회전 횟수와 상관없다.
     func testFlipKeepsSameSourcePixelsMirroredUnderTransform() {
         let aspect = 1.5
-        for turns in [0, 1] {
+        for turns in 0..<4 {
             let geometry = GeometryAdjustments(quarterTurns: turns, straightenDegrees: 7, crop: sample)
             let before = GeometryTransform(geometry: geometry, sourceAspect: aspect)
             let after = GeometryTransform(geometry: geometry.flippedHorizontally(), sourceAspect: aspect)
             for point in [NormalizedPoint(x: 0.2, y: 0.7), NormalizedPoint(x: 0.9, y: 0.1)] {
-                let mirrored: NormalizedPoint
-                if turns % 2 == 0 {
-                    mirrored = NormalizedPoint(x: 1 - point.x, y: point.y)
-                } else {
-                    mirrored = NormalizedPoint(x: point.x, y: 1 - point.y)
-                }
+                let mirrored = NormalizedPoint(x: 1 - point.x, y: point.y)
                 assertEqual(after.toOriginal(mirrored), before.toOriginal(point))
             }
         }

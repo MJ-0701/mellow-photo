@@ -126,7 +126,7 @@ final class EditorScenarioTests: XCTestCase {
         model.beginSliderEdit()
         model.edit(.straightenDegrees(5))
         model.endSliderEdit()
-        model.edit(.quarterTurns(model.currentRecipe.geometry.quarterTurns + 1))
+        model.turnClockwise()
         model.selectTool(.adjust)
         try await waitUntil { !model.isRendering }
 
@@ -147,7 +147,7 @@ final class EditorScenarioTests: XCTestCase {
         let model = try await importedModel(widePortraitCopy())
         model.selectTool(.crop)
         model.setCropAspect(.square)
-        model.edit(.quarterTurns(model.currentRecipe.geometry.quarterTurns + 1))
+        model.turnClockwise()
         model.selectTool(.adjust)
         XCTAssertEqual(try outputAspect(model), 1, accuracy: 1e-6, "회전해도 자른 영역은 정사각형으로 남는다")
         let size = try await exportedPixelSize(model)
