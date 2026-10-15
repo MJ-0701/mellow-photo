@@ -53,12 +53,16 @@ extension AppModel {
         }
     }
 
-    func applyAutoSuggestion(_ suggestion: AutoEnhanceSuggestion) {
+    /// 레시피가 실제로 바뀌었으면 true. 이미 같은 값이거나 편집할 수 없는 상태면 false.
+    @discardableResult
+    func applyAutoSuggestion(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         endSliderEditIfActive()
+        var applied = false
         mutateSelected { document in
-            document.applyAuto(suggestion)
+            applied = document.applyAuto(suggestion)
             return nil
         }
+        return applied
     }
 
     func applyToAll() {
@@ -109,6 +113,8 @@ extension AppModel {
     func touch(from: NormalizedPoint, to: NormalizedPoint) {
         guard isReady, !isBusy, !isComparing, !isRendering, !canvasShowsUncropped else { return }
         let transform = outputTransform
+        // 변환을 모르는데 기하가 있으면 캔버스 좌표를 원본 좌표로 오인하게 되므로 거절한다.
+        guard transform != nil || currentRecipe.geometry.isIdentity else { return }
         let fromOriginal = transform?.toOriginal(from) ?? from
         let toOriginal = transform?.toOriginal(to) ?? to
         switch tool {

@@ -300,9 +300,10 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.session.selected?.document.undoStack.count, 1)
         await model.autoEnhance()
         XCTAssertEqual(model.currentRecipe, first, "두 번 눌러도 누적되지 않는다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1, "연타해도 실행 취소 단계는 하나")
         model.undo()
-        model.undo()
-        XCTAssertTrue(model.currentRecipe.isDefault)
+        XCTAssertTrue(model.currentRecipe.isDefault, "⌘Z 한 번에 자동 보정 전으로 돌아간다")
+        XCTAssertFalse(model.canUndo)
     }
 
     func testCropToolShowsUncroppedPreview() async throws {
@@ -325,17 +326,33 @@ final class AppModelTests: XCTestCase {
         let model = TestSupport.makeModel(
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
-        model.edit(.crop(NormalizedRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)))
+        // 비대칭 자르기와 x ≠ y인 탭으로 축이 뒤바뀌거나 y가 뒤집히는 실수를 잡는다.
+        let crop = NormalizedRect(x: 0.1, y: 0.4, width: 0.6, height: 0.5)
+        model.edit(.crop(crop))
         try await waitUntil { !model.isRendering }
         model.selectTool(.retouch)
-        // 화면 중앙(0.5, 0.5)은 원본의 (0.75, 0.75).
-        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
-        XCTAssertEqual(model.cloneSource?.x ?? 0, 0.75, accuracy: 1e-9)
-        XCTAssertEqual(model.cloneSourceOnCanvas?.x ?? 0, 0.5, accuracy: 1e-9)
-        model.touch(from: NormalizedPoint(x: 0.2, y: 0.2), to: NormalizedPoint(x: 0.2, y: 0.2))
+        let transform = GeometryTransform(geometry: model.currentRecipe.geometry, sourceAspect: 1)
+        let sourceTap = NormalizedPoint(x: 0.5, y: 0.8)
+        let expectedSource = transform.toOriginal(sourceTap)
+        XCTAssertEqual(expectedSource.x, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(expectedSource.y, 0.8, accuracy: 1e-9)
+        model.touch(from: sourceTap, to: sourceTap)
+        let source = try XCTUnwrap(model.cloneSource)
+        XCTAssertEqual(source.x, expectedSource.x, accuracy: 1e-9)
+        XCTAssertEqual(source.y, expectedSource.y, accuracy: 1e-9)
+        let marker = try XCTUnwrap(model.cloneSourceOnCanvas)
+        XCTAssertEqual(marker.x, sourceTap.x, accuracy: 1e-9)
+        XCTAssertEqual(marker.y, sourceTap.y, accuracy: 1e-9)
+        let targetTap = NormalizedPoint(x: 0.2, y: 0.6)
+        let expectedTarget = transform.toOriginal(targetTap)
+        XCTAssertEqual(expectedTarget.x, 0.22, accuracy: 1e-9)
+        XCTAssertEqual(expectedTarget.y, 0.7, accuracy: 1e-9)
+        model.touch(from: targetTap, to: targetTap)
         let spot = try XCTUnwrap(model.currentRecipe.spots.first)
-        XCTAssertEqual(spot.x, 0.6, accuracy: 1e-9)
-        XCTAssertEqual(spot.sourceX, 0.75, accuracy: 1e-9)
+        XCTAssertEqual(spot.x, expectedTarget.x, accuracy: 1e-9)
+        XCTAssertEqual(spot.y, expectedTarget.y, accuracy: 1e-9)
+        XCTAssertEqual(spot.sourceX, expectedSource.x, accuracy: 1e-9)
+        XCTAssertEqual(spot.sourceY, expectedSource.y, accuracy: 1e-9)
     }
 
     func testLookThumbnailsIgnoreStaleResults() async throws {

@@ -36,8 +36,9 @@ extension AppModel {
             try await pipeline.reprepareIfEvicted(entry.id, at: copies.url(for: entry.filename))
             let suggestion = try await pipeline.autoEnhanceSuggestion(entry.id, hasFaces: !faces.isEmpty)
             guard session.selectedPhotoID == entry.id else { return }
-            applyAutoSuggestion(suggestion)
-            statusMessage = UserMessage.autoEnhanced
+            if applyAutoSuggestion(suggestion) {
+                statusMessage = UserMessage.autoEnhanced
+            }
         } catch {
             present(error)
         }

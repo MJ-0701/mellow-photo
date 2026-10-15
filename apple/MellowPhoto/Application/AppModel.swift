@@ -184,6 +184,10 @@ final class AppModel {
         selectionTask?.cancel()
         renderScheduler.cancel()
         endContinuousChangeOnSelected()
+        // 고른 비율은 화면 상태라 다른 사진으로 넘어가지 않는다.
+        if session.selectedPhotoID != id {
+            cropAspect = nil
+        }
         session.selectedPhotoID = id
         preview = nil
         original = nil

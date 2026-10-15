@@ -103,16 +103,22 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 룩·기하·수동 편집은 건드리지 않는다.
-    public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) {
-        checkpoint()
+    /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
+    @discardableResult
+    public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         var portrait = suggestion.portrait
         portrait.targetFace = recipe.portrait.targetFace
         if isGeometryLocked {
             portrait.faceSlim = recipe.portrait.faceSlim
         }
-        recipe.color = suggestion.color
-        recipe.detail = suggestion.detail
-        recipe.portrait = portrait
+        var updated = recipe
+        updated.color = suggestion.color
+        updated.detail = suggestion.detail
+        updated.portrait = portrait
+        guard updated != recipe else { return false }
+        checkpoint()
+        recipe = updated
+        return true
     }
 
     public mutating func appendLocalEdit(_ edit: LocalEdit) {

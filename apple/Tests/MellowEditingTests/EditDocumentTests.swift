@@ -186,4 +186,24 @@ final class EditDocumentTests: XCTestCase {
         document.undo()
         XCTAssertEqual(document.recipe.color.exposure, 0)
     }
+
+    func testApplyAutoWithSameValuesIsNoOp() {
+        var document = EditDocument()
+        let first = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.3), detail: DetailAdjustments(shadows: 0.2),
+            portrait: PortraitAdjustments(skinSmoothing: 0.3))
+        let second = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.5), detail: DetailAdjustments(), portrait: PortraitAdjustments())
+        XCTAssertTrue(document.applyAuto(first))
+        XCTAssertTrue(document.applyAuto(second))
+        document.undo()
+        let recipe = document.recipe
+        let undoCount = document.undoStack.count
+        XCTAssertFalse(document.applyAuto(first), "이미 같은 값이면 적용하지 않는다")
+        XCTAssertEqual(document.recipe, recipe)
+        XCTAssertEqual(document.undoStack.count, undoCount, "체크포인트를 만들지 않는다")
+        XCTAssertEqual(document.redoStack.count, 1, "다시 실행 기록도 지우지 않는다")
+        document.undo()
+        XCTAssertTrue(document.recipe.isDefault)
+    }
 }
