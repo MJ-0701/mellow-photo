@@ -37,6 +37,21 @@ Apple 기준 구현은 `apple/Sources/MellowShared/API/Look.swift`(`Look`, `Look
 
 다른 플랫폼도 이 순서를 지킵니다. 순서가 다르면 같은 수치라도 결과가 달라집니다.
 
+## 수치 환산
+
+다른 플랫폼이 같은 결과를 내도록 Apple 구현(`apple/Sources/MellowRendering/Domain/LookStage.swift`)의 환산식을 그대로 적습니다. 상수는 `RenderTuning`에 있습니다.
+
+| 항목 | 환산 |
+|---|---|
+| 톤 커브 | 다섯 점을 그대로 쓰되 첫 점 y만 `min(1, y + fade × 0.15)`로 올립니다(`Look.fadeLift` = 0.15). |
+| 채도·대비 | Core Image `CIColorControls`의 `inputSaturation = saturation`, `inputContrast = contrast`. |
+| 색온도 | 기준 중립 6500 K(`neutralKelvin`). 목표 중립 = `6500 − warmth × 2000` K(`warmthKelvinRange` = 2000). 색감 단계의 `color.warmth`와 같은 식입니다. `warmth`는 −1 … 1로 잘라 씁니다. |
+| 틴트 | `CITemperatureAndTint`의 목표 중립 y = `tint × 60`(`lookTintRange` = 60). 기준 중립 y는 0입니다. |
+| 비네팅 | `CIVignette`의 `inputIntensity = vignette`, `inputRadius = 1.5`(`vignetteRadius`). 디테일 단계 비네팅과 같은 반경입니다. |
+| 강도 혼합 | `결과 = 원본 + (룩 결과 − 원본) × intensity`(`CIMix`). intensity 0이면 원본, 1이면 룩 결과 그대로입니다. |
+
+룩은 렌더 파이프라인 맨 끝 단계라 자르기·회전이 끝난 현재 이미지 범위에 적용됩니다. 비네팅도 잘린 프레임 기준입니다.
+
 ## 앱 번들 사본
 
 Apple 앱은 `apple/MellowPhoto/Resources/looks.v1.json` 사본을 번들에 넣어 읽습니다. 이 파일을 고치면 사본도 같은 커밋에서 복사합니다.

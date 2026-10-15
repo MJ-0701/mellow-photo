@@ -32,6 +32,8 @@ public struct RenderTuning: Sendable {
     public var highlightLiftAmount: Double = 0.12
     public var sharpnessMax: Double = 1.5
     public var vignetteRadius: Double = 1.5
+    /// 룩 tint ±1이 CITemperatureAndTint 목표 중립 y ±이 값이 된다.
+    public var lookTintRange: Double = 60
 
     public init() {}
 

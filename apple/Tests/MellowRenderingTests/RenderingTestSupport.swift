@@ -33,6 +33,22 @@ enum RenderingTestSupport {
         return try RenderPipeline.standard.render(image, context: context)
     }
 
+    static func sharedLookCatalog() throws -> LookCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("shared/looks/looks.v1.json")
+        return try LookCatalog(data: Data(contentsOf: url))
+    }
+
+    static func render(_ image: CIImage, recipe: EditRecipe, faces: [FaceGeometry] = [], catalog: LookCatalog) throws
+        -> CIImage
+    {
+        let context = RenderContext(
+            extent: image.extent, recipe: recipe, faces: faces, tuning: RenderTuning(), lookCatalog: catalog)
+        return try RenderPipeline.standard.render(image, context: context)
+    }
+
     static func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

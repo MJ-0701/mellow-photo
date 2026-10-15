@@ -6,7 +6,7 @@
     { "id": "cozy",    "name": "포근",   "toneCurve": [[0,0.02],[0.25,0.26],[0.5,0.53],[0.75,0.77],[1,1]], "saturation": 0.95, "contrast": 0.98, "warmth": 0.3,  "tint": 0.04, "vignette": 0.05, "fade": 0.1 },
     { "id": "calm",    "name": "차분",   "toneCurve": [[0,0.02],[0.25,0.27],[0.5,0.5],[0.75,0.74],[1,0.98]], "saturation": 0.85, "contrast": 0.92, "warmth": -0.25, "tint": -0.03, "vignette": 0.08, "fade": 0.15 },
     { "id": "mono",    "name": "모노",   "toneCurve": [[0,0],[0.25,0.22],[0.5,0.5],[0.75,0.79],[1,1]], "saturation": 0,    "contrast": 1.1,  "warmth": 0,    "tint": 0,    "vignette": 0.12, "fade": 0.05 },
-    { "id": "sepia",   "name": "세피아", "toneCurve": [[0,0.03],[0.25,0.24],[0.5,0.5],[0.75,0.77],[1,0.97]], "saturation": 0.2,  "contrast": 1.02, "warmth": 0.6,  "tint": 0.1,  "vignette": 0.15, "fade": 0.2 },
+    { "id": "sepia",   "name": "세피아", "toneCurve": [[0,0.03],[0.25,0.24],[0.5,0.5],[0.75,0.77],[1,0.97]], "saturation": 0.2,  "contrast": 1.02, "warmth": 0.7,  "tint": 0.1,  "vignette": 0.1,  "fade": 0.2 },
     { "id": "vintage", "name": "빈티지", "toneCurve": [[0,0.06],[0.25,0.24],[0.5,0.5],[0.75,0.76],[1,0.94]], "saturation": 0.75, "contrast": 0.95, "warmth": 0.15, "tint": 0.05, "vignette": 0.3,  "fade": 0.4 },
     { "id": "vivid",   "name": "선명",   "toneCurve": [[0,0],[0.25,0.21],[0.5,0.5],[0.75,0.8],[1,1]], "saturation": 1.25, "contrast": 1.12, "warmth": 0.05, "tint": 0,    "vignette": 0,    "fade": 0 },
     { "id": "pastel",  "name": "파스텔", "toneCurve": [[0,0.08],[0.25,0.32],[0.5,0.56],[0.75,0.8],[1,1]], "saturation": 0.8,  "contrast": 0.88, "warmth": 0.05, "tint": 0.03, "vignette": 0,    "fade": 0.2 },

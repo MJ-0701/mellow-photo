@@ -32,13 +32,15 @@ public actor PhotoPipeline {
     private let pipeline = RenderPipeline.standard
     private let analyzer: any FaceAnalyzer
     private let tuning: RenderTuning
+    private let lookCatalog: LookCatalog
     /// 미리보기 이미지가 LRU로 밀려나도 일부러 남긴다. renderOriginal이 얼굴 좌표를 써야 한다.
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
-    public init(analyzer: any FaceAnalyzer, tuning: RenderTuning) {
+    public init(analyzer: any FaceAnalyzer, tuning: RenderTuning, lookCatalog: LookCatalog = .empty) {
         self.analyzer = analyzer
         self.tuning = tuning
+        self.lookCatalog = lookCatalog
         cache = PreviewCache(capacity: tuning.previewCacheCapacity)
     }
 
@@ -69,7 +71,8 @@ public actor PhotoPipeline {
         guard let entry = entries[id], let image = cache.image(for: id) else {
             throw MellowError.cannotCreatePreview
         }
-        let context = RenderContext(extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning)
+        let context = RenderContext(
+            extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 
@@ -95,7 +98,8 @@ public actor PhotoPipeline {
 
     private func render(url: URL, recipe: EditRecipe, faces: [FaceGeometry], maxDimension: Int?) throws -> CIImage {
         let image = try loader.load(url: url, maxDimension: maxDimension)
-        let context = RenderContext(extent: image.extent, recipe: recipe, faces: faces, tuning: tuning)
+        let context = RenderContext(
+            extent: image.extent, recipe: recipe, faces: faces, tuning: tuning, lookCatalog: lookCatalog)
         return try pipeline.render(image, context: context)
     }
 

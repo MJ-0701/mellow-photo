@@ -37,7 +37,7 @@ struct DetailStage: RenderStage {
             result = result.applyingFilter(
                 "CIVignette", parameters: ["inputIntensity": detail.vignette, "inputRadius": tuning.vignetteRadius])
         }
-        return result.cropped(to: context.extent)
+        return result.cropped(to: image.extent)
     }
 
     /// 항등 톤 커브에서 0.75 앵커만 `lift`만큼(최대 1) 올린 CIToneCurve 파라미터.
