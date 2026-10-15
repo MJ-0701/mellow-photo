@@ -48,15 +48,15 @@ final class BodySkeletonTests: XCTestCase {
         let pivot = NormalizedPoint(x: 0.5, y: 0.5)
         let body = Support.standingBody(in: Support.standingBox).rotated(by: angle, about: pivot)
         let skeleton = try XCTUnwrap(BodySkeleton(body: body, extent: extent, tuning: RenderTuning()))
-        XCTAssertEqual(skeleton.up.dx, -sin(angle), accuracy: 1e-9)
-        XCTAssertEqual(skeleton.up.dy, cos(angle), accuracy: 1e-9)
-        XCTAssertEqual(skeleton.across.dx, cos(angle), accuracy: 1e-9)
-        XCTAssertEqual(skeleton.across.dy, sin(angle), accuracy: 1e-9)
+        XCTAssertEqual(skeleton.up.dx, -CGFloat(sin(angle)), accuracy: 1e-9)
+        XCTAssertEqual(skeleton.up.dy, CGFloat(cos(angle)), accuracy: 1e-9)
+        XCTAssertEqual(skeleton.across.dx, CGFloat(cos(angle)), accuracy: 1e-9)
+        XCTAssertEqual(skeleton.across.dy, CGFloat(sin(angle)), accuracy: 1e-9)
         var noHip = body
         noHip.joints[.leftHip] = nil
         let shouldersOnly = try XCTUnwrap(BodySkeleton(body: noHip, extent: extent, tuning: RenderTuning()))
         XCTAssertNil(shouldersOnly.hipCenter)
-        XCTAssertEqual(shouldersOnly.up.dx, -sin(angle), accuracy: 1e-9, "엉덩이가 없으면 어깨선에 수직")
-        XCTAssertEqual(shouldersOnly.up.dy, cos(angle), accuracy: 1e-9)
+        XCTAssertEqual(shouldersOnly.up.dx, -CGFloat(sin(angle)), accuracy: 1e-9, "엉덩이가 없으면 어깨선에 수직")
+        XCTAssertEqual(shouldersOnly.up.dy, CGFloat(cos(angle)), accuracy: 1e-9)
     }
 }

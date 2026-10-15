@@ -239,6 +239,9 @@ final class BodyShapeRigTests: XCTestCase {
 
     func testTiltedBodyPushesFollowTorsoAxis() throws {
         let angle = Double.pi / 6
+        // CGVector 성분과 곱할 때 cos·sin 오버로드가 모호해지지 않도록 CGFloat로 미리 바꾼다(Xcode 26 컴파일러).
+        let cosine = CGFloat(cos(angle))
+        let sine = CGFloat(sin(angle))
         let body = Support.standingBody(in: Support.standingBox).rotated(
             by: angle, about: NormalizedPoint(x: 0.5, y: 0.5))
         let waist = pushes(primitives(BodyShapeAdjustments(waist: -1), body: body))
@@ -246,14 +249,14 @@ final class BodyShapeRigTests: XCTestCase {
         for push in waist {
             let length = hypot(push.vector.dx, push.vector.dy)
             XCTAssertEqual(length, 0.06 * torsoWidth, accuracy: 1e-6)
-            let alongAcross = push.vector.dx * cos(angle) + push.vector.dy * sin(angle)
+            let alongAcross = push.vector.dx * cosine + push.vector.dy * sine
             XCTAssertEqual(abs(alongAcross), length, accuracy: 1e-6, "몸통 가로축(cos 30°, sin 30°)과 평행")
         }
         let neck = pushes(primitives(BodyShapeAdjustments(neck: 1), body: body))
         XCTAssertEqual(neck.count, 3)
         for push in neck {
-            XCTAssertEqual(push.vector.dx, sin(angle) * 0.03 * torsoWidth, accuracy: 1e-6, "목은 몸통 아래쪽으로")
-            XCTAssertEqual(push.vector.dy, -cos(angle) * 0.03 * torsoWidth, accuracy: 1e-6)
+            XCTAssertEqual(push.vector.dx, sine * 0.03 * torsoWidth, accuracy: 1e-6, "목은 몸통 아래쪽으로")
+            XCTAssertEqual(push.vector.dy, -cosine * 0.03 * torsoWidth, accuracy: 1e-6)
         }
     }
 
