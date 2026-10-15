@@ -53,13 +53,17 @@ struct BeautyPanel: View {
         Text(UserMessage.skinHint).font(.caption).foregroundStyle(.secondary)
     }
 
+    /// 얼굴형 슬라이더 10개. 미소만 0…1, 나머지는 가운데 0인 양방향이고 0 근처에서 0에 붙는다.
     @ViewBuilder
     private func faceControls(_ face: FaceShapeAdjustments) -> some View {
-        AdjustmentSlider(
-            title: UserMessage.faceWidth, value: face.width, range: EditingPolicy.faceShapeRange(.width),
-            snapsToZero: true
-        ) { .faceShape(.width, $0) }
-        .disabled(model.isGeometryLocked)
+        ForEach(FaceShapeKey.allCases, id: \.self) { key in
+            let range = EditingPolicy.faceShapeRange(key)
+            AdjustmentSlider(
+                title: UserMessage.faceShapeTitle(key), value: face[key], range: range,
+                snapsToZero: range.lowerBound < 0
+            ) { .faceShape(key, $0) }
+            .disabled(model.isGeometryLocked)
+        }
         Text(model.isGeometryLocked ? UserMessage.geometryLocked : UserMessage.faceHint)
             .font(.caption).foregroundStyle(.secondary)
     }

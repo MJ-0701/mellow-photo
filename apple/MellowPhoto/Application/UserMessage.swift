@@ -30,9 +30,8 @@ enum UserMessage {
     static let beautyTabsLabel = "뷰티 항목"
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
-    static let faceWidth = "얼굴 폭"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
-    static let faceHint = "얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
+    static let faceHint = "가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
     static let noFaceDetected = "감지된 얼굴이 없어요"
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
@@ -96,6 +95,22 @@ enum UserMessage {
 
     static func faceOrdinal(_ number: Int) -> String {
         "왼쪽부터 \(number)번째"
+    }
+
+    /// 뷰티 › 얼굴 탭 슬라이더 이름. 화면 순서는 FaceShapeKey.allCases.
+    static func faceShapeTitle(_ key: FaceShapeKey) -> String {
+        switch key {
+        case .width: return "얼굴 폭"
+        case .jaw: return "턱선"
+        case .cheekbone: return "광대"
+        case .eyeSize: return "눈 크기"
+        case .eyeDistance: return "눈 간격"
+        case .noseWidth: return "코 폭"
+        case .mouthSize: return "입 크기"
+        case .smile: return "미소"
+        case .forehead: return "이마"
+        case .chinLength: return "턱 길이"
+        }
     }
 
     static func text(for error: Error) -> String {

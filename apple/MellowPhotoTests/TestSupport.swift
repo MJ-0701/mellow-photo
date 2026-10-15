@@ -112,6 +112,34 @@ enum TestSupport {
         return try LookCatalog(data: Data(contentsOf: url))
     }
 
+    /// box 안에 비율로 놓은 가짜 특징점 얼굴. 윤곽은 Vision처럼 한쪽 관자놀이에서 턱을 지나 반대쪽까지 17점이다.
+    static func landmarkedFace(in box: NormalizedRect) -> FaceGeometry {
+        func point(_ x: Double, _ y: Double) -> NormalizedPoint {
+            NormalizedPoint(x: box.minX + box.width * x, y: box.minY + box.height * y)
+        }
+        func ellipse(_ centerX: Double, _ centerY: Double, _ radiusX: Double, _ radiusY: Double) -> [NormalizedPoint] {
+            (0..<12).map { step in
+                let angle = 2 * Double.pi * Double(step) / 12
+                return point(centerX + radiusX * cos(angle), centerY + radiusY * sin(angle))
+            }
+        }
+        let contour = (0...16).map { step -> NormalizedPoint in
+            let angle = Double.pi + Double.pi * Double(step) / 16
+            return point(0.5 + 0.5 * cos(angle), 0.6 + 0.6 * sin(angle))
+        }
+        return FaceGeometry(
+            boundingBox: box,
+            landmarks: [
+                .faceContour: contour,
+                .leftEye: ellipse(0.3, 0.63, 0.1, 0.04), .rightEye: ellipse(0.7, 0.63, 0.1, 0.04),
+                .leftPupil: [point(0.3, 0.63)], .rightPupil: [point(0.7, 0.63)],
+                .leftEyebrow: ellipse(0.3, 0.75, 0.12, 0.02), .rightEyebrow: ellipse(0.7, 0.75, 0.12, 0.02),
+                .nose: [point(0.42, 0.4), point(0.58, 0.4), point(0.5, 0.55)],
+                .noseCrest: [point(0.5, 0.55), point(0.5, 0.45)],
+                .outerLips: ellipse(0.5, 0.27, 0.17, 0.06), .innerLips: ellipse(0.5, 0.27, 0.13, 0.02),
+            ])
+    }
+
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),

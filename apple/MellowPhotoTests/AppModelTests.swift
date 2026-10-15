@@ -483,4 +483,47 @@ final class AppModelTests: XCTestCase {
         model.selectTool(.beauty)
         XCTAssertEqual(model.beautyTab, .face)
     }
+
+    func testFaceTabEditsEveryShapeKeyOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        model.beautyTab = .face
+        for key in FaceShapeKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.faceShape(key, 0.3))
+            model.edit(.faceShape(key, 0.4))
+            model.endSliderEdit()
+        }
+        for key in FaceShapeKey.allCases {
+            XCTAssertEqual(model.currentRecipe.portrait.face[key], 0.4, accuracy: 1e-9, "\(key)")
+        }
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, FaceShapeKey.allCases.count)
+        let titles = FaceShapeKey.allCases.map(UserMessage.faceShapeTitle)
+        XCTAssertEqual(Set(titles).count, FaceShapeKey.allCases.count, "슬라이더 이름이 겹치지 않는다")
+        XCTAssertEqual(titles.first, "얼굴 폭")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.face.forehead, 0.4, accuracy: 1e-9)
+    }
+
+    func testGeometryLockRejectsEveryFaceShapeKey() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.currentRecipe.operations.count, 1)
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        for key in FaceShapeKey.allCases {
+            model.edit(.faceShape(key, 0.5))
+            XCTAssertEqual(model.currentRecipe.portrait.face[key], 0, "\(key)는 잠겨 있다")
+        }
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
+    }
 }
