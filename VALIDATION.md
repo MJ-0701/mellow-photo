@@ -146,4 +146,4 @@
 
 ## TestFlight 전용 배포 경로 (2026-10-15)
 
-- fastlane `beta` 레인(TestFlight 전용)과 배포 모드 변수 `IOS_RELEASE_MODE`는 아직 한 번도 실행하지 않았습니다. 로컬에서는 문법 검사와 기존 변경사항 테스트만 했고, 실제 TestFlight 업로드는 다음 `apple-v*` 태그 배포로 검증합니다.
+- fastlane `beta` 레인(TestFlight 전용)과 배포 모드 변수 `IOS_RELEASE_MODE=testflight`는 2026-10-15 태그 `apple-v0.3.1`로 처음 실행해 통과했습니다(GitHub Actions run 38671616792, 0.3.1 빌드 1.1을 App Store Connect에 업로드). App Store 버전은 건드리지 않았습니다. 내부 테스터 기기에서 빌드가 보이는지는 확인하지 않았습니다.
