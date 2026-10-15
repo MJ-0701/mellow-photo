@@ -30,6 +30,21 @@ public struct RenderTuning: Sendable {
     public var midBandFraction: Double = 0.04
     /// 피부 보정 1에서 중간 대역을 줄이는 비율. 15%를 남겨 플라스틱 느낌을 피한다.
     public var midReductionMax: Double = 0.85
+    /// 잡티를 찾을 때 얼굴 영역을 줄이는 긴 변. readPixels 세 번이 각각 1M float 이하가 된다.
+    public var blemishAnalysisMaxDimension: Int = 512
+    /// 잡티 반지름의 하한·상한. 얼굴 폭 비율(스펙 0.5%~2%). 여드름 3~5mm는 얼굴 폭 140mm의 1~1.8%다.
+    public var blemishMinRadiusFraction: Double = 0.005
+    public var blemishMaxRadiusFraction: Double = 0.02
+    /// 주변 밝기를 재는 흐림 반지름. 잡티 최대 반지름의 배수.
+    public var blemishSurroundScale: Double = 3
+    /// 주변보다 이만큼(상대값) 어두워야 잡티 후보. 모공 잡음은 흐린 뒤 ±1% 안팎이다.
+    public var blemishLumaDrop: Double = 0.06
+    /// 주변보다 Cr이 이만큼 높아야 잡티 후보. 무채색 그림자·얼룩은 0에 가깝다.
+    public var blemishRednessMin: Double = 0.012
+    /// 피부 마스크(세기 1)가 이 값 이상인 곳만 본다.
+    public var blemishMaskThreshold: Double = 0.5
+    /// 얼굴당 잡티 수 상한(스펙).
+    public var blemishMaxPerFace: Int = 40
 
     public var faceSlimShiftFraction: Double = 0.035
     public var faceSlimRadiusFraction: Double = 0.34

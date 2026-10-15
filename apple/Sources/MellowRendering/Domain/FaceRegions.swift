@@ -206,18 +206,20 @@ enum FaceRegions {
 
     /// 점이 다각형 안이거나 경계에서 dilation 이내인지.
     static func contains(_ point: CGPoint, polygons: [[CGPoint]], dilation: CGFloat) -> Bool {
-        polygons.contains { polygon in
-            guard polygon.count >= minimumPolygonPoints else { return false }
+        containment(polygons: polygons, dilation: dilation)(point)
+    }
+
+    /// contains와 같은 판정. 경로를 한 번만 만들어 점 여러 개를 물을 때 쓴다.
+    static func containment(polygons: [[CGPoint]], dilation: CGFloat) -> (CGPoint) -> Bool {
+        let paths: [CGPath] = polygons.filter { $0.count >= minimumPolygonPoints }.flatMap { polygon -> [CGPath] in
             let path = CGMutablePath()
             path.addLines(between: polygon)
             path.closeSubpath()
-            if path.contains(point) {
-                return true
-            }
-            guard dilation > 0 else { return false }
+            guard dilation > 0 else { return [path] }
             let stroked = path.copy(strokingWithWidth: dilation * 2, lineCap: .round, lineJoin: .round, miterLimit: 1)
-            return stroked.contains(point)
+            return [path, stroked]
         }
+        return { point in paths.contains { $0.contains(point) } }
     }
 
     private static func featherRadius(_ face: FaceGeometry, _ extent: CGRect, _ tuning: RenderTuning) -> CGFloat {

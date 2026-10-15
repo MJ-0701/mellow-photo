@@ -1,5 +1,6 @@
 import CoreImage
 import Foundation
+import ImageIO
 import MellowShared
 
 @testable import MellowRendering
@@ -52,6 +53,17 @@ enum RenderingTestSupport {
     static func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    static func writePNG(_ image: CIImage, name: String = "image") throws -> URL {
+        let url = try temporaryDirectory().appendingPathComponent("\(name).png")
+        let cg = try renderer.makeCGImage(image)
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else {
+            throw MellowError.cannotWriteToFolder
+        }
+        CGImageDestinationAddImage(destination, cg, nil)
+        guard CGImageDestinationFinalize(destination) else { throw MellowError.cannotWriteToFolder }
         return url
     }
 

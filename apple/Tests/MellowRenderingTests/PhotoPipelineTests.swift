@@ -34,6 +34,39 @@ final class PhotoPipelineTests: XCTestCase {
             max(prepared.thumbnail.width, prepared.thumbnail.height), RenderTuning().thumbnailMaxDimension)
     }
 
+    func testPrepareStoresBlemishesOnlyWhenFacesExist() async throws {
+        let synthetic = SyntheticFace.make(withBlemishes: true)
+        let url = try Support.writePNG(synthetic.image, name: "face")
+        let withFace = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await withFace.prepare(id, at: url)
+        let spots = await withFace.preparedBlemishes(id)
+        XCTAssertEqual(spots.count, SyntheticFace.blemishes.count)
+        let noFace = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        let other = PhotoID()
+        _ = try await noFace.prepare(other, at: url)
+        let none = await noFace.preparedBlemishes(other)
+        XCTAssertTrue(none.isEmpty)
+    }
+
+    func testRenderOriginalRefusesAutoBlemishOnlyWhenAnalysisFailed() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .failure(.faceAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        do {
+            _ = try await pipeline.renderOriginal(id, at: url, recipe: recipe, maxDimension: nil)
+            XCTFail("자동 잡티만 켠 저장도 조용히 빠지면 안 된다")
+        } catch {
+            XCTAssertEqual(error as? MellowError, .faceAnalysisUnavailable(reason: "test"))
+        }
+    }
+
     func testFaceAnalysisFailureIsReportedNotThrown() async throws {
         let url = try writeSolidPNG()
         let pipeline = PhotoPipeline(

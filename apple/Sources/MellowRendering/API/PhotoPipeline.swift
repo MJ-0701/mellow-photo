@@ -25,6 +25,7 @@ public actor PhotoPipeline {
     private struct Entry {
         var faces: [FaceGeometry]
         var faceAnalysisFailure: MellowError?
+        var blemishes: [BlemishSpot]
         /// 렌더해 둔 작은 비트맵에서 만든다. 미리보기 CIImage를 참조하지 않아 LRU로 밀려난 미리보기를 붙잡지 않는다.
         var thumbnail: CIImage
     }
@@ -49,6 +50,11 @@ public actor PhotoPipeline {
     /// 테스트용. 캐시에 든 사진 ID.
     var cachedPreviewIDs: [PhotoID] { cache.ids }
 
+    /// 테스트용. 준비 때 찾은 잡티.
+    func preparedBlemishes(_ id: PhotoID) -> [BlemishSpot] {
+        entries[id]?.blemishes ?? []
+    }
+
     public func prepare(_ id: PhotoID, at url: URL) throws -> PreparedPhoto {
         let metadata = try loader.metadata(url: url)
         let preview = try loader.load(url: url, maxDimension: tuning.previewMaxDimension)
@@ -61,8 +67,10 @@ public actor PhotoPipeline {
         } catch {
             failure = .faceAnalysisUnavailable(reason: error.localizedDescription)
         }
+        let blemishes = detectBlemishes(in: preview, faces: faces)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
-        entries[id] = Entry(faces: faces, faceAnalysisFailure: failure, thumbnail: CIImage(cgImage: thumbnail))
+        entries[id] = Entry(
+            faces: faces, faceAnalysisFailure: failure, blemishes: blemishes, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure)
@@ -76,7 +84,7 @@ public actor PhotoPipeline {
         }
         let context = RenderContext(
             extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog,
-            skipsCrop: showsUncropped)
+            skipsCrop: showsUncropped, blemishes: entry.blemishes)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 
@@ -109,19 +117,29 @@ public actor PhotoPipeline {
             if recipe.dependsOnFaces {
                 throw MellowError.faceAnalysisUnavailable(reason: Self.unpreparedReason)
             }
-            return try render(url: url, recipe: recipe, faces: [], maxDimension: maxDimension)
+            return try render(url: url, recipe: recipe, faces: [], blemishes: [], maxDimension: maxDimension)
         }
         if recipe.dependsOnFaces, entry.faces.isEmpty, let failure = entry.faceAnalysisFailure {
             throw failure
         }
-        return try render(url: url, recipe: recipe, faces: entry.faces, maxDimension: maxDimension)
+        return try render(
+            url: url, recipe: recipe, faces: entry.faces, blemishes: entry.blemishes, maxDimension: maxDimension)
     }
 
-    private func render(url: URL, recipe: EditRecipe, faces: [FaceGeometry], maxDimension: Int?) throws -> CIImage {
+    private func render(
+        url: URL, recipe: EditRecipe, faces: [FaceGeometry], blemishes: [BlemishSpot], maxDimension: Int?
+    ) throws -> CIImage {
         let image = try loader.load(url: url, maxDimension: maxDimension)
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, faces: faces, tuning: tuning, lookCatalog: lookCatalog)
+            extent: image.extent, recipe: recipe, faces: faces, tuning: tuning, lookCatalog: lookCatalog,
+            blemishes: blemishes)
         return try pipeline.render(image, context: context)
+    }
+
+    /// 잡티 분석이 실패해도 사진 준비는 막지 않는다. 자동 잡티만 동작하지 않는다.
+    private func detectBlemishes(in image: CIImage, faces: [FaceGeometry]) -> [BlemishSpot] {
+        guard !faces.isEmpty else { return [] }
+        return (try? BlemishDetector(tuning: tuning, renderer: renderer).detect(image: image, faces: faces)) ?? []
     }
 
     public func makeCGImage(_ image: CIImage) throws -> CGImage {

@@ -11,10 +11,14 @@ public struct RenderContext: Sendable {
     public let lookCatalog: LookCatalog
     /// 자르기 도구 화면용. 기하 단계가 자르기만 건너뛴다.
     public let skipsCrop: Bool
+    /// 사진 준비 때 찾은 자동 잡티. 영속화하지 않는다.
+    public let blemishes: [BlemishSpot]
+    /// recipe.portrait.targetFace를 적용한 잡티.
+    public let targetBlemishes: [BlemishSpot]
 
     public init(
         extent: CGRect, recipe: EditRecipe, faces: [FaceGeometry], tuning: RenderTuning,
-        lookCatalog: LookCatalog = .empty, skipsCrop: Bool = false
+        lookCatalog: LookCatalog = .empty, skipsCrop: Bool = false, blemishes: [BlemishSpot] = []
     ) {
         self.extent = extent
         self.recipe = recipe
@@ -22,10 +26,13 @@ public struct RenderContext: Sendable {
         self.tuning = tuning
         self.lookCatalog = lookCatalog
         self.skipsCrop = skipsCrop
+        self.blemishes = blemishes
         if let index = recipe.portrait.targetFace {
             targetFaces = faces.indices.contains(index) ? [faces[index]] : []
+            targetBlemishes = blemishes.filter { $0.faceIndex == index }
         } else {
             targetFaces = faces
+            targetBlemishes = blemishes
         }
     }
 
