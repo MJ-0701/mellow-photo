@@ -11,7 +11,7 @@ public struct RenderPipeline: Sendable {
     /// 자동 보정이 기반이 되고 수동 편집이 그 위에, 기하가 출력 화면을 정하고, 색감은 마지막에.
     /// 좌표 기반 단계는 기하 앞이라 원본 좌표를 쓰고, 비네팅·선명도는 기하 뒤라 잘린 화면을 따른다.
     public static let standard = RenderPipeline(stages: [
-        SkinStage(), FaceReshapeStage(), LocalEditStage(), GeometryStage(), ColorStage(), DetailStage(), LookStage(),
+        SkinStage(), ShapeWarpStage(), LocalEditStage(), GeometryStage(), ColorStage(), DetailStage(), LookStage(),
     ])
 
     public func render(_ image: CIImage, context: RenderContext) throws -> CIImage {

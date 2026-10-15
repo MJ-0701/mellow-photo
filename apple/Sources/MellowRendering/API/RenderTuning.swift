@@ -47,11 +47,6 @@ public struct RenderTuning: Sendable {
     /// 복제 원본을 복제 반지름의 이 배수만큼 얼굴 가운데 쪽 옆 피부에서 가져온다. 2 이상이면 원이 겹치지 않는다.
     public var blemishSourceOffset: Double = 2.5
 
-    public var faceSlimShiftFraction: Double = 0.035
-    public var faceSlimRadiusFraction: Double = 0.34
-    public var faceSlimAnchorX: Double = 0.12
-    public var faceSlimAnchorY: Double = 0.36
-
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25
     /// 얼굴형·체형 원소 하나가 옮기는 최대 거리. push는 반지름 비율, scale은 배율, band는 늘림 비율.

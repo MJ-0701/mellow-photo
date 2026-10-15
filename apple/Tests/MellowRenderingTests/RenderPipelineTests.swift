@@ -102,34 +102,35 @@ final class RenderPipelineTests: XCTestCase {
     }
 
     func testFaceWidthWorksInBothDirections() throws {
-        let input = Support.gradient()
-        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.15, y: 0.05, width: 0.7, height: 0.9))
+        let synthetic = SyntheticFace.make()
         var narrow = EditRecipe()
         narrow.portrait.face.width = -1
         var wide = EditRecipe()
         wide.portrait.face.width = 1
-        let narrowBytes = try Support.bytes(Support.render(input, recipe: narrow, faces: [face]))
-        let wideBytes = try Support.bytes(Support.render(input, recipe: wide, faces: [face]))
-        XCTAssertNotEqual(narrowBytes, try Support.bytes(input))
-        XCTAssertNotEqual(wideBytes, try Support.bytes(input))
+        let narrowBytes = try Support.bytes(Support.render(synthetic.image, recipe: narrow, faces: [synthetic.face]))
+        let wideBytes = try Support.bytes(Support.render(synthetic.image, recipe: wide, faces: [synthetic.face]))
+        XCTAssertNotEqual(narrowBytes, try Support.bytes(synthetic.image))
+        XCTAssertNotEqual(wideBytes, try Support.bytes(synthetic.image))
         XCTAssertNotEqual(narrowBytes, wideBytes)
     }
 
     func testStageOrderMatters() throws {
-        let input = Support.gradient()
+        let synthetic = SyntheticFace.make()
+        let input = synthetic.image
         var recipe = EditRecipe()
         recipe.color.exposure = 0.8
-        // 노출·잡티 복제는 둘 다 선형이라 서로 교환된다. 순서 차이는 자동 얼굴 변형과 수동 잡티 사이에서 드러난다.
+        // 노출·잡티 복제는 둘 다 선형이라 서로 교환된다. 순서 차이는 얼굴형 변형과 수동 잡티 사이에서 드러난다.
+        // 잡티 복제 원본(x 0.15 둘레)이 왼쪽 윤곽 변형 영역에 걸친다.
         recipe.portrait.face.width = -1
         recipe.operations = [.spot(RetouchSpot(x: 0.5, y: 0.5, sourceX: 0.15, sourceY: 0.5, radius: 0.2))]
-        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.15, y: 0.05, width: 0.7, height: 0.9))
-        let context = RenderContext(extent: input.extent, recipe: recipe, faces: [face], tuning: RenderTuning())
+        let context = RenderContext(
+            extent: input.extent, recipe: recipe, faces: [synthetic.face], tuning: RenderTuning())
         let standard = try RenderPipeline.standard.render(input, context: context)
         let reversed = try RenderPipeline(stages: RenderPipeline.standard.stages.reversed()).render(
             input, context: context)
         XCTAssertEqual(
             RenderPipeline.standard.stages.map(\.name),
-            ["skin", "faceReshape", "localEdit", "geometry", "color", "detail", "look"])
+            ["skin", "shapeWarp", "localEdit", "geometry", "color", "detail", "look"])
         XCTAssertNotEqual(try Support.bytes(standard), try Support.bytes(reversed))
     }
 

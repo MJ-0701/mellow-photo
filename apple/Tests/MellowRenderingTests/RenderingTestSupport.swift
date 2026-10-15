@@ -432,4 +432,15 @@ extension FaceGeometry {
         }
         return copy
     }
+
+    /// 상자와 특징점을 정규화 좌표에서 scale배 한 뒤 offset만큼 옮긴다. 한 사진에 얼굴 여럿을 놓을 때 쓴다.
+    func transformed(scale: Double, offset: NormalizedPoint) -> FaceGeometry {
+        func move(_ point: NormalizedPoint) -> NormalizedPoint {
+            NormalizedPoint(x: point.x * scale + offset.x, y: point.y * scale + offset.y)
+        }
+        let box = NormalizedRect(
+            x: boundingBox.x * scale + offset.x, y: boundingBox.y * scale + offset.y,
+            width: boundingBox.width * scale, height: boundingBox.height * scale)
+        return FaceGeometry(boundingBox: box, landmarks: landmarks.mapValues { $0.map(move) }, roll: roll, yaw: yaw)
+    }
 }
