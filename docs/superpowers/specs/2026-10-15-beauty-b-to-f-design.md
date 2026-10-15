@@ -12,6 +12,7 @@
 | 다섯 단계를 B → C → D → E → F 순서로 만들고 끝난 뒤 1.2.0으로 한 번 배포 | 사용자 결정 | 작음 |
 | 색을 바꾸는 얼굴 보정은 원본 좌표에서 먼저, 얼굴·체형 변형은 그 뒤 한 번만 | 화면이 덜 깨지고 영역 계산이 단순해짐 | **큼** |
 | 얼굴 10개·체형 7개 슬라이더를 이동량 지도 하나로 합쳐 한 번만 다시 그림 | 여러 번 변형하면 화질이 떨어짐 | **큼** |
+| (C 구현 중 변경) 이동량 지도를 그라데이션 덧셈 대신 Core Image 커널 언어 색 커널로 그리고, 이동 원소가 닿는 영역의 합집합 안에서만 계산한 뒤 원본 위에 합성 | 그라데이션 덧셈은 음수 이동량을 보존하지 못함. 영역 제한으로 Mac 8000×6000·얼굴 1개 최대 메모리 875 → 832 MB. 커널 언어는 지원 중단 경고가 늘어남(기존 피부 커널과 같은 처지) | 작음 |
 | 얼굴 보정은 찾은 얼굴 모두(기존 대상 얼굴 선택 유지), 체형은 가장 큰 사람 한 명 | 단체 사진에서 체형 변형이 서로 간섭함 | 작음 |
 | 얼굴형·체형 슬라이더는 가운데 0인 양방향(미소·다리 길게만 한 방향) | Evoto·메이투와 같은 조작감 | 작음 |
 | 수동 잡티·변형 편집이 있으면 얼굴형·체형 슬라이더도 잠김 | 수동 편집 좌표가 변형 뒤에서 어긋남(기존 얼굴 미세 조정과 같은 규칙) | 작음 |
@@ -126,7 +127,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 #### 1.5 이동량 지도 (`DisplacementWarp`)
 
 - 이동 원소 `ShapePrimitive`: `.push(center, vector, radius)`(반지름 안에서 smoothstep 감쇠로 vector만큼 이동), `.scale(center, factor, radius)`(반경 방향 확대·축소), `.band(yStart, yEnd, stretch)`(가로 띠 세로 늘림, 다리 길게 전용).
-- 모든 원소를 더한 이동량 `D(p)`를 RG float 이미지로 만들고(`CIRadialGradient`·`CIConstantColor`·`CIAdditionCompositing`, 작업 색공간 float), 일반 커널 하나로 `out(p) = in(p − D(p))`를 샘플링. 원소별 이동 길이는 `radius × RenderTuning.shapeDisplacementLimit`로 제한.
+- 모든 원소를 더한 이동량 `D(p)`를 RG float 이미지로 만들고(원소 종류마다 CIKL `CIColorKernel(source:)` 하나(`pushField`·`scaleField`·`bandField`)가 앞 지도에 자기 이동량을 더함, 음수 보존, 작업 색공간 float), 일반 커널(`CIKernel(source:)`) 하나로 `out(p) = in(p − D(p))`를 샘플링. 원소별 이동 길이는 `radius × RenderTuning.shapeDisplacementLimit`로 제한. 지도와 샘플링은 `DisplacementWarp.influenceBounds`(limit 적용 원소의 영향 경계 합집합 ∩ extent, band는 extent 전체) 안에서만 하고 `CIBlendWithMask`로 원본 위에 합성. (C 구현 중 변경: 처음 문구는 `CIRadialGradient`·`CIConstantColor`·`CIAdditionCompositing` 덧셈과 전체 extent 지도였음.)
 - 기존 수동 변형(`LocalEditStage.applyWarp`)은 그대로 둠.
 - 테스트: 원소 0개면 입력과 같은 바이트, push 하나가 지정 방향으로 픽셀을 옮김, 두 원소 합이 각각의 이동 합과 근사.
 
