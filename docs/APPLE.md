@@ -16,7 +16,8 @@ SwiftUI 멀티플랫폼 앱 하나가 iPhone·iPad(iOS 17 이상)와 Mac(macOS 1
 ./scripts/build-apple.sh mac             # Release Mac 빌드(arm64·x86_64) + 서명 검사
 open apple/build/Build/Products/Release/Mellow\ Photo.app
 ./scripts/package-mac.sh                 # dist/Mellow-Photo-Mac.zip (임시 서명, 공증 전)
-./scripts/test-apple.sh                  # 모듈 검사·포맷·XcodeGen 동기화·패키지 테스트·iPhone·iPad·Mac 앱 테스트
+./scripts/test-apple.sh                  # 모듈 검사·포맷·XcodeGen 동기화·패키지 테스트·Mac 앱 테스트 (CI는 iPhone·iPad도)
+MELLOW_IOS_TESTS=1 ./scripts/test-apple.sh   # 로컬에서 iPhone·iPad 시뮬레이터 앱 테스트까지
 ```
 
 환경 변수 `MELLOW_BUILD_NUMBER`를 주면 `build-apple.sh`가 `CURRENT_PROJECT_VERSION`(CFBundleVersion)을 그 값으로 덮어씁니다. 릴리스 워크플로가 씁니다. `scripts/tools/make-icon.swift`와 `make-ios-icon.swift`는 앱 아이콘 PNG를 다시 만들 때만 씁니다. 생성된 아이콘은 에셋에 커밋되어 있습니다.
