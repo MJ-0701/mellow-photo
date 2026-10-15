@@ -1,4 +1,5 @@
 import Foundation
+import MellowShared
 
 public struct RenderTuning: Sendable {
     /// 미리보기 긴 변. 8GB 이상 1600, 미만 1200.
@@ -56,6 +57,46 @@ public struct RenderTuning: Sendable {
     /// 얼굴형·체형 원소 하나가 옮기는 최대 거리. push는 반지름 비율, scale은 배율, band는 늘림 비율.
     /// smoothstep 감쇠의 최대 기울기가 1.5 / 반지름이라 0.25면 원소 하나의 야코비안이 0.625 이상으로 접히지 않는다.
     public var shapeDisplacementLimit: Double = 0.25
+    /// |yaw|가 이보다 크면 얼굴형 이동을 cos(|yaw|) / cos(이 값)으로 줄인다(스펙 0.35rad ≈ 20°). 이 값에서 1이라 끊기지 않는다.
+    public var faceShapeYawThreshold: Double = 0.35
+    /// 얼굴 폭 ±1에서 한쪽 윤곽을 미는 양. 얼굴 폭 비율. 같은 쪽 점 수로 나눠 겹치므로 실효 최대는 약 0.034
+    /// (140mm 얼굴에서 약 5mm)이고 B0 얼굴 미세 조정(0.035)과 비슷하다.
+    public var faceWidthMaxShift: Double = 0.06
+    /// 턱선. 입 아래 윤곽점 몫으로 나눠 실효 최대 약 0.029, 위로 드는 양은 안쪽의 절반.
+    public var faceJawMaxShift: Double = 0.07
+    /// 광대. 각 쪽 윤곽 맨 위 점 하나를 민다.
+    public var faceCheekboneMaxShift: Double = 0.04
+    /// 눈 크기. scale 배율이라 눈 중심 선형 배율은 1 / (1 − 0.18) ≈ 1.22(큰 눈 보정의 흔한 1.2~1.3배).
+    public var faceEyeSizeMaxScale: Double = 0.18
+    /// 눈 간격. 눈 하나가 얼굴 폭의 2%(약 3mm) 움직인다.
+    public var faceEyeDistanceMaxShift: Double = 0.02
+    /// 코 폭. 코 날개 하나가 얼굴 폭의 2% 움직인다. 코 폭은 얼굴 폭의 25% 안팎이라 −1이면 약 16% 좁아진다.
+    public var faceNoseWidthMaxShift: Double = 0.02
+    /// 입 크기. scale 배율, 입 중심 선형 배율 약 1.18.
+    public var faceMouthSizeMaxScale: Double = 0.15
+    /// 미소. 입꼬리가 위로 얼굴 폭의 2.5%, 바깥으로 그 40%.
+    public var faceSmileMaxShift: Double = 0.025
+    /// 이마. 이마 가운데를 위·아래로 얼굴 폭의 5%(약 7mm).
+    public var faceForeheadMaxShift: Double = 0.05
+    /// 턱 길이. 턱 끝을 아래·위로 얼굴 폭의 5%.
+    public var faceChinLengthMaxShift: Double = 0.05
+
+    /// 얼굴형 항목별 최대 이동. eyeSize·mouthSize는 scale 배율, 나머지는 얼굴 폭 비율.
+    public func faceShapeMaxShift(_ key: FaceShapeKey) -> Double {
+        switch key {
+        case .width: return faceWidthMaxShift
+        case .jaw: return faceJawMaxShift
+        case .cheekbone: return faceCheekboneMaxShift
+        case .eyeSize: return faceEyeSizeMaxScale
+        case .eyeDistance: return faceEyeDistanceMaxShift
+        case .noseWidth: return faceNoseWidthMaxShift
+        case .mouthSize: return faceMouthSizeMaxScale
+        case .smile: return faceSmileMaxShift
+        case .forehead: return faceForeheadMaxShift
+        case .chinLength: return faceChinLengthMaxShift
+        }
+    }
+
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500

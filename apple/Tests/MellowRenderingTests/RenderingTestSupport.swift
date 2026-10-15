@@ -164,6 +164,34 @@ enum RenderingTestSupport {
         return position
     }
 
+    /// minimumJacobian의 격자 간격과 중앙 차분 간격(픽셀).
+    static let jacobianGridStep: CGFloat = 4
+    static let jacobianDelta: CGFloat = 0.5
+
+    /// out(p) = in(p − D(p))에서 읽는 위치 p − D(p)의 야코비안 행렬식 최솟값. 0 이하면 이미지가 접힌다.
+    static func minimumJacobian(of primitives: [ShapePrimitive], limit: Double, in rect: CGRect) -> CGFloat {
+        func source(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            let shift = DisplacementWarp.displacement(at: CGPoint(x: x, y: y), of: primitives, limit: limit)
+            return CGPoint(x: x - shift.dx, y: y - shift.dy)
+        }
+        let h = jacobianDelta
+        var worst = CGFloat.infinity
+        for y in stride(from: rect.minY, through: rect.maxY, by: jacobianGridStep) {
+            for x in stride(from: rect.minX, through: rect.maxX, by: jacobianGridStep) {
+                let right = source(x + h, y)
+                let left = source(x - h, y)
+                let up = source(x, y + h)
+                let down = source(x, y - h)
+                let a = (right.x - left.x) / (2 * h)
+                let b = (up.x - down.x) / (2 * h)
+                let c = (right.y - left.y) / (2 * h)
+                let d = (up.y - down.y) / (2 * h)
+                worst = min(worst, a * d - b * c)
+            }
+        }
+        return worst
+    }
+
     /// 피부색 바탕에 모공(픽셀 단위 잡음 ±4%)과 얼룩(흐린 잡음으로 섞은 밝고 어두운 피부)을 넣는다.
     /// CIRandomGenerator는 늘 같은 무늬라 테스트가 결정적이다.
     static func skinTexture(size: Int) -> CIImage {
