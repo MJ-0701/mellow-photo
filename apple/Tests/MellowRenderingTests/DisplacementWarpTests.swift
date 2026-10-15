@@ -96,6 +96,8 @@ final class DisplacementWarpTests: XCTestCase {
     func testBandMappingIsMonotoneAndContinuous() {
         let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
         let step: CGFloat = 0.5
+        // smoothstep의 최대 기울기는 1.5라 한 걸음 변화는 step × 0.08 × 1.5 이하다.
+        let maximumStepChange = step * 0.08 * 1.5 + 1e-9
         var previousSource = -CGFloat.infinity
         var previousShift = band.displacement(at: CGPoint(x: 0, y: 0)).dy
         for index in 0...256 {
@@ -103,13 +105,27 @@ final class DisplacementWarpTests: XCTestCase {
             let shift = band.displacement(at: CGPoint(x: 0, y: y)).dy
             let source = y - shift
             XCTAssertGreaterThan(source, previousSource, "출력 y가 커지면 읽는 입력 y도 커진다(접힘 없음) y=\(y)")
-            XCTAssertLessThanOrEqual(abs(shift - previousShift), step * 0.08 + 1e-9, "끊김 없음 y=\(y)")
+            XCTAssertLessThanOrEqual(abs(shift - previousShift), maximumStepChange, "끊김 없음 y=\(y)")
             previousSource = source
             previousShift = shift
         }
         XCTAssertEqual(band.displacement(at: CGPoint(x: 0, y: 10)).dy, -5.12, accuracy: 1e-9, "띠 아래 내용은 5.12px 내려온다")
         XCTAssertEqual(band.displacement(at: CGPoint(x: 0, y: 10)).dx, 0)
+        XCTAssertEqual(band.displacement(at: CGPoint(x: 0, y: 64)).dy, -2.56, accuracy: 1e-9, "띠 가운데는 전체 이동의 절반")
         XCTAssertEqual(band.displacement(at: CGPoint(x: 0, y: 110)).dy, 0, "띠 위는 그대로")
+    }
+
+    func testBandEdgesHaveZeroSlope() {
+        let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
+        let h: CGFloat = 0.01
+        func slope(at y: CGFloat) -> CGFloat {
+            let above = band.displacement(at: CGPoint(x: 0, y: y + h)).dy
+            let below = band.displacement(at: CGPoint(x: 0, y: y - h)).dy
+            return (above - below) / (2 * h)
+        }
+        XCTAssertEqual(slope(at: 96), 0, accuracy: 1e-3, "골반(띠 시작)에서 꺾이지 않는다")
+        XCTAssertEqual(slope(at: 32), 0, accuracy: 1e-3, "발목(띠 끝)에서 꺾이지 않는다")
+        XCTAssertEqual(slope(at: 64), 0.12, accuracy: 1e-3, "가운데 기울기는 1.5 × stretch")
     }
 
     func testBandMovesMarkerBeyondBand() throws {
@@ -151,8 +167,14 @@ final class DisplacementWarpTests: XCTestCase {
             DisplacementWarp.influenceBounds([corner], extent: extent), CGRect(x: 0, y: 0, width: 15, height: 15))
         XCTAssertEqual(
             DisplacementWarp.influenceBounds([push, corner], extent: extent), CGRect(x: 0, y: 0, width: 92, height: 92))
+        // 띠는 시작 행 96 + 이동 5.12 + 여백 2 = 103.12 아래만 움직인다. 위쪽 행은 패치에서 빠진다.
         let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
-        XCTAssertEqual(DisplacementWarp.influenceBounds([band], extent: extent), extent, "띠는 그 너머 전체를 옮긴다")
+        XCTAssertEqual(
+            DisplacementWarp.influenceBounds([band], extent: extent), CGRect(x: 0, y: 0, width: 128, height: 104))
+        // 위로 늘리는 띠는 32 − 7.12 = 24.88 위만.
+        let rising = ShapePrimitive.band(yStart: 32, yEnd: 96, stretch: 0.08)
+        XCTAssertEqual(
+            DisplacementWarp.influenceBounds([rising], extent: extent), CGRect(x: 0, y: 24, width: 128, height: 104))
     }
 
     /// 두 얼굴의 원소 경계 안만 변형한 결과가 전체 extent 변형과 같고, 경계 밖은 입력 바이트 그대로다.
@@ -206,5 +228,69 @@ final class DisplacementWarpTests: XCTestCase {
             XCTAssertEqual(changedOutside, 0, "경계 밖은 입력 바이트 그대로")
             XCTAssertLessThanOrEqual(worstOutside, 1, "경계 밖도 전체 변형과 ±1 LSB 안")
         }
+    }
+
+    func testBandIsNotDrawnIntoFieldAndRowsAboveKeepInputBytes() throws {
+        let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
+        let push = ShapePrimitive.push(center: CGPoint(x: 100, y: 110), vector: CGVector(dx: 3, dy: 0), radius: 10)
+        XCTAssertTrue(DisplacementWarp.fieldBounds([band], extent: extent).isNull, "띠만 있으면 지도를 그리지 않는다")
+        XCTAssertEqual(
+            DisplacementWarp.fieldBounds([band, push], extent: extent),
+            DisplacementWarp.influenceBounds([push], extent: extent), "지도는 push 경계만")
+        // 사진처럼 비트맵에서 읽은 입력. 패치 밖 바이트 동일성은 비트맵 입력에서만 판정할 수 있다(C Task 4).
+        let input = CIImage(cgImage: try Support.renderer.makeCGImage(Support.skinTexture(size: 128)))
+        let before = try Support.grid(input)
+        let after = try Support.grid(warp(input, [band]))
+        var changedAbove = 0
+        var changedBelow = 0
+        for y in 0..<128 {
+            for x in 0..<128 {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if y >= 104 {
+                    changedAbove += 1
+                } else {
+                    changedBelow += 1
+                }
+            }
+        }
+        XCTAssertEqual(changedAbove, 0, "띠 시작 위쪽 행(패치 밖)은 입력 바이트 그대로")
+        XCTAssertGreaterThan(changedBelow, 0, "띠 안과 너머는 움직인다")
+    }
+
+    /// 띠 이동이 512px를 넘어도 반정밀도 지도의 0.5px 계단이 생기지 않는다(띠는 샘플링 커널이 float로 계산한다).
+    func testLargeBandShiftKeepsSubpixelAccuracy() throws {
+        let tall = CGRect(x: 0, y: 0, width: 32, height: 4096)
+        // 2600 × 0.24625 = 640.25. 반정밀도는 512~1024에서 0.5 간격이라 지도에 담으면 640으로 반올림된다.
+        let band = ShapePrimitive.band(yStart: 100, yEnd: 2700, stretch: 0.24625)
+        let marker = CGPoint(x: 16, y: 3000)
+        let input = Support.markers([marker], extent: tall)
+        let output = try DisplacementWarp.shared.apply([band], to: input, extent: tall, limit: limit)
+        // 가장자리를 늘려 채운 뒤 옮겨야 기준 이미지 extent가 tall 그대로라 격자 좌표가 출력과 같다.
+        let reference = input.clampedToExtent().transformed(by: CGAffineTransform(translationX: 0, y: 640.25))
+            .cropped(to: tall)
+        let expected = CGPoint(x: 16, y: 3640.25)
+        let moved = try XCTUnwrap(Support.markerCentroid(Support.grid(output), near: expected, window: 8))
+        let translated = try XCTUnwrap(Support.markerCentroid(Support.grid(reference), near: expected, window: 8))
+        XCTAssertEqual(moved.y, translated.y, accuracy: 0.1, "띠 너머는 640.25px 평행 이동과 같다")
+        XCTAssertEqual(moved.x, translated.x, accuracy: 0.05)
+    }
+
+    func testOnlyOneBandIsAccepted() {
+        let first = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.05)
+        let second = ShapePrimitive.band(yStart: 120, yEnd: 60, stretch: 0.05)
+        XCTAssertThrowsError(try warp(Support.gradient(), [first, second])) { error in
+            XCTAssertEqual(error as? MellowError, .renderFailed, "샘플링 커널은 띠 하나만 받는다")
+        }
+    }
+
+    func testBandAndPushMoveMarkerTogether() throws {
+        let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
+        let push = ShapePrimitive.push(center: CGPoint(x: 64, y: 20), vector: CGVector(dx: 6, dy: 0), radius: 40)
+        let marker = CGPoint(x: 64, y: 20)
+        let result = try moved(marker, by: [band, push])
+        assertNear(result, Support.expectedPosition(of: marker, primitives: [band, push], limit: limit))
+        XCTAssertGreaterThan(result.x - marker.x, 4, "push 몫")
+        XCTAssertLessThan(result.y - marker.y, -4, "띠 몫")
     }
 }

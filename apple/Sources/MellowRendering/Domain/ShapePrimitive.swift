@@ -7,7 +7,9 @@ enum ShapePrimitive: Equatable, Sendable {
     case push(center: CGPoint, vector: CGVector, radius: CGFloat)
     /// center 기준 반경 방향으로 확대(factor > 0)하거나 축소(< 0)한다. 중심의 선형 배율은 1 / (1 − factor).
     case scale(center: CGPoint, factor: CGFloat, radius: CGFloat)
-    /// yStart에서 yEnd까지의 가로 띠를 yEnd 쪽으로 늘린다. yEnd 너머는 stretch × (yEnd − yStart)만큼 통째로 밀린다.
+    /// yStart에서 yEnd까지의 가로 띠를 yEnd 쪽으로 늘린다. 띠 안 이동은 stretch × span × t²(3 − 2t)라
+    /// 양 끝(골반·발목)에서 기울기가 0이고 가운데 국소 늘림이 최대 1.5 × stretch다.
+    /// yEnd 너머는 stretch × (yEnd − yStart)만큼 통째로 밀린다. 지도에 그리지 않고 DisplacementWarp 샘플링 커널이 같은 식으로 더한다.
     case band(yStart: CGFloat, yEnd: CGFloat, stretch: CGFloat)
 
     /// smoothstep 감쇠. t = clamp(1 − d / r), w = t²(3 − 2t). WarpKernel과 같은 모양이다.
@@ -31,6 +33,16 @@ enum ShapePrimitive: Equatable, Sendable {
             return .scale(center: center, factor: min(cap, max(-cap, factor)), radius: radius)
         case .band(let yStart, let yEnd, let stretch):
             return .band(yStart: yStart, yEnd: yEnd, stretch: min(cap, max(-cap, stretch)))
+        }
+    }
+
+    /// 다리 길게 띠인지. 띠는 이동량 지도가 아니라 샘플링 커널이 계산한다.
+    var isBand: Bool {
+        switch self {
+        case .band:
+            return true
+        case .push, .scale:
+            return false
         }
     }
 
@@ -72,7 +84,7 @@ enum ShapePrimitive: Equatable, Sendable {
             let span = yEnd - yStart
             guard span != 0 else { return .zero }
             let t = min(1, max(0, (point.y - yStart) / span))
-            return CGVector(dx: 0, dy: stretch * span * t)
+            return CGVector(dx: 0, dy: stretch * span * t * t * (3 - 2 * t))
         }
     }
 }
