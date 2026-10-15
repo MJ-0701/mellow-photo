@@ -21,7 +21,7 @@ public final class Renderer: @unchecked Sendable {
         return cg
     }
 
-    /// RGBAf로 읽는다. 행 우선, 왼쪽 아래 픽셀부터. 히스토그램·평균처럼 작은 이미지에만 쓴다.
+    /// RGBAf로 읽는다. 행 우선, 맨 위 행부터(Core Image 좌표의 가장 큰 y가 첫 행). 히스토그램·평균처럼 작은 이미지에만 쓴다.
     public func readPixels(_ image: CIImage) throws -> [Float] {
         guard !image.extent.isInfinite else { throw MellowError.renderFailed }
         let width = Int(image.extent.width.rounded())
