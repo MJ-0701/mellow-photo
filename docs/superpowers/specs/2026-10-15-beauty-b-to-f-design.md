@@ -126,7 +126,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 3. 인물 마스크 — `PersonAnalyzer.personMask(_:) throws -> CIImage?`(회색조, 사람 1·배경 0, 미리보기 이미지로 계산). 받은 크기 그대로(원점 (0, 0)) 보관하고 렌더 시 extent로 가로·세로를 따로 확대. `VisionPersonAnalyzer`(`.balanced` 품질)의 결과는 입력 비율과 무관하게 512×384 고정이라 축마다 배율이 다르다. 마스크 픽셀 중 128/255 이상이 1% 미만이면 "사람 없음"으로 nil. (D 구현 중 변경: 처음 문구는 "미리보기 크기" 마스크를 원본 extent로 확대.)
 4. 관절점 — `BodyAnalyzer.analyze(_:) throws -> [BodyGeometry]`, 면적이 가장 큰 사람을 앞에.
 
-각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. 분석 결과는 `PhotoAnalysis`(MellowRendering/API, `faces`·`faceAnalysisFailure`·`blemishes`·`personMask`·`personAnalysisFailure`, E에서 `bodies` 추가) 하나로 묶어 `RenderContext.analysis`로 넘기고, `RenderContext.faces`·`blemishes`·`personMask`는 묶음을 읽는 계산 속성이다. 새 분석은 이 묶음에만 더하고 `RenderContext`·`PhotoPipeline`의 인자 목록은 늘리지 않는다. 다각형 마스크 비트맵은 묶음의 `RegionMaskCache`(다각형·extent 키, 32개 상한)가 사진마다 한 번만 그리며, 미리보기 캐시에서 밀려난 사진의 비트맵은 놓는다. 옛 생성자 `RenderContext(extent:recipe:faces:…blemishes:)`는 묶음을 만들어 넘기는 형태로 남긴다. `makeupCatalog: MakeupCatalog`는 F에서 `RenderContext`에 추가(기본값 있음). (D 구현 중 변경: 처음 문구는 `RenderContext`에 `blemishes`·`personMask`·`bodies` 개별 필드 추가.)
+각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. 분석 결과는 `PhotoAnalysis`(MellowRendering/API, `faces`·`faceAnalysisFailure`·`blemishes`·`personMask`·`personAnalysisFailure`, E에서 `bodies`·`bodyAnalysisFailure` 추가) 하나로 묶어 `RenderContext.analysis`로 넘기고, `RenderContext.faces`·`blemishes`·`personMask`는 묶음을 읽는 계산 속성이다. 새 분석은 이 묶음에만 더하고 `RenderContext`·`PhotoPipeline`의 인자 목록은 늘리지 않는다. 다각형 마스크 비트맵은 묶음의 `RegionMaskCache`(다각형·extent 키, 32개 상한)가 사진마다 한 번만 그리며, 미리보기 캐시에서 밀려난 사진의 비트맵은 놓는다. 옛 생성자 `RenderContext(extent:recipe:faces:…blemishes:)`는 묶음을 만들어 넘기는 형태로 남긴다. `makeupCatalog: MakeupCatalog`는 F에서 `RenderContext`에 추가(기본값 있음). (D 구현 중 변경: 처음 문구는 `RenderContext`에 `blemishes`·`personMask`·`bodies` 개별 필드 추가.)
 
 `PhotoPipeline.init`에 `personAnalyzer`, `bodyAnalyzer` 인자 추가(테스트는 스텁). 앱 `AppModel+Live.swift`가 Vision 구현을 주입.
 
@@ -180,7 +180,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 ### 5. E 체형
 
 - **`BodyGeometry`:** `joints: [BodyJoint: NormalizedPoint]`, `confidence: [BodyJoint: Double]`, `boundingBox`. 관절: neck, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist, leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle, root. 신뢰도 < `bodyJointMinConfidence`(0.3)인 관절은 없는 것으로.
-- **`BodyShapeRig.primitives(body:adjustments:extent:)`:** 상한 = 몸통 폭(어깨 사이) × `bodyShapeMaxShift`(0.06).
+- **`BodyShapeRig.primitives(body:adjustments:extent:tuning:)`:** 상한 = 몸통 폭(어깨 사이) × `bodyShapeMaxShift`(0.06).
 - 항목별 최대는 `RenderTuning`(허리 0.06·몸 전체 0.035·팔 0.02·허벅지 0.035·어깨 0.04·목 0.03, 모두 `bodyShapeMaxShift` 이하), push 이동 = 어깨 폭 × 값 × min(항목 최대, `bodyShapeMaxShift`), push 반지름 ≥ 이동 / `shapeDisplacementLimit`, 음수는 가늘게·좁게·짧게. 화면 이름은 overall을 "몸 전체"로 부름. 두 어깨가 없으면 체형 없음(안내 대상). 다리 띠는 두 엉덩이와 발목 하나 이상이 있고 엉덩이 중점이 발목 평균보다 어깨 폭 × 0.5 이상 위일 때만. 목 push는 목 관절과 양쪽 승모근 비탈 점(목 관절에서 각 어깨 쪽 40%) 세 곳을 몸통 아래쪽(+)·위쪽(−)으로 밀고 반지름은 어깨 폭 × 0.2라 관절 위 0.2W에서 0(턱 끝 0.28W 이동 0px, +1에서 목 아래끝~턱 거리 +0.03W). 반지름이 세 점 간격과 같아 그 사이 어깨선이 고르게 움직인다. (E 구현 중 정함, 목은 E 리뷰 두 번 뒤 변경: 처음 구현은 목 관절 위 0.2W 중심·반지름 0.3W를 위로, 두 번째는 0.1W 중심·반지름 0.15W를 위로.)
 
 | 항목 | 원소 |
