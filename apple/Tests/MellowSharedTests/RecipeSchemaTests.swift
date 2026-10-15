@@ -28,6 +28,9 @@ final class RecipeSchemaTests: XCTestCase {
             .spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.45, sourceY: 0.4, radius: 0.02)),
             .warp(WarpStroke(x: 0.5, y: 0.4, dx: 0.01, dy: 0, radius: 0.08)),
         ]
+        recipe.look = LookSelection(id: "film", intensity: 0.5)
+        recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
+        recipe.detail.sharpness = 0.2
         return try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any])
     }
 
@@ -40,6 +43,14 @@ final class RecipeSchemaTests: XCTestCase {
         XCTAssertEqual(try propertyKeys(properties["color"]), Set(encodedColor.keys))
         let encodedPortrait = try XCTUnwrap(encoded["portrait"] as? [String: Any])
         XCTAssertEqual(try propertyKeys(properties["portrait"]), Set(encodedPortrait.keys))
+        for key in ["detail", "look", "geometry"] {
+            let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
+            XCTAssertEqual(try propertyKeys(properties[key]), Set(encodedSection.keys), key)
+        }
+        let geometrySchema = properties["geometry"] as? [String: Any]
+        let geometryProperties = try XCTUnwrap(geometrySchema?["properties"] as? [String: Any])
+        let encodedCrop = try XCTUnwrap((encoded["geometry"] as? [String: Any])?["crop"] as? [String: Any])
+        XCTAssertEqual(try propertyKeys(geometryProperties["crop"]), Set(encodedCrop.keys))
         try assertOperationsMatchBranches(properties: properties, encoded: encoded)
         XCTAssertEqual(schema["$id"] as? String, "https://mellow.photo/schema/edit-recipe.v2.schema.json")
     }

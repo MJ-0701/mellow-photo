@@ -3,10 +3,21 @@ import Foundation
 public struct PresetValues: Codable, Equatable, Sendable {
     public var color: ColorAdjustments
     public var portrait: PortraitAdjustments
+    public var detail: DetailAdjustments
 
-    public init(color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init()) {
+    public init(
+        color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init()
+    ) {
         self.color = color
         self.portrait = portrait
+        self.detail = detail
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        color = try container.decodeIfPresent(ColorAdjustments.self, forKey: .color) ?? .init()
+        portrait = try container.decodeIfPresent(PortraitAdjustments.self, forKey: .portrait) ?? .init()
+        detail = try container.decodeIfPresent(DetailAdjustments.self, forKey: .detail) ?? .init()
     }
 }
 

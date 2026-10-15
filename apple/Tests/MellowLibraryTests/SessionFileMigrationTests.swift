@@ -75,4 +75,12 @@ final class SessionFileMigrationTests: XCTestCase {
         let data = try SessionFile.encode(file)
         XCTAssertTrue(try XCTUnwrap(String(data: data, encoding: .utf8)).contains("\"schemaVersion\":2"))
     }
+
+    func testPresetWithoutDetailDecodes() throws {
+        let json = """
+            {"schemaVersion":2,"photos":[],"presets":[{"id":"33333333-3333-3333-3333-333333333333","name":"옛","values":{"color":{"exposure":0.1},"portrait":{}}}]}
+            """
+        let snapshot = SessionFileMapper.snapshot(from: try SessionFile.decode(Data(json.utf8)))
+        XCTAssertEqual(snapshot.presets[0].values.detail, DetailAdjustments())
+    }
 }

@@ -36,7 +36,8 @@
             "required": ["color", "portrait"],
             "properties": {
               "color": { "$ref": "edit-recipe.v2.schema.json#/properties/color" },
-              "portrait": { "$ref": "edit-recipe.v2.schema.json#/properties/portrait" }
+              "portrait": { "$ref": "edit-recipe.v2.schema.json#/properties/portrait" },
+              "detail": { "$ref": "edit-recipe.v2.schema.json#/properties/detail" }
             }
           }
         }

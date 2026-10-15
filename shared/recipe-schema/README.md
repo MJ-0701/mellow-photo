@@ -4,14 +4,14 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
 | 파일 | 기술하는 것 | Apple 기준 구현 |
 |---|---|---|
-| `edit-recipe.v2.schema.json` | 사진 한 장의 보정 레시피 `EditRecipe` | `apple/Sources/MellowShared/API/EditRecipe.swift`, `Adjustments.swift`, `LocalEdit.swift` |
+| `edit-recipe.v2.schema.json` | 사진 한 장의 보정 레시피 `EditRecipe` | `apple/Sources/MellowShared/API/EditRecipe.swift`, `Adjustments.swift`, `DetailAdjustments.swift`, `LookSelection.swift`, `GeometryAdjustments.swift`, `LocalEdit.swift` |
 | `session-file.v2.schema.json` | 작업 세션 파일 `session.json` 전체(사진 목록, 사진별 레시피와 실행 취소·다시 실행 기록, 선택한 사진, 사용자 프리셋) | `apple/Sources/MellowLibrary/Infrastructure/SessionFile.swift` |
 
 `session-file.v2`는 레시피 부분을 `edit-recipe.v2.schema.json`의 `$ref`로 가리킵니다. 검증기에는 두 스키마를 각자의 `$id`로 등록하거나, 같은 폴더에서 파일 이름으로 읽게 하세요. 어느 방식이든 `$ref`가 풀리도록 두 `$id`(`https://mellow.photo/schema/edit-recipe.v2.schema.json`, `…/session-file.v2.schema.json`)를 파일 이름과 같게 맞췄습니다.
 
 두 테스트가 실제 Apple 인코드 결과의 **키 집합**을 스키마의 `properties` 키 집합과 비교합니다.
 
-- `apple/Tests/MellowSharedTests/RecipeSchemaTests.swift`: `targetFace`, spot 하나, warp 하나를 넣은 레시피를 인코드해 최상위 키, `color` 키, `portrait` 키, 그리고 각 `operations` 항목의 키를 `type.const`가 같은 `oneOf` 분기의 `properties` 키와 비교합니다. `$id`도 확인합니다.
+- `apple/Tests/MellowSharedTests/RecipeSchemaTests.swift`: `targetFace`, 룩, 자르기 사각형, 선명도, spot 하나, warp 하나를 넣은 레시피를 인코드해 최상위 키, `color`·`portrait`·`detail`·`look`·`geometry` 키, `geometry.crop` 키, 그리고 각 `operations` 항목의 키를 `type.const`가 같은 `oneOf` 분기의 `properties` 키와 비교합니다. `$id`도 확인합니다.
 - `apple/Tests/MellowLibraryTests/SessionSchemaTests.swift`: 사진 한 장(실행 취소·다시 실행 기록 포함)과 프리셋 하나가 든 세션을 `SessionFile.encode`로 인코드해 최상위 키, `photos` 항목 키, `presets` 항목 키, 프리셋 `values` 키를 비교합니다. `$id`도 확인합니다.
 
 값의 범위(`minimum`·`maximum`·`maxItems`·`maxLength`), 타입, `required` 목록, `$ref`가 가리키는 하위 구조의 키는 기계로 검사하지 않습니다. 키를 추가하거나 고치면 위 키 집합이 어긋나 테스트가 스키마 갱신을 요구하지만, 범위나 필수 여부를 바꿀 때는 사람이 스키마를 직접 맞춰야 합니다.
@@ -20,10 +20,14 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
 - 좌표(`x`, `y`, `sourceX`, `sourceY`, `dx`, `dy`, `radius`)는 방향 보정된 이미지 기준 0~1 정규화 값이고, 원점은 왼쪽 아래입니다.
 - `portrait.targetFace`는 왼쪽부터 센 얼굴 인덱스입니다. 값이 없으면 모든 얼굴에 적용합니다.
+- `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
+- `look`은 필터 선택입니다. `id`는 `shared/looks/looks.v1.json`의 룩 id이고, 값이 없으면 필터를 쓰지 않습니다. `intensity`는 원본과 룩 결과의 혼합 비율이며 기본값은 1입니다.
+- `geometry`는 반전(`flipHorizontal`) → 시계 방향 90° 회전(`quarterTurns`, 0~3) → 수평 보정(`straightenDegrees`, 양수면 시계 방향) → 자르기(`crop`) 순서로 적용합니다. `crop`은 그 앞 단계가 끝난 이미지 기준 정규화 사각형(`x`, `y`, `width`, `height`)이고, 값이 없으면 자르지 않습니다.
+- 프리셋 `values`는 `color`·`portrait`와 함께 `detail`을 담습니다. `detail`이 없는 프리셋은 기본값으로 읽습니다. 룩과 기하는 프리셋에 담지 않습니다.
 - `operations`는 사용자가 기록한 순서대로 재생합니다. 각 항목은 `"type": "spot"` 또는 `"type": "warp"`와 그 값을 같은 객체에 평평하게 담습니다.
 - 사진별 `undo`는 최대 40개입니다(`EditingPolicy.historyLimit`). 프리셋 이름은 최대 30자입니다(`LibraryPolicy.presetNameLimit`).
 - `filename`은 작업 사본의 파일 이름만 담습니다. 폴더는 플랫폼이 정합니다. Apple은 `Application Support/MellowPhoto/Library/<uuid>.<확장자>`에 둡니다.
-- Apple 구현은 값이 없는 선택 키(`portrait.targetFace`, `selectedPhotoID`)를 `null`로 쓰지 않고 키 자체를 생략합니다. 읽는 쪽은 생략과 `null`을 같은 뜻으로 받아야 합니다.
+- Apple 구현은 값이 없는 선택 키(`portrait.targetFace`, `look.id`, `geometry.crop`, `selectedPhotoID`)를 `null`로 쓰지 않고 키 자체를 생략합니다. 읽는 쪽은 생략과 `null`을 같은 뜻으로 받아야 합니다.
 - 읽을 때는 빠진 키를 기본값으로 채웁니다. 기본값은 스키마의 `default`와 같습니다.
 
 ### 값의 범위: 스키마 한계와 UI 권장 범위
@@ -38,8 +42,14 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 | `color.warmth` | −1 … 1 | −1 … 1 |
 | `portrait.skinSmoothing` | 0 … 1 | 0 … 1 |
 | `portrait.faceSlim` | 0 … 1 | 0 … 1 |
+| `detail.highlights` | −1 … 1 | −1 … 1 |
+| `detail.shadows` | −1 … 1 | −1 … 1 |
+| `detail.sharpness` | 0 … 1 | 0 … 1 |
+| `detail.vignette` | 0 … 1 | 0 … 1 |
+| `look.intensity` | 0 … 1 | 0 … 1 |
+| `geometry.straightenDegrees` | −15 … 15 | −15 … 15 (`GeometryAdjustments.maxStraightenDegrees`) |
 
-Apple의 권장 범위는 `apple/MellowPhoto/Features/Editor/ColorPanel.swift`와 `PortraitPanel.swift`의 슬라이더 `range`입니다. 다른 플랫폼도 같은 권장 범위를 쓰는 것을 원칙으로 합니다.
+Apple의 권장 범위는 `apple/MellowPhoto/Features/Editor/ColorPanel.swift`와 `PortraitPanel.swift`의 슬라이더 `range`입니다. `detail`·`look`·`geometry` 행은 B0 기본 편집 패널이 따를 값입니다. 다른 플랫폼도 같은 권장 범위를 쓰는 것을 원칙으로 합니다.
 
 ## v1: 출시된 iPhone 앱의 형식
 

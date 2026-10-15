@@ -6,13 +6,20 @@ public struct EditRecipe: Codable, Equatable, Sendable {
 
     public var color = ColorAdjustments()
     public var portrait = PortraitAdjustments()
+    public var detail = DetailAdjustments()
+    public var look = LookSelection()
+    public var geometry = GeometryAdjustments()
     public var operations: [LocalEdit] = []
 
     public init(
-        color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), operations: [LocalEdit] = []
+        color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
+        look: LookSelection = .init(), geometry: GeometryAdjustments = .init(), operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
+        self.detail = detail
+        self.look = look
+        self.geometry = geometry
         self.operations = operations
     }
 
@@ -20,6 +27,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case schemaVersion
         case color
         case portrait
+        case detail
+        case look
+        case geometry
         case operations
     }
 
@@ -27,6 +37,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         color = try container.decodeIfPresent(ColorAdjustments.self, forKey: .color) ?? .init()
         portrait = try container.decodeIfPresent(PortraitAdjustments.self, forKey: .portrait) ?? .init()
+        detail = try container.decodeIfPresent(DetailAdjustments.self, forKey: .detail) ?? .init()
+        look = try container.decodeIfPresent(LookSelection.self, forKey: .look) ?? .init()
+        geometry = try container.decodeIfPresent(GeometryAdjustments.self, forKey: .geometry) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
     }
 
@@ -35,6 +48,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(Self.currentSchemaVersion, forKey: .schemaVersion)
         try container.encode(color, forKey: .color)
         try container.encode(portrait, forKey: .portrait)
+        try container.encode(detail, forKey: .detail)
+        try container.encode(look, forKey: .look)
+        try container.encode(geometry, forKey: .geometry)
         try container.encode(operations, forKey: .operations)
     }
 
@@ -60,8 +76,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var allValuesFinite: Bool {
         let scalars = [
             color.exposure, color.contrast, color.saturation, color.warmth, portrait.skinSmoothing, portrait.faceSlim,
+            look.intensity,
         ]
         let locals = operations.flatMap(\.numericValues)
-        return (scalars + locals).allSatisfy(\.isFinite)
+        return (scalars + detail.numericValues + geometry.numericValues + locals).allSatisfy(\.isFinite)
     }
 }

@@ -52,4 +52,50 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(BuiltInPresets.cozy.values.portrait.skinSmoothing, 0.3)
         XCTAssertEqual(BuiltInPresets.clean.values.color.contrast, 1.05)
     }
+
+    func testRecipeWithoutNewKeysDecodesToDefaults() throws {
+        let json = #"{"schemaVersion":2,"color":{"exposure":0.2},"portrait":{},"operations":[]}"#
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.detail, DetailAdjustments())
+        XCTAssertEqual(decoded.look, LookSelection())
+        XCTAssertEqual(decoded.geometry, GeometryAdjustments())
+        XCTAssertNil(decoded.look.id)
+        XCTAssertEqual(decoded.look.intensity, 1)
+        var plain = decoded
+        plain.color.exposure = 0
+        XCTAssertTrue(plain.isDefault)
+    }
+
+    func testNewFieldsRoundTripAndAffectDefaultness() throws {
+        var recipe = EditRecipe()
+        recipe.detail.highlights = -0.4
+        recipe.look = LookSelection(id: "film", intensity: 0.7)
+        recipe.geometry = GeometryAdjustments(
+            flipHorizontal: true, quarterTurns: 1, straightenDegrees: -3,
+            crop: NormalizedRect(x: 0.1, y: 0.2, width: 0.5, height: 0.5))
+        XCTAssertFalse(recipe.isDefault)
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual((json["look"] as? [String: Any])?["id"] as? String, "film")
+        XCTAssertEqual((json["geometry"] as? [String: Any])?["quarterTurns"] as? Int, 1)
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: data)
+        XCTAssertEqual(decoded, recipe)
+    }
+
+    func testNonFiniteGeometryIsNotFinite() {
+        var recipe = EditRecipe()
+        recipe.geometry.straightenDegrees = .infinity
+        XCTAssertFalse(recipe.allValuesFinite)
+        recipe.geometry.straightenDegrees = 0
+        recipe.detail.vignette = .nan
+        XCTAssertFalse(recipe.allValuesFinite)
+    }
+
+    func testPresetValuesCarryDetail() throws {
+        let values = PresetValues(detail: DetailAdjustments(vignette: 0.3))
+        let decoded = try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values))
+        XCTAssertEqual(decoded.detail.vignette, 0.3)
+        let legacy = #"{"color":{},"portrait":{}}"#
+        XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: Data(legacy.utf8)).detail, DetailAdjustments())
+    }
 }
