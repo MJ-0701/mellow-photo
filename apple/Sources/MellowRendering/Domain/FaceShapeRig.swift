@@ -3,6 +3,7 @@ import MellowShared
 
 /// 얼굴형 슬라이더 10개를 이동 원소로 바꾼다. 좌표·길이는 extent 픽셀, 원소 위치는 FaceFrame 얼굴 좌표로 고른다.
 /// 값은 여기서 AdjustmentRange로 자른다. 프리셋·일괄 적용 값은 편집 규칙의 클램프를 거치지 않기 때문이다.
+/// 유한하지 않은 값은 0으로 본다. 클램프는 NaN을 아래 끝으로 보내 최대 음수 효과를 걸기 때문이다.
 /// push 항목의 이동 = 값 × 항목 최대 × 얼굴 폭 × yaw 약화, scale 항목의 배율 = 값 × 항목 최대 배율 × yaw 약화.
 enum FaceShapeRig {
     /// 얼굴 중심선 한쪽의 윤곽점.
@@ -65,7 +66,8 @@ enum FaceShapeRig {
         guard attenuation > negligibleAttenuation else { return [] }
         var result: [ShapePrimitive] = []
         for key in FaceShapeKey.allCases {
-            let value = AdjustmentRange.clamped(adjustments[key], to: AdjustmentRange.faceShape(key))
+            let raw = adjustments[key]
+            let value = AdjustmentRange.clamped(raw.isFinite ? raw : 0, to: AdjustmentRange.faceShape(key))
             guard value != 0 else { continue }
             let amount = CGFloat(value * tuning.faceShapeMaxShift(key) * attenuation)
             result += primitives(for: key, amount: amount, frame: frame)
@@ -108,10 +110,12 @@ enum FaceShapeRig {
     }
 
     /// 입 아래 윤곽점을 안쪽·위(음수, V라인)나 바깥·아래로 민다. 턱 끝 가까운 점은 뺀다.
+    /// 좌우와 턱 끝은 두 눈 중점 기준이다. 돌린 얼굴은 턱 끝이 상자 중심에서 벗어나기 때문이다.
     private static func jaw(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
         let radius = contourRadius * frame.faceWidth
         let exclusion = jawCenterExclusion * frame.faceWidth
-        let sides = contourSides(frame) { $0.y < frame.mouthLevel && abs($0.x) >= exclusion }
+        let middle = eyeMidline(frame)
+        let sides = contourSides(frame, midline: middle) { $0.y < frame.mouthLevel && abs($0.x - middle) >= exclusion }
         return sides.flatMap { group in
             group.points.map { point in
                 let count = CGFloat(group.points.count)
@@ -135,10 +139,11 @@ enum FaceShapeRig {
         separatedEyes(frame).map { .scale(center: $0.center, factor: factor, radius: $0.width * eyeScaleRadius) }
     }
 
-    /// 각 눈을 중심선에서 멀어지게(양수) 하거나 가깝게 민다.
+    /// 각 눈을 두 눈 중점에서 멀어지게(양수) 하거나 가깝게 민다. 돌린 얼굴도 두 눈이 서로 반대로 움직인다.
     private static func eyeDistance(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
-        separatedEyes(frame).compactMap { eye in
-            let side = side(of: frame.local(eye.center).x)
+        let middle = eyeMidline(frame)
+        return separatedEyes(frame).compactMap { eye in
+            let side = side(of: frame.local(eye.center).x - middle)
             guard side != 0 else { return nil }
             return .push(
                 center: eye.center, vector: frame.vector(u: side * shift, v: 0), radius: eye.width * eyeShiftRadius)
@@ -196,16 +201,24 @@ enum FaceShapeRig {
         return [.push(center: chin, vector: frame.vector(u: 0, v: -shift), radius: chinRadius * frame.faceWidth)]
     }
 
-    /// 중심선 왼쪽·오른쪽 윤곽점 중 얼굴 좌표 조건에 맞는 점. 중심선 위의 점은 빠진다.
-    private static func contourSides(_ frame: FaceFrame, where include: (CGPoint) -> Bool) -> [ContourSide] {
+    /// 중심선(얼굴 좌표 u = midline) 왼쪽·오른쪽 윤곽점 중 얼굴 좌표 조건에 맞는 점. 중심선 위의 점은 빠진다.
+    private static func contourSides(
+        _ frame: FaceFrame, midline: CGFloat = 0, where include: (CGPoint) -> Bool
+    ) -> [ContourSide] {
         [CGFloat(-1), 1].map { side in
             ContourSide(
                 side: side,
                 points: frame.contour.filter { point in
                     let local = frame.local(point)
-                    return local.x * side > 0 && include(local)
+                    return (local.x - midline) * side > 0 && include(local)
                 })
         }
+    }
+
+    /// 두 눈 중점의 얼굴 좌표 u(국소 중심선). 눈이 둘이 아니면 상자 중심(0).
+    private static func eyeMidline(_ frame: FaceFrame) -> CGFloat {
+        guard frame.eyes.count == eyeCount else { return 0 }
+        return frame.eyes.map { frame.local($0.center).x }.reduce(0, +) / CGFloat(eyeCount)
     }
 
     /// 서로 떨어진 두 눈. 눈이 둘이 아니거나 두 중심이 너무 가까우면 빈 배열.

@@ -351,4 +351,48 @@ final class FaceShapeRigTests: XCTestCase {
         XCTAssertEqual(chin.vector.dy, -14, accuracy: 1e-9)
         XCTAssertEqual(chin.radius, 70, accuracy: 1e-9)
     }
+
+    /// 얼굴을 옆으로 돌린 듯 특징점만 dx 픽셀 옮긴다. 상자는 그대로라 두 눈 중점이 상자 중심에서 벗어난다.
+    private func turned(by dx: CGFloat) -> FaceGeometry {
+        let face = SyntheticFace.make().face
+        let shift = Double(dx) / Double(SyntheticFace.size)
+        let moved = face.landmarks.mapValues { points in points.map { NormalizedPoint(x: $0.x + shift, y: $0.y) } }
+        return FaceGeometry(boundingBox: face.boundingBox, landmarks: moved)
+    }
+
+    func testNonFiniteValuesAreTreatedAsZero() {
+        for value in [Double.nan, .infinity, -.infinity] {
+            XCTAssertTrue(primitives(FaceShapeAdjustments(width: value)).isEmpty, "\(value)는 원소를 만들지 않는다")
+            var mixed = FaceShapeAdjustments(eyeSize: 0.5)
+            mixed.jaw = value
+            XCTAssertEqual(primitives(mixed), primitives(FaceShapeAdjustments(eyeSize: 0.5)), "다른 항목은 그대로")
+        }
+    }
+
+    func testTurnedFacePushesEyesApartAboutTheirMidpoint() throws {
+        // 두 눈(260, 372)이 모두 상자 중심(256) 오른쪽에 있다.
+        let list = pushes(primitives(FaceShapeAdjustments(eyeDistance: 1), face: turned(by: 60)))
+        XCTAssertEqual(list.count, 2)
+        let left = try XCTUnwrap(list.min { $0.center.x < $1.center.x })
+        let right = try XCTUnwrap(list.max { $0.center.x < $1.center.x })
+        XCTAssertLessThan(left.vector.dx, 0, "왼쪽 눈은 −x")
+        XCTAssertGreaterThan(right.vector.dx, 0, "오른쪽 눈은 +x")
+        XCTAssertEqual(left.vector.dx + right.vector.dx, 0, accuracy: 1e-9, "두 눈 중점에 대해 대칭")
+    }
+
+    func testTurnedFaceJawIsSymmetricAboutEyeMidpoint() {
+        let shift: CGFloat = 40
+        let middle = midline + shift
+        let list = pushes(primitives(FaceShapeAdjustments(jaw: -1), face: turned(by: shift)))
+        XCTAssertEqual(list.count, 10, "턱 끝은 두 눈 중점 기준으로 뺀다")
+        for push in list {
+            XCTAssertGreaterThanOrEqual(abs(push.center.x - middle), faceWidth * 0.1, "턱 끝 가까운 점 제외")
+            XCTAssertEqual(push.vector.dx > 0, push.center.x < middle, "두 눈 중점 쪽으로")
+            let hasMirror = list.contains { other in
+                abs(other.center.x - (2 * middle - push.center.x)) < 1e-6 && abs(other.center.y - push.center.y) < 1e-6
+                    && abs(other.vector.dx + push.vector.dx) < 1e-9
+            }
+            XCTAssertTrue(hasMirror, "\(push.center)의 거울 원소가 없다")
+        }
+    }
 }

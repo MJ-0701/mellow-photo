@@ -139,4 +139,72 @@ final class DisplacementWarpTests: XCTestCase {
         XCTAssertNotEqual(after.rgba(CGPoint(x: 6, y: 40)), before.rgba(CGPoint(x: 6, y: 40)), "가장자리 근처가 움직인다")
         XCTAssertEqual(after.rgba(CGPoint(x: 100, y: 40)), before.rgba(CGPoint(x: 100, y: 40)), "반지름 밖은 그대로")
     }
+
+    func testInfluenceBoundsCoverEachPrimitiveInsideExtent() {
+        // 반지름 20 + 최대 이동 6 + ROI 여백 2 = 28.
+        let push = ShapePrimitive.push(center: center, vector: CGVector(dx: 6, dy: 0), radius: 20)
+        XCTAssertEqual(
+            DisplacementWarp.influenceBounds([push], extent: extent), CGRect(x: 36, y: 36, width: 56, height: 56))
+        // 반지름 10 + 이동 0.1 × 10 + 2 = 13, 왼쪽 아래 모서리에서 잘린다.
+        let corner = ShapePrimitive.scale(center: CGPoint(x: 2, y: 2), factor: 0.1, radius: 10)
+        XCTAssertEqual(
+            DisplacementWarp.influenceBounds([corner], extent: extent), CGRect(x: 0, y: 0, width: 15, height: 15))
+        XCTAssertEqual(
+            DisplacementWarp.influenceBounds([push, corner], extent: extent), CGRect(x: 0, y: 0, width: 92, height: 92))
+        let band = ShapePrimitive.band(yStart: 96, yEnd: 32, stretch: 0.08)
+        XCTAssertEqual(DisplacementWarp.influenceBounds([band], extent: extent), extent, "띠는 그 너머 전체를 옮긴다")
+    }
+
+    /// 두 얼굴의 원소 경계 안만 변형한 결과가 전체 extent 변형과 같고, 경계 밖은 입력 바이트 그대로다.
+    func testPatchWarpMatchesFullExtentWarp() throws {
+        let faceExtent = SyntheticFace.extent
+        let base = SyntheticFace.make().face
+        let faces = [
+            base.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25)),
+            base.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25)),
+        ]
+        let adjustments = FaceShapeAdjustments(width: -1, eyeSize: 1, chinLength: 1)
+        let primitives = faces.flatMap {
+            FaceShapeRig.primitives(face: $0, adjustments: adjustments, extent: faceExtent, tuning: RenderTuning())
+        }
+        let patch = DisplacementWarp.influenceBounds(primitives.map { $0.limited(to: limit) }, extent: faceExtent)
+        XCTAssertFalse(patch.isEmpty)
+        XCTAssertLessThan(patch.width * patch.height, faceExtent.width * faceExtent.height, "경계가 extent보다 작아야 의미가 있다")
+        // 사진처럼 비트맵에서 읽은 입력을 쓴다. 절차 생성 입력은 중간 버퍼 정밀도에 따라 1 LSB씩 달라져 통과 여부를 가릴 수 없다.
+        let texture = Support.skinTexture(size: SyntheticFace.size)
+        let translucent = texture.applyingFilter(
+            "CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.5)])
+        let inputs = try [texture, translucent].map { CIImage(cgImage: try Support.renderer.makeCGImage($0)) }
+        for input in inputs {
+            let patched = try Support.grid(
+                DisplacementWarp.shared.apply(primitives, to: input, extent: faceExtent, limit: limit))
+            let full = try Support.grid(
+                DisplacementWarp.shared.apply(
+                    primitives, to: input, extent: faceExtent, limit: limit, region: faceExtent))
+            let original = try Support.grid(input)
+            var worstInside = 0
+            var worstOutside = 0
+            var changedInside = 0
+            var changedOutside = 0
+            for y in 0..<SyntheticFace.size {
+                for x in 0..<SyntheticFace.size {
+                    let point = CGPoint(x: x, y: y)
+                    let pixel = patched.rgba(point)
+                    let difference = zip(pixel, full.rgba(point)).map { abs(Int($0) - Int($1)) }.max() ?? 0
+                    let changed = pixel == original.rgba(point) ? 0 : 1
+                    if patch.contains(CGPoint(x: Double(x) + 0.5, y: Double(y) + 0.5)) {
+                        worstInside = max(worstInside, difference)
+                        changedInside += changed
+                    } else {
+                        worstOutside = max(worstOutside, difference)
+                        changedOutside += changed
+                    }
+                }
+            }
+            XCTAssertLessThanOrEqual(worstInside, 1, "경계 안은 전체 변형과 ±1 LSB 안")
+            XCTAssertGreaterThan(changedInside, 0, "경계 안은 실제로 변형된다")
+            XCTAssertEqual(changedOutside, 0, "경계 밖은 입력 바이트 그대로")
+            XCTAssertLessThanOrEqual(worstOutside, 1, "경계 밖도 전체 변형과 ±1 LSB 안")
+        }
+    }
 }
