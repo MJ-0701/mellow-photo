@@ -52,14 +52,16 @@ enum BodyShapeRig {
     /// 위팔·허벅지는 항목 이동 그대로, 아래팔은 75%(아래팔이 가늘어 같은 이동이면 더 많이 줄어든다).
     private static let fullShift: CGFloat = 1
     private static let forearmShiftRatio: CGFloat = 0.75
-    /// push 기본 반지름. 어깨 폭 비율. 모두 기본 이동(≤ 0.06)의 4배 이상이다.
+    /// push 기본 반지름. 어깨 폭 비율. 몸통·팔다리는 기본 이동(≤ 0.06)의 3배 이상이다.
     private static let torsoRadius: CGFloat = 0.3
     private static let armRadius: CGFloat = 0.2
     private static let thighRadius: CGFloat = 0.3
     private static let shoulderRadius: CGFloat = 0.3
-    private static let neckRadius: CGFloat = 0.3
-    /// 목 push 중심. 목 관절(목 아래끝)에서 몸통 위쪽으로 어깨 폭 비율. 목~턱 사이 위쪽이다.
-    private static let neckRise: CGFloat = 0.2
+    /// 목 push 반지름. 중심에서 이만큼 위(목 관절 위 0.25W)에서 0이 되어 턱 끝(0.25~0.3W 위)과 입에 닿지 않는다.
+    /// 목 기본 이동(0.03)의 5배라 이동 / shapeDisplacementLimit(0.12)보다 크다.
+    private static let neckRadius: CGFloat = 0.15
+    /// 목 push 중심. 목 관절(목 아래끝)에서 몸통 위쪽으로 어깨 폭 비율. 목 관절과 턱 사이 가운데쯤이다.
+    private static let neckRise: CGFloat = 0.1
     /// 엉덩이가 발목보다 이만큼(어깨 폭 비율) 위에 있어야 다리 띠를 만든다. 누운 사람·거꾸로 된 사진은 건너뛴다.
     private static let minimumLegSpan: CGFloat = 0.5
     /// 이보다 짧은 팔다리 선분(픽셀)은 방향을 정할 수 없어 건너뛴다.
@@ -175,7 +177,7 @@ enum BodyShapeRig {
         }
     }
 
-    /// 목 관절에서 위로 어깨 폭 × 0.2 점(목~턱 사이 위쪽)을 몸통 위쪽(양수, 목이 길어짐)이나 아래로 민다.
+    /// 목 관절에서 위로 어깨 폭 × 0.1 점을 몸통 위쪽(양수, 목이 길어짐)이나 아래로 민다. 턱 아래에서 0이 된다.
     private static func neck(_ rig: Builder, shift: CGFloat) -> [ShapePrimitive] {
         guard let neck = rig.skeleton.point(.neck) else { return [] }
         let center = offset(neck, rig.skeleton.up, neckRise * rig.width)

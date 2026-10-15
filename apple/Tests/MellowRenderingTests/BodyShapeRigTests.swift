@@ -109,9 +109,30 @@ final class BodyShapeRigTests: XCTestCase {
         let longer = try XCTUnwrap(pushes(primitives(BodyShapeAdjustments(neck: 1))).first)
         XCTAssertEqual(longer.vector.dy, 0.03 * torsoWidth, accuracy: 1e-6, "목은 위로")
         XCTAssertEqual(longer.vector.dx, 0, accuracy: 1e-9)
-        XCTAssertEqual(longer.center.y, 0.82 * 512 + 0.2 * torsoWidth, accuracy: 1e-6, "목 관절 위 목~턱 사이")
+        XCTAssertEqual(longer.center.y, 0.82 * 512 + 0.1 * torsoWidth, accuracy: 1e-6, "목 관절과 턱 사이")
         let shorter = try XCTUnwrap(pushes(primitives(BodyShapeAdjustments(neck: -1))).first)
         XCTAssertLessThan(shorter.vector.dy, 0, "음수는 아래로")
+    }
+
+    func testNeckPushStaysBelowTheChin() throws {
+        /// 턱 끝은 목 관절에서 어깨 폭의 약 0.25~0.3 위다.
+        let chinRise: CGFloat = 0.28
+        let limit = tuning.shapeDisplacementLimit
+        let skeleton = try XCTUnwrap(
+            BodySkeleton(body: Support.standingBody(in: Support.standingBox), extent: extent, tuning: tuning))
+        let neckJoint = try XCTUnwrap(skeleton.point(.neck))
+        let chin = CGPoint(x: neckJoint.x, y: neckJoint.y + chinRise * torsoWidth)
+        let midway = BodySkeleton.midpoint(neckJoint, chin)
+        let maxShift = CGFloat(tuning.bodyNeckMaxShift) * torsoWidth
+        for sign in [CGFloat(-1), 1] {
+            let result = primitives(BodyShapeAdjustments(neck: Double(sign)))
+            let atChin = DisplacementWarp.displacement(at: chin, of: result, limit: limit)
+            let chinShift = hypot(atChin.dx, atChin.dy)
+            XCTAssertLessThan(chinShift, 0.1 * maxShift, "턱·입은 끌려가지 않는다(턱 이동 \(chinShift)px)")
+            let atMidway = DisplacementWarp.displacement(at: midway, of: result, limit: limit)
+            XCTAssertGreaterThan(atMidway.dy * sign, 0.5 * maxShift, "목 가운데는 값 방향으로 움직인다")
+            XCTAssertEqual(atMidway.dx, 0, accuracy: 1e-9)
+        }
     }
 
     func testLegLengthMakesOneBandFromHipsToAnkles() throws {

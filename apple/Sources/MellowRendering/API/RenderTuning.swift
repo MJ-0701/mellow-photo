@@ -143,7 +143,7 @@ public struct RenderTuning: Sendable {
     public var bodyThighMaxShift: Double = 0.035
     /// 어깨. 각 어깨 관절을 어깨 폭의 4%(약 1.6cm)라 어깨 폭이 ±8% 바뀐다.
     public var bodyShoulderMaxShift: Double = 0.04
-    /// 목. 목~턱 사이 위쪽을 어깨 폭의 3%(약 1.2cm) 올리거나 내린다.
+    /// 목. 목 관절과 턱 사이를 어깨 폭의 3%(약 1.2cm) 올리거나 내린다. 턱·입은 움직이지 않는다.
     public var bodyNeckMaxShift: Double = 0.03
     /// 다리 길게 1의 띠 늘림 비율(스펙 0.08). 골반~발목이 8% 길어지고 발 아래는 그만큼 사진 밖으로 밀린다.
     public var legLengthMaxStretch: Double = 0.08
