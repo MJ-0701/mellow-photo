@@ -117,6 +117,29 @@ enum RenderingTestSupport {
         return CIImage(color: .white).cropped(to: person).composited(over: CIImage(color: .black)).cropped(to: extent)
     }
 
+    /// 체형 테스트의 기본 사람 자리. 512 정사각형에서 어깨 폭 204.8px, 엉덩이 y 256, 발목 y 25.6.
+    static let standingBox = NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1)
+
+    /// 정면으로 선 사람의 관절점(box 비율). Vision처럼 찍힌 사람 기준 이름이라 leftShoulder가 화면 오른쪽이다.
+    /// 모든 관절의 신뢰도는 confidence이고 omitting의 관절은 뺀다.
+    static func standingBody(
+        in box: NormalizedRect, confidence: Double = 1, omitting: Set<BodyJoint> = []
+    ) -> BodyGeometry {
+        let layout: [BodyJoint: (x: Double, y: Double)] = [
+            .neck: (0.5, 0.82), .rightShoulder: (0.25, 0.8), .leftShoulder: (0.75, 0.8),
+            .rightElbow: (0.18, 0.62), .leftElbow: (0.82, 0.62), .rightWrist: (0.15, 0.45), .leftWrist: (0.85, 0.45),
+            .rightHip: (0.38, 0.5), .leftHip: (0.62, 0.5), .rightKnee: (0.39, 0.27), .leftKnee: (0.61, 0.27),
+            .rightAnkle: (0.4, 0.05), .leftAnkle: (0.6, 0.05), .root: (0.5, 0.5),
+        ]
+        var joints: [BodyJoint: NormalizedPoint] = [:]
+        var confidences: [BodyJoint: Double] = [:]
+        for (joint, spot) in layout where !omitting.contains(joint) {
+            joints[joint] = NormalizedPoint(x: box.minX + box.width * spot.x, y: box.minY + box.height * spot.y)
+            confidences[joint] = confidence
+        }
+        return BodyGeometry(joints: joints, confidence: confidences)
+    }
+
     /// 변형 테스트의 점 표식 반지름(픽셀).
     static let markerRadius: CGFloat = 3
     /// 이 빨강 값보다 어두운 픽셀을 표식으로 본다. 바탕(0.9 회색)은 sRGB 바이트로 약 230이다.
@@ -495,5 +518,19 @@ extension FaceGeometry {
             x: boundingBox.x * scale + offset.x, y: boundingBox.y * scale + offset.y,
             width: boundingBox.width * scale, height: boundingBox.height * scale)
         return FaceGeometry(boundingBox: box, landmarks: landmarks.mapValues { $0.map(move) }, roll: roll, yaw: yaw)
+    }
+}
+
+extension BodyGeometry {
+    /// pivot 둘레로 반시계 angle(라디안) 돌린 관절점. 정사각형 extent에서만 픽셀 회전과 같다. 상자는 그대로 둔다.
+    func rotated(by angle: Double, about pivot: NormalizedPoint) -> BodyGeometry {
+        var copy = self
+        for (joint, point) in joints {
+            let x = point.x - pivot.x
+            let y = point.y - pivot.y
+            copy.joints[joint] = NormalizedPoint(
+                x: pivot.x + x * cos(angle) - y * sin(angle), y: pivot.y + x * sin(angle) + y * cos(angle))
+        }
+        return copy
     }
 }

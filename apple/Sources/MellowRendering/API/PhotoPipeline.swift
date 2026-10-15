@@ -12,10 +12,15 @@ public struct PreparedPhoto: Sendable {
     public let hasPerson: Bool
     /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public let personAnalysisFailure: MellowError?
+    /// 가장 큰 사람의 두 어깨가 보이면 true. 체형 도구의 "전신 없음" 안내에 쓴다.
+    public let hasBody: Bool
+    /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+    public let bodyAnalysisFailure: MellowError?
 
     public init(
         pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
-        hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil
+        hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil, hasBody: Bool = false,
+        bodyAnalysisFailure: MellowError? = nil
     ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
@@ -23,6 +28,8 @@ public struct PreparedPhoto: Sendable {
         self.faceAnalysisFailure = faceAnalysisFailure
         self.hasPerson = hasPerson
         self.personAnalysisFailure = personAnalysisFailure
+        self.hasBody = hasBody
+        self.bodyAnalysisFailure = bodyAnalysisFailure
     }
 }
 
@@ -43,19 +50,21 @@ public actor PhotoPipeline {
     private let pipeline = RenderPipeline.standard
     private let analyzer: any FaceAnalyzer
     private let personAnalyzer: (any PersonAnalyzer)?
+    private let bodyAnalyzer: (any BodyAnalyzer)?
     private let tuning: RenderTuning
     private let lookCatalog: LookCatalog
     /// 미리보기 이미지가 LRU로 밀려나도 일부러 남긴다. renderOriginal이 얼굴 좌표를 써야 한다.
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
-    /// personAnalyzer가 nil이면 인물 분석을 하지 않는다(사람 없음과 같다). 앱은 VisionPersonAnalyzer를 넘긴다.
+    /// personAnalyzer·bodyAnalyzer가 nil이면 그 분석을 하지 않는다(사람 없음과 같다). 앱은 Vision 구현을 넘긴다.
     public init(
-        analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil, tuning: RenderTuning,
-        lookCatalog: LookCatalog = .empty
+        analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil,
+        bodyAnalyzer: (any BodyAnalyzer)? = nil, tuning: RenderTuning, lookCatalog: LookCatalog = .empty
     ) {
         self.analyzer = analyzer
         self.personAnalyzer = personAnalyzer
+        self.bodyAnalyzer = bodyAnalyzer
         self.tuning = tuning
         self.lookCatalog = lookCatalog
         cache = PreviewCache(capacity: tuning.previewCacheCapacity)
@@ -87,16 +96,21 @@ public actor PhotoPipeline {
             failure = .faceAnalysisUnavailable(reason: error.localizedDescription)
         }
         let person = analyzePerson(in: preview)
+        let body = analyzeBodies(in: preview)
         let analysis = PhotoAnalysis(
             faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces),
-            personMask: person.mask, personAnalysisFailure: person.failure)
+            personMask: person.mask, personAnalysisFailure: person.failure, bodies: body.bodies,
+            bodyAnalysisFailure: body.failure)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
         entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
         releaseMasksOfEvictedPreviews()
+        // 렌더(BodyShapeRig)와 같은 판정이라 앱 안내와 실제 동작이 어긋나지 않는다.
+        let usable = body.bodies.first.flatMap { BodySkeleton(body: $0, extent: preview.extent, tuning: tuning) }
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
-            hasPerson: person.mask != nil, personAnalysisFailure: person.failure)
+            hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable != nil,
+            bodyAnalysisFailure: body.failure)
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.
@@ -175,6 +189,18 @@ public actor PhotoPipeline {
             return (nil, error)
         } catch {
             return (nil, .personAnalysisUnavailable(reason: error.localizedDescription))
+        }
+    }
+
+    /// 체형 분석이 실패해도 사진 준비는 막지 않는다. 체형 원소만 빠진다(스펙 1.4).
+    private func analyzeBodies(in image: CIImage) -> (bodies: [BodyGeometry], failure: MellowError?) {
+        guard let bodyAnalyzer else { return ([], nil) }
+        do {
+            return (try bodyAnalyzer.analyze(image), nil)
+        } catch let error as MellowError {
+            return ([], error)
+        } catch {
+            return ([], .bodyAnalysisUnavailable(reason: error.localizedDescription))
         }
     }
 

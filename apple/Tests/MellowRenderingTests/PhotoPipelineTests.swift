@@ -14,6 +14,11 @@ struct StubPersonAnalyzer: PersonAnalyzer {
     func personMask(_ image: CIImage) throws -> CIImage? { try result.get() }
 }
 
+struct StubBodyAnalyzer: BodyAnalyzer {
+    var result: Result<[BodyGeometry], MellowError>
+    func analyze(_ image: CIImage) throws -> [BodyGeometry] { try result.get() }
+}
+
 final class PhotoPipelineTests: XCTestCase {
     typealias Support = RenderingTestSupport
 
@@ -310,6 +315,62 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(prepared.personAnalysisFailure)
         let analysis = await pipeline.preparedAnalysis(id)
         XCTAssertNil(analysis?.personMask)
+    }
+
+    func testPrepareStoresBodiesAndReportsUsableBody() async throws {
+        let url = try writeSolidPNG()
+        let large = Support.standingBody(in: Support.standingBox)
+        let small = Support.standingBody(in: NormalizedRect(x: 0.7, y: 0.5, width: 0.2, height: 0.3))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([large, small])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertTrue(prepared.hasBody)
+        XCTAssertNil(prepared.bodyAnalysisFailure)
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertEqual(analysis?.bodies, [large, small], "분석기가 준 순서 그대로 보관한다")
+    }
+
+    func testBodyWithoutBothShouldersIsNotUsable() async throws {
+        let url = try writeSolidPNG()
+        let body = Support.standingBody(in: Support.standingBox, omitting: [.leftShoulder])
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([body])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertFalse(prepared.hasBody, "체형 이동량의 기준인 어깨 폭이 없다")
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertEqual(analysis?.bodies.count, 1, "관절은 그대로 보관한다")
+    }
+
+    func testBodyAnalysisFailureIsReportedNotThrown() async throws {
+        let url = try writeSolidPNG()
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let mask = Support.personMask(
+            size: CGSize(width: 64, height: 48), person: CGRect(x: 16, y: 8, width: 32, height: 32))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(mask)),
+            bodyAnalyzer: StubBodyAnalyzer(result: .failure(.bodyAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        let prepared = try await pipeline.prepare(PhotoID(), at: url)
+        XCTAssertFalse(prepared.hasBody)
+        XCTAssertEqual(prepared.bodyAnalysisFailure, .bodyAnalysisUnavailable(reason: "test"))
+        XCTAssertEqual(prepared.faces, [face], "체형 분석 실패가 얼굴 분석에 영향을 주지 않는다")
+        XCTAssertTrue(prepared.hasPerson, "인물 분석에도 영향을 주지 않는다")
+    }
+
+    func testWithoutBodyAnalyzerThereIsNoBody() async throws {
+        let url = try writeSolidPNG()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertFalse(prepared.hasBody)
+        XCTAssertNil(prepared.bodyAnalysisFailure)
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertEqual(analysis?.bodies, [])
     }
 
     func testPersonAnalysisFailureSkipsOnlyBackgroundBlur() async throws {

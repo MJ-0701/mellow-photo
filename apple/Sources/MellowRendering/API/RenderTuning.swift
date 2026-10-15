@@ -129,6 +129,8 @@ public struct RenderTuning: Sendable {
     public var backgroundBlurMaxFraction: Double = 0.02
     /// 인물 마스크를 키운 뒤 흐리는 반지름. 짧은 변 비율. 512×384 마스크 한 칸(1600px 미리보기에서 약 3px)의 두 배를 넘겨 계단을 덮는다.
     public var backgroundMaskFeather: Double = 0.006
+    /// 관절 신뢰도가 이보다 낮으면 없는 것으로 본다(스펙 5).
+    public var bodyJointMinConfidence: Double = 0.3
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
