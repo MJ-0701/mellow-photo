@@ -73,7 +73,7 @@ Mac 앱은 App Sandbox(사용자가 고른 파일 읽기·쓰기)에서 실행�
 
 ## 검증 상태
 
-2026-10-15 로컬 기준(`./scripts/test-apple.sh`, 브랜치 `beauty-b-to-f`): 패키지 `swift test` 173개(MellowShared 37 · MellowRendering 82 · MellowLibrary 30 · MellowExport 4 · MellowEditing 20), 앱 테스트 iPhone 시뮬레이터 50개 · iPad 시뮬레이터 50개 · Mac 51개 통과. 이번 실행에서 스크립트는 Mac 단계 직전에 셸 오류로 멈춰 종료 코드 1이었고, Mac 51개는 같은 xcodebuild 명령을 따로 실행한 결과입니다(자세한 내용은 VALIDATION.md의 B 절). 화면을 직접 보는 확인은 [VALIDATION.md](../VALIDATION.md)의 미검증 목록에 있습니다. CI(`.github/workflows/apple-checks.yml`)는 PR과 main push에서 `scripts/test-apple.sh`와 서명 없는 iPhone·Mac Release 빌드를 실행합니다.
+2026-10-15 로컬 기준(`./scripts/test-apple.sh`, 브랜치 `beauty-b-to-f` 커밋 `42a1cd9`, 종료 코드 0): 패키지 `swift test` 175개(MellowShared 37 · MellowRendering 84 · MellowLibrary 30 · MellowExport 4 · MellowEditing 20), 앱 테스트 iPhone 시뮬레이터 50개 · iPad 시뮬레이터 50개 · Mac 51개 통과. 이전 커밋 `70be778`의 실행은 macOS bash 3.2의 빈 배열 오류로 Mac 단계 직전에 멈춰 종료 코드 1이었고, 커밋 `b06c7da`에서 고쳤습니다(자세한 내용은 VALIDATION.md의 B 절). 화면을 직접 보는 확인은 [VALIDATION.md](../VALIDATION.md)의 미검증 목록에 있습니다. CI(`.github/workflows/apple-checks.yml`)는 PR과 main push에서 `scripts/test-apple.sh`와 서명 없는 iPhone·Mac Release 빌드를 실행합니다.
 
 기기에서 반드시 확인할 항목: 도구 줄 스크롤, 필터 칩 썸네일과 룩 10종의 실제 사진 결과, 자르기 손잡이 드래그(확대 상태 포함), 최초 권한 허용/거절, HEIC 및 방향 회전, iCloud 사진 가져오기, 얼굴 0/1/여러 명, 잡티·변형 후 실행 취소, 재실행 복원(출시본 v1 기록 포함), 전체 사진 저장, 48MP 메모리, 작은 화면과 큰 글자, 백그라운드 전환, 피부 보정·자동 잡티의 실제 사진 결과(주근깨, 머리카락 경계), Mac의 이전 폴더 이전과 프리셋 가져오기.
 

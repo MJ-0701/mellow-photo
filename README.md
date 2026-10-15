@@ -78,9 +78,9 @@ Xcode에서는 `apple/MellowPhoto.xcodeproj`를 열고 **MellowPhoto** 스킴을
 
 이번 구조 정리(A) 다음 로드맵:
 
-- **B 피부**: 피부 보정 고도화 (레시피 키 `portrait.skin`) — 완료
-- **C 얼굴 리셰이프**: 얼굴 랜드마크 전체를 쓰는 형태 조정 (`reshape`)
-- **D 디테일·배경**: 디테일과 배경 보정 (`detail`)
+- **B 피부**: 피부 보정 고도화 (레시피 키 `portrait.skin`) — 구현됨, 실제 인물 사진 확인은 사용자 조치로 남음
+- **C 얼굴 리셰이프**: 얼굴 랜드마크 전체를 쓰는 형태 조정 (`portrait.face`)
+- **D 눈·치아·입술·배경**: 눈·치아·입술 보정과 배경 흐림 (`portrait.features`, `background`)
 - **E 체형**: 체형 보정 (`body`)
 - **F 메이크업**: 메이크업 효과 (`makeup`)
 

@@ -146,18 +146,17 @@
 
 ## 인물 보정 B 피부 (2026-10-15)
 
-2026-10-15, 브랜치 `beauty-b-to-f` 커밋 `70be778` 기준(이 절을 쓴 문서 커밋 직전). Apple Silicon / macOS 26.6.2 / Xcode 27.0 / iOS 27.0 시뮬레이터. 이 절의 검증은 모두 자동 테스트와 빌드이며, 앱 화면을 직접 보거나 조작한 검증은 없습니다.
+2026-10-15, 브랜치 `beauty-b-to-f` 커밋 `42a1cd9` 기준(자동 잡티 복구 원본 수정 직후). Apple Silicon / macOS 26.6.2 / Xcode 27.0 / iOS 27.0 시뮬레이터. 이 절의 검증은 모두 자동 테스트와 빌드이며, 앱 화면을 직접 보거나 조작한 검증은 없습니다.
 
 ### 자동 검증
 
-- `./scripts/test-apple.sh` 종료 코드 **1**. 모듈 의존성·import 검사, `swift format lint --strict`, XcodeGen 2.46.0 재생성 후 xcodeproj 차이 없음, 패키지 테스트, iPhone·iPad 시뮬레이터 앱 테스트까지는 통과했습니다. Mac 앱 테스트 단계에 들어가자마자 스크립트가 `line 19: parallel[@]: unbound variable`로 멈췄습니다.
-- 원인: 시뮬레이터 병렬 테스트를 끄는 수정(커밋 `a167917`)이 Mac 대상에서는 빈 배열을 넘기는데, 스크립트를 실행하는 macOS 기본 bash 3.2는 `set -u`에서 빈 배열 확장을 오류로 봅니다. 스크립트는 이번 문서 작업 범위 밖이라 고치지 않았습니다. 고치기 전까지 로컬과 CI의 `test-apple.sh`는 Mac 단계에서 실패합니다.
-- Mac 앱 테스트는 스크립트와 같은 `xcodebuild … -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test` 명령을 따로 실행해 확인했습니다.
-- 패키지 `swift test` 173개 통과: MellowShared 37, MellowRendering 82, MellowLibrary 30, MellowExport 4, MellowEditing 20.
-- 앱 XCTest: iPhone 18 Pro 시뮬레이터 50개, iPad Pro 13-inch (M5) 시뮬레이터 50개(두 대상 모두 `test-apple.sh` 안에서, 병렬 테스트 끔), macOS 51개(따로 실행) 모두 통과. Mac이 하나 많은 것은 Mac 전용 폴더 저장 테스트 때문입니다.
-- `./scripts/build-apple.sh ios-device`: 서명 없는 Release iPhone/iPad arm64 빌드, Info.plist·PrivacyInfo 검사, 번들 ID·iPhoneOS·Assets.car 검사 통과.
-- `./scripts/build-apple.sh mac`: Release 빌드 arm64·x86_64 포함, 서명 검사 통과.
-- 두 빌드의 경고는 Core Image 커널 언어 API 지원 중단 경고뿐입니다. 기존 `WarpKernel.swift`(`CIWarpKernel`)와 이번에 더한 `SkinKernels.swift`(`CIColorKernel`, 커널 두 개)입니다.
+- `./scripts/test-apple.sh` 종료 코드 **0**. 모듈 의존성·import 검사, `swift format lint --strict`, XcodeGen 2.46.0 재생성 후 xcodeproj 차이 없음, 패키지 테스트, iPhone·iPad 시뮬레이터 앱 테스트(병렬 테스트 끔), Mac 앱 테스트까지 한 번에 통과했습니다.
+- 이력: 커밋 `70be778`에서의 실행은 Mac 단계 직전에 `line 19: parallel[@]: unbound variable`로 멈춰 종료 코드 1이었습니다. macOS bash 3.2가 `set -u`에서 빈 배열 확장을 오류로 본 탓이며 커밋 `b06c7da`에서 고쳤습니다.
+- 패키지 `swift test` 175개 통과: MellowShared 37, MellowRendering 84, MellowLibrary 30, MellowExport 4, MellowEditing 20.
+- 앱 XCTest(모두 `test-apple.sh` 안에서): iPhone 18 Pro 시뮬레이터 50개, iPad Pro 13-inch (M5) 시뮬레이터 50개, macOS 51개 모두 통과. Mac이 하나 많은 것은 Mac 전용 폴더 저장 테스트 때문입니다.
+- `./scripts/build-apple.sh ios-device`(커밋 `42a1cd9`): 종료 코드 0. 서명 없는 Release iPhone/iPad arm64 빌드, Info.plist·PrivacyInfo 검사, 번들 ID·iPhoneOS·Assets.car 검사 통과.
+- `./scripts/build-apple.sh mac`(커밋 `42a1cd9`): 종료 코드 0. Release 빌드 arm64·x86_64 포함, 서명 검사 통과.
+- 두 빌드의 경고는 Core Image 커널 언어 API 지원 중단 경고뿐입니다. 기존 `WarpKernel.swift`(`CIWarpKernel`)와 이번에 더한 `SkinKernels.swift`(`CIColorKernel`, 커널 두 개)입니다. iPhone 빌드 로그에는 이 경고만 낸 컴파일 단계에 xcodebuild가 붙인 "failed with exit code 0" 머리줄이 하나 있지만 빌드와 스크립트는 종료 코드 0입니다.
 
 ### 자동 테스트가 확인하는 것
 
@@ -165,6 +164,7 @@
 - 세 대역 주파수 분리: 모공 대역 분산은 ±10% 안에 남고(구현 때 측정 −5.4%), 중간(얼룩) 대역 분산은 줄어듭니다. 분리 단독은 절반 아래(구현 때 측정 0.19배), 피부 단계 전체는 0.6배 아래가 기준입니다.
 - 잡티 검출: 합성 얼굴에 심은 잡티 5개를 모두 찾고 눈 바로 옆 점은 무시합니다. 깨끗한 피부와 얼굴 없는 사진은 아무것도 찾지 않습니다. 얼굴당 상한을 지킵니다. 분석을 절반으로 축소해도 찾은 위치가 원래 자리로 돌아옵니다.
 - 자동 잡티 복구: 심은 잡티가 지워지고, 고른 얼굴의 잡티만 지워집니다. 복구 원본이 코·입술에 걸리면 반대쪽을 쓰고 입술 픽셀은 그대로입니다.
+- 자동 잡티 복구 원본은 얼굴 피부 다각형 안이어야 합니다. 가운데 쪽은 눈이고 바깥쪽은 피부 다각형 밖인 관자놀이 잡티는 건너뛰어 픽셀이 그대로입니다. 가운데 쪽 원본이 이웃 잡티 위면 반대쪽 피부를 쓰고 두 잡티 모두 지워집니다.
 - 데모 인물 사진의 실제 Vision 특징점으로 볼은 피부 마스크 안, 눈동자는 밖입니다. 데모 사진에서 찾은 잡티는 상한 안이고 눈·입술 밖입니다.
 - 얼굴 폭은 좁게·넓게 두 방향 모두 렌더됩니다.
 - 옛 키 이행: `portrait.skinSmoothing`·`faceSlim`이 새 키로 읽히고 다시 쓰이지 않습니다. 새 키가 있으면 새 키가 이깁니다. B0 세션 파일의 실행 취소 기록 안 레시피도 이행됩니다. 스키마에는 옛 키가 지원 중단 표시로 남아 있습니다.
@@ -181,7 +181,7 @@
 ### 구현 중 측정 (이번 절을 쓰면서 다시 재지 않음)
 
 - 자동 잡티 복구 비용: 4032×3024 합성 이미지, 얼굴 하나, 잡티 40개를 이 Mac 디버그 빌드에서 렌더하면 7회 중앙값 23~25 ms였습니다. 노출 필터 하나(26 ms)와 같은 수준입니다. 커밋하지 않은 임시 측정이며 시뮬레이터·실기기·48MP 원본은 재지 않았습니다.
-- 복구 원본이 코·입술·눈 제외 영역에 걸리면 반대쪽을 쓰고, 양쪽 다 걸리면 그 잡티는 건너뜁니다.
+- 복구 원본이 코·입술·눈 제외 영역에 걸리거나, 얼굴 피부 다각형 밖이거나, 그 얼굴의 다른 잡티와 겹치면 반대쪽을 쓰고, 양쪽 다 안 되면 그 잡티는 건너뜁니다(커밋 `42a1cd9`에서 피부 다각형·이웃 잡티 조건 추가). 위 비용 측정은 이 조건을 넣기 전 값입니다.
 
 ### 스펙과 다르게 한 것
 
@@ -189,7 +189,7 @@
 - 잡티 검출 범위는 얼굴 상자가 아니라 피부 마스크 범위입니다. 이마가 얼굴 상자 위로 나가서, 상자만 보면 이마 잡티를 놓쳤습니다.
 - 잡티(`BlemishSpot`)에 얼굴 번호를 담습니다. 얼굴 하나만 고른 경우 그 얼굴 잡티만 지우기 위해서입니다.
 - 옛 키 `portrait.skinSmoothing`·`faceSlim`은 레시피 스키마에 읽기 전용(지원 중단 표시)으로 남겼습니다. B0에서 저장한 파일이 스키마 검증을 통과해야 해서입니다.
-- `scripts/test-apple.sh`의 iPhone·iPad 시뮬레이터 앱 테스트는 병렬 테스트를 끄고 돕니다(커밋 `a167917`). 복제 시뮬레이터를 켰다 지우는 과정이 시뮬레이터 SpringBoard를 반복해서 죽였기 때문입니다. 이 수정이 위의 Mac 단계 실패를 만들었습니다.
+- `scripts/test-apple.sh`의 iPhone·iPad 시뮬레이터 앱 테스트는 병렬 테스트를 끄고 돕니다(커밋 `a167917`). 복제 시뮬레이터를 켰다 지우는 과정이 시뮬레이터 SpringBoard를 반복해서 죽였기 때문입니다. 이 수정이 커밋 `70be778` 실행의 Mac 단계 실패를 만들었고, 커밋 `b06c7da`에서 고쳤습니다.
 
 ### 미검증 (사용자 확인 필요)
 
