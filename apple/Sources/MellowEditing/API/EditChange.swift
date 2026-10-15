@@ -12,6 +12,8 @@ public enum EditChange: Equatable, Sendable {
     case feature(FeatureKey, Double)
     case backgroundBlur(Double)
     case bodyShape(BodyShapeKey, Double)
+    case makeupColor(MakeupPart, String?)
+    case makeupIntensity(MakeupPart, Double)
     case highlights(Double)
     case shadows(Double)
     case sharpness(Double)

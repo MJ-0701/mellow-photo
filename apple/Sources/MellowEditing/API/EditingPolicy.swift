@@ -8,6 +8,8 @@ public enum EditingPolicy {
     public static let unitRange = AdjustmentRange.unit
     /// 얼굴형·체형의 가운데 0인 양방향 범위.
     public static let bipolarRange = AdjustmentRange.bipolar
+    /// 메이크업 색을 처음 고를 때 그 부위 강도가 0이면 두는 값. 색 칩을 눌렀는데 아무것도 안 바뀌는 일을 막는다.
+    public static let makeupDefaultIntensity = 0.5
 
     /// 미소만 한 방향이다.
     public static func faceShapeRange(_ key: FaceShapeKey) -> ClosedRange<Double> {

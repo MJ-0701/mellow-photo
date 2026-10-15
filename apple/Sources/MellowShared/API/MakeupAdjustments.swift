@@ -42,7 +42,7 @@ public struct MakeupStrength: Codable, Equatable, Sendable {
     }
 }
 
-/// 메이크업 레시피. lookID는 마지막으로 적용한 룩이다. 렌더와 룩 규칙은 F 단계.
+/// 메이크업 레시피. lookID는 마지막으로 적용한 룩이고 부위 값을 바꾸면 비운다(EditDocument).
 public struct MakeupAdjustments: Codable, Equatable, Sendable {
     public var lookID: String?
     public var lip: MakeupTint
@@ -80,6 +80,36 @@ public struct MakeupAdjustments: Codable, Equatable, Sendable {
         case .eyeshadow: return eyeshadow.intensity
         case .brow: return brow.intensity
         case .contour: return contour.intensity
+        }
+    }
+
+    /// 색을 고르는 부위의 색 id. brow·contour는 늘 nil이다.
+    public func colorID(of part: MakeupPart) -> String? {
+        switch part {
+        case .lip: return lip.colorID
+        case .blush: return blush.colorID
+        case .eyeshadow: return eyeshadow.colorID
+        case .brow, .contour: return nil
+        }
+    }
+
+    /// brow·contour는 색이 없어 무시한다.
+    public mutating func setColorID(_ id: String?, of part: MakeupPart) {
+        switch part {
+        case .lip: lip.colorID = id
+        case .blush: blush.colorID = id
+        case .eyeshadow: eyeshadow.colorID = id
+        case .brow, .contour: break
+        }
+    }
+
+    public mutating func setIntensity(_ value: Double, of part: MakeupPart) {
+        switch part {
+        case .lip: lip.intensity = value
+        case .blush: blush.intensity = value
+        case .eyeshadow: eyeshadow.intensity = value
+        case .brow: brow.intensity = value
+        case .contour: contour.intensity = value
         }
     }
 

@@ -161,6 +161,62 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.undoStack.count, 1, "거절된 변경은 실행 취소 단계를 만들지 않는다")
     }
 
+    func testMakeupChangesClampDetachLookAndAreNotLocked() {
+        var document = EditDocument()
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.5, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        XCTAssertFalse(EditChange.makeupIntensity(.lip, 0.5).affectsGeometry)
+        XCTAssertFalse(EditChange.makeupColor(.lip, "lip-coral").affectsGeometry)
+        XCTAssertNil(document.set(.makeupColor(.lip, "lip-coral")), "메이크업은 수동 편집이 있어도 잠기지 않는다")
+        XCTAssertEqual(
+            document.recipe.makeup.lip,
+            MakeupTint(colorID: "lip-coral", intensity: EditingPolicy.makeupDefaultIntensity),
+            "색을 처음 고르면 기본 강도")
+        XCTAssertEqual(EditingPolicy.makeupDefaultIntensity, 0.5)
+        XCTAssertNil(document.set(.makeupIntensity(.lip, 1.7)))
+        XCTAssertEqual(document.recipe.makeup.lip.intensity, 1)
+        XCTAssertNil(document.set(.makeupIntensity(.brow, -0.3)))
+        XCTAssertEqual(document.recipe.makeup.brow.intensity, 0)
+        document.set(.makeupColor(.lip, "lip-red"))
+        XCTAssertEqual(document.recipe.makeup.lip, MakeupTint(colorID: "lip-red", intensity: 1), "강도가 있으면 색만 바꾼다")
+        let steps = document.undoStack.count
+        document.set(.makeupColor(.brow, "lip-red"))
+        XCTAssertEqual(document.undoStack.count, steps, "눈썹은 색이 없어 무시한다")
+        XCTAssertNil(document.recipe.makeup.colorID(of: .brow))
+        document.set(.makeupColor(.lip, nil))
+        XCTAssertEqual(document.recipe.makeup.lip, MakeupTint(colorID: nil, intensity: 1), "색을 빼도 강도는 남는다")
+    }
+
+    func testApplyMakeupLookIsOneUndoStepAndPartEditsDetachLook() {
+        let look = MakeupLook(
+            id: "daily", name: "데일리", lip: MakeupTint(colorID: "lip-mlbb", intensity: 0.5),
+            blush: MakeupTint(colorID: "blush-peach", intensity: 0.35),
+            eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.3), brow: MakeupStrength(intensity: 0.3),
+            contour: MakeupStrength(intensity: 0.2))
+        var document = EditDocument()
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        document.set(.makeupIntensity(.brow, 0.9))
+        let before = document.undoStack.count
+        document.applyMakeupLook(look)
+        XCTAssertEqual(document.recipe.makeup, look.adjustments, "잠긴 사진에도 룩을 적용한다")
+        XCTAssertEqual(document.recipe.makeup.lookID, "daily")
+        XCTAssertEqual(document.undoStack.count, before + 1, "룩 적용은 체크포인트 한 번")
+        document.applyMakeupLook(look)
+        XCTAssertEqual(document.undoStack.count, before + 1, "같은 룩을 다시 골라도 단계가 늘지 않는다")
+        document.set(.makeupIntensity(.blush, 0.35))
+        XCTAssertEqual(document.recipe.makeup.lookID, "daily", "값이 그대로면 룩을 유지한다")
+        document.set(.makeupIntensity(.blush, 0.6))
+        XCTAssertNil(document.recipe.makeup.lookID, "부위를 바꾸면 룩 이름을 지운다")
+        XCTAssertEqual(document.recipe.makeup.lip, look.lip, "나머지 부위는 룩 값 그대로")
+        document.undo()
+        XCTAssertEqual(document.recipe.makeup, look.adjustments)
+        document.undo()
+        XCTAssertEqual(document.recipe.makeup.brow.intensity, 0.9, "실행 취소 한 번에 룩 적용 전으로")
+        XCTAssertNil(document.recipe.makeup.lookID)
+        document.redo()
+        document.applyMakeupLook(nil)
+        XCTAssertEqual(document.recipe.makeup, MakeupAdjustments(), "없음은 메이크업을 모두 지운다")
+    }
+
     func testPresetAndBatchCarryFeaturesAndBackground() {
         let values = PresetValues(
             portrait: PortraitAdjustments(features: FeatureAdjustments(eyeBrighten: 0.3, lipVitality: 0.2)),

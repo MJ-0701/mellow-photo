@@ -60,6 +60,18 @@ public struct EditDocument: Equatable, Sendable {
             updated.background.blur = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .bodyShape(let key, let value):
             updated.body[key] = EditingPolicy.clamped(value, to: EditingPolicy.bodyShapeRange(key))
+        case .makeupColor(let part, let id):
+            updated.makeup = Self.editedMakeup(updated.makeup) { makeup in
+                guard part.hasColor else { return }
+                makeup.setColorID(id, of: part)
+                if id != nil, makeup.intensity(of: part) == 0 {
+                    makeup.setIntensity(EditingPolicy.makeupDefaultIntensity, of: part)
+                }
+            }
+        case .makeupIntensity(let part, let value):
+            updated.makeup = Self.editedMakeup(updated.makeup) { makeup in
+                makeup.setIntensity(EditingPolicy.clamped(value, to: EditingPolicy.unitRange), of: part)
+            }
         case .highlights(let value): updated.detail.highlights = value
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value
@@ -117,6 +129,15 @@ public struct EditDocument: Equatable, Sendable {
         return true
     }
 
+    /// 룩의 부위 값 다섯 개를 메이크업에 써 넣고 lookID를 기록한다(스펙 6). nil이면 메이크업을 모두 지운다(룩 "없음").
+    /// 체크포인트 한 번이다. 색만 바꾸므로 수동 편집이 있어도 잠기지 않는다. 이미 같은 값이면 아무것도 하지 않는다.
+    public mutating func applyMakeupLook(_ look: MakeupLook?) {
+        let makeup = look?.adjustments ?? MakeupAdjustments()
+        guard makeup != recipe.makeup else { return }
+        checkpoint()
+        recipe.makeup = makeup
+    }
+
     /// 슬라이더 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 둔다.
     private func merged(_ values: PresetValues, targetFace: Int?) -> EditRecipe {
         var updated = recipe
@@ -132,6 +153,18 @@ public struct EditDocument: Equatable, Sendable {
             updated.body = recipe.body
         }
         return updated
+    }
+
+    /// 부위 값이 실제로 바뀌었으면 룩 이름을 지운다(스펙 6). 같은 값이면 룩을 유지한다.
+    private static func editedMakeup(
+        _ previous: MakeupAdjustments, _ change: (inout MakeupAdjustments) -> Void
+    ) -> MakeupAdjustments {
+        var makeup = previous
+        change(&makeup)
+        if makeup != previous {
+            makeup.lookID = nil
+        }
+        return makeup
     }
 
     public mutating func appendLocalEdit(_ edit: LocalEdit) {
