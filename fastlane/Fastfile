@@ -133,6 +133,28 @@ ensure
   FileUtils.rm_rf(signing) if signing
 end
 
+TESTFLIGHT_GROUPS = ['Mellow Photo Internal', 'Mellow Photo External'].freeze
+DEFAULT_WHAT_TO_TEST = '새 기능과 수정 사항을 확인해 주세요.'.freeze
+
+# "What to Test" text comes from fastlane/release_notes/<version>.json (ko) when present.
+def what_to_test(version)
+  path = File.expand_path("release_notes/#{version}.json", __dir__)
+  return DEFAULT_WHAT_TO_TEST unless File.file?(path)
+  text = JSON.parse(File.read(path)).fetch('ko', '').strip
+  text.empty? ? DEFAULT_WHAT_TO_TEST : text
+end
+
+# Internal group gets the build at once; the external group gets it after Apple's beta review.
+def testflight_distribution(version)
+  {
+    groups: TESTFLIGHT_GROUPS,
+    distribute_external: true,
+    notify_external_testers: true,
+    changelog: what_to_test(version),
+    skip_submission: false
+  }
+end
+
 default_platform(:ios)
 platform :ios do
   desc 'Build a signed App Store IPA, upload, and optionally submit for review'
@@ -163,13 +185,24 @@ platform :ios do
     end
   end
 
-  desc 'Build a signed App Store IPA and upload it to TestFlight only, without touching any App Store version'
+  desc 'Build a signed App Store IPA, upload it to TestFlight and distribute it to both tester groups, without touching any App Store version'
   lane :beta do
-    # Internal testers receive the build through App Store Connect internal groups, so no group names are passed.
-    with_signed_ipa do |api_key, ipa, _version, _build|
+    with_signed_ipa do |api_key, ipa, version, _build|
+      # Distribution needs a processed build, so this waits for Apple's processing.
       upload_to_testflight(api_key: api_key, ipa: ipa, app_identifier: 'com.mj.mellowphoto',
-        skip_waiting_for_build_processing: true, distribute_external: false, skip_submission: true)
+        skip_waiting_for_build_processing: false, **testflight_distribution(version))
     end
+  end
+
+  desc 'Distribute an already uploaded build to both tester groups (internal now, external after beta review)'
+  lane :distribute do
+    version = required('APP_VERSION')
+    build = required('APP_BUILD')
+    UI.user_error!('Invalid version or build') unless version.match?(/\A\d+\.\d+\.\d+\z/) && build.match?(/\A\d+\.\d+\z/)
+    api_key = app_store_connect_api_key(key_id: required('ASC_KEY_ID'), issuer_id: required('ASC_ISSUER_ID'),
+      key_content: required('ASC_KEY_BASE64'), is_key_content_base64: true, in_house: false)
+    upload_to_testflight(api_key: api_key, app_identifier: 'com.mj.mellowphoto', distribute_only: true,
+      app_version: version, build_number: build, app_platform: 'ios', **testflight_distribution(version))
   end
 
   desc 'Read-only: print recent TestFlight builds and beta groups (no tester emails, no changes)'
