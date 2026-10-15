@@ -215,7 +215,8 @@ platform :ios do
       key_content: required('ASC_KEY_BASE64'), is_key_content_base64: true, in_house: false)
     app = Spaceship::ConnectAPI::App.find('com.mj.mellowphoto')
     UI.user_error!('App com.mj.mellowphoto not found') unless app
-    user = Spaceship::ConnectAPI::User.find(email: email).first
+    # App Store Connect filters users by username (the Apple ID); the email filter was removed.
+    user = Spaceship::ConnectAPI::User.all(filter: { username: email }).first
     unless user
       if Spaceship::ConnectAPI::UserInvitation.find(email: email).first
         UI.important('Invitation already sent. Run this again after the tester accepts it.')
