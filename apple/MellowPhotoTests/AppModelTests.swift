@@ -839,4 +839,57 @@ final class AppModelTests: XCTestCase {
             AppModel.bundledMakeupCatalog(in: Bundle(for: AppModelTests.self)), "파일이 없는 번들은 nil(안내 문구로 바뀐다)")
         XCTAssertEqual(AppModel.bundledMakeupCatalog()?.looks.count, 5, "앱 번들에서는 읽힌다")
     }
+
+    func testMakeupLookDuringSliderDragEndsDragFirst() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.makeup)
+        model.beginSliderEdit()
+        model.edit(.makeupIntensity(.contour, 0.7))
+        XCTAssertTrue(model.session.isPersistenceDeferred)
+        model.applyMakeupLook(id: "daily")
+        XCTAssertFalse(model.session.isPersistenceDeferred, "룩 적용 전에 열린 드래그를 끝낸다")
+        let daily = try XCTUnwrap(model.makeupCatalog.look(id: "daily"))
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments)
+        try await waitUntil { !model.isRendering }
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup.contour.intensity, 0.7, accuracy: 1e-9, "룩 적용은 자기 단계를 갖는다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "드래그도 자기 단계를 갖는다")
+    }
+
+    func testSliderDraggedToZeroWithoutBodyStaysEnabledUntilDragEnds() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let store = MemorySessionStore()
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]),
+            store: store)
+        try await importOne(model, staged)
+        model.applyPreset(
+            PresetValues(background: BackgroundAdjustments(blur: 0.4), body: BodyShapeAdjustments(waist: -0.3)))
+        model.beginSliderEdit()
+        model.edit(.bodyShape(.waist, 0))
+        XCTAssertTrue(model.canAdjustBodyShape(.waist), "드래그 중에는 0이 돼도 끄지 않아 드래그가 정상으로 끝난다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.session.isPersistenceDeferred, "드래그가 끝나면 미룬 저장도 끝난다")
+        XCTAssertFalse(model.canAdjustBodyShape(.waist), "드래그가 끝난 뒤에 끈다")
+        model.beginSliderEdit()
+        model.edit(.backgroundBlur(0))
+        XCTAssertTrue(model.canAdjustBackgroundBlur, "배경 흐림도 드래그 중에는 끄지 않는다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.session.isPersistenceDeferred)
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        let saves = store.saveCount
+        model.edit(.makeupIntensity(.lip, 0.4))
+        XCTAssertEqual(store.saveCount, saves + 1, "다음 편집은 바로 저장된다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0, "다음 편집은 자기 단계를 갖는다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0.4, accuracy: 1e-9, "흐림 드래그가 한 단계")
+        XCTAssertEqual(model.currentRecipe.body.waist, 0, "허리 드래그는 그 앞 단계")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+    }
 }

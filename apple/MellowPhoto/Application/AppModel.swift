@@ -174,13 +174,17 @@ final class AppModel {
         let lacksLandmarks = !targets.isEmpty && targets.allSatisfy { $0.landmarks.isEmpty }
         return lacksLandmarks ? .noLandmarks : .ready
     }
+    /// 슬라이더 드래그가 열려 있는지. 드래그 중에 슬라이더를 끄면 끝 이벤트가 오지 않아 연속 변경과 미룬 저장이 남는다.
+    var isSliderEditActive: Bool { session.isPersistenceDeferred }
     /// 배경 흐림 슬라이더를 움직일 수 있는지. 사람이 없어도 프리셋으로 들어온 값은 0으로 되돌릴 수 있게 켠다.
+    /// 드래그 중에는 0에 닿아도 끄지 않는다.
     var canAdjustBackgroundBlur: Bool {
-        backgroundAvailability == .ready || currentRecipe.background.blur != 0
+        isSliderEditActive || backgroundAvailability == .ready || currentRecipe.background.blur != 0
     }
     /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 드래그 중에는 0을 지나도 끄지 않는다.
     func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
-        !isGeometryLocked && (bodyAvailability == .ready || currentRecipe.body[key] != 0)
+        !isGeometryLocked && (isSliderEditActive || bodyAvailability == .ready || currentRecipe.body[key] != 0)
     }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }
