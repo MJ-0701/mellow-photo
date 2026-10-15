@@ -22,7 +22,8 @@ struct SkinStage: RenderStage {
             let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(result.extent)
             guard !bounds.isEmpty else { continue }
             let mask = try FaceRegions.skinMask(
-                face: face, image: result, extent: extent, tuning: tuning, strength: tuning.skinMaskMaxStrength)
+                face: face, image: result, extent: extent, tuning: tuning, strength: tuning.skinMaskMaxStrength,
+                cache: context.regionMasks)
             let smooth = try FrequencySeparation.smoothed(
                 result, bounds: bounds, faceWidth: FaceRegions.faceWidth(face, extent: extent),
                 smoothing: skin.smoothing, tuning: tuning)

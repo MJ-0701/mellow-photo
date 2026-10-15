@@ -148,4 +148,26 @@ final class RenderPipelineTests: XCTestCase {
             XCTAssertEqual(error as? MellowError, .invalidImageSize)
         }
     }
+
+    func testAnalysisInitMatchesFaceInit() {
+        let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.1, width: 0.3, height: 0.3))
+        let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.3, height: 0.3))
+        let spots = [
+            BlemishSpot(x: 0.2, y: 0.2, radius: 0.01, faceIndex: 0),
+            BlemishSpot(x: 0.7, y: 0.2, radius: 0.01, faceIndex: 1),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.targetFace = 1
+        let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
+        let legacy = RenderContext(
+            extent: extent, recipe: recipe, faces: [left, right], tuning: RenderTuning(), blemishes: spots)
+        let bundled = RenderContext(
+            extent: extent, recipe: recipe, analysis: PhotoAnalysis(faces: [left, right], blemishes: spots),
+            tuning: RenderTuning())
+        XCTAssertEqual(legacy.faces, bundled.faces)
+        XCTAssertEqual(legacy.blemishes, bundled.blemishes)
+        XCTAssertEqual(legacy.targetFaces, [right])
+        XCTAssertEqual(bundled.targetFaces, [right])
+        XCTAssertEqual(bundled.targetBlemishes, [spots[1]])
+    }
 }

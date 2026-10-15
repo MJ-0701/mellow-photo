@@ -196,4 +196,20 @@ final class SkinStageTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(Int(after.red(first)), Int(before.red(first)) + 20)
         XCTAssertEqual(after.rgba(second), before.rgba(second), "대상이 아닌 얼굴의 잡티는 그대로")
     }
+
+    func testSkinRenderReusesCachedMaskAcrossRenders() throws {
+        let synthetic = SyntheticFace.make()
+        var recipe = EditRecipe()
+        recipe.portrait.skin.smoothing = 0.6
+        let analysis = PhotoAnalysis(faces: [synthetic.face])
+        let context = RenderContext(
+            extent: synthetic.image.extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
+        let first = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        XCTAssertEqual(analysis.regionMasks.count, 1, "얼굴 하나의 피부 다각형은 한 번만 그린다")
+        XCTAssertEqual(first, second)
+        let fresh = RenderContext(
+            extent: synthetic.image.extent, recipe: recipe, faces: [synthetic.face], tuning: RenderTuning())
+        XCTAssertEqual(first, try Support.bytes(SkinStage().apply(synthetic.image, in: fresh)), "캐시 여부와 결과가 같다")
+    }
 }

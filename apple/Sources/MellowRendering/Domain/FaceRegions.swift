@@ -45,7 +45,8 @@ enum FaceRegions {
     /// 0…strength 피부 가중치. 눈·눈썹·입술은 0, 피부색이 아닌 픽셀(머리카락·배경)은 0에 가깝다.
     /// 윤곽 다각형 + 이마 호 − 넓힌 보호 영역 → × 피부색 가중치 → 흐림 → × strength.
     static func skinMask(
-        face: FaceGeometry, image: CIImage, extent: CGRect, tuning: RenderTuning, strength: Double = 1
+        face: FaceGeometry, image: CIImage, extent: CGRect, tuning: RenderTuning, strength: Double = 1,
+        cache: RegionMaskCache? = nil
     ) throws -> CIImage {
         let black = CIImage(color: .black).cropped(to: extent)
         let bounds = maskBounds(face: face, extent: extent, tuning: tuning)
@@ -53,7 +54,8 @@ enum FaceRegions {
         let cutWidth = faceWidth(face, extent: extent) * CGFloat(tuning.skinFeatureFeather) * 2
         var mask = polygonMask(
             fill: [skinPolygon(face: face, extent: extent, tuning: tuning)],
-            cut: protectedPolygons(face: face, extent: extent), cutWidth: cutWidth, extent: extent, tuning: tuning)
+            cut: protectedPolygons(face: face, extent: extent), cutWidth: cutWidth, extent: extent, tuning: tuning,
+            cache: cache)
         let cheeks = cheekRects(face: face, extent: extent)
         if let left = cheeks.first, let right = cheeks.last {
             let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
@@ -160,8 +162,23 @@ enum FaceRegions {
     }
 
     /// fill 다각형을 1, cut 다각형(경계를 cutWidth/2만큼 넓혀)을 0으로 그린 extent 크기 회색 마스크.
-    /// 얼굴 영역만 긴 변 regionMaskMaxDimension 비트맵에 그리고 확대한다.
+    /// 얼굴 영역만 긴 변 regionMaskMaxDimension 비트맵에 그리고 확대한다. cache가 있으면 같은 입력의 비트맵을 다시 그리지 않는다.
     static func polygonMask(
+        fill: [[CGPoint]], cut: [[CGPoint]], cutWidth: CGFloat, extent: CGRect, tuning: RenderTuning,
+        cache: RegionMaskCache? = nil
+    ) -> CIImage {
+        guard let cache else {
+            return rasterize(fill: fill, cut: cut, cutWidth: cutWidth, extent: extent, tuning: tuning)
+        }
+        let key = RegionMaskKey(
+            fill: fill, cut: cut, cutWidth: cutWidth, extent: extent, maxDimension: tuning.regionMaskMaxDimension)
+        return cache.mask(for: key) {
+            rasterize(fill: fill, cut: cut, cutWidth: cutWidth, extent: extent, tuning: tuning)
+        }
+    }
+
+    /// polygonMask의 CGContext 래스터.
+    private static func rasterize(
         fill: [[CGPoint]], cut: [[CGPoint]], cutWidth: CGFloat, extent: CGRect, tuning: RenderTuning
     ) -> CIImage {
         let black = CIImage(color: .black).cropped(to: extent)

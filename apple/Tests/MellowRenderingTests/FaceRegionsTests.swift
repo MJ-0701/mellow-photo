@@ -59,4 +59,34 @@ final class FaceRegionsTests: XCTestCase {
         let cheek = CGPoint(x: eye.midX * image.extent.width, y: (eye.minY + lips.maxY) / 2 * image.extent.height)
         XCTAssertGreaterThan(grid.red(cheek), 128, "실제 사진의 눈 아래 볼은 피부 마스크 안")
     }
+
+    func testPolygonMaskCacheReusesRasterAndMatchesUncached() throws {
+        let synthetic = SyntheticFace.make()
+        let extent = synthetic.image.extent
+        let tuning = RenderTuning()
+        let fill = [FaceRegions.skinPolygon(face: synthetic.face, extent: extent, tuning: tuning)]
+        let cut = FaceRegions.protectedPolygons(face: synthetic.face, extent: extent)
+        let cache = RegionMaskCache()
+        let first = FaceRegions.polygonMask(
+            fill: fill, cut: cut, cutWidth: 28, extent: extent, tuning: tuning, cache: cache)
+        let second = FaceRegions.polygonMask(
+            fill: fill, cut: cut, cutWidth: 28, extent: extent, tuning: tuning, cache: cache)
+        XCTAssertEqual(cache.count, 1, "같은 다각형·extent는 한 번만 그린다")
+        XCTAssertTrue(first === second, "저장한 이미지를 그대로 돌려준다")
+        let uncached = FaceRegions.polygonMask(fill: fill, cut: cut, cutWidth: 28, extent: extent, tuning: tuning)
+        XCTAssertEqual(try Support.bytes(first), try Support.bytes(uncached))
+        _ = FaceRegions.polygonMask(fill: fill, cut: cut, cutWidth: 14, extent: extent, tuning: tuning, cache: cache)
+        XCTAssertEqual(cache.count, 2, "넓힘 폭이 다르면 다른 항목")
+    }
+
+    func testRegionMaskCacheEmptiesWhenFull() {
+        let cache = RegionMaskCache()
+        let extent = CGRect(x: 0, y: 0, width: 8, height: 8)
+        for index in 0...RegionMaskCache.maximumEntries {
+            let polygon = [CGPoint(x: 0, y: 0), CGPoint(x: CGFloat(index + 1), y: 0), CGPoint(x: 0, y: 4)]
+            let key = RegionMaskKey(fill: [polygon], cut: [], cutWidth: 0, extent: extent, maxDimension: 512)
+            _ = cache.mask(for: key) { CIImage(color: .white).cropped(to: extent) }
+        }
+        XCTAssertEqual(cache.count, 1, "상한을 넘으면 모두 비우고 새 항목 하나만 남는다")
+    }
 }

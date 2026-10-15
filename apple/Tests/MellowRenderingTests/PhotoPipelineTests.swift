@@ -241,4 +241,22 @@ final class PhotoPipelineTests: XCTestCase {
             XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
         }
     }
+
+    func testEvictedPreviewReleasesRegionMasks() async throws {
+        let synthetic = SyntheticFace.make()
+        let url = try Support.writePNG(synthetic.image, name: "face")
+        var tuning = RenderTuning()
+        tuning.previewCacheCapacity = 1
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: tuning)
+        let first = PhotoID()
+        _ = try await pipeline.prepare(first, at: url)
+        var recipe = EditRecipe()
+        recipe.portrait.skin.smoothing = 0.5
+        _ = try await pipeline.preview(first, recipe: recipe)
+        let prepared = await pipeline.preparedAnalysis(first)
+        let analysis = try XCTUnwrap(prepared)
+        XCTAssertEqual(analysis.regionMasks.count, 1)
+        _ = try await pipeline.prepare(PhotoID(), at: try writeSolidPNG())
+        XCTAssertEqual(analysis.regionMasks.count, 0, "미리보기가 캐시에서 밀려나면 마스크 비트맵도 놓는다")
+    }
 }

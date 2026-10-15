@@ -23,9 +23,8 @@ public actor PhotoPipeline {
     public static let unpreparedReason = "photo-not-prepared"
 
     private struct Entry {
-        var faces: [FaceGeometry]
-        var faceAnalysisFailure: MellowError?
-        var blemishes: [BlemishSpot]
+        /// 준비 때 계산한 분석 결과. 다각형 마스크 캐시도 함께 들고 있다.
+        var analysis: PhotoAnalysis
         /// 렌더해 둔 작은 비트맵에서 만든다. 미리보기 CIImage를 참조하지 않아 LRU로 밀려난 미리보기를 붙잡지 않는다.
         var thumbnail: CIImage
     }
@@ -52,7 +51,12 @@ public actor PhotoPipeline {
 
     /// 테스트용. 준비 때 찾은 잡티.
     func preparedBlemishes(_ id: PhotoID) -> [BlemishSpot] {
-        entries[id]?.blemishes ?? []
+        entries[id]?.analysis.blemishes ?? []
+    }
+
+    /// 테스트용. 준비 때 계산한 분석 묶음.
+    func preparedAnalysis(_ id: PhotoID) -> PhotoAnalysis? {
+        entries[id]?.analysis
     }
 
     public func prepare(_ id: PhotoID, at url: URL) throws -> PreparedPhoto {
@@ -67,11 +71,12 @@ public actor PhotoPipeline {
         } catch {
             failure = .faceAnalysisUnavailable(reason: error.localizedDescription)
         }
-        let blemishes = detectBlemishes(in: preview, faces: faces)
+        let analysis = PhotoAnalysis(
+            faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces))
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
-        entries[id] = Entry(
-            faces: faces, faceAnalysisFailure: failure, blemishes: blemishes, thumbnail: CIImage(cgImage: thumbnail))
+        entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
+        releaseMasksOfEvictedPreviews()
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure)
     }
@@ -83,8 +88,8 @@ public actor PhotoPipeline {
             throw MellowError.cannotCreatePreview
         }
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog,
-            skipsCrop: showsUncropped, blemishes: entry.blemishes)
+            extent: image.extent, recipe: recipe, analysis: entry.analysis, tuning: tuning, lookCatalog: lookCatalog,
+            skipsCrop: showsUncropped)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 
@@ -117,22 +122,21 @@ public actor PhotoPipeline {
             if recipe.dependsOnFaces {
                 throw MellowError.faceAnalysisUnavailable(reason: Self.unpreparedReason)
             }
-            return try render(url: url, recipe: recipe, faces: [], blemishes: [], maxDimension: maxDimension)
+            return try render(url: url, recipe: recipe, analysis: PhotoAnalysis(), maxDimension: maxDimension)
         }
-        if recipe.dependsOnFaces, entry.faces.isEmpty, let failure = entry.faceAnalysisFailure {
+        if recipe.dependsOnFaces, entry.analysis.faces.isEmpty, let failure = entry.analysis.faceAnalysisFailure {
             throw failure
         }
-        return try render(
-            url: url, recipe: recipe, faces: entry.faces, blemishes: entry.blemishes, maxDimension: maxDimension)
+        let rendered = try render(url: url, recipe: recipe, analysis: entry.analysis, maxDimension: maxDimension)
+        // 원본 해상도 마스크는 다시 쓸 일이 드물다. 이미 만든 렌더 그래프는 비트맵을 붙잡고 있어 비워도 안전하다.
+        releaseMasksOfEvictedPreviews()
+        return rendered
     }
 
-    private func render(
-        url: URL, recipe: EditRecipe, faces: [FaceGeometry], blemishes: [BlemishSpot], maxDimension: Int?
-    ) throws -> CIImage {
+    private func render(url: URL, recipe: EditRecipe, analysis: PhotoAnalysis, maxDimension: Int?) throws -> CIImage {
         let image = try loader.load(url: url, maxDimension: maxDimension)
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, faces: faces, tuning: tuning, lookCatalog: lookCatalog,
-            blemishes: blemishes)
+            extent: image.extent, recipe: recipe, analysis: analysis, tuning: tuning, lookCatalog: lookCatalog)
         return try pipeline.render(image, context: context)
     }
 
@@ -140,6 +144,14 @@ public actor PhotoPipeline {
     private func detectBlemishes(in image: CIImage, faces: [FaceGeometry]) -> [BlemishSpot] {
         guard !faces.isEmpty else { return [] }
         return (try? BlemishDetector(tuning: tuning, renderer: renderer).detect(image: image, faces: faces)) ?? []
+    }
+
+    /// 미리보기 캐시에 없는 사진의 마스크 비트맵을 놓는다. 메모리를 최근 사진 몇 장 몫으로 묶는다.
+    private func releaseMasksOfEvictedPreviews() {
+        let cached = Set(cache.ids)
+        for (id, entry) in entries where !cached.contains(id) {
+            entry.analysis.regionMasks.removeAll()
+        }
     }
 
     public func makeCGImage(_ image: CIImage) throws -> CGImage {
