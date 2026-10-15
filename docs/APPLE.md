@@ -76,6 +76,22 @@ Mac 앱은 App Sandbox(사용자가 고른 파일 읽기·쓰기)에서 실행�
 
 기기에서 반드시 확인할 항목: 도구 줄 스크롤, 필터 칩 썸네일과 룩 10종의 실제 사진 결과, 자르기 손잡이 드래그(확대 상태 포함), 최초 권한 허용/거절, HEIC 및 방향 회전, iCloud 사진 가져오기, 얼굴 0/1/여러 명, 잡티·변형 후 실행 취소, 재실행 복원(출시본 v1 기록 포함), 전체 사진 저장, 48MP 메모리, 작은 화면과 큰 글자, 백그라운드 전환, Mac의 이전 폴더 이전과 프리셋 가져오기.
 
+## TestFlight 배포
+
+지금은 내부 테스터 두 명에게 TestFlight 빌드만 보내는 것이 기본입니다. 릴리스 워크플로(Actions 화면 이름 `Apple release`)는 배포 모드 두 가지를 지원합니다.
+
+| 모드 | 하는 일 | App Store 버전 |
+|---|---|---|
+| `testflight` (기본) | 서명한 빌드를 TestFlight에 올리고 끝냅니다 | 만들지도 고치지도 않습니다 |
+| `appstore` | 지금까지의 스토어 출시 경로입니다. 변경사항 반영, 설정에 따라 심사 제출까지 합니다 | 해당 버전을 만들거나 고칩니다 |
+
+- 태그로 배포할 때 모드는 저장소 변수 `IOS_RELEASE_MODE`로 정합니다. 비워 두거나 `testflight`이면 TestFlight 전용, `appstore`이면 스토어 출시입니다. 다른 값이면 워크플로가 테스트 전에 멈춥니다.
+- 수동 실행(Run workflow)에서는 입력 `mode`로 고르며 기본값은 `testflight`입니다.
+- 태그 절차: `scripts/release.sh apple X.Y.Z`로 버전 커밋과 태그를 만든 뒤 `git push origin main apple-vX.Y.Z`로 올립니다.
+- `appstore` 모드는 App Store Connect에 편집 가능한 다른 버전이 남아 있으면 빌드 전에 멈춥니다. 예전 편집 중 버전(예: 0.2.0)을 먼저 정리해야 합니다. `testflight` 모드는 이 조건과 상관없이 올라갑니다.
+- 내부 테스터는 App Store Connect의 내부 테스트 그룹으로 빌드를 받습니다. 그룹이 새 빌드를 자동으로 받도록 설정되어 있으면 Apple의 빌드 처리가 끝난 뒤 따로 할 일이 없습니다. 외부 테스터 배포와 베타 심사 제출은 하지 않습니다.
+- `testflight` 모드는 아직 실제로 돌려 보지 않았습니다. 다음 태그 배포로 확인합니다.
+
 App Store 자동화는 [IOS_RELEASE.md](IOS_RELEASE.md), 제출 자료는 [APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md), Mac 전달본은 [MAC_INSTALL.md](MAC_INSTALL.md)를 참조하세요.
 
 공개 지원: https://mj-0701.github.io/mellow-photo-support/

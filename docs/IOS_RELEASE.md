@@ -19,7 +19,7 @@
 - `.github/workflows/apple-checks.yml`(PR, main push, 수동 실행): 고정 버전 XcodeGen 설치 → 릴리스 노트 자동화 테스트 → `scripts/test-apple.sh`(모듈 의존성 검사, `swift format lint --strict`, XcodeGen 동기화 확인, 패키지 `swift test`, iPhone·iPad 시뮬레이터와 Mac 앱 테스트) → 서명 없는 Release 빌드 `scripts/build-apple.sh ios-device`(arm64, bundle ID, iPhoneOS 플랫폼, asset catalog, 개인정보 manifest 검사)와 `scripts/build-apple.sh mac`. 인증서가 없어도 이 단계까지 실행할 수 있습니다.
 - XcodeGen은 `apple/.xcodegen-version`(현재 2.46.0)에 고정되어 있고, CI는 그 버전의 GitHub 릴리스 zip을 내려받아 설치합니다. 로컬은 `brew install xcodegen`이며, `test-apple.sh`는 설치된 버전이 다르면 멈춥니다.
 - 테스트 결과는 `apple/build/Logs/Test`에 남기며, 실패 시 GitHub Actions artifact에 7일간 보관합니다. 실패 로그·테스트 결과는 실기기/실사용자 사진으로 만든 자료가 아닌 CI 테스트 자료만 담아야 합니다.
-- `.github/workflows/apple-release.yml`(Actions 화면 이름 `Apple App Store release`), `apple-v1.0.1` 같은 태그: 버전 확인 → 동일 테스트 → Mac 패키지(`scripts/package-mac.sh`, 임시 서명 zip을 `mellow-photo-mac-<버전>` 아티팩트로 업로드) → 서명된 archive/IPA 생성 → 서명·bundle·버전 검증 → App Store Connect 업로드. App Store 업로드는 되돌릴 수 없으므로 Mac zip을 먼저 만들어, 업로드가 실패해도 Mac 산출물은 남습니다.
+- `.github/workflows/apple-release.yml`(Actions 화면 이름 `Apple release`), `apple-v1.0.1` 같은 태그: 버전 확인 → 동일 테스트 → Mac 패키지(`scripts/package-mac.sh`, 임시 서명 zip을 `mellow-photo-mac-<버전>` 아티팩트로 업로드) → 서명된 archive/IPA 생성 → 서명·bundle·버전 검증 → App Store Connect 업로드. App Store 업로드는 되돌릴 수 없으므로 Mac zip을 먼저 만들어, 업로드가 실패해도 Mac 산출물은 남습니다.
 - 버전은 `apple/Config/Version.xcconfig`의 `MARKETING_VERSION` 한 곳에서 정합니다. 워크플로는 태그의 버전(수동 실행이면 입력한 `version`)이 이 값과 같은지 먼저 확인하고, 다르면 테스트 전에 중단합니다.
 - 기본값은 업로드까지만. 심사 제출과 승인 후 자동 공개는 별도로 켤 수 있습니다.
 - Apple 심사, 계정 약관, 개인정보/수출 관련 응답은 자동으로 생략하거나 통과할 수 없습니다.
@@ -57,7 +57,7 @@ Mac에서 파일을 변환하려면 `base64 -i /path/to/file | tr -d '\n' | pbco
 
 ## 수동 실행
 
-GitHub Actions → `Apple App Store release` → Run workflow에서 `version`, `submit_for_review`, `automatic_release`를 입력합니다. `version`은 `apple/Config/Version.xcconfig`의 `MARKETING_VERSION`과 같아야 합니다. 다르면 워크플로가 테스트 전에 중단하므로, 먼저 `scripts/release.sh apple X.Y.Z`로 버전을 올린 커밋을 push한 뒤 실행합니다. 처음에는 `submit_for_review=false`, `automatic_release=false`로 올리고 App Store Connect에서 처리 완료된 빌드를 확인한 다음 직접 심사 제출하는 것이 좋습니다. 인증서/프로필 만료, 계정 활성화 지연, 약관 미동의는 정상적인 차단 원인이며 CI가 우회하지 않습니다.
+GitHub Actions → `Apple release` → Run workflow에서 `version`, `submit_for_review`, `automatic_release`를 입력합니다. `version`은 `apple/Config/Version.xcconfig`의 `MARKETING_VERSION`과 같아야 합니다. 다르면 워크플로가 테스트 전에 중단하므로, 먼저 `scripts/release.sh apple X.Y.Z`로 버전을 올린 커밋을 push한 뒤 실행합니다. 처음에는 `submit_for_review=false`, `automatic_release=false`로 올리고 App Store Connect에서 처리 완료된 빌드를 확인한 다음 직접 심사 제출하는 것이 좋습니다. 인증서/프로필 만료, 계정 활성화 지연, 약관 미동의는 정상적인 차단 원인이며 CI가 우회하지 않습니다.
 
 빌드 번호는 `github.run_number.github.run_attempt`로 자동 증가합니다. 같은 실행의 재시도도 다른 번호를 사용합니다. iOS 빌드는 fastlane이 `CURRENT_PROJECT_VERSION`으로, Mac zip은 `MELLOW_BUILD_NUMBER` 환경 변수로 같은 번호를 씁니다. 수동으로 더 높은 빌드 번호를 이미 올렸다면 이후 번호 충돌을 피하도록 규칙을 조정해야 합니다. 공개된 버전을 업데이트할 때는 새로운 앱 버전 번호를 사용합니다.
 
@@ -79,6 +79,8 @@ git push origin main apple-v1.0.1
 | `IOS_RELEASE_ENABLED` | 배포 job 실행 허용 |
 | `IOS_AUTO_SUBMIT` | 태그 빌드를 업로드한 뒤 Apple 심사 제출 |
 | `IOS_AUTO_RELEASE` | Apple이 승인한 뒤 자동 공개 |
+
+이 세 변수는 배포 모드가 `appstore`일 때만 의미가 있습니다. 배포 모드 변수 `IOS_RELEASE_MODE`가 비어 있거나 `testflight`이면 태그 배포는 TestFlight 업로드에서 끝나고 App Store 버전·심사 제출·공개는 건드리지 않습니다. 자세한 내용은 [Apple 앱 문서의 TestFlight 배포](APPLE.md#testflight-배포)를 참조하세요.
 
 수동 실행은 위 두 AUTO 변수 대신 입력 체크박스를 사용합니다. `automatic_release`는 `submit_for_review=true`와 함께 사용하세요. 심사 거절 시 수정 후 새 빌드를 올려야 합니다.
 

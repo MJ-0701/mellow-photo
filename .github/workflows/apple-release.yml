@@ -1,4 +1,4 @@
-name: Apple App Store release
+name: Apple release
 on:
   push:
     tags: ['apple-v*']
@@ -16,6 +16,13 @@ on:
         description: 'Publish automatically AFTER Apple approves'
         type: boolean
         default: false
+      mode:
+        description: 'testflight uploads to TestFlight only, appstore also updates the App Store version'
+        type: choice
+        options:
+          - testflight
+          - appstore
+        default: testflight
 permissions:
   contents: read
 concurrency:
@@ -33,10 +40,23 @@ jobs:
       FASTLANE_HIDE_CHANGELOG: '1'
       FASTLANE_DISABLE_COLORS: '1'
       VERSION_INPUT: ${{ inputs.version }}
+      RELEASE_MODE_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || vars.IOS_RELEASE_MODE }}
       SUBMIT_FOR_REVIEW: ${{ github.event_name == 'workflow_dispatch' && inputs.submit_for_review || github.event_name == 'push' && vars.IOS_AUTO_SUBMIT == 'true' }}
       AUTOMATIC_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.automatic_release || github.event_name == 'push' && vars.IOS_AUTO_RELEASE == 'true' }}
     steps:
       - uses: actions/checkout@v4
+      # 배포 모드를 테스트 전에 확정해, 잘못된 값이면 긴 빌드 없이 바로 멈춘다.
+      - name: Resolve release lane
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$RELEASE_MODE_INPUT" in
+            ''|testflight) lane=testflight ;;
+            appstore) lane=release ;;
+            *) echo "Unknown release mode '$RELEASE_MODE_INPUT'. Use testflight or appstore (repo variable IOS_RELEASE_MODE or workflow input mode)."; exit 1 ;;
+          esac
+          echo "RELEASE_LANE=$lane" >> "$GITHUB_ENV"
+          echo "Release mode '${RELEASE_MODE_INPUT:-testflight}' -> fastlane lane '$lane'"
       - name: Install pinned XcodeGen
         shell: bash
         run: |
@@ -92,7 +112,7 @@ jobs:
           DISTRIBUTION_P12_BASE64: ${{ secrets.DISTRIBUTION_P12_BASE64 }}
           DISTRIBUTION_P12_PASSWORD: ${{ secrets.DISTRIBUTION_P12_PASSWORD }}
           APPSTORE_PROFILE_BASE64: ${{ secrets.APPSTORE_PROFILE_BASE64 }}
-        run: bundle exec fastlane ios release
+        run: bundle exec fastlane ios "$RELEASE_LANE"
       - name: Clean temporary signing material
         if: always()
         shell: bash
