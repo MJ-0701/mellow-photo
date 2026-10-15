@@ -16,6 +16,7 @@ for destination in "platform=iOS Simulator,id=$IPHONE" "platform=iOS Simulator,i
   echo "== app tests: $destination"
   parallel=()
   [[ "$destination" == *"iOS Simulator"* ]] && parallel=(-parallel-testing-enabled NO)
-  xcodebuild "${MELLOW_PROJECT[@]}" -destination "$destination" "${parallel[@]}" CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
+  # bash 3.2 + set -u는 빈 배열 전개를 오류로 본다.
+  xcodebuild "${MELLOW_PROJECT[@]}" -destination "$destination" ${parallel[@]+"${parallel[@]}"} CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
   [[ "${PIPESTATUS[0]}" -eq 0 ]]
 done
