@@ -35,6 +35,48 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     }
 }
 
+/// 호출마다 다음 분석 결과를 돌려주고 마지막 결과는 계속 되풀이한다.
+/// 값 타입인 스텁 분석기가 복사돼도 같은 순서와 호출 횟수를 공유한다.
+final class AnalysisResultQueue<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var results: [Result<Value, MellowError>]
+    private var callCount = 0
+
+    init(_ results: [Result<Value, MellowError>]) {
+        self.results = results
+    }
+
+    var calls: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return callCount
+    }
+
+    func next() -> Result<Value, MellowError> {
+        lock.lock()
+        defer { lock.unlock() }
+        callCount += 1
+        return results.count > 1 ? results.removeFirst() : results[0]
+    }
+}
+
+typealias PersonResultQueue = AnalysisResultQueue<CIImage?>
+typealias BodyResultQueue = AnalysisResultQueue<[BodyGeometry]>
+
+struct StubPersonAnalyzer: PersonAnalyzer {
+    var result: Result<CIImage?, MellowError> = .success(nil)
+    /// 있으면 result 대신 호출마다 이 순서의 다음 결과를 쓴다.
+    var queue: PersonResultQueue?
+    func personMask(_ image: CIImage) throws -> CIImage? { try (queue?.next() ?? result).get() }
+}
+
+struct StubBodyAnalyzer: BodyAnalyzer {
+    var result: Result<[BodyGeometry], MellowError> = .success([])
+    /// 있으면 result 대신 호출마다 이 순서의 다음 결과를 쓴다.
+    var queue: BodyResultQueue?
+    func analyze(_ image: CIImage) throws -> [BodyGeometry] { try (queue?.next() ?? result).get() }
+}
+
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
 final class StagingLog: @unchecked Sendable {
     var calls = 0
@@ -112,21 +154,91 @@ enum TestSupport {
         return try LookCatalog(data: Data(contentsOf: url))
     }
 
+    /// 저장소의 공용 메이크업 카탈로그. 앱 번들과 같은 파일이다.
+    static func sharedMakeupCatalog() throws -> MakeupCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/makeup/makeup.v1.json")
+        return try MakeupCatalog(data: Data(contentsOf: url))
+    }
+
+    /// box 안에 비율로 놓은 가짜 특징점 얼굴. 윤곽은 Vision처럼 한쪽 관자놀이에서 턱을 지나 반대쪽까지 17점이다.
+    static func landmarkedFace(in box: NormalizedRect) -> FaceGeometry {
+        func point(_ x: Double, _ y: Double) -> NormalizedPoint {
+            NormalizedPoint(x: box.minX + box.width * x, y: box.minY + box.height * y)
+        }
+        func ellipse(_ centerX: Double, _ centerY: Double, _ radiusX: Double, _ radiusY: Double) -> [NormalizedPoint] {
+            (0..<12).map { step in
+                let angle = 2 * Double.pi * Double(step) / 12
+                return point(centerX + radiusX * cos(angle), centerY + radiusY * sin(angle))
+            }
+        }
+        let contour = (0...16).map { step -> NormalizedPoint in
+            let angle = Double.pi + Double.pi * Double(step) / 16
+            return point(0.5 + 0.5 * cos(angle), 0.6 + 0.6 * sin(angle))
+        }
+        return FaceGeometry(
+            boundingBox: box,
+            landmarks: [
+                .faceContour: contour,
+                .leftEye: ellipse(0.3, 0.63, 0.1, 0.04), .rightEye: ellipse(0.7, 0.63, 0.1, 0.04),
+                .leftPupil: [point(0.3, 0.63)], .rightPupil: [point(0.7, 0.63)],
+                .leftEyebrow: ellipse(0.3, 0.75, 0.12, 0.02), .rightEyebrow: ellipse(0.7, 0.75, 0.12, 0.02),
+                .nose: [point(0.42, 0.4), point(0.58, 0.4), point(0.5, 0.55)],
+                .noseCrest: [point(0.5, 0.55), point(0.5, 0.45)],
+                .outerLips: ellipse(0.5, 0.27, 0.17, 0.06), .innerLips: ellipse(0.5, 0.27, 0.13, 0.02),
+            ])
+    }
+
+    /// 스텁 인물 마스크의 한 변(픽셀). Vision 마스크처럼 사진과 크기·비율이 다르다.
+    static let personMaskSide = 64.0
+
+    /// 검은 바탕에 흰 사각형 사람이 있는 정사각형 인물 마스크. person은 정규화 사각형(원점 왼쪽 아래).
+    static func personMask(_ person: NormalizedRect) -> CIImage {
+        let extent = CGRect(x: 0, y: 0, width: personMaskSide, height: personMaskSide)
+        let rect = CGRect(
+            x: person.x * personMaskSide, y: person.y * personMaskSide, width: person.width * personMaskSide,
+            height: person.height * personMaskSide)
+        return CIImage(color: .white).cropped(to: rect).composited(over: CIImage(color: .black)).cropped(to: extent)
+    }
+
+    /// 정면으로 선 사람의 관절점(box 비율, 신뢰도 1). 패키지 테스트의 RenderingTestSupport.standingBody와 같은 배치다.
+    static func standingBody(in box: NormalizedRect) -> BodyGeometry {
+        let layout: [BodyJoint: (x: Double, y: Double)] = [
+            .neck: (0.5, 0.82), .rightShoulder: (0.25, 0.8), .leftShoulder: (0.75, 0.8),
+            .rightElbow: (0.18, 0.62), .leftElbow: (0.82, 0.62), .rightWrist: (0.15, 0.45), .leftWrist: (0.85, 0.45),
+            .rightHip: (0.38, 0.5), .leftHip: (0.62, 0.5), .rightKnee: (0.39, 0.27), .leftKnee: (0.61, 0.27),
+            .rightAnkle: (0.4, 0.05), .leftAnkle: (0.6, 0.05), .root: (0.5, 0.5),
+        ]
+        var joints: [BodyJoint: NormalizedPoint] = [:]
+        for (joint, spot) in layout {
+            joints[joint] = NormalizedPoint(x: box.minX + box.width * spot.x, y: box.minY + box.height * spot.y)
+        }
+        return BodyGeometry(joints: joints, confidence: joints.mapValues { _ in 1 })
+    }
+
+    /// makeupCatalog가 nil이면 공용 파일을 읽는다. 카탈로그가 없는 경우는 .empty를 넘긴다.
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
-        importer: FakeImporter = FakeImporter(), store: MemorySessionStore = MemorySessionStore()
+        personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), bodyAnalyzer: StubBodyAnalyzer = StubBodyAnalyzer(),
+        makeupCatalog: MakeupCatalog? = nil, importer: FakeImporter = FakeImporter(),
+        store: MemorySessionStore = MemorySessionStore()
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
         try? copies.prepareDirectory()
         let catalog = (try? sharedLookCatalog()) ?? .empty
+        let makeup = makeupCatalog ?? (try? sharedMakeupCatalog()) ?? .empty
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
-            pipeline: PhotoPipeline(analyzer: analyzer, tuning: RenderTuning(), lookCatalog: catalog),
+            pipeline: PhotoPipeline(
+                analyzer: analyzer, personAnalyzer: personAnalyzer, bodyAnalyzer: bodyAnalyzer, tuning: RenderTuning(),
+                lookCatalog: catalog, makeupCatalog: makeup),
             copies: copies,
             importer: importer,
             exporter: Exporter(renderer: Renderer()),
             lookCatalog: catalog,
+            makeupCatalog: makeup,
             renderDebounce: .milliseconds(10))
     }
 }

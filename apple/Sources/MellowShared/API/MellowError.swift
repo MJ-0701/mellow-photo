@@ -14,6 +14,8 @@ public enum MellowError: Error, Equatable, Sendable {
     case fileAlreadyExists
     case exportFailed(reason: String)
     case faceAnalysisUnavailable(reason: String)
+    case personAnalysisUnavailable(reason: String)
+    case bodyAnalysisUnavailable(reason: String)
     case sessionUnreadable
     case sessionWriteFailed(reason: String)
     case photoLibraryAccessDenied

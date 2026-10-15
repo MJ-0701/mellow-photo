@@ -14,18 +14,26 @@ extension AppModel {
         let session = ProjectSession(
             store: JSONSessionStore(fileURL: root.appendingPathComponent("session.json")),
             maxPhotos: LibraryPolicy.maxPhotosForCurrentDevice)
-        let bundledCatalog = bundledLookCatalog()
-        let lookCatalog = bundledCatalog ?? .empty
+        let lookCatalog = bundledLookCatalog()
+        let makeupCatalog = bundledMakeupCatalog()
         let model = AppModel(
             session: session,
             pipeline: PhotoPipeline(
-                analyzer: VisionFaceAnalyzer(), tuning: RenderTuning.forCurrentDevice(), lookCatalog: lookCatalog),
+                analyzer: VisionFaceAnalyzer(), personAnalyzer: VisionPersonAnalyzer(),
+                bodyAnalyzer: VisionBodyAnalyzer(), tuning: RenderTuning.forCurrentDevice(),
+                lookCatalog: lookCatalog ?? .empty, makeupCatalog: makeupCatalog ?? .empty),
             copies: copies,
             importer: SystemPhotoImporter(),
             exporter: Exporter(renderer: Renderer()),
-            lookCatalog: lookCatalog)
-        if bundledCatalog == nil {
-            model.present(message: UserMessage.lookCatalogUnavailable)
+            lookCatalog: lookCatalog ?? .empty,
+            makeupCatalog: makeupCatalog ?? .empty)
+        // 두 목록을 모두 읽지 못하면 알림 하나에 함께 적는다. 알림은 마지막 것 하나만 보인다.
+        let unavailable = [
+            lookCatalog == nil ? UserMessage.lookCatalogUnavailable : nil,
+            makeupCatalog == nil ? UserMessage.makeupCatalogUnavailable : nil,
+        ].compactMap { $0 }
+        if !unavailable.isEmpty {
+            model.present(message: unavailable.joined(separator: "\n"))
         }
         do {
             try copies.prepareDirectory()
@@ -51,6 +59,19 @@ extension AppModel {
         else { return nil }
         do {
             return try LookCatalog(data: Data(contentsOf: url))
+        } catch {
+            return nil
+        }
+    }
+
+    /// 번들 메이크업 카탈로그. 파일이 없거나 형식이 틀리면(DecodingError 포함) nil이고, 호출자가 빈 카탈로그와 안내 문구로 바꾼다.
+    static func bundledMakeupCatalog(in bundle: Bundle = .main) -> MakeupCatalog? {
+        guard
+            let url = bundle.url(
+                forResource: Policy.bundledMakeupCatalogName, withExtension: Policy.bundledMakeupCatalogExtension)
+        else { return nil }
+        do {
+            return try MakeupCatalog(data: Data(contentsOf: url))
         } catch {
             return nil
         }

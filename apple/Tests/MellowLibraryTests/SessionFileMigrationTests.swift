@@ -19,8 +19,8 @@ final class SessionFileMigrationTests: XCTestCase {
         XCTAssertEqual(first.filename, "11111111-1111-1111-1111-111111111111.heic")
         XCTAssertEqual(first.displayName, "사진 1")
         XCTAssertEqual(first.document.recipe.color.exposure, 0.4)
-        XCTAssertEqual(first.document.recipe.portrait.skinSmoothing, 0.3)
-        XCTAssertEqual(first.document.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(first.document.recipe.portrait.skin.smoothing, 0.3)
+        XCTAssertEqual(first.document.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(first.document.recipe.portrait.targetFace, 1)
         XCTAssertEqual(
             first.document.recipe.operations,
@@ -32,7 +32,7 @@ final class SessionFileMigrationTests: XCTestCase {
         XCTAssertEqual(snapshot.selectedPhotoID, first.id)
         XCTAssertEqual(snapshot.presets.count, 1)
         XCTAssertEqual(snapshot.presets[0].name, "포근한")
-        XCTAssertEqual(snapshot.presets[0].values.portrait.skinSmoothing, 0.3)
+        XCTAssertEqual(snapshot.presets[0].values.portrait.skin.smoothing, 0.3)
         XCTAssertEqual(snapshot.presets[0].values.color.warmth, 0.25)
     }
 
@@ -82,5 +82,27 @@ final class SessionFileMigrationTests: XCTestCase {
             """
         let snapshot = SessionFileMapper.snapshot(from: try SessionFile.decode(Data(json.utf8)))
         XCTAssertEqual(snapshot.presets[0].values.detail, DetailAdjustments())
+    }
+
+    func testB0SessionWithLegacyPortraitKeysMigratesUndoHistory() throws {
+        let json = """
+            {"schemaVersion":2,"photos":[{"id":"22222222-2222-2222-2222-222222222222",\
+            "filename":"22222222-2222-2222-2222-222222222222.heic","displayName":"사진 1",\
+            "recipe":{"schemaVersion":2,"portrait":{"skinSmoothing":0.4,"faceSlim":0.25,"targetFace":0}},\
+            "undo":[{"schemaVersion":2,"portrait":{"skinSmoothing":0.1}}],"redo":[]}],\
+            "presets":[{"id":"33333333-3333-3333-3333-333333333333","name":"옛",\
+            "values":{"color":{},"portrait":{"faceSlim":0.3}}}]}
+            """
+        let snapshot = SessionFileMapper.snapshot(from: try SessionFile.decode(Data(json.utf8)))
+        let document = snapshot.photos[0].document
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.4)
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.25)
+        XCTAssertEqual(document.recipe.portrait.targetFace, 0)
+        XCTAssertEqual(document.undoStack[0].portrait.skin.smoothing, 0.1)
+        XCTAssertEqual(snapshot.presets[0].values.portrait.face.width, -0.3)
+        let rewritten = try SessionFile.encode(SessionFileMapper.file(from: snapshot))
+        let text = try XCTUnwrap(String(data: rewritten, encoding: .utf8))
+        XCTAssertFalse(text.contains("skinSmoothing"), "다시 저장하면 옛 키를 쓰지 않는다")
+        XCTAssertFalse(text.contains("faceSlim"))
     }
 }

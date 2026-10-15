@@ -151,7 +151,10 @@ struct EditorScene: View {
         case .look: LookPanel()
         case .crop: CropPanel()
         case .adjust: AdjustPanel(presetSheet: $presetSheet)
-        case .portrait: PortraitPanel()
+        case .beauty: BeautyPanel()
+        case .makeup: MakeupPanel()
+        case .body: BodyPanel()
+        case .background: BackgroundPanel()
         case .retouch, .warp: BrushPanel()
         }
     }

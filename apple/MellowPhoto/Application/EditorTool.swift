@@ -2,7 +2,10 @@ enum EditorTool: CaseIterable, Identifiable {
     case look
     case crop
     case adjust
-    case portrait
+    case beauty
+    case makeup
+    case body
+    case background
     case retouch
     case warp
 
@@ -14,7 +17,10 @@ enum EditorTool: CaseIterable, Identifiable {
         case .look: return UserMessage.toolLook
         case .crop: return UserMessage.toolCrop
         case .adjust: return UserMessage.toolAdjust
-        case .portrait: return UserMessage.toolPortrait
+        case .beauty: return UserMessage.toolBeauty
+        case .makeup: return UserMessage.toolMakeup
+        case .body: return UserMessage.toolBody
+        case .background: return UserMessage.toolBackground
         case .retouch: return UserMessage.toolRetouch
         case .warp: return UserMessage.toolWarp
         }
@@ -25,7 +31,10 @@ enum EditorTool: CaseIterable, Identifiable {
         case .look: return "camera.filters"
         case .crop: return "crop.rotate"
         case .adjust: return "slider.horizontal.3"
-        case .portrait: return "face.smiling"
+        case .beauty: return "face.smiling"
+        case .makeup: return "paintbrush.pointed"
+        case .body: return "figure.stand"
+        case .background: return "camera.aperture"
         case .retouch: return "bandage"
         case .warp: return "arrow.up.left.and.arrow.down.right"
         }

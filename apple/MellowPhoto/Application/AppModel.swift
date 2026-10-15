@@ -20,6 +20,37 @@ final class AppModel {
         var pixelSize: CGSize
         var faces: [FaceGeometry]
         var faceAnalysisFailure: MellowError?
+        /// 인물 마스크가 있는지. 배경 도구 안내에 쓴다.
+        var hasPerson = false
+        /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+        var personAnalysisFailure: MellowError?
+        /// 가장 큰 사람의 두 어깨가 보이는지. 체형 도구 안내에 쓴다.
+        var hasBody = false
+        /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+        var bodyAnalysisFailure: MellowError?
+    }
+
+    /// 배경 도구가 보여줄 상태. 분석 실패가 사람 없음보다 먼저다.
+    enum BackgroundAvailability: Equatable {
+        case ready
+        case noPerson
+        case unavailable(MellowError)
+    }
+
+    /// 체형 도구가 보여줄 상태. 분석 실패가 전신 없음보다 먼저다.
+    enum BodyAvailability: Equatable {
+        case ready
+        case noBody
+        case unavailable(MellowError)
+    }
+
+    /// 뷰티·메이크업 도구가 보여줄 얼굴 상태. 분석 실패가 얼굴 없음보다 먼저다.
+    enum FaceAvailability: Equatable {
+        case ready
+        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정만 동작한다.
+        case noLandmarks
+        case noFace
+        case unavailable(MellowError)
     }
 
     enum Policy {
@@ -34,6 +65,9 @@ final class AppModel {
         /// 앱 번들에 든 룩 카탈로그 파일. shared/looks/looks.v1.json과 같은 내용이다.
         static let bundledLookCatalogName = "looks.v1"
         static let bundledLookCatalogExtension = "json"
+        /// 앱 번들에 든 메이크업 카탈로그 파일. shared/makeup/makeup.v1.json과 같은 내용이다.
+        static let bundledMakeupCatalogName = "makeup.v1"
+        static let bundledMakeupCatalogExtension = "json"
     }
 
     let session: ProjectSession
@@ -42,6 +76,7 @@ final class AppModel {
     let importer: any PhotoImporter
     let exporter: Exporter
     let lookCatalog: LookCatalog
+    let makeupCatalog: MakeupCatalog
 
     var thumbnails: [PhotoID: CGImage] = [:]
     /// 사진별 룩 썸네일. 키가 사진 id라서 늦게 온 결과가 다른 사진에 붙지 않는다.
@@ -67,6 +102,10 @@ final class AppModel {
     var selectionFailure: String?
 
     var tool: EditorTool = .look
+    /// 뷰티 도구에서 마지막으로 본 탭. 도구를 바꿔도 유지한다.
+    var beautyTab: BeautyTab = .skin
+    /// 메이크업 도구에서 마지막으로 본 부위. 도구를 바꿔도 유지한다.
+    var makeupPart: MakeupPart = .lip
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
@@ -88,7 +127,8 @@ final class AppModel {
 
     init(
         session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
-        exporter: Exporter, lookCatalog: LookCatalog = .empty, renderDebounce: Duration = Policy.renderDebounce
+        exporter: Exporter, lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty,
+        renderDebounce: Duration = Policy.renderDebounce
     ) {
         self.session = session
         self.pipeline = pipeline
@@ -96,6 +136,7 @@ final class AppModel {
         self.importer = importer
         self.exporter = exporter
         self.lookCatalog = lookCatalog
+        self.makeupCatalog = makeupCatalog
         renderScheduler = RenderScheduler(debounce: renderDebounce)
     }
 
@@ -107,6 +148,50 @@ final class AppModel {
     var displayImage: CGImage? { isComparing ? original : (preview ?? original) }
     var selectedInfo: PhotoInfo? { session.selectedPhotoID.flatMap { photoInfo[$0] } }
     var faces: [FaceGeometry] { selectedInfo?.faces ?? [] }
+    /// 선택 사진의 배경 도구 상태.
+    var backgroundAvailability: BackgroundAvailability {
+        if let failure = selectedInfo?.personAnalysisFailure {
+            return .unavailable(failure)
+        }
+        return selectedInfo?.hasPerson == true ? .ready : .noPerson
+    }
+    /// 선택 사진의 체형 도구 상태.
+    var bodyAvailability: BodyAvailability {
+        if let failure = selectedInfo?.bodyAnalysisFailure {
+            return .unavailable(failure)
+        }
+        return selectedInfo?.hasBody == true ? .ready : .noBody
+    }
+    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상 얼굴(모든 얼굴이면 전부)에 특징점이 없으면 noLandmarks다.
+    var faceAvailability: FaceAvailability {
+        if let failure = selectedInfo?.faceAnalysisFailure {
+            return .unavailable(failure)
+        }
+        guard !faces.isEmpty else { return .noFace }
+        let targets =
+            currentRecipe.portrait.targetFace.map { index in faces.indices.contains(index) ? [faces[index]] : [] }
+            ?? faces
+        let lacksLandmarks = !targets.isEmpty && targets.allSatisfy { $0.landmarks.isEmpty }
+        return lacksLandmarks ? .noLandmarks : .ready
+    }
+    /// 슬라이더 드래그가 열려 있는지. 드래그 중에 슬라이더를 끄면 끝 이벤트가 오지 않아 연속 변경과 미룬 저장이 남는다.
+    var isSliderEditActive: Bool { session.isPersistenceDeferred }
+    /// 배경 흐림 슬라이더를 움직일 수 있는지. 사람이 없어도 프리셋으로 들어온 값은 0으로 되돌릴 수 있게 켠다.
+    /// 드래그 중에는 0에 닿아도 끄지 않는다.
+    var canAdjustBackgroundBlur: Bool {
+        isSliderEditActive || backgroundAvailability == .ready || currentRecipe.background.blur != 0
+    }
+    /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 드래그 중에는 0을 지나도 끄지 않는다.
+    func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
+        !isGeometryLocked && (isSliderEditActive || bodyAvailability == .ready || currentRecipe.body[key] != 0)
+    }
+    /// 메이크업 룩·색·강도를 바꿀 수 있는지. 얼굴 분석이 실패한 사진에 메이크업을 넣으면 저장이 실패하므로 끈다.
+    /// 이미 들어온 메이크업은 줄이거나 지울 수 있게 켜고, 드래그 중에는 0에 닿아도 끄지 않는다. 얼굴이 없을 뿐이면 저장은 되므로 켠다.
+    var canAdjustMakeup: Bool {
+        guard case .unavailable = faceAvailability else { return true }
+        return isSliderEditActive || currentRecipe.makeup.hasEffect
+    }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }
 
@@ -127,8 +212,9 @@ final class AppModel {
         return transform.toOutput(source)
     }
 
-    /// 도구를 바꾼다. 자르기 화면을 드나들면 미리보기를 다시 그리고, 필터 도구는 썸네일을 준비한다.
+    /// 도구를 바꾼다. 열린 드래그는 먼저 끝낸다. 자르기 화면을 드나들면 미리보기를 다시 그리고, 필터 도구는 썸네일을 준비한다.
     func selectTool(_ newTool: EditorTool) {
+        endSliderEditIfActive()
         let showedUncropped = canvasShowsUncropped
         tool = newTool
         if canvasShowsUncropped != showedUncropped {
@@ -178,7 +264,17 @@ final class AppModel {
     func remember(_ id: PhotoID, _ prepared: PreparedPhoto) {
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
-            pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure)
+            pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
+            hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
+            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure)
+    }
+
+    /// 미리보기 캐시에서 밀려난 사진을 다시 준비한다. 다시 준비하면 분석도 새로 하므로 사진 정보를 함께 바꾼다.
+    /// 기다리는 동안 사진을 뺐으면 결과를 버린다.
+    func reprepareIfEvicted(_ id: PhotoID, at url: URL) async throws {
+        guard let prepared = try await pipeline.reprepareIfEvicted(id, at: url) else { return }
+        guard session.index(of: id) != nil else { return }
+        remember(id, prepared)
     }
 
     func select(_ id: PhotoID) {
@@ -203,7 +299,7 @@ final class AppModel {
         guard let entry = session.selected else { return }
         selectionTask = Task {
             do {
-                try await pipeline.reprepareIfEvicted(id, at: copies.url(for: entry.filename))
+                try await reprepareIfEvicted(id, at: copies.url(for: entry.filename))
                 let baseRecipe = EditRecipe()
                 let base = try await pipeline.preview(id, recipe: baseRecipe)
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
@@ -252,9 +348,9 @@ final class AppModel {
         if showsUncropped {
             shownGeometry.crop = nil
         }
-        renderScheduler.schedule {
+        renderScheduler.schedule { [weak self] in
             // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
-            try await pipeline.reprepareIfEvicted(id, at: url)
+            try await self?.reprepareIfEvicted(id, at: url)
             return try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }

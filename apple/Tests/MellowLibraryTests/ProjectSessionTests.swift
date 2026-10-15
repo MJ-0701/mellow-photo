@@ -138,7 +138,7 @@ final class ProjectSessionTests: XCTestCase {
         let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
         let source = entry("A")
         var locked = entry("B")
-        locked.document.set(.faceSlim(0.2))
+        locked.document.set(.faceShape(.width, -0.2))
         locked.document.set(.targetFace(1))
         locked.document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
         var plain = entry("C")
@@ -147,14 +147,22 @@ final class ProjectSessionTests: XCTestCase {
         try session.add(locked)
         try session.add(plain)
         session.edit(source.id) { $0.set(.exposure(0.3)) }
-        session.edit(source.id) { $0.set(.faceSlim(0.9)) }
+        session.edit(source.id) { $0.set(.faceShape(.width, -0.9)) }
+        session.edit(source.id) { document in
+            var values = PresetValues(of: document.recipe)
+            values.background.blur = 0.4
+            document.apply(values)
+            return nil
+        }
         session.applyToAll(from: source.id)
-        XCTAssertEqual(session.photos[1].document.recipe.portrait.faceSlim, 0.2)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 1)
         XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
-        XCTAssertEqual(session.photos[2].document.recipe.portrait.faceSlim, 0.9)
+        XCTAssertEqual(session.photos[2].document.recipe.portrait.face.width, -0.9)
         XCTAssertNil(session.photos[2].document.recipe.portrait.targetFace)
         XCTAssertEqual(session.photos[0].document.recipe.color.exposure, 0.3, "원본 사진은 바뀌지 않는다")
+        XCTAssertEqual(session.photos[1].document.recipe.background.blur, 0.4, "잠긴 사진도 배경 값은 복사한다")
+        XCTAssertEqual(session.photos[2].document.recipe.background.blur, 0.4)
     }
 
     func testAddPresetTrimsAndLimitsName() throws {

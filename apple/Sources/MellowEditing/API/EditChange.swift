@@ -6,8 +6,14 @@ public enum EditChange: Equatable, Sendable {
     case saturation(Double)
     case warmth(Double)
     case skinSmoothing(Double)
-    case faceSlim(Double)
+    case autoBlemish(Bool)
+    case faceShape(FaceShapeKey, Double)
     case targetFace(Int?)
+    case feature(FeatureKey, Double)
+    case backgroundBlur(Double)
+    case bodyShape(BodyShapeKey, Double)
+    case makeupColor(MakeupPart, String?)
+    case makeupIntensity(MakeupPart, Double)
     case highlights(Double)
     case shadows(Double)
     case sharpness(Double)
@@ -22,7 +28,7 @@ public enum EditChange: Equatable, Sendable {
     /// 수동 편집이 있는 동안 바꿀 수 없는 변경. 자르기·회전은 원본 좌표를 바꾸지 않으므로 잠기지 않는다.
     public var affectsGeometry: Bool {
         switch self {
-        case .faceSlim, .targetFace:
+        case .faceShape, .bodyShape, .targetFace:
             return true
         default:
             return false

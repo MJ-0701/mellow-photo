@@ -38,7 +38,7 @@ extension AppModel {
 
     /// 드래그 도중 들어온 한 번짜리 편집은 진행 중인 연속 변경을 먼저 끝내 자기 체크포인트를 갖게 한다.
     /// 드래그 중이 아니면 아무것도 하지 않는다(세션을 한 번 더 쓰지 않는다).
-    private func endSliderEditIfActive() {
+    func endSliderEditIfActive() {
         guard session.isPersistenceDeferred else { return }
         endSliderEdit()
     }
@@ -65,6 +65,17 @@ extension AppModel {
             return nil
         }
         return applied
+    }
+
+    /// 카탈로그의 룩을 체크포인트 한 번으로 적용한다. nil은 메이크업을 모두 지운다(없음). 모르는 id는 무시한다.
+    func applyMakeupLook(id: String?) {
+        let look = makeupCatalog.look(id: id)
+        guard id == nil || look != nil else { return }
+        endSliderEditIfActive()
+        mutateSelected { document in
+            document.applyMakeupLook(look)
+            return nil
+        }
     }
 
     func applyToAll() {
@@ -101,11 +112,9 @@ extension AppModel {
 
     /// 프리셋은 얼굴을 고르지 않는다. 대상 얼굴 번호는 사진마다 의미가 달라 저장하지 않는다.
     func savePreset(named name: String) {
-        var portrait = currentRecipe.portrait
-        portrait.targetFace = nil
-        session.addPreset(
-            named: name,
-            values: PresetValues(color: currentRecipe.color, portrait: portrait, detail: currentRecipe.detail))
+        var values = PresetValues(of: currentRecipe)
+        values.portrait.targetFace = nil
+        session.addPreset(named: name, values: values)
     }
 
     func resetCloneSource() {
@@ -148,7 +157,7 @@ extension AppModel {
                 document.appendLocalEdit(.warp(stroke))
                 return nil
             }
-        case .look, .crop, .adjust, .portrait:
+        case .look, .crop, .adjust, .beauty, .makeup, .body, .background:
             return
         }
     }

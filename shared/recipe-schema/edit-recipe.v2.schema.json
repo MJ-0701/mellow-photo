@@ -22,9 +22,40 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "skinSmoothing": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
-        "faceSlim": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
-        "targetFace": { "type": ["integer", "null"], "default": null, "description": "왼쪽부터 센 얼굴 인덱스. null이면 모든 얼굴." }
+        "targetFace": { "type": ["integer", "null"], "default": null, "description": "왼쪽부터 센 얼굴 인덱스. null이면 모든 얼굴." },
+        "skin": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "smoothing": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+            "autoBlemish": { "type": "boolean", "default": false }
+          }
+        },
+        "face": {
+          "type": "object", "additionalProperties": false,
+          "description": "가운데 0인 양방향. width 음수는 좁게. smile만 0~1.",
+          "properties": {
+            "width": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "jaw": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "cheekbone": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "eyeSize": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "eyeDistance": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "noseWidth": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "mouthSize": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "smile": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+            "forehead": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "chinLength": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 }
+          }
+        },
+        "features": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "eyeBrighten": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+            "teethWhiten": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+            "lipVitality": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
+          }
+        },
+        "skinSmoothing": { "type": "number", "minimum": 0, "maximum": 1, "deprecated": true, "description": "B0까지의 읽기 전용 키. skin이 없을 때만 skin.smoothing으로 읽는다. 쓰지 않는다." },
+        "faceSlim": { "type": "number", "minimum": 0, "maximum": 1, "deprecated": true, "description": "B0까지의 읽기 전용 키. face가 없을 때만 face.width = −faceSlim으로 읽는다. 쓰지 않는다." }
       }
     },
     "detail": {
@@ -57,6 +88,58 @@
             "x": { "type": "number", "minimum": 0, "maximum": 1 }, "y": { "type": "number", "minimum": 0, "maximum": 1 },
             "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }, "height": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
           }
+        }
+      }
+    },
+    "background": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "blur": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 } }
+    },
+    "body": {
+      "type": "object", "additionalProperties": false,
+      "description": "가운데 0인 양방향. legLength만 0~1.",
+      "properties": {
+        "legLength": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+        "waist": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "overall": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "arms": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "thighs": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "shoulders": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "neck": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 }
+      }
+    },
+    "makeup": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "lookID": { "type": ["string", "null"], "default": null, "description": "shared/makeup/makeup.v1.json의 룩 id. 마지막으로 적용한 룩." },
+        "lip": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "colorID": { "type": ["string", "null"], "default": null },
+            "intensity": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
+          }
+        },
+        "blush": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "colorID": { "type": ["string", "null"], "default": null },
+            "intensity": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
+          }
+        },
+        "eyeshadow": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "colorID": { "type": ["string", "null"], "default": null },
+            "intensity": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
+          }
+        },
+        "brow": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "intensity": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 } }
+        },
+        "contour": {
+          "type": "object", "additionalProperties": false,
+          "properties": { "intensity": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 } }
         }
       }
     },

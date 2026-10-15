@@ -100,8 +100,11 @@ final class AutoEnhancerTests: XCTestCase {
         let image = Support.gradient()
         XCTAssertEqual(try enhancer.suggestion(for: image, hasFaces: false).portrait, PortraitAdjustments())
         let withFaces = try enhancer.suggestion(for: image, hasFaces: true).portrait
-        XCTAssertEqual(withFaces.skinSmoothing, RenderTuning().autoSkinSmoothing)
-        XCTAssertEqual(withFaces.faceSlim, RenderTuning().autoFaceSlim)
+        XCTAssertEqual(withFaces.skin, SkinAdjustments(smoothing: RenderTuning().autoSkinSmoothing, autoBlemish: true))
+        XCTAssertEqual(withFaces.face, FaceShapeAdjustments(), "자동 보정은 얼굴형을 제안하지 않는다")
+        XCTAssertEqual(
+            withFaces.features, FeatureAdjustments(eyeBrighten: RenderTuning().autoEyeBrighten),
+            "얼굴이 있으면 눈 또렷하게만 제안한다(스펙 7)")
         XCTAssertNil(withFaces.targetFace)
     }
 

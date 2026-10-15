@@ -9,17 +9,25 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var detail = DetailAdjustments()
     public var look = LookSelection()
     public var geometry = GeometryAdjustments()
+    public var background = BackgroundAdjustments()
+    public var body = BodyShapeAdjustments()
+    public var makeup = MakeupAdjustments()
     public var operations: [LocalEdit] = []
 
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
-        look: LookSelection = .init(), geometry: GeometryAdjustments = .init(), operations: [LocalEdit] = []
+        look: LookSelection = .init(), geometry: GeometryAdjustments = .init(),
+        background: BackgroundAdjustments = .init(), body: BodyShapeAdjustments = .init(),
+        makeup: MakeupAdjustments = .init(), operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
         self.detail = detail
         self.look = look
         self.geometry = geometry
+        self.background = background
+        self.body = body
+        self.makeup = makeup
         self.operations = operations
     }
 
@@ -30,6 +38,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case detail
         case look
         case geometry
+        case background
+        case body
+        case makeup
         case operations
     }
 
@@ -40,6 +51,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         detail = try container.decodeIfPresent(DetailAdjustments.self, forKey: .detail) ?? .init()
         look = try container.decodeIfPresent(LookSelection.self, forKey: .look) ?? .init()
         geometry = try container.decodeIfPresent(GeometryAdjustments.self, forKey: .geometry) ?? .init()
+        background = try container.decodeIfPresent(BackgroundAdjustments.self, forKey: .background) ?? .init()
+        body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
+        makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
     }
 
@@ -51,6 +65,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(detail, forKey: .detail)
         try container.encode(look, forKey: .look)
         try container.encode(geometry, forKey: .geometry)
+        try container.encode(background, forKey: .background)
+        try container.encode(body, forKey: .body)
+        try container.encode(makeup, forKey: .makeup)
         try container.encode(operations, forKey: .operations)
     }
 
@@ -69,16 +86,21 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     }
 
     public var hasLocalEdits: Bool { !operations.isEmpty }
-    public var dependsOnFaces: Bool { portrait.dependsOnFaces }
+    /// 피부·얼굴형·눈·입·메이크업 중 하나라도 렌더를 바꾸면 얼굴 분석이 필요하다.
+    public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect }
+    /// 배경 흐림은 인물 마스크가 필요하다.
+    public var dependsOnPerson: Bool { background.hasEffect }
+    /// 체형은 관절점이 필요하다.
+    public var dependsOnBody: Bool { body.hasEffect }
     public var isDefault: Bool { self == EditRecipe() }
 
     /// 렌더 전 검증용. 비유한수가 하나라도 있으면 false.
     public var allValuesFinite: Bool {
-        let scalars = [
-            color.exposure, color.contrast, color.saturation, color.warmth, portrait.skinSmoothing, portrait.faceSlim,
-            look.intensity,
-        ]
+        let scalars = [color.exposure, color.contrast, color.saturation, color.warmth, look.intensity]
+        let groups =
+            portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
+            + body.numericValues + makeup.numericValues
         let locals = operations.flatMap(\.numericValues)
-        return (scalars + detail.numericValues + geometry.numericValues + locals).allSatisfy(\.isFinite)
+        return (scalars + groups + locals).allSatisfy(\.isFinite)
     }
 }

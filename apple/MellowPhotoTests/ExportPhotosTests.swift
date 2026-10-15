@@ -83,7 +83,7 @@ final class ExportPhotosTests: XCTestCase {
             analyzer: StubFaceAnalyzer(result: .failure(.faceAnalysisUnavailable(reason: "test"))),
             tuning: RenderTuning())
         var recipe = EditRecipe()
-        recipe.portrait.skinSmoothing = 0.3
+        recipe.portrait.skin.smoothing = 0.3
         let photo = try await entry(named: "A", recipe: recipe)
         let destination = RecordingDestination()
         let report = await useCase().run(entries: [photo], options: ExportOptions(), destination: destination) { _ in }

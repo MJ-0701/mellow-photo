@@ -25,7 +25,7 @@ public struct EditDocument: Equatable, Sendable {
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
     public var hasEdits: Bool { !recipe.isDefault }
-    /// 수동 편집 좌표가 어긋나지 않도록 얼굴 형태와 대상 얼굴을 고정한다.
+    /// 수동 편집 좌표가 어긋나지 않도록 얼굴형·체형과 대상 얼굴을 고정한다.
     public var isGeometryLocked: Bool { recipe.hasLocalEdits }
 
     public mutating func beginContinuousChange() {
@@ -48,9 +48,30 @@ public struct EditDocument: Equatable, Sendable {
         case .contrast(let value): updated.color.contrast = value
         case .saturation(let value): updated.color.saturation = value
         case .warmth(let value): updated.color.warmth = value
-        case .skinSmoothing(let value): updated.portrait.skinSmoothing = value
-        case .faceSlim(let value): updated.portrait.faceSlim = value
+        case .skinSmoothing(let value):
+            updated.portrait.skin.smoothing = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .autoBlemish(let flag): updated.portrait.skin.autoBlemish = flag
+        case .faceShape(let key, let value):
+            updated.portrait.face[key] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(key))
         case .targetFace(let index): updated.portrait.targetFace = index
+        case .feature(let key, let value):
+            updated.portrait.features[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .backgroundBlur(let value):
+            updated.background.blur = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .bodyShape(let key, let value):
+            updated.body[key] = EditingPolicy.clamped(value, to: EditingPolicy.bodyShapeRange(key))
+        case .makeupColor(let part, let id):
+            updated.makeup = Self.editedMakeup(updated.makeup) { makeup in
+                guard part.hasColor else { return }
+                makeup.setColorID(id, of: part)
+                if id != nil, makeup.intensity(of: part) == 0 {
+                    makeup.setIntensity(EditingPolicy.makeupDefaultIntensity, of: part)
+                }
+            }
+        case .makeupIntensity(let part, let value):
+            updated.makeup = Self.editedMakeup(updated.makeup) { makeup in
+                makeup.setIntensity(EditingPolicy.clamped(value, to: EditingPolicy.unitRange), of: part)
+            }
         case .highlights(let value): updated.detail.highlights = value
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value
@@ -80,51 +101,70 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
-    /// 잠긴 사진은 얼굴 형태 값도 유지한다.
+    /// 잠긴 사진은 얼굴형·체형도 유지한다.
     public mutating func apply(_ values: PresetValues) {
         checkpoint()
-        var portrait = values.portrait
-        portrait.targetFace = recipe.portrait.targetFace
-        if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
-        }
-        recipe.color = values.color
-        recipe.detail = values.detail
-        recipe.portrait = portrait
+        recipe = merged(values, targetFace: recipe.portrait.targetFace)
     }
 
     /// 다른 사진의 설정을 일괄 복사. 잠기지 않은 사진은 대상 얼굴을 전체로 되돌린다.
     public mutating func applyFromBatch(_ values: PresetValues) {
         checkpoint()
-        var portrait = values.portrait
-        if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
-            portrait.targetFace = recipe.portrait.targetFace
-        } else {
-            portrait.targetFace = nil
-        }
-        recipe.color = values.color
-        recipe.detail = values.detail
-        recipe.portrait = portrait
+        recipe = merged(values, targetFace: isGeometryLocked ? recipe.portrait.targetFace : nil)
     }
 
-    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 룩·기하·수동 편집은 건드리지 않는다.
+    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부·눈 또렷하게만 바꾸고
+    /// 치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·메이크업·룩·기하·수동 편집은 건드리지 않는다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
-        var portrait = suggestion.portrait
-        portrait.targetFace = recipe.portrait.targetFace
-        if isGeometryLocked {
-            portrait.faceSlim = recipe.portrait.faceSlim
-        }
         var updated = recipe
         updated.color = suggestion.color
         updated.detail = suggestion.detail
-        updated.portrait = portrait
+        updated.portrait.skin = suggestion.portrait.skin
+        updated.portrait.features.eyeBrighten = suggestion.portrait.features.eyeBrighten
         guard updated != recipe else { return false }
         checkpoint()
         recipe = updated
         return true
+    }
+
+    /// 룩의 부위 값 다섯 개를 메이크업에 써 넣고 lookID를 기록한다(스펙 6). nil이면 메이크업을 모두 지운다(룩 "없음").
+    /// 체크포인트 한 번이다. 색만 바꾸므로 수동 편집이 있어도 잠기지 않는다. 이미 같은 값이면 아무것도 하지 않는다.
+    public mutating func applyMakeupLook(_ look: MakeupLook?) {
+        let makeup = look?.adjustments ?? MakeupAdjustments()
+        guard makeup != recipe.makeup else { return }
+        checkpoint()
+        recipe.makeup = makeup
+    }
+
+    /// 슬라이더 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 둔다.
+    private func merged(_ values: PresetValues, targetFace: Int?) -> EditRecipe {
+        var updated = recipe
+        updated.color = values.color
+        updated.detail = values.detail
+        updated.portrait = values.portrait
+        updated.portrait.targetFace = targetFace
+        updated.background = values.background
+        updated.body = values.body
+        updated.makeup = values.makeup
+        if isGeometryLocked {
+            updated.portrait.face = recipe.portrait.face
+            updated.body = recipe.body
+        }
+        return updated
+    }
+
+    /// 부위 값이 실제로 바뀌었으면 룩 이름을 지운다(스펙 6). 같은 값이면 룩을 유지한다.
+    private static func editedMakeup(
+        _ previous: MakeupAdjustments, _ change: (inout MakeupAdjustments) -> Void
+    ) -> MakeupAdjustments {
+        var makeup = previous
+        change(&makeup)
+        if makeup != previous {
+            makeup.lookID = nil
+        }
+        return makeup
     }
 
     public mutating func appendLocalEdit(_ edit: LocalEdit) {

@@ -53,7 +53,7 @@ final class AppModelTests: XCTestCase {
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         await model.importFromFiles([staged])
         try await waitUntil { model.isReady && model.preview != nil }
-        model.edit(.faceSlim(0.2))
+        model.edit(.faceShape(.width, -0.2))
         try await waitUntil { !model.isRendering }
         model.tool = .retouch
         model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
@@ -61,8 +61,8 @@ final class AppModelTests: XCTestCase {
         model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
         XCTAssertEqual(model.currentRecipe.operations.count, 1)
         try await waitUntil { !model.isRendering }
-        model.edit(.faceSlim(0.9))
-        XCTAssertEqual(model.currentRecipe.portrait.faceSlim, 0.2)
+        model.edit(.faceShape(.width, -0.9))
+        XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.2)
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
     }
 
@@ -82,6 +82,29 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotNil(model.preview)
         XCTAssertEqual(model.currentRecipe.color.exposure, 0.5)
         XCTAssertEqual(model.thumbnails.count, 4)
+    }
+
+    func testReprepareAfterEvictionRefreshesPhotoInfo() async throws {
+        let files = try ["A", "B", "C", "D"].map { try TestSupport.solidPNG(in: root, name: $0) }
+        let failure = MellowError.personAnalysisUnavailable(reason: "first")
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.3, y: 0, width: 0.4, height: 0.8))
+        let queue = PersonResultQueue([.failure(failure), .success(mask)])
+        let model = TestSupport.makeModel(
+            root: root, personAnalyzer: StubPersonAnalyzer(queue: queue),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([files[0]])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let first = try XCTUnwrap(model.session.selectedPhotoID)
+        XCTAssertEqual(model.backgroundAvailability, .unavailable(failure), "첫 준비의 인물 분석은 실패한다")
+        await model.importFromFiles(Array(files[1...]))
+        try await waitUntil { !model.isImporting }
+        XCTAssertEqual(queue.calls, 4, "사진마다 한 번씩 분석한다")
+        model.select(first)
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(queue.calls, 5, "밀려난 첫 사진을 다시 준비하며 다시 분석한다")
+        XCTAssertNil(model.photoInfo[first]?.personAnalysisFailure, "다시 준비한 분석이 이전 실패를 지운다")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        XCTAssertNil(model.presentedError)
     }
 
     func testImportIsRejectedWhileBusyWithoutLeakingStagedFiles() async throws {
@@ -184,13 +207,13 @@ final class AppModelTests: XCTestCase {
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         await model.importFromFiles([staged])
         try await waitUntil { model.isReady && model.preview != nil }
-        model.edit(.faceSlim(0.4))
+        model.edit(.faceShape(.width, -0.4))
         model.edit(.targetFace(1))
         XCTAssertEqual(model.currentRecipe.portrait.targetFace, 1)
         model.savePreset(named: "대상 얼굴")
         let saved = try XCTUnwrap(model.session.presets.last)
         XCTAssertNil(saved.values.portrait.targetFace, "프리셋은 얼굴을 고르지 않는다")
-        XCTAssertEqual(saved.values.portrait.faceSlim, 0.4)
+        XCTAssertEqual(saved.values.portrait.face.width, -0.4)
     }
 
     func testSliderDragSavesSessionOnceAtEnd() async throws {
@@ -439,5 +462,498 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.geometry.crop?.width, 0.7)
         model.undo()
         XCTAssertNil(model.currentRecipe.geometry.crop, "실행 취소 한 번에 드래그 전으로")
+    }
+
+    func testBeautyToolEditsSkinOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .skin)
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.4))
+        model.edit(.skinSmoothing(0.5))
+        model.endSliderEdit()
+        model.edit(.autoBlemish(true))
+        XCTAssertEqual(model.currentRecipe.portrait.skin, SkinAdjustments(smoothing: 0.5, autoBlemish: true))
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.skin, SkinAdjustments(smoothing: 0.5))
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.isDefault)
+    }
+
+    func testAutoEnhanceWithFaceTurnsOnAutoBlemishAndKeepsFaceWidth() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.faceShape(.width, -0.4))
+        await model.autoEnhance()
+        XCTAssertEqual(
+            model.currentRecipe.portrait.skin,
+            SkinAdjustments(smoothing: RenderTuning().autoSkinSmoothing, autoBlemish: true))
+        XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.4, "자동 보정은 얼굴형을 건드리지 않는다")
+        XCTAssertEqual(
+            model.currentRecipe.portrait.features.eyeBrighten, RenderTuning().autoEyeBrighten, "자동 보정은 눈 또렷하게를 켠다")
+    }
+
+    func testBeautyTabSurvivesToolSwitch() {
+        let model = TestSupport.makeModel(root: root)
+        model.selectTool(.beauty)
+        model.beautyTab = .face
+        model.selectTool(.adjust)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .face)
+    }
+
+    func testFaceTabEditsEveryShapeKeyOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        model.beautyTab = .face
+        for key in FaceShapeKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.faceShape(key, 0.3))
+            model.edit(.faceShape(key, 0.4))
+            model.endSliderEdit()
+        }
+        for key in FaceShapeKey.allCases {
+            XCTAssertEqual(model.currentRecipe.portrait.face[key], 0.4, accuracy: 1e-9, "\(key)")
+        }
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, FaceShapeKey.allCases.count)
+        let titles = FaceShapeKey.allCases.map(UserMessage.faceShapeTitle)
+        XCTAssertEqual(Set(titles).count, FaceShapeKey.allCases.count, "슬라이더 이름이 겹치지 않는다")
+        XCTAssertEqual(titles.first, "얼굴 폭")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.face.forehead, 0.4, accuracy: 1e-9)
+    }
+
+    func testGeometryLockRejectsEveryFaceShapeKey() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.currentRecipe.operations.count, 1)
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        for key in FaceShapeKey.allCases {
+            model.edit(.faceShape(key, 0.5))
+            XCTAssertEqual(model.currentRecipe.portrait.face[key], 0, "\(key)는 잠겨 있다")
+        }
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
+    }
+
+    func testFeaturesTabEditsEachKeyAndIsNotLockedByLocalEdits() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features])
+        XCTAssertEqual(BeautyTab.features.title, "눈·입")
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.beauty)
+        model.beautyTab = .features
+        for key in FeatureKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.feature(key, 0.3))
+            model.edit(.feature(key, 0.6))
+            model.endSliderEdit()
+        }
+        for key in FeatureKey.allCases {
+            XCTAssertEqual(model.currentRecipe.portrait.features[key], 0.6, accuracy: 1e-9, "\(key)는 잠기지 않는다")
+        }
+        XCTAssertEqual(FeatureKey.allCases.map(UserMessage.featureTitle), ["눈 또렷하게", "치아 미백", "입술 생기"])
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.features.lipVitality, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.features.teethWhiten, 0.6, accuracy: 1e-9)
+    }
+
+    func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.3, y: 0, width: 0.4, height: 0.8))
+        let model = TestSupport.makeModel(
+            root: root, personAnalyzer: StubPersonAnalyzer(result: .success(mask)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.background)
+        XCTAssertEqual(EditorTool.background.title, "배경")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        model.beginSliderEdit()
+        model.edit(.backgroundBlur(0.3))
+        model.edit(.backgroundBlur(0.5))
+        model.endSliderEdit()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0.5, accuracy: 1e-9)
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0, "드래그 한 번이 실행 취소 한 단계")
+    }
+
+    func testBackgroundToolReportsNoPersonAndAnalysisFailureWithoutBlockingRender() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let empty = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(empty, staged)
+        XCTAssertEqual(empty.backgroundAvailability, .noPerson)
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let failure = MellowError.personAnalysisUnavailable(reason: "test")
+        let failing = TestSupport.makeModel(
+            root: otherRoot, personAnalyzer: StubPersonAnalyzer(result: .failure(failure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(failing, otherStaged)
+        XCTAssertNil(failing.presentedError, "인물 분석 실패는 가져오기 경고로 띄우지 않는다")
+        XCTAssertEqual(failing.backgroundAvailability, .unavailable(failure))
+        failing.edit(.backgroundBlur(0.5))
+        try await waitUntil { !failing.isRendering }
+        XCTAssertEqual(failing.currentRecipe.background.blur, 0.5, "값은 저장된다")
+        XCTAssertNil(failing.presentedError, "렌더는 흐림만 건너뛰고 오류를 띄우지 않는다")
+    }
+
+    func testBodyToolEditsEveryKeyOneUndoStepEachWhenBodyFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(
+            EditorTool.allCases, [.look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
+        model.selectTool(.body)
+        XCTAssertEqual(EditorTool.body.title, "체형")
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        for key in BodyShapeKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.bodyShape(key, 0.2))
+            model.edit(.bodyShape(key, 0.4))
+            model.endSliderEdit()
+        }
+        for key in BodyShapeKey.allCases {
+            XCTAssertEqual(model.currentRecipe.body[key], 0.4, accuracy: 1e-9, "\(key)")
+        }
+        XCTAssertEqual(
+            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle), ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목"])
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.body.neck, 0, "드래그 한 번이 실행 취소 한 단계")
+        XCTAssertEqual(model.currentRecipe.body.shoulders, 0.4, accuracy: 1e-9)
+    }
+
+    func testBodyToolReportsNoBodyAndAnalysisFailureWithoutBlockingRender() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let empty = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(empty, staged)
+        XCTAssertEqual(empty.bodyAvailability, .noBody)
+        XCTAssertEqual(UserMessage.noBodyHint, "전신이 보이는 사진에서 동작합니다.")
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let failure = MellowError.bodyAnalysisUnavailable(reason: "test")
+        let failing = TestSupport.makeModel(
+            root: otherRoot, bodyAnalyzer: StubBodyAnalyzer(result: .failure(failure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(failing, otherStaged)
+        XCTAssertNil(failing.presentedError, "체형 분석 실패는 가져오기 경고로 띄우지 않는다")
+        XCTAssertEqual(failing.bodyAvailability, .unavailable(failure))
+        failing.edit(.bodyShape(.legLength, 0.5))
+        try await waitUntil { !failing.isRendering }
+        XCTAssertEqual(failing.currentRecipe.body.legLength, 0.5, "값은 저장된다")
+        XCTAssertNil(failing.presentedError, "렌더는 체형만 건너뛰고 오류를 띄우지 않는다")
+    }
+
+    func testReprepareAfterEvictionRefreshesBodyInfo() async throws {
+        let files = try ["A", "B", "C", "D"].map { try TestSupport.solidPNG(in: root, name: $0) }
+        let failure = MellowError.bodyAnalysisUnavailable(reason: "first")
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let queue = BodyResultQueue([.failure(failure), .success([body])])
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(queue: queue),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([files[0]])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let first = try XCTUnwrap(model.session.selectedPhotoID)
+        XCTAssertEqual(model.bodyAvailability, .unavailable(failure), "첫 준비의 체형 분석은 실패한다")
+        await model.importFromFiles(Array(files[1...]))
+        try await waitUntil { !model.isImporting }
+        XCTAssertEqual(queue.calls, 4, "사진마다 한 번씩 분석한다")
+        model.select(first)
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(queue.calls, 5, "밀려난 첫 사진을 다시 준비하며 다시 분석한다")
+        XCTAssertNil(model.photoInfo[first]?.bodyAnalysisFailure, "다시 준비한 분석이 이전 실패를 지운다")
+        XCTAssertEqual(model.photoInfo[first]?.hasBody, true, "다시 준비한 분석의 전신 여부를 저장한다")
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        XCTAssertNil(model.presentedError)
+    }
+
+    func testGeometryLockRejectsEveryBodyShapeKey() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.currentRecipe.operations.count, 1)
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.body)
+        for key in BodyShapeKey.allCases {
+            model.edit(.bodyShape(key, 0.5))
+            XCTAssertEqual(model.currentRecipe.body[key], 0, "\(key)는 잠겨 있다")
+        }
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
+        XCTAssertTrue(UserMessage.geometryLocked.contains("체형"), "잠금 문구가 체형도 말한다")
+    }
+
+    func testFaceAvailabilityReportsMissingLandmarksForTargetFaces() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let landmarked = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.05, y: 0.3, width: 0.35, height: 0.4))
+        let boxOnly = FaceGeometry(boundingBox: NormalizedRect(x: 0.55, y: 0.3, width: 0.35, height: 0.4))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([landmarked, boxOnly])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.faceAvailability, .ready, "특징점이 있는 얼굴이 대상에 있으면 준비됨")
+        model.edit(.targetFace(1))
+        XCTAssertEqual(model.faceAvailability, .noLandmarks)
+        XCTAssertTrue(UserMessage.noLandmarksHint.contains("메이크업"))
+        model.edit(.targetFace(0))
+        XCTAssertEqual(model.faceAvailability, .ready)
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let empty = TestSupport.makeModel(
+            root: otherRoot,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(empty, otherStaged)
+        XCTAssertEqual(empty.faceAvailability, .noFace)
+    }
+
+    func testBackgroundAndBodySlidersStayUsableToResetPresetValues() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.backgroundAvailability, .noPerson)
+        XCTAssertEqual(model.bodyAvailability, .noBody)
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        model.applyPreset(
+            PresetValues(background: BackgroundAdjustments(blur: 0.4), body: BodyShapeAdjustments(waist: -0.3)))
+        XCTAssertTrue(model.canAdjustBackgroundBlur, "프리셋으로 들어온 흐림은 0으로 되돌릴 수 있다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist))
+        XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 효과가 없어 계속 끈다")
+        model.edit(.backgroundBlur(0))
+        model.edit(.bodyShape(.waist, 0))
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+    }
+
+    func testMakeupToolAppliesLookOnceAndPartEditsDetachLook() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.makeup)
+        XCTAssertEqual(EditorTool.makeup.title, "메이크업")
+        XCTAssertEqual(model.makeupCatalog.looks.map(\.name), ["데일리", "쿨톤", "웜피치", "로지", "스모키"])
+        XCTAssertEqual(
+            MakeupPart.allCases.map(UserMessage.makeupPartTitle), ["립", "블러셔", "아이섀도", "눈썹", "쉐딩"])
+        let daily = try XCTUnwrap(model.makeupCatalog.look(id: "daily"))
+        model.applyMakeupLook(id: "daily")
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments)
+        model.applyMakeupLook(id: "nope")
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments, "모르는 룩은 무시한다")
+        model.makeupPart = .blush
+        model.beginSliderEdit()
+        model.edit(.makeupIntensity(.blush, 0.6))
+        model.edit(.makeupIntensity(.blush, 0.8))
+        model.endSliderEdit()
+        XCTAssertEqual(model.currentRecipe.makeup.blush.intensity, 0.8, accuracy: 1e-9)
+        XCTAssertNil(model.currentRecipe.makeup.lookID, "부위를 바꾸면 룩 이름이 풀린다")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments, "드래그 한 번이 실행 취소 한 단계")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "룩 적용도 실행 취소 한 번")
+        model.redo()
+        model.applyMakeupLook(id: nil)
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "없음은 메이크업을 모두 지운다")
+    }
+
+    func testMakeupWorksWithLocalEditsAndFallsBackWithoutCatalog() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.makeup)
+        model.edit(.makeupColor(.lip, "lip-coral"))
+        XCTAssertEqual(model.currentRecipe.makeup.lip.colorID, "lip-coral", "메이크업은 수동 편집이 있어도 잠기지 않는다")
+        XCTAssertNotEqual(model.statusMessage, UserMessage.geometryLocked)
+        model.applyMakeupLook(id: "smoky")
+        XCTAssertEqual(model.currentRecipe.makeup.lookID, "smoky")
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let bare = TestSupport.makeModel(
+            root: otherRoot, makeupCatalog: .empty,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(bare, otherStaged)
+        bare.applyMakeupLook(id: "daily")
+        XCTAssertEqual(bare.currentRecipe.makeup, MakeupAdjustments(), "카탈로그가 없으면 룩을 고를 수 없다")
+        XCTAssertTrue(bare.makeupCatalog.isEmpty)
+        XCTAssertTrue(UserMessage.makeupCatalogUnavailable.contains("메이크업"))
+        XCTAssertNil(
+            AppModel.bundledMakeupCatalog(in: Bundle(for: AppModelTests.self)), "파일이 없는 번들은 nil(안내 문구로 바뀐다)")
+        XCTAssertEqual(AppModel.bundledMakeupCatalog()?.looks.count, 5, "앱 번들에서는 읽힌다")
+    }
+
+    func testMakeupLookDuringSliderDragEndsDragFirst() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.makeup)
+        model.beginSliderEdit()
+        model.edit(.makeupIntensity(.contour, 0.7))
+        XCTAssertTrue(model.session.isPersistenceDeferred)
+        model.applyMakeupLook(id: "daily")
+        XCTAssertFalse(model.session.isPersistenceDeferred, "룩 적용 전에 열린 드래그를 끝낸다")
+        let daily = try XCTUnwrap(model.makeupCatalog.look(id: "daily"))
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments)
+        try await waitUntil { !model.isRendering }
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup.contour.intensity, 0.7, accuracy: 1e-9, "룩 적용은 자기 단계를 갖는다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "드래그도 자기 단계를 갖는다")
+    }
+
+    func testMakeupControlsLockWhenFaceAnalysisFailedUnlessMakeupNeedsClearing() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let failed = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .failure(.faceAnalysisUnavailable(reason: "test"))),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(failed, staged)
+        failed.selectTool(.makeup)
+        XCTAssertEqual(failed.faceAvailability, .unavailable(.faceAnalysisUnavailable(reason: "test")))
+        XCTAssertFalse(failed.canAdjustMakeup, "분석이 실패한 사진에 메이크업을 넣으면 저장이 실패한다")
+        let daily = try XCTUnwrap(failed.makeupCatalog.look(id: "daily"))
+        failed.applyPreset(PresetValues(makeup: daily.adjustments))
+        XCTAssertTrue(failed.canAdjustMakeup, "프리셋으로 들어온 메이크업은 줄이거나 지울 수 있다")
+        failed.applyMakeupLook(id: nil)
+        XCTAssertEqual(failed.currentRecipe.makeup, MakeupAdjustments(), "없음은 언제나 메이크업을 지운다")
+        XCTAssertFalse(failed.canAdjustMakeup)
+        failed.applyPreset(PresetValues(makeup: daily.adjustments))
+        failed.beginSliderEdit()
+        for part in MakeupPart.allCases {
+            failed.edit(.makeupIntensity(part, 0))
+        }
+        XCTAssertTrue(failed.canAdjustMakeup, "드래그 중에는 효과가 0이 돼도 끄지 않는다")
+        failed.endSliderEdit()
+        XCTAssertFalse(failed.canAdjustMakeup)
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let ready = TestSupport.makeModel(
+            root: otherRoot, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(ready, otherStaged)
+        XCTAssertEqual(ready.faceAvailability, .ready)
+        XCTAssertTrue(ready.canAdjustMakeup)
+    }
+
+    func testMakeupStaysAdjustableWithoutFacesBecauseExportStillWorks() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.faceAvailability, .noFace)
+        XCTAssertTrue(model.canAdjustMakeup, "얼굴이 없으면 메이크업은 효과만 없고 저장은 된다")
+    }
+
+    func testSelectingToolDuringSliderDragEndsDrag() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.makeup)
+        model.beginSliderEdit()
+        model.edit(.makeupIntensity(.lip, 0.4))
+        XCTAssertTrue(model.isSliderEditActive)
+        model.selectTool(.adjust)
+        XCTAssertFalse(model.isSliderEditActive, "도구를 바꾸면 열린 드래그를 끝낸다")
+        model.edit(.exposure(0.2))
+        try await waitUntil { !model.isRendering }
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup.lip.intensity, 0.4, accuracy: 1e-9, "도구 전환 뒤 편집은 자기 단계를 갖는다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup.lip.intensity, 0, "드래그가 한 단계")
+    }
+
+    func testSliderDraggedToZeroWithoutBodyStaysEnabledUntilDragEnds() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let store = MemorySessionStore()
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]),
+            store: store)
+        try await importOne(model, staged)
+        model.applyPreset(
+            PresetValues(background: BackgroundAdjustments(blur: 0.4), body: BodyShapeAdjustments(waist: -0.3)))
+        model.beginSliderEdit()
+        model.edit(.bodyShape(.waist, 0))
+        XCTAssertTrue(model.canAdjustBodyShape(.waist), "드래그 중에는 0이 돼도 끄지 않아 드래그가 정상으로 끝난다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.session.isPersistenceDeferred, "드래그가 끝나면 미룬 저장도 끝난다")
+        XCTAssertFalse(model.canAdjustBodyShape(.waist), "드래그가 끝난 뒤에 끈다")
+        model.beginSliderEdit()
+        model.edit(.backgroundBlur(0))
+        XCTAssertTrue(model.canAdjustBackgroundBlur, "배경 흐림도 드래그 중에는 끄지 않는다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.session.isPersistenceDeferred)
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        let saves = store.saveCount
+        model.edit(.makeupIntensity(.lip, 0.4))
+        XCTAssertEqual(store.saveCount, saves + 1, "다음 편집은 바로 저장된다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0, "다음 편집은 자기 단계를 갖는다")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0.4, accuracy: 1e-9, "흐림 드래그가 한 단계")
+        XCTAssertEqual(model.currentRecipe.body.waist, 0, "허리 드래그는 그 앞 단계")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
     }
 }

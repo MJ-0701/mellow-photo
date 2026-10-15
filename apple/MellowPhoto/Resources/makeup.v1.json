@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "colors": {
+    "lip": [
+      { "id": "lip-nude",  "name": "누드", "rgb": [0.80, 0.55, 0.49] },
+      { "id": "lip-coral", "name": "코랄", "rgb": [0.96, 0.45, 0.38] },
+      { "id": "lip-rose",  "name": "로즈", "rgb": [0.82, 0.38, 0.47] },
+      { "id": "lip-red",   "name": "레드", "rgb": [0.80, 0.10, 0.16] },
+      { "id": "lip-berry", "name": "베리", "rgb": [0.60, 0.13, 0.30] },
+      { "id": "lip-mlbb",  "name": "MLBB", "rgb": [0.72, 0.42, 0.42] }
+    ],
+    "blush": [
+      { "id": "blush-peach", "name": "피치", "rgb": [0.98, 0.70, 0.58] },
+      { "id": "blush-pink",  "name": "핑크", "rgb": [0.97, 0.62, 0.70] },
+      { "id": "blush-coral", "name": "코랄", "rgb": [0.97, 0.55, 0.45] },
+      { "id": "blush-rose",  "name": "로즈", "rgb": [0.86, 0.52, 0.58] }
+    ],
+    "eyeshadow": [
+      { "id": "shadow-brown", "name": "브라운", "rgb": [0.55, 0.38, 0.28] },
+      { "id": "shadow-peach", "name": "피치",   "rgb": [0.90, 0.62, 0.50] },
+      { "id": "shadow-pink",  "name": "핑크",   "rgb": [0.85, 0.55, 0.62] },
+      { "id": "shadow-smoky", "name": "스모키", "rgb": [0.30, 0.27, 0.28] }
+    ]
+  },
+  "looks": [
+    { "id": "daily",      "name": "데일리", "lip": { "colorID": "lip-mlbb",  "intensity": 0.5 },  "blush": { "colorID": "blush-peach", "intensity": 0.35 }, "eyeshadow": { "colorID": "shadow-brown", "intensity": 0.3 },  "brow": { "intensity": 0.3 },  "contour": { "intensity": 0.2 } },
+    { "id": "cool",       "name": "쿨톤",   "lip": { "colorID": "lip-rose",  "intensity": 0.55 }, "blush": { "colorID": "blush-pink",  "intensity": 0.4 },  "eyeshadow": { "colorID": "shadow-pink",  "intensity": 0.35 }, "brow": { "intensity": 0.3 },  "contour": { "intensity": 0.25 } },
+    { "id": "warm-peach", "name": "웜피치", "lip": { "colorID": "lip-coral", "intensity": 0.55 }, "blush": { "colorID": "blush-peach", "intensity": 0.45 }, "eyeshadow": { "colorID": "shadow-peach", "intensity": 0.4 },  "brow": { "intensity": 0.3 },  "contour": { "intensity": 0.2 } },
+    { "id": "rosy",       "name": "로지",   "lip": { "colorID": "lip-rose",  "intensity": 0.6 },  "blush": { "colorID": "blush-rose",  "intensity": 0.5 },  "eyeshadow": { "colorID": "shadow-pink",  "intensity": 0.3 },  "brow": { "intensity": 0.25 }, "contour": { "intensity": 0.15 } },
+    { "id": "smoky",      "name": "스모키", "lip": { "colorID": "lip-berry", "intensity": 0.6 },  "blush": { "colorID": "blush-rose",  "intensity": 0.3 },  "eyeshadow": { "colorID": "shadow-smoky", "intensity": 0.6 },  "brow": { "intensity": 0.5 },  "contour": { "intensity": 0.4 } }
+  ]
+}
