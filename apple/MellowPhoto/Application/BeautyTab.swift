@@ -1,7 +1,8 @@
-/// 뷰티 도구의 하위 탭. 눈·입 탭은 D 단계에서 추가한다.
+/// 뷰티 도구의 하위 탭.
 enum BeautyTab: CaseIterable, Identifiable {
     case skin
     case face
+    case features
 
     var id: Self { self }
 
@@ -9,6 +10,7 @@ enum BeautyTab: CaseIterable, Identifiable {
         switch self {
         case .skin: return UserMessage.beautyTabSkin
         case .face: return UserMessage.beautyTabFace
+        case .features: return UserMessage.beautyTabFeatures
         }
     }
 }

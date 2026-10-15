@@ -473,6 +473,8 @@ final class AppModelTests: XCTestCase {
             model.currentRecipe.portrait.skin,
             SkinAdjustments(smoothing: RenderTuning().autoSkinSmoothing, autoBlemish: true))
         XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.4, "자동 보정은 얼굴형을 건드리지 않는다")
+        XCTAssertEqual(
+            model.currentRecipe.portrait.features.eyeBrighten, RenderTuning().autoEyeBrighten, "자동 보정은 눈 또렷하게를 켠다")
     }
 
     func testBeautyTabSurvivesToolSwitch() {
@@ -525,5 +527,34 @@ final class AppModelTests: XCTestCase {
             XCTAssertEqual(model.currentRecipe.portrait.face[key], 0, "\(key)는 잠겨 있다")
         }
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
+    }
+
+    func testFeaturesTabEditsEachKeyAndIsNotLockedByLocalEdits() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features])
+        XCTAssertEqual(BeautyTab.features.title, "눈·입")
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.beauty)
+        model.beautyTab = .features
+        for key in FeatureKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.feature(key, 0.3))
+            model.edit(.feature(key, 0.6))
+            model.endSliderEdit()
+        }
+        for key in FeatureKey.allCases {
+            XCTAssertEqual(model.currentRecipe.portrait.features[key], 0.6, accuracy: 1e-9, "\(key)는 잠기지 않는다")
+        }
+        XCTAssertEqual(FeatureKey.allCases.map(UserMessage.featureTitle), ["눈 또렷하게", "치아 미백", "입술 생기"])
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.features.lipVitality, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.features.teethWhiten, 0.6, accuracy: 1e-9)
     }
 }

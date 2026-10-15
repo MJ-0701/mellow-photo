@@ -36,6 +36,7 @@ struct BeautyPanel: View {
             switch model.beautyTab {
             case .skin: skinControls(recipe.portrait.skin)
             case .face: faceControls(recipe.portrait.face)
+            case .features: featureControls(recipe.portrait.features)
             }
         }
     }
@@ -66,5 +67,16 @@ struct BeautyPanel: View {
         }
         Text(model.isGeometryLocked ? UserMessage.geometryLocked : UserMessage.faceHint)
             .font(.caption).foregroundStyle(.secondary)
+    }
+
+    /// 눈 또렷하게·치아 미백·입술 생기 0…1. 색만 바꾸므로 수동 편집이 있어도 잠기지 않는다.
+    @ViewBuilder
+    private func featureControls(_ features: FeatureAdjustments) -> some View {
+        ForEach(FeatureKey.allCases, id: \.self) { key in
+            AdjustmentSlider(
+                title: UserMessage.featureTitle(key), value: features[key], range: EditingPolicy.unitRange
+            ) { .feature(key, $0) }
+        }
+        Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
     }
 }

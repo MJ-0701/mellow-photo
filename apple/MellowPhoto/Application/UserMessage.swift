@@ -27,11 +27,13 @@ enum UserMessage {
     static let toolBeauty = "뷰티"
     static let beautyTabSkin = "피부"
     static let beautyTabFace = "얼굴"
+    static let beautyTabFeatures = "눈·입"
     static let beautyTabsLabel = "뷰티 항목"
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
     static let faceHint = "미소는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
+    static let featureHint = "치아 미백은 치아가 보이는 사진에서만 바뀌어요. 눈·입 보정은 얼굴 특징점을 찾은 얼굴에 적용돼요."
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
     static let noFaceDetected = "감지된 얼굴이 없어요"
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
@@ -110,6 +112,15 @@ enum UserMessage {
         case .smile: return "미소"
         case .forehead: return "이마"
         case .chinLength: return "턱 길이"
+        }
+    }
+
+    /// 뷰티 › 눈·입 탭 슬라이더 이름. 화면 순서는 FeatureKey.allCases.
+    static func featureTitle(_ key: FeatureKey) -> String {
+        switch key {
+        case .eyeBrighten: return "눈 또렷하게"
+        case .teethWhiten: return "치아 미백"
+        case .lipVitality: return "입술 생기"
         }
     }
 
