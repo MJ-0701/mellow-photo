@@ -723,4 +723,51 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
         XCTAssertTrue(UserMessage.geometryLocked.contains("체형"), "잠금 문구가 체형도 말한다")
     }
+
+    func testFaceAvailabilityReportsMissingLandmarksForTargetFaces() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let landmarked = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.05, y: 0.3, width: 0.35, height: 0.4))
+        let boxOnly = FaceGeometry(boundingBox: NormalizedRect(x: 0.55, y: 0.3, width: 0.35, height: 0.4))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([landmarked, boxOnly])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.faceAvailability, .ready, "특징점이 있는 얼굴이 대상에 있으면 준비됨")
+        model.edit(.targetFace(1))
+        XCTAssertEqual(model.faceAvailability, .noLandmarks)
+        XCTAssertTrue(UserMessage.noLandmarksHint.contains("메이크업"))
+        model.edit(.targetFace(0))
+        XCTAssertEqual(model.faceAvailability, .ready)
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let empty = TestSupport.makeModel(
+            root: otherRoot,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(empty, otherStaged)
+        XCTAssertEqual(empty.faceAvailability, .noFace)
+    }
+
+    func testBackgroundAndBodySlidersStayUsableToResetPresetValues() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.backgroundAvailability, .noPerson)
+        XCTAssertEqual(model.bodyAvailability, .noBody)
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        model.applyPreset(
+            PresetValues(background: BackgroundAdjustments(blur: 0.4), body: BodyShapeAdjustments(waist: -0.3)))
+        XCTAssertTrue(model.canAdjustBackgroundBlur, "프리셋으로 들어온 흐림은 0으로 되돌릴 수 있다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist))
+        XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 효과가 없어 계속 끈다")
+        model.edit(.backgroundBlur(0))
+        model.edit(.bodyShape(.waist, 0))
+        XCTAssertFalse(model.canAdjustBackgroundBlur)
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+    }
 }

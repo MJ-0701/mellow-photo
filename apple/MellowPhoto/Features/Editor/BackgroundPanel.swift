@@ -2,7 +2,7 @@ import MellowEditing
 import SwiftUI
 
 /// 배경 도구. 사람은 그대로 두고 인물 영역 밖을 흐린다.
-/// 사람을 찾지 못했거나 인물 분석이 실패하면 안내를 보이고 슬라이더는 값이 보이게 끈다(프리셋으로 들어온 값을 확인할 수 있다).
+/// 사람을 찾지 못했거나 인물 분석이 실패하면 안내를 보이고 슬라이더는 끈다. 프리셋으로 들어온 값이 있으면 0으로 되돌릴 수 있게 켠다.
 struct BackgroundPanel: View {
     @Environment(AppModel.self) private var model
 
@@ -22,7 +22,7 @@ struct BackgroundPanel: View {
             title: UserMessage.backgroundBlur, value: model.currentRecipe.background.blur,
             range: EditingPolicy.unitRange
         ) { .backgroundBlur($0) }
-        .disabled(availability != .ready)
+        .disabled(!model.canAdjustBackgroundBlur)
         Text(UserMessage.backgroundHint).font(.caption).foregroundStyle(.secondary)
     }
 }

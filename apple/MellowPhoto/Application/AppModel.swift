@@ -44,6 +44,15 @@ final class AppModel {
         case unavailable(MellowError)
     }
 
+    /// 뷰티·메이크업 도구가 보여줄 얼굴 상태. 분석 실패가 얼굴 없음보다 먼저다.
+    enum FaceAvailability: Equatable {
+        case ready
+        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정만 동작한다.
+        case noLandmarks
+        case noFace
+        case unavailable(MellowError)
+    }
+
     enum Policy {
         static let brushRadiusRange = 0.008...0.07
         static let defaultBrushRadius = 0.025
@@ -144,6 +153,26 @@ final class AppModel {
             return .unavailable(failure)
         }
         return selectedInfo?.hasBody == true ? .ready : .noBody
+    }
+    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상 얼굴(모든 얼굴이면 전부)에 특징점이 없으면 noLandmarks다.
+    var faceAvailability: FaceAvailability {
+        if let failure = selectedInfo?.faceAnalysisFailure {
+            return .unavailable(failure)
+        }
+        guard !faces.isEmpty else { return .noFace }
+        let targets =
+            currentRecipe.portrait.targetFace.map { index in faces.indices.contains(index) ? [faces[index]] : [] }
+            ?? faces
+        let lacksLandmarks = !targets.isEmpty && targets.allSatisfy { $0.landmarks.isEmpty }
+        return lacksLandmarks ? .noLandmarks : .ready
+    }
+    /// 배경 흐림 슬라이더를 움직일 수 있는지. 사람이 없어도 프리셋으로 들어온 값은 0으로 되돌릴 수 있게 켠다.
+    var canAdjustBackgroundBlur: Bool {
+        backgroundAvailability == .ready || currentRecipe.background.blur != 0
+    }
+    /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
+        !isGeometryLocked && (bodyAvailability == .ready || currentRecipe.body[key] != 0)
     }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }

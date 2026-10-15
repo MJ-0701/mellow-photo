@@ -12,13 +12,15 @@ struct BeautyPanel: View {
     var body: some View {
         @Bindable var model = model
         let recipe = model.currentRecipe
-        if let failure = model.selectedInfo?.faceAnalysisFailure {
+        let availability = model.faceAvailability
+        switch availability {
+        case .unavailable(let failure):
             Label(UserMessage.faceAnalysisUnavailableTitle, systemImage: "exclamationmark.triangle")
             Text(UserMessage.text(for: failure)).font(.caption).foregroundStyle(.secondary)
-        } else if model.faces.isEmpty {
+        case .noFace:
             Label(UserMessage.noFaceDetected, systemImage: "person.crop.rectangle.badge.questionmark")
             Text(UserMessage.noFaceHint).font(.caption).foregroundStyle(.secondary)
-        } else {
+        case .ready, .noLandmarks:
             Picker(
                 UserMessage.faceCount(model.faces.count),
                 selection: Binding(
@@ -29,6 +31,9 @@ struct BeautyPanel: View {
                 ForEach(model.faces.indices, id: \.self) { Text(UserMessage.faceOrdinal($0 + 1)).tag($0) }
             }
             .disabled(model.isGeometryLocked)
+            if availability == .noLandmarks {
+                Text(UserMessage.noLandmarksHint).font(.caption).foregroundStyle(.secondary)
+            }
             Picker(UserMessage.beautyTabsLabel, selection: $model.beautyTab) {
                 ForEach(BeautyTab.allCases) { Text($0.title).tag($0) }
             }
