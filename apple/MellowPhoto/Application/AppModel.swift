@@ -31,6 +31,9 @@ final class AppModel {
         static let renderDebounce = Duration.milliseconds(100)
         /// 알림에 나열하는 실패·경고 줄 수. 나머지는 개수로만 알린다.
         static let listedIssueLimit = 3
+        /// 앱 번들에 든 룩 카탈로그 파일. shared/looks/looks.v1.json과 같은 내용이다.
+        static let bundledLookCatalogName = "looks.v1"
+        static let bundledLookCatalogExtension = "json"
     }
 
     let session: ProjectSession
@@ -38,8 +41,14 @@ final class AppModel {
     let copies: WorkingCopyStore
     let importer: any PhotoImporter
     let exporter: Exporter
+    let lookCatalog: LookCatalog
 
     var thumbnails: [PhotoID: CGImage] = [:]
+    /// 사진별 룩 썸네일. 키가 사진 id라서 늦게 온 결과가 다른 사진에 붙지 않는다.
+    var lookThumbnails: [PhotoID: [String: CGImage]] = [:]
+    /// 만드는 중인 룩 썸네일. 같은 사진을 두 번 요청하지 않는다.
+    var lookThumbnailRequests: Set<PhotoID> = []
+    var cropAspect: CropAspect?
     var photoInfo: [PhotoID: PhotoInfo] = [:]
     var preview: CGImage?
     var original: CGImage?
@@ -55,7 +64,7 @@ final class AppModel {
     var presentedError: PresentedError?
     var selectionFailure: String?
 
-    var tool: EditorTool = .color
+    var tool: EditorTool = .look
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
@@ -72,16 +81,19 @@ final class AppModel {
     let renderScheduler: RenderScheduler
     private var selectionTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
+    /// 비교 화면의 원본에 마지막으로 입힌 기하. 같으면 원본을 다시 그리지 않는다.
+    private var originalGeometry: GeometryAdjustments?
 
     init(
         session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
-        exporter: Exporter, renderDebounce: Duration = Policy.renderDebounce
+        exporter: Exporter, lookCatalog: LookCatalog = .empty, renderDebounce: Duration = Policy.renderDebounce
     ) {
         self.session = session
         self.pipeline = pipeline
         self.copies = copies
         self.importer = importer
         self.exporter = exporter
+        self.lookCatalog = lookCatalog
         renderScheduler = RenderScheduler(debounce: renderDebounce)
     }
 
@@ -93,6 +105,37 @@ final class AppModel {
     var displayImage: CGImage? { isComparing ? original : (preview ?? original) }
     var selectedInfo: PhotoInfo? { session.selectedPhotoID.flatMap { photoInfo[$0] } }
     var faces: [FaceGeometry] { selectedInfo?.faces ?? [] }
+    /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
+    var canvasShowsUncropped: Bool { tool == .crop }
+
+    /// 캔버스(출력) 좌표와 원본 좌표 사이의 변환. 자르기 도구에서는 자르기만 뺀 기하를 쓴다.
+    var outputTransform: GeometryTransform? {
+        guard let size = selectedInfo?.pixelSize, size.height > 0 else { return nil }
+        var geometry = currentRecipe.geometry
+        if canvasShowsUncropped {
+            geometry.crop = nil
+        }
+        return GeometryTransform(geometry: geometry, sourceAspect: size.width / size.height)
+    }
+
+    /// 복제 샘플 마커를 그릴 캔버스 좌표. 자른 영역 밖이면 nil.
+    var cloneSourceOnCanvas: NormalizedPoint? {
+        guard let source = cloneSource else { return nil }
+        guard let transform = outputTransform else { return source }
+        return transform.toOutput(source)
+    }
+
+    /// 도구를 바꾼다. 자르기 화면을 드나들면 미리보기를 다시 그리고, 필터 도구는 썸네일을 준비한다.
+    func selectTool(_ newTool: EditorTool) {
+        let showedUncropped = canvasShowsUncropped
+        tool = newTool
+        if canvasShowsUncropped != showedUncropped {
+            scheduleRender()
+        }
+        if newTool == .look {
+            loadLookThumbnails()
+        }
+    }
 
     func present(_ error: Error) {
         presentedError = PresentedError(message: UserMessage.text(for: error))
@@ -150,15 +193,21 @@ final class AppModel {
         isComparing = false
         cloneSource = nil
         isChoosingCloneSource = true
+        originalGeometry = nil
         guard let entry = session.selected else { return }
         selectionTask = Task {
             do {
                 try await pipeline.reprepareIfEvicted(id, at: copies.url(for: entry.filename))
-                let base = try await pipeline.preview(id, recipe: EditRecipe())
+                let baseRecipe = EditRecipe()
+                let base = try await pipeline.preview(id, recipe: baseRecipe)
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
                 original = base
+                originalGeometry = baseRecipe.geometry
                 isReady = true
                 scheduleRender()
+                if tool == .look {
+                    loadLookThumbnails()
+                }
             } catch {
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
                 selectionFailure = UserMessage.selectionUnreadable
@@ -192,17 +241,42 @@ final class AppModel {
         let recipe = entry.document.recipe
         let id = entry.id
         let url = copies.url(for: entry.filename)
+        let showsUncropped = canvasShowsUncropped
+        var shownGeometry = recipe.geometry
+        if showsUncropped {
+            shownGeometry.crop = nil
+        }
         renderScheduler.schedule {
             // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
             try await pipeline.reprepareIfEvicted(id, at: url)
-            return try await pipeline.preview(id, recipe: recipe)
+            return try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }
             isRendering = false
             switch result {
-            case .success(let image): preview = image
+            case .success(let image):
+                preview = image
+                refreshOriginalIfNeeded(id: id, geometry: shownGeometry)
             case .failure(let error): present(error)
             }
+        }
+    }
+
+    /// 비교 화면의 원본은 미리보기와 같은 기하(자르기·회전)로 보여야 한다.
+    private func refreshOriginalIfNeeded(id: PhotoID, geometry: GeometryAdjustments) {
+        guard originalGeometry != geometry else { return }
+        originalGeometry = geometry
+        let recipe = EditRecipe(geometry: geometry)
+        let pipeline = self.pipeline
+        Task { [weak self] in
+            let image = try? await pipeline.preview(id, recipe: recipe)
+            guard let self, session.selectedPhotoID == id, originalGeometry == geometry else { return }
+            // 실패하면 다음 렌더가 다시 시도하도록 기록을 지운다. 그동안은 이전 원본을 보여준다.
+            guard let image else {
+                originalGeometry = nil
+                return
+            }
+            original = image
         }
     }
 

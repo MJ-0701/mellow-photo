@@ -18,10 +18,15 @@ enum UserMessage {
     static let photoLibraryCouldNotCreateAsset = "사진 앱에 새 사진을 만들지 못했습니다."
     /// PhotoPipeline.unpreparedReason을 사용자에게 보여줄 때의 문구.
     static let photoNotPrepared = "사진이 아직 준비되지 않았습니다"
-    static let toolColor = "색감"
+    static let toolLook = "필터"
+    static let toolCrop = "자르기"
+    static let toolAdjust = "조정"
+    static let toolAuto = "자동"
     static let toolPortrait = "인물"
     static let toolRetouch = "잡티"
     static let toolWarp = "변형"
+    static let autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."
+    static let lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."
 
     static func workingFolderUnavailable(_ reason: String) -> String {
         "작업 폴더를 열지 못했습니다: \(reason)"

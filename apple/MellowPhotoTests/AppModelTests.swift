@@ -283,4 +283,97 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(store.saved?.photos.first?.document.recipe.color.exposure, 0.5)
         XCTAssertFalse(model.session.isPersistenceDeferred)
     }
+
+    private func importOne(_ model: AppModel, _ url: URL) async throws {
+        await model.importFromFiles([url])
+        try await waitUntil { model.isReady && model.preview != nil }
+    }
+
+    func testAutoEnhanceIsOneUndoStepAndIdempotent() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        await model.autoEnhance()
+        let first = model.currentRecipe
+        XCTAssertNotEqual(first, EditRecipe())
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1)
+        await model.autoEnhance()
+        XCTAssertEqual(model.currentRecipe, first, "두 번 눌러도 누적되지 않는다")
+        model.undo()
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.isDefault)
+    }
+
+    func testCropToolShowsUncroppedPreview() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.crop(NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5)))
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.preview?.width, 100)
+        model.selectTool(.crop)
+        try await waitUntil { !model.isRendering && model.preview?.width == 200 }
+        XCTAssertTrue(model.canvasShowsUncropped)
+        model.selectTool(.adjust)
+        try await waitUntil { !model.isRendering && model.preview?.width == 100 }
+    }
+
+    func testRetouchTapWhileCroppedIsStoredInOriginalCoordinates() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.crop(NormalizedRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)))
+        try await waitUntil { !model.isRendering }
+        model.selectTool(.retouch)
+        // 화면 중앙(0.5, 0.5)은 원본의 (0.75, 0.75).
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.cloneSource?.x ?? 0, 0.75, accuracy: 1e-9)
+        XCTAssertEqual(model.cloneSourceOnCanvas?.x ?? 0, 0.5, accuracy: 1e-9)
+        model.touch(from: NormalizedPoint(x: 0.2, y: 0.2), to: NormalizedPoint(x: 0.2, y: 0.2))
+        let spot = try XCTUnwrap(model.currentRecipe.spots.first)
+        XCTAssertEqual(spot.x, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(spot.sourceX, 0.75, accuracy: 1e-9)
+    }
+
+    func testLookThumbnailsIgnoreStaleResults() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A", size: 300)
+        let second = try TestSupport.solidPNG(in: root, name: "B", size: 300)
+        let importer = FakeImporter(staged: [
+            .success(StagedPhoto(url: first, displayName: "A")), .success(StagedPhoto(url: second, displayName: "B")),
+        ])
+        let model = TestSupport.makeModel(root: root, importer: importer)
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady }
+        let a = model.session.photos[0].id
+        let b = model.session.photos[1].id
+        model.selectTool(.look)
+        model.select(b)
+        try await waitUntil { model.lookThumbnails[a]?.count == 10 || model.lookThumbnails[b]?.count == 10 }
+        try await waitUntil { model.lookThumbnails[b]?.count == 10 }
+        XCTAssertNotNil(model.lookThumbnails[b]?["mono"])
+        if let aThumbs = model.lookThumbnails[a] {
+            XCTAssertEqual(aThumbs.count, 10, "A의 결과가 왔다면 A 키 아래에만 있다")
+        }
+    }
+
+    func testCropAspectSetsCenteredRectAndResetGeometryIsOneUndoStep() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.setCropAspect(.square)
+        XCTAssertEqual(model.currentRecipe.geometry.crop, NormalizedRect(x: 0, y: 0, width: 1, height: 1))
+        model.edit(.quarterTurns(1))
+        model.setCropAspect(.nineSixteen)
+        let crop = try XCTUnwrap(model.currentRecipe.geometry.crop)
+        XCTAssertEqual(crop.width, 9.0 / 16.0, accuracy: 1e-9)
+        XCTAssertEqual(crop.x, (1 - 9.0 / 16.0) / 2, accuracy: 1e-9)
+        let before = model.session.selected?.document.undoStack.count ?? 0
+        model.resetGeometry()
+        XCTAssertTrue(model.currentRecipe.geometry.isIdentity)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, before + 1)
+    }
 }

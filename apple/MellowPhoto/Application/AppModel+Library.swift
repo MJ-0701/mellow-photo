@@ -75,6 +75,8 @@ extension AppModel {
         }
         cancelSelectionWork()
         thumbnails[entry.id] = nil
+        lookThumbnails[entry.id] = nil
+        lookThumbnailRequests.remove(entry.id)
         photoInfo[entry.id] = nil
         preview = nil
         original = nil

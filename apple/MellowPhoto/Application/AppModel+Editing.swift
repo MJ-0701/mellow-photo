@@ -26,10 +26,7 @@ extension AppModel {
 
     func endSliderEdit() {
         if let id = session.selectedPhotoID {
-            session.edit(id) { document in
-                document.endContinuousChange()
-                return nil
-            }
+            session.endContinuousChange(id)
         }
         session.endDeferredPersistence()
         if let error = session.lastPersistenceError {
@@ -37,13 +34,29 @@ extension AppModel {
         }
     }
 
+    /// 드래그 도중 들어온 한 번짜리 편집은 진행 중인 연속 변경을 먼저 끝내 자기 체크포인트를 갖게 한다.
+    /// 드래그 중이 아니면 아무것도 하지 않는다(세션을 한 번 더 쓰지 않는다).
+    private func endSliderEditIfActive() {
+        guard session.isPersistenceDeferred else { return }
+        endSliderEdit()
+    }
+
     func edit(_ change: EditChange) {
         mutateSelected { $0.set(change) }
     }
 
     func applyPreset(_ values: PresetValues) {
+        endSliderEditIfActive()
         mutateSelected { document in
             document.apply(values)
+            return nil
+        }
+    }
+
+    func applyAutoSuggestion(_ suggestion: AutoEnhanceSuggestion) {
+        endSliderEditIfActive()
+        mutateSelected { document in
+            document.applyAuto(suggestion)
             return nil
         }
     }
@@ -81,7 +94,9 @@ extension AppModel {
     func savePreset(named name: String) {
         var portrait = currentRecipe.portrait
         portrait.targetFace = nil
-        session.addPreset(named: name, values: PresetValues(color: currentRecipe.color, portrait: portrait))
+        session.addPreset(
+            named: name,
+            values: PresetValues(color: currentRecipe.color, portrait: portrait, detail: currentRecipe.detail))
     }
 
     func resetCloneSource() {
@@ -90,34 +105,39 @@ extension AppModel {
         statusMessage = UserMessage.chooseCloneSource
     }
 
-    /// 캔버스 탭·드래그. 좌표는 정규화, 원점 왼쪽 아래.
+    /// 캔버스 탭·드래그. 좌표는 캔버스(출력) 정규화, 원점 왼쪽 아래. 저장은 원본 좌표로 한다.
     func touch(from: NormalizedPoint, to: NormalizedPoint) {
-        guard isReady, !isBusy, !isComparing, !isRendering else { return }
+        guard isReady, !isBusy, !isComparing, !isRendering, !canvasShowsUncropped else { return }
+        let transform = outputTransform
+        let fromOriginal = transform?.toOriginal(from) ?? from
+        let toOriginal = transform?.toOriginal(to) ?? to
         switch tool {
         case .retouch:
             if isChoosingCloneSource || cloneSource == nil {
-                cloneSource = to
+                cloneSource = toOriginal
                 isChoosingCloneSource = false
                 statusMessage = UserMessage.chooseCloneTarget
                 return
             }
             guard let source = cloneSource else { return }
-            let spot = RetouchSpot(x: to.x, y: to.y, sourceX: source.x, sourceY: source.y, radius: brushRadius)
+            let spot = RetouchSpot(
+                x: toOriginal.x, y: toOriginal.y, sourceX: source.x, sourceY: source.y, radius: brushRadius)
             mutateSelected { document in
                 document.appendLocalEdit(.spot(spot))
                 return nil
             }
         case .warp:
-            let dx = max(-Policy.warpMaxDelta, min(Policy.warpMaxDelta, to.x - from.x))
-            let dy = max(-Policy.warpMaxDelta, min(Policy.warpMaxDelta, to.y - from.y))
+            let dx = max(-Policy.warpMaxDelta, min(Policy.warpMaxDelta, toOriginal.x - fromOriginal.x))
+            let dy = max(-Policy.warpMaxDelta, min(Policy.warpMaxDelta, toOriginal.y - fromOriginal.y))
             guard abs(dx) + abs(dy) > Policy.warpMinimumDelta else { return }
             let stroke = WarpStroke(
-                x: from.x, y: from.y, dx: dx, dy: dy, radius: brushRadius * Policy.warpRadiusMultiplier)
+                x: fromOriginal.x, y: fromOriginal.y, dx: dx, dy: dy,
+                radius: brushRadius * Policy.warpRadiusMultiplier)
             mutateSelected { document in
                 document.appendLocalEdit(.warp(stroke))
                 return nil
             }
-        case .color, .portrait:
+        case .look, .crop, .adjust, .portrait:
             return
         }
     }

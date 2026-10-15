@@ -92,10 +92,14 @@ struct EditorScene: View {
         }
     }
 
+    /// 도구 전환은 selectTool을 거쳐야 자르기 화면의 미리보기와 필터 썸네일이 준비된다.
+    private var toolSelection: Binding<EditorTool> {
+        Binding(get: { model.tool }, set: { model.selectTool($0) })
+    }
+
     private var compactControls: some View {
-        @Bindable var model = model
-        return VStack(spacing: 12) {
-            Picker("보정 도구", selection: $model.tool) {
+        VStack(spacing: 12) {
+            Picker("보정 도구", selection: toolSelection) {
                 ForEach(EditorTool.allCases) { Text($0.title).tag($0) }
             }
             .pickerStyle(.segmented)
@@ -116,8 +120,7 @@ struct EditorScene: View {
     }
 
     private var regularLayout: some View {
-        @Bindable var model = model
-        return HStack(spacing: 0) {
+        HStack(spacing: 0) {
             LibrarySidebar()
             Divider()
             VStack(spacing: 0) {
@@ -128,7 +131,7 @@ struct EditorScene: View {
             }
             Divider()
             VStack(spacing: 0) {
-                Picker("보정 도구", selection: $model.tool) {
+                Picker("보정 도구", selection: toolSelection) {
                     ForEach(EditorTool.allCases) { Label($0.title, systemImage: $0.symbol).tag($0) }
                 }
                 .pickerStyle(.segmented).padding(14)
@@ -156,7 +159,8 @@ struct EditorScene: View {
     @ViewBuilder
     private var toolPanel: some View {
         switch model.tool {
-        case .color: ColorPanel(presetSheet: $presetSheet)
+        // 필터·자르기 화면은 Task 12에서 붙인다. 그때까지는 조정 패널을 보여준다.
+        case .look, .crop, .adjust: ColorPanel(presetSheet: $presetSheet)
         case .portrait: PortraitPanel()
         case .retouch, .warp: BrushPanel()
         }

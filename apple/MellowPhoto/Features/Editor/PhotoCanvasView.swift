@@ -71,7 +71,7 @@ struct PhotoCanvasView: View {
 
     @ViewBuilder
     private func cloneSourceMarker(in size: CGSize) -> some View {
-        if let source = model.cloneSource, model.tool == .retouch, !model.isComparing {
+        if let source = model.cloneSourceOnCanvas, model.tool == .retouch, !model.isComparing {
             let diameter = max(12, model.brushRadius * min(size.width, size.height) * 2)
             Circle().stroke(Theme.accent, lineWidth: 2)
                 .frame(width: diameter, height: diameter)

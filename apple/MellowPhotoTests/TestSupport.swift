@@ -89,6 +89,14 @@ enum TestSupport {
         return url
     }
 
+    /// 저장소의 공용 룩 카탈로그. 앱 번들과 같은 파일이다.
+    static func sharedLookCatalog() throws -> LookCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/looks/looks.v1.json")
+        return try LookCatalog(data: Data(contentsOf: url))
+    }
+
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
@@ -96,12 +104,14 @@ enum TestSupport {
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
         try? copies.prepareDirectory()
+        let catalog = (try? sharedLookCatalog()) ?? .empty
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
-            pipeline: PhotoPipeline(analyzer: analyzer, tuning: RenderTuning()),
+            pipeline: PhotoPipeline(analyzer: analyzer, tuning: RenderTuning(), lookCatalog: catalog),
             copies: copies,
             importer: importer,
             exporter: Exporter(renderer: Renderer()),
+            lookCatalog: catalog,
             renderDebounce: .milliseconds(10))
     }
 }
