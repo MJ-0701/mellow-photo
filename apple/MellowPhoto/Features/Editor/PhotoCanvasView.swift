@@ -27,6 +27,7 @@ struct PhotoCanvasView: View {
                             .frame(width: size.width, height: size.height)
                             .overlay { cloneSourceMarker(in: size) }
                             .overlay { touchLayer(in: size) }
+                            .overlay { cropOverlay(in: size) }
                             .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                     }
                     .scrollDisabled(zoom == Theme.zoomRange.lowerBound)
@@ -72,11 +73,27 @@ struct PhotoCanvasView: View {
     @ViewBuilder
     private func cloneSourceMarker(in size: CGSize) -> some View {
         if let source = model.cloneSourceOnCanvas, model.tool == .retouch, !model.isComparing {
-            let diameter = max(12, model.brushRadius * min(size.width, size.height) * 2)
+            let diameter = max(
+                Theme.brushMarkerMinimumDiameter,
+                model.brushRadius * min(size.width, size.height) * 2 * outputToOriginalScale)
             Circle().stroke(Theme.accent, lineWidth: 2)
                 .frame(width: diameter, height: diameter)
                 .position(x: source.x * size.width, y: (1 - source.y) * size.height)
                 .allowsHitTesting(false)
+        }
+    }
+
+    /// 브러시 반지름은 원본 정규화 단위다. 자른 캔버스에서는 그만큼 크게 보여야 실제 적용 범위와 맞는다.
+    private var outputToOriginalScale: CGFloat {
+        guard let crop = model.outputTransform?.geometry.crop, crop.width > 0 else { return 1 }
+        return 1 / crop.width
+    }
+
+    /// 자르기 손잡이 드래그가 확대 제스처보다 우선하도록 가장 위에 둔다.
+    @ViewBuilder
+    private func cropOverlay(in size: CGSize) -> some View {
+        if model.tool == .crop, !model.isComparing {
+            CropOverlay(size: size)
         }
     }
 
