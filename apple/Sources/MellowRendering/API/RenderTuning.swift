@@ -26,6 +26,13 @@ public struct RenderTuning: Sendable {
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
 
+    /// highlights −1에서 CIHighlightShadowAdjust의 highlightAmount가 1 − 이 값까지 내려간다.
+    public var highlightReductionRange: Double = 0.7
+    /// highlights +1에서 밝은 구간 톤 커브를 이만큼 올린다.
+    public var highlightLiftAmount: Double = 0.12
+    public var sharpnessMax: Double = 1.5
+    public var vignetteRadius: Double = 1.5
+
     public init() {}
 
     public static func forCurrentDevice(physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> RenderTuning

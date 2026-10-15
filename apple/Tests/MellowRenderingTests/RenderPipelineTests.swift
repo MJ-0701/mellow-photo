@@ -113,7 +113,8 @@ final class RenderPipelineTests: XCTestCase {
         let standard = try RenderPipeline.standard.render(input, context: context)
         let reversed = try RenderPipeline(stages: RenderPipeline.standard.stages.reversed()).render(
             input, context: context)
-        XCTAssertEqual(RenderPipeline.standard.stages.map(\.name), ["skin", "faceReshape", "localEdit", "color"])
+        XCTAssertEqual(
+            RenderPipeline.standard.stages.map(\.name), ["skin", "faceReshape", "localEdit", "color", "detail"])
         XCTAssertNotEqual(try Support.bytes(standard), try Support.bytes(reversed))
     }
 

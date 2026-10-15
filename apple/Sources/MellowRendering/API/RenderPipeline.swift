@@ -10,7 +10,7 @@ public struct RenderPipeline: Sendable {
 
     /// 자동 보정이 기반이 되고 수동 편집이 그 위에, 색감은 마지막에.
     public static let standard = RenderPipeline(stages: [
-        SkinStage(), FaceReshapeStage(), LocalEditStage(), ColorStage(),
+        SkinStage(), FaceReshapeStage(), LocalEditStage(), ColorStage(), DetailStage(),
     ])
 
     public func render(_ image: CIImage, context: RenderContext) throws -> CIImage {
