@@ -92,6 +92,26 @@ public struct RenderTuning: Sendable {
         }
     }
 
+    /// 눈·입술·치아 다각형 마스크를 흐리는 반지름. 얼굴 폭 비율. 300px 얼굴에서 1.2px라 눈꺼풀·피부로 거의 번지지 않는다.
+    public var featureMaskFeather: Double = 0.004
+    /// 흰자로 보는 밝기(sRGB 감마 BT.601 휘도)의 시작점과 1이 되는 폭. 홍채·속눈썹(0.2 안팎)은 빠지고 흰자(0.6~0.8)는 들어간다.
+    public var scleraLumaMin: Double = 0.45
+    public var scleraLumaRamp: Double = 0.15
+    /// 흰자로 보는 채도(감마 Cb·Cr 거리) 상한과 0이 되는 폭. 흰자는 0.03 안팎, 눈꼬리 피부는 0.12 이상이다.
+    public var scleraChromaMax: Double = 0.08
+    public var scleraChromaRamp: Double = 0.04
+    /// 눈동자 반지름. 눈 높이(눈 다각형 경계 상자의 짧은 변) 비율(스펙 0.5).
+    public var irisRadiusFraction: Double = 0.5
+    /// 안쪽 입술 넓이가 얼굴 상자 넓이의 이 비율보다 작으면 다문 입으로 보고 치아 미백을 건너뛴다.
+    /// 다문 입의 안쪽 입술은 0.3% 안팎, 치아가 보이는 입은 1% 이상이다.
+    public var mouthOpenMinArea: Double = 0.004
+    /// 치아로 보는 밝기 시작점과 폭. 입안 그늘(0.1 안팎)은 빠진다.
+    public var teethLumaMin: Double = 0.35
+    public var teethLumaRamp: Double = 0.15
+    /// 치아로 보는 붉은기(감마 Cr) 상한과 0이 되는 폭. 누런 치아는 0.04 안팎, 잇몸·혀·입술은 0.15 이상이다.
+    public var teethRednessMax: Double = 0.08
+    public var teethRednessRamp: Double = 0.04
+
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500

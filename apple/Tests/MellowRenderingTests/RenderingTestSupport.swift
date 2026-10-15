@@ -414,6 +414,53 @@ struct SyntheticFace {
     }
 }
 
+/// 흰자·홍채·치아까지 그린 합성 얼굴. 눈 다각형·동공·입술 특징점은 make()와 같다.
+extension SyntheticFace {
+    static let scleraColor = CIColor(red: 0.78, green: 0.74, blue: 0.72)
+    static let teethColor = CIColor(red: 0.86, green: 0.80, blue: 0.66)
+    /// 홍채 바깥 고리·안쪽 고리·동공의 반지름(픽셀). 눈 높이 28px × 0.5 = 14px 원 안에 든다.
+    static let irisRingRadii: [CGFloat] = [12, 7, 3]
+    static let irisRingColors = [
+        CIColor(red: 0.30, green: 0.20, blue: 0.12), CIColor(red: 0.50, green: 0.36, blue: 0.22),
+        CIColor(red: 0.04, green: 0.03, blue: 0.03),
+    ]
+    /// 다문 입의 안쪽 입술 타원. 높이 1px이라 넓이가 얼굴 상자의 0.14%다.
+    static let closedInnerMouthRadii = CGSize(width: 40, height: 1)
+    /// 흰자 위 표본 점(왼눈 중심에서 20px 바깥). 홍채 고리 밖이고 눈 다각형 안이다.
+    static let scleraPoint = CGPoint(x: 180, y: 300)
+    /// 입술 고리(바깥 20px·안쪽 8px 반지름 사이) 위 표본 점.
+    static let lipPoint = CGPoint(x: 256, y: 152)
+    /// 왼눈 위끝(314)과 눈썹 아래끝(332) 사이 피부.
+    static let lidSkin = CGPoint(x: 200, y: 324)
+    /// 입술 위끝(160)과 코 아래(190) 사이 피부.
+    static let philtrum = CGPoint(x: 256, y: 172)
+
+    /// mouthOpen이 false면 치아를 그리지 않고 안쪽 입술을 closedInnerMouthRadii 타원으로 둔다(다문 입).
+    static func makeFeatures(mouthOpen: Bool = true) -> SyntheticFace {
+        let base = make()
+        var image = base.image
+        for eye in [leftEye, rightEye] {
+            image = paint(CIImage(color: scleraColor), center: eye, radii: eyeRadii, over: image)
+            for (radius, color) in zip(irisRingRadii, irisRingColors) {
+                let radii = CGSize(width: radius, height: radius)
+                image = paint(CIImage(color: color), center: eye, radii: radii, over: image)
+            }
+        }
+        var face = base.face
+        if mouthOpen {
+            image = paint(CIImage(color: teethColor), center: mouth, radii: innerMouthRadii, over: image)
+        } else {
+            face.landmarks[.innerLips] = innerLips(radii: closedInnerMouthRadii)
+        }
+        return SyntheticFace(image: image, face: face)
+    }
+
+    /// 입 중심의 12점 타원 안쪽 입술 특징점(정규화).
+    static func innerLips(radii: CGSize) -> [NormalizedPoint] {
+        ellipse(mouth, radii)
+    }
+}
+
 extension FaceGeometry {
     /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
     func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {

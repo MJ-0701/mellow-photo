@@ -4,6 +4,18 @@ import MellowShared
 /// 얼굴 특징점에서 영역 마스크를 만드는 유일한 곳. 분할 모델로 바꿀 때 이 타입만 바꾼다.
 /// 좌표는 extent 기준 픽셀이고 원점은 왼쪽 아래다.
 enum FaceRegions {
+    /// 눈·입 마스크와 그 마스크가 0이 아닐 수 있는 영역. 영역 밖 마스크는 정확히 0이다.
+    struct RegionMask {
+        let image: CIImage
+        let bounds: CGRect
+    }
+
+    /// 눈동자 원(픽셀).
+    struct IrisCircle: Equatable {
+        let center: CGPoint
+        let radius: CGFloat
+    }
+
     /// 이마 호를 그리는 구간 수.
     private static let foreheadArcSegments = 12
     /// 타원 다각형의 점 수.
@@ -221,6 +233,104 @@ enum FaceRegions {
             .composited(over: black).cropped(to: extent)
     }
 
+    /// 두 눈 다각형. 특징점이 없는 눈은 뺀다.
+    static func eyePolygons(face: FaceGeometry, extent: CGRect) -> [[CGPoint]] {
+        [FaceLandmark.leftEye, .rightEye].compactMap { landmarkPolygon(face, $0, extent) }
+    }
+
+    /// 눈마다 동공(없으면 눈 다각형 꼭짓점 평균)을 중심으로, 눈 높이 × irisRadiusFraction을 반지름으로 한 원.
+    /// 눈 높이는 눈 다각형 경계 상자의 짧은 변이다. 기운 눈에서 조금 커지지만 눈 마스크를 곱해 쓰므로 넘치지 않는다.
+    static func irisCircles(face: FaceGeometry, extent: CGRect, tuning: RenderTuning) -> [IrisCircle] {
+        let pairs: [(FaceLandmark, FaceLandmark)] = [(.leftEye, .leftPupil), (.rightEye, .rightPupil)]
+        return pairs.compactMap { eye, pupil in
+            guard let polygon = landmarkPolygon(face, eye, extent) else { return nil }
+            let box = boundingRect(polygon)
+            let pupilPoint = face.landmarks[pupil]?.first.map { point in
+                CGPoint(x: extent.minX + point.x * extent.width, y: extent.minY + point.y * extent.height)
+            }
+            let radius = min(box.width, box.height) * CGFloat(tuning.irisRadiusFraction)
+            return IrisCircle(center: pupilPoint ?? centroid(polygon), radius: radius)
+        }
+    }
+
+    /// 다각형 넓이(픽셀²). 점 순서 방향과 무관하다.
+    static func area(of polygon: [CGPoint]) -> CGFloat {
+        guard polygon.count >= minimumPolygonPoints else { return 0 }
+        var twice: CGFloat = 0
+        for index in polygon.indices {
+            let current = polygon[index]
+            let next = polygon[(index + 1) % polygon.count]
+            twice += current.x * next.y - next.x * current.y
+        }
+        return abs(twice) / 2
+    }
+
+    /// 안쪽 입술 다각형 넓이 ÷ 얼굴 상자 넓이(픽셀). 안쪽 입술이 없으면 nil.
+    static func innerMouthAreaFraction(face: FaceGeometry, extent: CGRect) -> Double? {
+        guard let inner = landmarkPolygon(face, .innerLips, extent) else { return nil }
+        let box = pixelRect(face.boundingBox, in: extent)
+        let faceArea = box.width * box.height
+        guard faceArea > 0 else { return nil }
+        return Double(area(of: inner) / faceArea)
+    }
+
+    /// 두 눈 다각형 마스크. 눈 특징점이 없으면 nil.
+    static func eyeMask(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
+        -> RegionMask?
+    {
+        let eyes = eyePolygons(face: face, extent: extent)
+        guard !eyes.isEmpty else { return nil }
+        return featheredPolygonMask(fill: eyes, cut: [], face: face, extent: extent, tuning: tuning, cache: cache)
+    }
+
+    /// 눈동자 원(가운데 0.65까지 1, 가장자리에서 0) × 눈 마스크. 눈 특징점이 없으면 nil.
+    static func irisMask(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
+        -> RegionMask?
+    {
+        let circles = irisCircles(face: face, extent: extent, tuning: tuning)
+        guard !circles.isEmpty, let eyes = eyeMask(face: face, extent: extent, tuning: tuning, cache: cache) else {
+            return nil
+        }
+        var discs = CIImage(color: .black).cropped(to: extent)
+        for circle in circles {
+            let rect = CGRect(
+                x: circle.center.x - circle.radius, y: circle.center.y - circle.radius, width: circle.radius * 2,
+                height: circle.radius * 2)
+            discs = MaskBuilder.ellipse(rect, extent: extent)
+                .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: discs])
+        }
+        let image = discs.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: eyes.image])
+            .cropped(to: extent)
+        return RegionMask(image: image, bounds: eyes.bounds)
+    }
+
+    /// 입술 = 바깥 입술 − 안쪽 입술. 안쪽 입술이 없으면 바깥 입술 전체, 바깥 입술이 없으면 nil.
+    static func lipMask(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
+        -> RegionMask?
+    {
+        guard let outer = landmarkPolygon(face, .outerLips, extent) else { return nil }
+        let inner = landmarkPolygon(face, .innerLips, extent).map { [$0] } ?? []
+        return featheredPolygonMask(fill: [outer], cut: inner, face: face, extent: extent, tuning: tuning, cache: cache)
+    }
+
+    /// 치아 = 안쪽 입술 다각형 × 밝기 × 낮은 붉은기(스펙 4). 다문 입(넓이 비율 < mouthOpenMinArea)이거나 안쪽 입술이 없으면 nil.
+    static func teethMask(
+        face: FaceGeometry, image: CIImage, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil
+    ) throws -> RegionMask? {
+        guard let inner = landmarkPolygon(face, .innerLips, extent),
+            let fraction = innerMouthAreaFraction(face: face, extent: extent), fraction >= tuning.mouthOpenMinArea,
+            let region = featheredPolygonMask(
+                fill: [inner], cut: [], face: face, extent: extent, tuning: tuning, cache: cache)
+        else { return nil }
+        let weight = try FeatureKernels.shared.weight(of: image, rule: .teeth(tuning), extent: region.bounds)
+        let black = CIImage(color: .black).cropped(to: extent)
+        let background = weight.composited(over: black)
+        let masked = region.image
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: background])
+            .cropped(to: extent)
+        return RegionMask(image: masked, bounds: region.bounds)
+    }
+
     /// 점이 다각형 안이거나 경계에서 dilation 이내인지.
     static func contains(_ point: CGPoint, polygons: [[CGPoint]], dilation: CGFloat) -> Bool {
         containment(polygons: polygons, dilation: dilation)(point)
@@ -239,6 +349,25 @@ enum FaceRegions {
         return { point in paths.contains { $0.contains(point) } }
     }
 
+    /// 다각형 마스크를 얼굴 폭 × featureMaskFeather로 흐리고 경계 상자 + 흐림 4배 여백 밖을 0으로 자른다.
+    /// cut은 넓히지 않는다(선 굵기 0은 CGContext의 가장 가는 선이다).
+    private static func featheredPolygonMask(
+        fill: [[CGPoint]], cut: [[CGPoint]], face: FaceGeometry, extent: CGRect, tuning: RenderTuning,
+        cache: RegionMaskCache?
+    ) -> RegionMask? {
+        let feather = max(
+            CGFloat(tuning.skinBlurMinimumRadius), faceWidth(face, extent: extent) * CGFloat(tuning.featureMaskFeather))
+        let padding = feather * boundsPaddingInFeathers
+        let bounds = boundingRect(fill.flatMap { $0 }).insetBy(dx: -padding, dy: -padding).intersection(extent).integral
+        guard !bounds.isEmpty else { return nil }
+        let raster = polygonMask(fill: fill, cut: cut, cutWidth: 0, extent: extent, tuning: tuning, cache: cache)
+        let black = CIImage(color: .black).cropped(to: extent)
+        let image = raster.clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: feather])
+            .cropped(to: bounds).composited(over: black)
+        return RegionMask(image: image, bounds: bounds)
+    }
+
     private static func featherRadius(_ face: FaceGeometry, _ extent: CGRect, _ tuning: RenderTuning) -> CGFloat {
         max(CGFloat(tuning.skinBlurMinimumRadius), faceWidth(face, extent: extent) * CGFloat(tuning.skinMaskFeather))
     }
@@ -248,7 +377,8 @@ enum FaceRegions {
             .clampedToExtent()
     }
 
-    private static func landmarkPolygon(_ face: FaceGeometry, _ landmark: FaceLandmark, _ extent: CGRect)
+    /// 특징점 다각형(픽셀). 점이 셋보다 적으면 nil.
+    static func landmarkPolygon(_ face: FaceGeometry, _ landmark: FaceLandmark, _ extent: CGRect)
         -> [CGPoint]?
     {
         guard let points = face.landmarks[landmark], points.count >= minimumPolygonPoints else { return nil }
