@@ -624,4 +624,103 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(failing.currentRecipe.background.blur, 0.5, "값은 저장된다")
         XCTAssertNil(failing.presentedError, "렌더는 흐림만 건너뛰고 오류를 띄우지 않는다")
     }
+
+    func testBodyToolEditsEveryKeyOneUndoStepEachWhenBodyFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(EditorTool.allCases, [.look, .crop, .adjust, .beauty, .body, .background, .retouch, .warp])
+        model.selectTool(.body)
+        XCTAssertEqual(EditorTool.body.title, "체형")
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        for key in BodyShapeKey.allCases {
+            model.beginSliderEdit()
+            model.edit(.bodyShape(key, 0.2))
+            model.edit(.bodyShape(key, 0.4))
+            model.endSliderEdit()
+        }
+        for key in BodyShapeKey.allCases {
+            XCTAssertEqual(model.currentRecipe.body[key], 0.4, accuracy: 1e-9, "\(key)")
+        }
+        XCTAssertEqual(
+            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle), ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목"])
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.body.neck, 0, "드래그 한 번이 실행 취소 한 단계")
+        XCTAssertEqual(model.currentRecipe.body.shoulders, 0.4, accuracy: 1e-9)
+    }
+
+    func testBodyToolReportsNoBodyAndAnalysisFailureWithoutBlockingRender() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let empty = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(empty, staged)
+        XCTAssertEqual(empty.bodyAvailability, .noBody)
+        XCTAssertEqual(UserMessage.noBodyHint, "전신이 보이는 사진에서 동작합니다.")
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let failure = MellowError.bodyAnalysisUnavailable(reason: "test")
+        let failing = TestSupport.makeModel(
+            root: otherRoot, bodyAnalyzer: StubBodyAnalyzer(result: .failure(failure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(failing, otherStaged)
+        XCTAssertNil(failing.presentedError, "체형 분석 실패는 가져오기 경고로 띄우지 않는다")
+        XCTAssertEqual(failing.bodyAvailability, .unavailable(failure))
+        failing.edit(.bodyShape(.legLength, 0.5))
+        try await waitUntil { !failing.isRendering }
+        XCTAssertEqual(failing.currentRecipe.body.legLength, 0.5, "값은 저장된다")
+        XCTAssertNil(failing.presentedError, "렌더는 체형만 건너뛰고 오류를 띄우지 않는다")
+    }
+
+    func testReprepareAfterEvictionRefreshesBodyInfo() async throws {
+        let files = try ["A", "B", "C", "D"].map { try TestSupport.solidPNG(in: root, name: $0) }
+        let failure = MellowError.bodyAnalysisUnavailable(reason: "first")
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let queue = BodyResultQueue([.failure(failure), .success([body])])
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(queue: queue),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([files[0]])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let first = try XCTUnwrap(model.session.selectedPhotoID)
+        XCTAssertEqual(model.bodyAvailability, .unavailable(failure), "첫 준비의 체형 분석은 실패한다")
+        await model.importFromFiles(Array(files[1...]))
+        try await waitUntil { !model.isImporting }
+        XCTAssertEqual(queue.calls, 4, "사진마다 한 번씩 분석한다")
+        model.select(first)
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(queue.calls, 5, "밀려난 첫 사진을 다시 준비하며 다시 분석한다")
+        XCTAssertNil(model.photoInfo[first]?.bodyAnalysisFailure, "다시 준비한 분석이 이전 실패를 지운다")
+        XCTAssertEqual(model.photoInfo[first]?.hasBody, true, "다시 준비한 분석의 전신 여부를 저장한다")
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        XCTAssertNil(model.presentedError)
+    }
+
+    func testGeometryLockRejectsEveryBodyShapeKey() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let body = TestSupport.standingBody(in: NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 1))
+        let model = TestSupport.makeModel(
+            root: root, bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.currentRecipe.operations.count, 1)
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.body)
+        for key in BodyShapeKey.allCases {
+            model.edit(.bodyShape(key, 0.5))
+            XCTAssertEqual(model.currentRecipe.body[key], 0, "\(key)는 잠겨 있다")
+        }
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked)
+        XCTAssertTrue(UserMessage.geometryLocked.contains("체형"), "잠금 문구가 체형도 말한다")
+    }
 }

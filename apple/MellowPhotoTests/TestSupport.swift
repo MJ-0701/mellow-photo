@@ -35,14 +35,14 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     }
 }
 
-/// 호출마다 다음 인물 분석 결과를 돌려주고 마지막 결과는 계속 되풀이한다.
-/// 값 타입인 StubPersonAnalyzer가 복사돼도 같은 순서와 호출 횟수를 공유한다.
-final class PersonResultQueue: @unchecked Sendable {
+/// 호출마다 다음 분석 결과를 돌려주고 마지막 결과는 계속 되풀이한다.
+/// 값 타입인 스텁 분석기가 복사돼도 같은 순서와 호출 횟수를 공유한다.
+final class AnalysisResultQueue<Value>: @unchecked Sendable {
     private let lock = NSLock()
-    private var results: [Result<CIImage?, MellowError>]
+    private var results: [Result<Value, MellowError>]
     private var callCount = 0
 
-    init(_ results: [Result<CIImage?, MellowError>]) {
+    init(_ results: [Result<Value, MellowError>]) {
         self.results = results
     }
 
@@ -52,7 +52,7 @@ final class PersonResultQueue: @unchecked Sendable {
         return callCount
     }
 
-    func next() -> Result<CIImage?, MellowError> {
+    func next() -> Result<Value, MellowError> {
         lock.lock()
         defer { lock.unlock() }
         callCount += 1
@@ -60,11 +60,21 @@ final class PersonResultQueue: @unchecked Sendable {
     }
 }
 
+typealias PersonResultQueue = AnalysisResultQueue<CIImage?>
+typealias BodyResultQueue = AnalysisResultQueue<[BodyGeometry]>
+
 struct StubPersonAnalyzer: PersonAnalyzer {
     var result: Result<CIImage?, MellowError> = .success(nil)
     /// 있으면 result 대신 호출마다 이 순서의 다음 결과를 쓴다.
     var queue: PersonResultQueue?
     func personMask(_ image: CIImage) throws -> CIImage? { try (queue?.next() ?? result).get() }
+}
+
+struct StubBodyAnalyzer: BodyAnalyzer {
+    var result: Result<[BodyGeometry], MellowError> = .success([])
+    /// 있으면 result 대신 호출마다 이 순서의 다음 결과를 쓴다.
+    var queue: BodyResultQueue?
+    func analyze(_ image: CIImage) throws -> [BodyGeometry] { try (queue?.next() ?? result).get() }
 }
 
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
@@ -184,11 +194,26 @@ enum TestSupport {
         return CIImage(color: .white).cropped(to: rect).composited(over: CIImage(color: .black)).cropped(to: extent)
     }
 
+    /// 정면으로 선 사람의 관절점(box 비율, 신뢰도 1). 패키지 테스트의 RenderingTestSupport.standingBody와 같은 배치다.
+    static func standingBody(in box: NormalizedRect) -> BodyGeometry {
+        let layout: [BodyJoint: (x: Double, y: Double)] = [
+            .neck: (0.5, 0.82), .rightShoulder: (0.25, 0.8), .leftShoulder: (0.75, 0.8),
+            .rightElbow: (0.18, 0.62), .leftElbow: (0.82, 0.62), .rightWrist: (0.15, 0.45), .leftWrist: (0.85, 0.45),
+            .rightHip: (0.38, 0.5), .leftHip: (0.62, 0.5), .rightKnee: (0.39, 0.27), .leftKnee: (0.61, 0.27),
+            .rightAnkle: (0.4, 0.05), .leftAnkle: (0.6, 0.05), .root: (0.5, 0.5),
+        ]
+        var joints: [BodyJoint: NormalizedPoint] = [:]
+        for (joint, spot) in layout {
+            joints[joint] = NormalizedPoint(x: box.minX + box.width * spot.x, y: box.minY + box.height * spot.y)
+        }
+        return BodyGeometry(joints: joints, confidence: joints.mapValues { _ in 1 })
+    }
+
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
-        personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), importer: FakeImporter = FakeImporter(),
-        store: MemorySessionStore = MemorySessionStore()
+        personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), bodyAnalyzer: StubBodyAnalyzer = StubBodyAnalyzer(),
+        importer: FakeImporter = FakeImporter(), store: MemorySessionStore = MemorySessionStore()
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
         try? copies.prepareDirectory()
@@ -196,7 +221,8 @@ enum TestSupport {
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
             pipeline: PhotoPipeline(
-                analyzer: analyzer, personAnalyzer: personAnalyzer, tuning: RenderTuning(), lookCatalog: catalog),
+                analyzer: analyzer, personAnalyzer: personAnalyzer, bodyAnalyzer: bodyAnalyzer, tuning: RenderTuning(),
+                lookCatalog: catalog),
             copies: copies,
             importer: importer,
             exporter: Exporter(renderer: Renderer()),

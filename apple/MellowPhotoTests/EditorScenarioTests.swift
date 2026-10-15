@@ -169,14 +169,18 @@ final class EditorScenarioTests: XCTestCase {
     /// 공용 픽스처에서 사람이 있는 영역을 어림한 스텁 인물 마스크. 얼굴과 어깨를 덮는다.
     private static let demoPersonMask = TestSupport.personMask(NormalizedRect(x: 0.2, y: 0, width: 0.65, height: 0.85))
 
+    /// 공용 픽스처에는 전신이 없다(Vision은 0명을 찾는다). 다리 띠가 사진 아래쪽에 걸리도록 놓은 스텁 사람이다.
+    private static let demoBody = TestSupport.standingBody(in: NormalizedRect(x: 0.15, y: 0, width: 0.7, height: 0.9))
+
     private func previewBytes(_ model: AppModel) -> [UInt8] {
         model.preview.map { Array($0.dataProvider!.data! as Data) } ?? []
     }
 
-    func testBeautySkinFaceFeaturesThenBackgroundThenExportSucceeds() async throws {
+    func testBeautySkinFaceFeaturesBackgroundThenBodyThenExportSucceeds() async throws {
         let model = TestSupport.makeModel(
             root: root, analyzer: StubFaceAnalyzer(result: .success([Self.demoFace])),
             personAnalyzer: StubPersonAnalyzer(result: .success(Self.demoPersonMask)),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([Self.demoBody])),
             importer: FakeImporter(passesThroughFileURLs: true))
         await model.importFromFiles([try demoPortraitCopy()])
         try await waitUntil { model.isReady && model.preview != nil }
@@ -214,13 +218,23 @@ final class EditorScenarioTests: XCTestCase {
         model.endSliderEdit()
         // 배경 흐림만 바꿔도 미리보기가 바뀌어야 한다.
         try await waitUntil { !model.isRendering && self.previewBytes(model) != featured }
+        let blurred = previewBytes(model)
+
+        model.selectTool(.body)
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        model.beginSliderEdit()
+        model.edit(.bodyShape(.legLength, 0.5))
+        model.endSliderEdit()
+        // 다리 길게만 바꿔도 미리보기가 바뀌어야 한다.
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != blurred }
 
         let recipe = model.currentRecipe
         XCTAssertEqual(recipe.portrait.skin, SkinAdjustments(smoothing: 0.5, autoBlemish: true))
         XCTAssertEqual(recipe.portrait.face, FaceShapeAdjustments(width: -0.5, eyeSize: 0.3, smile: 0.4))
         XCTAssertEqual(recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.5))
         XCTAssertEqual(recipe.background.blur, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(recipe.body, BodyShapeAdjustments(legLength: 0.5))
         let size = try await exportedPixelSize(model)
-        XCTAssertEqual(size.width, size.height, "정사각형 원본이 그대로 저장된다")
+        XCTAssertEqual(size.width, size.height, "다리를 늘려도 정사각형 원본 크기 그대로 저장된다")
     }
 }

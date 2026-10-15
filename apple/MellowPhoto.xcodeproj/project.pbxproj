@@ -54,6 +54,7 @@
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */; };
 		C32E30AA9490534A74C0ABA2 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */; };
+		C51CAABDED6649C066D63C91 /* BodyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83CBCF07C95A8CA66A73434E /* BodyPanel.swift */; };
 		C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */ = {isa = PBXBuildFile; fileRef = DD25AA90F8D05216BCD544F0 /* container-migration.plist */; };
 		CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */; };
 		CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */; };
@@ -107,6 +108,7 @@
 		6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderSchedulerTests.swift; sourceTree = "<group>"; };
 		73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Library.swift"; sourceTree = "<group>"; };
 		7451F7A8E9DE87961267F974 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		83CBCF07C95A8CA66A73434E /* BodyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPanel.swift; sourceTree = "<group>"; };
 		8610E11E70A395E3B9504730 /* CropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlay.swift; sourceTree = "<group>"; };
 		881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStripView.swift; sourceTree = "<group>"; };
 		88D5662CFBE9D0374BC48B21 /* looks.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = looks.v1.json; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 				9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */,
 				B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */,
 				66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */,
+				83CBCF07C95A8CA66A73434E /* BodyPanel.swift */,
 				67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */,
 				8610E11E70A395E3B9504730 /* CropOverlay.swift */,
 				0D9139D4C642B3B57F110390 /* CropPanel.swift */,
@@ -495,6 +498,7 @@
 				C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */,
 				505B12210B3B0B3403966121 /* BeautyPanel.swift in Sources */,
 				EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */,
+				C51CAABDED6649C066D63C91 /* BodyPanel.swift in Sources */,
 				0A057E2AF9D0378C785F1D3F /* BrushPanel.swift in Sources */,
 				60596D9E8104A6F04F5CBC9D /* CropOverlay.swift in Sources */,
 				89D66B4D324B8DBA6E28BC23 /* CropPanel.swift in Sources */,

@@ -5,7 +5,7 @@ import MellowShared
 /// 모든 한국어 사용자 문구. 모듈은 문구를 모른다.
 enum UserMessage {
     static let welcomeStatus = "사진을 골라 시작해보세요."
-    static let geometryLocked = "수동 보정 위치를 유지하려고 얼굴 조정을 잠갔어요. 실행 취소 또는 초기화하면 다시 조정할 수 있어요."
+    static let geometryLocked = "수동 보정 위치를 유지하려고 얼굴형·체형 조정을 잠갔어요. 실행 취소 또는 초기화하면 다시 조정할 수 있어요."
     static let chooseCloneSource = "① 깨끗한 피부를 톡 눌러 샘플을 골라주세요."
     static let chooseCloneTarget = "② 지우고 싶은 작은 잡티를 톡 눌러주세요."
     static let appliedToAll = "전체 사진에 슬라이더 설정을 적용했어요."
@@ -31,6 +31,11 @@ enum UserMessage {
     static let noPersonDetected = "사진에서 사람을 찾지 못했어요"
     static let noPersonHint = "배경 흐림은 사람이 보이는 사진에서 동작해요."
     static let personAnalysisUnavailableTitle = "인물 영역 분석을 사용할 수 없어요"
+    static let toolBody = "체형"
+    static let bodyHint = "다리 길게는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요(왼쪽은 가늘게·좁게, 오른쪽은 넓게·길게). 다리 길게는 골반과 발목이 보여야 바뀌어요."
+    static let noBodyDetected = "몸의 관절을 찾지 못했어요"
+    static let noBodyHint = "전신이 보이는 사진에서 동작합니다."
+    static let bodyAnalysisUnavailableTitle = "체형 분석을 사용할 수 없어요"
     static let beautyTabSkin = "피부"
     static let beautyTabFace = "얼굴"
     static let beautyTabFeatures = "눈·입"
@@ -127,6 +132,19 @@ enum UserMessage {
         case .eyeBrighten: return "눈 또렷하게"
         case .teethWhiten: return "치아 미백"
         case .lipVitality: return "입술 생기"
+        }
+    }
+
+    /// 체형 도구 슬라이더 이름. 화면 순서는 BodyShapeKey.allCases. 스펙의 "전체 날씬"은 양방향이라 "몸 전체"로 부른다.
+    static func bodyShapeTitle(_ key: BodyShapeKey) -> String {
+        switch key {
+        case .legLength: return "다리 길게"
+        case .waist: return "허리"
+        case .overall: return "몸 전체"
+        case .arms: return "팔"
+        case .thighs: return "허벅지"
+        case .shoulders: return "어깨"
+        case .neck: return "목"
         }
     }
 

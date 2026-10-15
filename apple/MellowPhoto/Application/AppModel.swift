@@ -24,12 +24,23 @@ final class AppModel {
         var hasPerson = false
         /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
         var personAnalysisFailure: MellowError?
+        /// 가장 큰 사람의 두 어깨가 보이는지. 체형 도구 안내에 쓴다.
+        var hasBody = false
+        /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+        var bodyAnalysisFailure: MellowError?
     }
 
     /// 배경 도구가 보여줄 상태. 분석 실패가 사람 없음보다 먼저다.
     enum BackgroundAvailability: Equatable {
         case ready
         case noPerson
+        case unavailable(MellowError)
+    }
+
+    /// 체형 도구가 보여줄 상태. 분석 실패가 전신 없음보다 먼저다.
+    enum BodyAvailability: Equatable {
+        case ready
+        case noBody
         case unavailable(MellowError)
     }
 
@@ -127,6 +138,13 @@ final class AppModel {
         }
         return selectedInfo?.hasPerson == true ? .ready : .noPerson
     }
+    /// 선택 사진의 체형 도구 상태.
+    var bodyAvailability: BodyAvailability {
+        if let failure = selectedInfo?.bodyAnalysisFailure {
+            return .unavailable(failure)
+        }
+        return selectedInfo?.hasBody == true ? .ready : .noBody
+    }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }
 
@@ -199,7 +217,8 @@ final class AppModel {
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
-            hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure)
+            hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
+            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure)
     }
 
     /// 미리보기 캐시에서 밀려난 사진을 다시 준비한다. 다시 준비하면 분석도 새로 하므로 사진 정보를 함께 바꾼다.
