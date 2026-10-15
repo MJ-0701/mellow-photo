@@ -51,7 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           case "$RELEASE_MODE_INPUT" in
-            ''|testflight) lane=testflight ;;
+            ''|testflight) lane=beta ;;
             appstore) lane=release ;;
             *) echo "Unknown release mode '$RELEASE_MODE_INPUT'. Use testflight or appstore (repo variable IOS_RELEASE_MODE or workflow input mode)."; exit 1 ;;
           esac

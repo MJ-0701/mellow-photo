@@ -146,4 +146,4 @@
 
 ## TestFlight 전용 배포 경로 (2026-10-15)
 
-- fastlane `testflight` 레인과 배포 모드 변수 `IOS_RELEASE_MODE`는 아직 한 번도 실행하지 않았습니다. 로컬에서는 문법 검사와 기존 변경사항 테스트만 했고, 실제 TestFlight 업로드는 다음 `apple-v*` 태그 배포로 검증합니다.
+- fastlane `beta` 레인(TestFlight 전용)과 배포 모드 변수 `IOS_RELEASE_MODE`는 아직 한 번도 실행하지 않았습니다. 로컬에서는 문법 검사와 기존 변경사항 테스트만 했고, 실제 TestFlight 업로드는 다음 `apple-v*` 태그 배포로 검증합니다.

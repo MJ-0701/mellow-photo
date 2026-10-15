@@ -164,7 +164,7 @@ platform :ios do
   end
 
   desc 'Build a signed App Store IPA and upload it to TestFlight only, without touching any App Store version'
-  lane :testflight do
+  lane :beta do
     # Internal testers receive the build through App Store Connect internal groups, so no group names are passed.
     with_signed_ipa do |api_key, ipa, _version, _build|
       upload_to_testflight(api_key: api_key, ipa: ipa, app_identifier: 'com.mj.mellowphoto',
