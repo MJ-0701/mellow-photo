@@ -50,6 +50,7 @@
 		94DCFD6C43D5566F3B20C7F3 /* LegacyMacPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */; };
 		993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41FC59ED8903FB97642854A /* AppModel+Editing.swift */; };
 		9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */; };
+		A6638DE9800F8B3C5FA0B8B6 /* makeup.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 9D32CC590745242241C9A2F3 /* makeup.v1.json */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */; };
@@ -116,6 +117,7 @@
 		8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9AC98B66372F456AF761759B /* ExportMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportMenu.swift; sourceTree = "<group>"; };
 		9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustPanel.swift; sourceTree = "<group>"; };
+		9D32CC590745242241C9A2F3 /* makeup.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = makeup.v1.json; sourceTree = "<group>"; };
 		A03AC7B91F35D1BE3DDBF0BB /* PresetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetSheet.swift; sourceTree = "<group>"; };
 		A541985795F5FEE15374903C /* BeautyTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyTab.swift; sourceTree = "<group>"; };
 		ADD5E80F3B80B364E7019C06 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 				DD25AA90F8D05216BCD544F0 /* container-migration.plist */,
 				14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */,
 				88D5662CFBE9D0374BC48B21 /* looks.v1.json */,
+				9D32CC590745242241C9A2F3 /* makeup.v1.json */,
 				0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */,
 				8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */,
 			);
@@ -457,6 +460,7 @@
 				49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */,
 				C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */,
 				8254D4A0F3372FE08F211357 /* looks.v1.json in Resources */,
+				A6638DE9800F8B3C5FA0B8B6 /* makeup.v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
