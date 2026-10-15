@@ -78,6 +78,12 @@ public actor PhotoPipeline {
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 
+    /// 원본 분석 기준의 제안. 현재 레시피와 무관하다.
+    public func autoEnhanceSuggestion(_ id: PhotoID, hasFaces: Bool) throws -> AutoEnhanceSuggestion {
+        guard let image = cache.image(for: id) else { throw MellowError.cannotCreatePreview }
+        return try AutoEnhancer(tuning: tuning, renderer: renderer).suggestion(for: image, hasFaces: hasFaces)
+    }
+
     public func reprepareIfEvicted(_ id: PhotoID, at url: URL) throws {
         guard cache.image(for: id) == nil else { return }
         _ = try prepare(id, at: url)

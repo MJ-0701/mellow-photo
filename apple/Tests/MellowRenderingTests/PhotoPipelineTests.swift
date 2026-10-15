@@ -146,4 +146,20 @@ final class PhotoPipelineTests: XCTestCase {
         let rendered = try await pipeline.renderOriginal(id, at: url, recipe: colorRecipe, maxDimension: nil)
         XCTAssertEqual(rendered.extent.size, CGSize(width: 256, height: 256), "색감만이면 준비 없이도 저장한다")
     }
+
+    func testAutoEnhanceSuggestionUsesCachedPreview() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        let suggestion = try await pipeline.autoEnhanceSuggestion(id, hasFaces: false)
+        XCTAssertTrue(suggestion.color.exposure.isFinite)
+        await pipeline.evict(id)
+        do {
+            _ = try await pipeline.autoEnhanceSuggestion(id, hasFaces: false)
+            XCTFail("캐시가 없으면 제안할 수 없다")
+        } catch {
+            XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
+        }
+    }
 }

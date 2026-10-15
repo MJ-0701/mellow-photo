@@ -35,6 +35,31 @@ public struct RenderTuning: Sendable {
     /// 룩 tint ±1이 CITemperatureAndTint 목표 중립 y ±이 값이 된다.
     public var lookTintRange: Double = 60
 
+    /// 자동 보정이 노출로 맞추는 평균 휘도(sRGB 감마 값).
+    public var autoTargetLuminance: Double = 0.45
+    public var autoWarmthGain: Double = 0.5
+    public var autoWarmthLimit: Double = 0.3
+    public var autoHighlightThreshold: Double = 0.97
+    public var autoShadowThreshold: Double = 0.03
+    public var autoSaturation: Double = 1.08
+    public var autoContrast: Double = 1.04
+    public var autoSkinSmoothing: Double = 0.3
+    public var autoFaceSlim: Double = 0.15
+    /// 상·하위 백분위 차이가 이보다 작으면 단색으로 보고 노출만 조정한다.
+    public var autoFlatRange: Double = 0.05
+    public var autoExposureLimit: Double = 1
+    public var autoHistogramBins: Int = 64
+    /// 어두운 끝·밝은 끝으로 보는 히스토그램 백분위.
+    public var autoLowPercentile: Double = 0.01
+    public var autoHighPercentile: Double = 0.99
+    /// highlights = −(L₉₉ − 이 값) × autoRecoveryGain.
+    public var autoHighlightRampStart: Double = 0.9
+    /// shadows = (이 값 − L₁) × autoRecoveryGain.
+    public var autoShadowRampEnd: Double = 0.1
+    public var autoRecoveryGain: Double = 5
+    /// 검은 이미지에서 log2가 발산하지 않게 하는 평균 휘도 하한.
+    public var autoMinimumLuminance: Double = 0.001
+
     public init() {}
 
     public static func forCurrentDevice(physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> RenderTuning
