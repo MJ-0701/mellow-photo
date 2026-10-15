@@ -19,7 +19,8 @@ public struct PhotoAnalysis: Sendable {
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var bodyAnalysisFailure: MellowError?
     /// 다각형 마스크 비트맵 캐시. 묶음을 복사해도 같은 캐시를 나눠 쓴다. 키에 다각형 점이 들어 있어 얼굴이 바뀌어도 낡은 값을 쓰지 않는다.
-    let regionMasks = RegionMaskCache()
+    /// 상한은 준비 때 찾은 얼굴 수에 비례한다(RegionMaskCache.capacity(forFaces:)).
+    let regionMasks: RegionMaskCache
 
     public init(
         faces: [FaceGeometry] = [], faceAnalysisFailure: MellowError? = nil, blemishes: [BlemishSpot] = [],
@@ -33,5 +34,6 @@ public struct PhotoAnalysis: Sendable {
         self.personAnalysisFailure = personAnalysisFailure
         self.bodies = bodies
         self.bodyAnalysisFailure = bodyAnalysisFailure
+        regionMasks = RegionMaskCache(maximumEntries: RegionMaskCache.capacity(forFaces: faces.count))
     }
 }

@@ -82,7 +82,7 @@ final class FaceRegionsTests: XCTestCase {
     func testRegionMaskCacheEmptiesWhenFull() {
         let cache = RegionMaskCache()
         let extent = CGRect(x: 0, y: 0, width: 8, height: 8)
-        for index in 0...RegionMaskCache.maximumEntries {
+        for index in 0...cache.maximumEntries {
             let polygon = [CGPoint(x: 0, y: 0), CGPoint(x: CGFloat(index + 1), y: 0), CGPoint(x: 0, y: 4)]
             let key = RegionMaskKey(fill: [polygon], cut: [], cutWidth: 0, extent: extent, maxDimension: 512)
             _ = cache.mask(for: key) { CIImage(color: .white).cropped(to: extent) }
