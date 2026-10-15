@@ -9,6 +9,8 @@ public enum EditChange: Equatable, Sendable {
     case autoBlemish(Bool)
     case faceShape(FaceShapeKey, Double)
     case targetFace(Int?)
+    case feature(FeatureKey, Double)
+    case backgroundBlur(Double)
     case highlights(Double)
     case shadows(Double)
     case sharpness(Double)

@@ -119,6 +119,38 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(EditingPolicy.clamped(4, to: AdjustmentRange.unit), 1)
     }
 
+    func testFeatureAndBackgroundChangesClampAndStayUnlocked() {
+        var document = EditDocument()
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        XCTAssertNil(document.set(.feature(.eyeBrighten, 0.4)), "색만 바꾸므로 수동 편집이 있어도 잠기지 않는다")
+        XCTAssertNil(document.set(.feature(.teethWhiten, 1.7)))
+        XCTAssertNil(document.set(.feature(.lipVitality, -0.2)))
+        XCTAssertNil(document.set(.backgroundBlur(2)))
+        XCTAssertEqual(
+            document.recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.4, teethWhiten: 1, lipVitality: 0))
+        XCTAssertEqual(document.recipe.background.blur, 1)
+        XCTAssertFalse(EditChange.feature(.eyeBrighten, 0.5).affectsGeometry)
+        XCTAssertFalse(EditChange.backgroundBlur(0.5).affectsGeometry)
+        document.undo()
+        XCTAssertEqual(document.recipe.background.blur, 0, "변경마다 실행 취소 한 단계")
+        XCTAssertEqual(document.recipe.portrait.features.teethWhiten, 1)
+    }
+
+    func testPresetAndBatchCarryFeaturesAndBackground() {
+        let values = PresetValues(
+            portrait: PortraitAdjustments(features: FeatureAdjustments(eyeBrighten: 0.3, lipVitality: 0.2)),
+            background: BackgroundAdjustments(blur: 0.5))
+        var preset = EditDocument()
+        preset.apply(values)
+        var locked = EditDocument()
+        locked.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        locked.applyFromBatch(values)
+        for document in [preset, locked] {
+            XCTAssertEqual(document.recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.3, lipVitality: 0.2))
+            XCTAssertEqual(document.recipe.background.blur, 0.5, "잠긴 사진도 색 보정은 복사한다")
+        }
+    }
+
     func testPresetPreservesFaceShapeWhenLocked() {
         var document = EditDocument()
         document.set(.faceShape(.width, -0.2))

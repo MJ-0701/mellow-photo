@@ -54,6 +54,10 @@ public struct EditDocument: Equatable, Sendable {
         case .faceShape(let key, let value):
             updated.portrait.face[key] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(key))
         case .targetFace(let index): updated.portrait.targetFace = index
+        case .feature(let key, let value):
+            updated.portrait.features[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .backgroundBlur(let value):
+            updated.background.blur = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .highlights(let value): updated.detail.highlights = value
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value

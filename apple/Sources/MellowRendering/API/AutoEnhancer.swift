@@ -35,6 +35,7 @@ public struct AutoEnhancer: Sendable {
         var portrait = PortraitAdjustments()
         if hasFaces {
             portrait.skin = SkinAdjustments(smoothing: tuning.autoSkinSmoothing, autoBlemish: true)
+            portrait.features = FeatureAdjustments(eyeBrighten: tuning.autoEyeBrighten)
         }
         return AutoEnhanceSuggestion(color: color, detail: detail, portrait: portrait)
     }
