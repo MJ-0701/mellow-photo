@@ -31,6 +31,14 @@ final class GeometryStageTests: XCTestCase {
         XCTAssertEqual(result.extent, CGRect(x: 0, y: 0, width: 80, height: 80))
     }
 
+    func testCropEdgesRoundToNearestPixelIgnoringFloatNoise() throws {
+        // 회전으로 옮긴 자르기 값은 1 − x − w처럼 계산돼 아주 작은 오차가 붙는다. 그 오차로 한 픽셀이 늘면 안 된다.
+        let noise = 1e-12
+        let crop = NormalizedRect(x: 0.25 + noise, y: 0.1 + noise, width: 0.5, height: 0.6)
+        let result = try render(GeometryAdjustments(crop: crop))
+        XCTAssertEqual(result.extent, CGRect(x: 0, y: 0, width: 64, height: 48))
+    }
+
     func testQuarterTurnSwapsWidthAndHeight() throws {
         let result = try render(GeometryAdjustments(quarterTurns: 1))
         XCTAssertEqual(result.extent, CGRect(x: 0, y: 0, width: 80, height: 128))
@@ -153,6 +161,20 @@ final class GeometryStageTests: XCTestCase {
         }
         // +10°(시계 방향)에서 출력 왼쪽 위는 원본 x ≈ 0.07, −10°에서는 x ≈ 0.16을 본다. 왼쪽이 어두우니 +10°가 더 어둡다.
         XCTAssertLessThan(try XCTUnwrap(samples[10]), try XCTUnwrap(samples[-10]))
+    }
+
+    func testTurnedClockwiseShowsSamePixelsRotated() throws {
+        let input = Support.gradient()
+        let geometry = GeometryAdjustments(crop: NormalizedRect(x: 0.25, y: 0.1, width: 0.5, height: 0.6))
+        let before = try Pixels(render(geometry, input: input))
+        let after = try Pixels(render(geometry.turnedClockwise(), input: input))
+        XCTAssertEqual(after.width, before.height)
+        XCTAssertEqual(after.height, before.width)
+        // 시계 방향 90°: 회전 후 (열 c, 위에서 행 r)는 회전 전 (열 r, 위에서 행 height − 1 − c)다.
+        for (column, row) in [(0, 0), (after.width - 1, 0), (0, after.height - 1), (20, 40)] {
+            let expected = before.red(column: row, rowFromTop: before.height - 1 - column)
+            XCTAssertEqual(after.red(column: column, rowFromTop: row), expected, accuracy: 2, "(\(column), \(row))")
+        }
     }
 
     func testCropOffsetSamplesRightQuarter() throws {

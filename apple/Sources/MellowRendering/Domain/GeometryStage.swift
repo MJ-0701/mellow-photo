@@ -34,10 +34,12 @@ struct GeometryStage: RenderStage {
             result = result.transformed(by: transform).cropped(to: extent)
         }
         if let crop = geometry.crop, !context.skipsCrop {
-            let pixelRect = CGRect(
-                x: extent.minX + crop.x * extent.width, y: extent.minY + crop.y * extent.height,
-                width: crop.width * extent.width, height: crop.height * extent.height
-            ).integral.intersection(extent)
+            // 변마다 가장 가까운 픽셀로 맞춘다. integral처럼 바깥으로 넓히면 부동소수 오차로 한 픽셀이 늘어난다.
+            let minX = (extent.minX + crop.minX * extent.width).rounded()
+            let maxX = (extent.minX + crop.maxX * extent.width).rounded()
+            let minY = (extent.minY + crop.minY * extent.height).rounded()
+            let maxY = (extent.minY + crop.maxY * extent.height).rounded()
+            let pixelRect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY).intersection(extent)
             guard !pixelRect.isEmpty else { throw MellowError.invalidRecipeValues }
             result = result.cropped(to: pixelRect)
         }

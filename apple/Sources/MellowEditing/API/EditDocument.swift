@@ -57,10 +57,16 @@ public struct EditDocument: Equatable, Sendable {
         case .vignette(let value): updated.detail.vignette = value
         case .lookID(let id): updated.look.id = id
         case .lookIntensity(let value): updated.look.intensity = value
-        case .flipHorizontal(let flag): updated.geometry.flipHorizontal = flag
+        // 회전·반전은 자르기 영역을 이미지와 함께 옮긴다.
+        case .flipHorizontal(let flag):
+            if flag != updated.geometry.flipHorizontal {
+                updated.geometry = updated.geometry.flippedHorizontally()
+            }
         case .quarterTurns(let turns):
-            updated.geometry.quarterTurns = turns
-            updated.geometry.quarterTurns = updated.geometry.normalizedQuarterTurns
+            let steps = ((turns - updated.geometry.normalizedQuarterTurns) % 4 + 4) % 4
+            for _ in 0..<steps {
+                updated.geometry = updated.geometry.turnedClockwise()
+            }
         case .straightenDegrees(let degrees):
             let limit = GeometryAdjustments.maxStraightenDegrees
             updated.geometry.straightenDegrees = max(-limit, min(limit, degrees))

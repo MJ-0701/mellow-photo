@@ -153,6 +153,35 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.geometry.straightenDegrees, GeometryAdjustments.maxStraightenDegrees)
     }
 
+    func testQuarterTurnsMoveCropWithImage() {
+        var document = EditDocument()
+        let crop = NormalizedRect(x: 0.1, y: 0.2, width: 0.5, height: 0.3)
+        document.set(.crop(crop))
+        document.set(.quarterTurns(1))
+        XCTAssertEqual(document.recipe.geometry.quarterTurns, 1)
+        XCTAssertEqual(document.recipe.geometry.crop?.width ?? 0, 0.3, accuracy: 1e-9)
+        XCTAssertEqual(document.recipe.geometry.crop?.y ?? 0, 0.4, accuracy: 1e-9)
+        document.set(.quarterTurns(0))
+        XCTAssertEqual(document.recipe.geometry.quarterTurns, 0)
+        XCTAssertEqual(document.recipe.geometry.crop?.x ?? 0, crop.x, accuracy: 1e-9, "남은 세 번을 돌아 제자리")
+        XCTAssertEqual(document.recipe.geometry.crop?.width ?? 0, crop.width, accuracy: 1e-9)
+        XCTAssertEqual(document.undoStack.count, 3)
+    }
+
+    func testFlipMovesCropOnlyWhenFlagChanges() {
+        var document = EditDocument()
+        document.set(.crop(NormalizedRect(x: 0, y: 0, width: 0.5, height: 1)))
+        document.set(.straightenDegrees(4))
+        document.set(.flipHorizontal(true))
+        XCTAssertTrue(document.recipe.geometry.flipHorizontal)
+        XCTAssertEqual(document.recipe.geometry.crop?.x ?? 0, 0.5, accuracy: 1e-9)
+        XCTAssertEqual(document.recipe.geometry.straightenDegrees, -4)
+        let steps = document.undoStack.count
+        document.set(.flipHorizontal(true))
+        XCTAssertEqual(document.recipe.geometry.crop?.x ?? 0, 0.5, accuracy: 1e-9, "같은 값이면 다시 옮기지 않는다")
+        XCTAssertEqual(document.undoStack.count, steps)
+    }
+
     func testPresetCarriesDetailButNotLookOrGeometry() {
         var document = EditDocument()
         document.set(.lookID("mono"))
