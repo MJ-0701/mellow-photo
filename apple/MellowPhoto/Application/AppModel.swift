@@ -202,6 +202,14 @@ final class AppModel {
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure)
     }
 
+    /// 미리보기 캐시에서 밀려난 사진을 다시 준비한다. 다시 준비하면 분석도 새로 하므로 사진 정보를 함께 바꾼다.
+    /// 기다리는 동안 사진을 뺐으면 결과를 버린다.
+    func reprepareIfEvicted(_ id: PhotoID, at url: URL) async throws {
+        guard let prepared = try await pipeline.reprepareIfEvicted(id, at: url) else { return }
+        guard session.index(of: id) != nil else { return }
+        remember(id, prepared)
+    }
+
     func select(_ id: PhotoID) {
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
@@ -224,7 +232,7 @@ final class AppModel {
         guard let entry = session.selected else { return }
         selectionTask = Task {
             do {
-                try await pipeline.reprepareIfEvicted(id, at: copies.url(for: entry.filename))
+                try await reprepareIfEvicted(id, at: copies.url(for: entry.filename))
                 let baseRecipe = EditRecipe()
                 let base = try await pipeline.preview(id, recipe: baseRecipe)
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
@@ -273,9 +281,9 @@ final class AppModel {
         if showsUncropped {
             shownGeometry.crop = nil
         }
-        renderScheduler.schedule {
+        renderScheduler.schedule { [weak self] in
             // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
-            try await pipeline.reprepareIfEvicted(id, at: url)
+            try await self?.reprepareIfEvicted(id, at: url)
             return try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }

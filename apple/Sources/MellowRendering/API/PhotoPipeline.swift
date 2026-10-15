@@ -142,9 +142,12 @@ public actor PhotoPipeline {
         return try AutoEnhancer(tuning: tuning, renderer: renderer).suggestion(for: image, hasFaces: hasFaces)
     }
 
-    public func reprepareIfEvicted(_ id: PhotoID, at url: URL) throws {
-        guard cache.image(for: id) == nil else { return }
-        _ = try prepare(id, at: url)
+    /// 미리보기가 캐시에서 밀려났으면 다시 준비하고 새 결과를 돌려준다. 캐시에 남아 있으면 nil.
+    /// 다시 준비하면 분석도 새로 하므로 호출자는 돌려받은 결과로 사진 정보(얼굴·인물·체형과 그 실패)를 갱신한다.
+    @discardableResult
+    public func reprepareIfEvicted(_ id: PhotoID, at url: URL) throws -> PreparedPhoto? {
+        guard cache.image(for: id) == nil else { return nil }
+        return try prepare(id, at: url)
     }
 
     /// 준비 때 얻은 정규화 얼굴 좌표를 원본 해상도에 그대로 쓴다. 얼굴을 다시 분석하지 않는다.

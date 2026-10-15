@@ -13,7 +13,7 @@ extension AppModel {
         let url = copies.url(for: entry.filename)
         Task { [weak self] in
             do {
-                try await pipeline.reprepareIfEvicted(id, at: url)
+                try await self?.reprepareIfEvicted(id, at: url)
                 let thumbnails = try await pipeline.lookThumbnails(id)
                 self?.finishLookThumbnails(id, thumbnails)
             } catch {
@@ -33,7 +33,7 @@ extension AppModel {
     func autoEnhance() async {
         guard let entry = session.selected, isReady, !isBusy else { return }
         do {
-            try await pipeline.reprepareIfEvicted(entry.id, at: copies.url(for: entry.filename))
+            try await reprepareIfEvicted(entry.id, at: copies.url(for: entry.filename))
             let suggestion = try await pipeline.autoEnhanceSuggestion(entry.id, hasFaces: !faces.isEmpty)
             guard session.selectedPhotoID == entry.id else { return }
             if applyAutoSuggestion(suggestion) {

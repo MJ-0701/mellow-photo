@@ -84,6 +84,29 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.thumbnails.count, 4)
     }
 
+    func testReprepareAfterEvictionRefreshesPhotoInfo() async throws {
+        let files = try ["A", "B", "C", "D"].map { try TestSupport.solidPNG(in: root, name: $0) }
+        let failure = MellowError.personAnalysisUnavailable(reason: "first")
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.3, y: 0, width: 0.4, height: 0.8))
+        let queue = PersonResultQueue([.failure(failure), .success(mask)])
+        let model = TestSupport.makeModel(
+            root: root, personAnalyzer: StubPersonAnalyzer(queue: queue),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([files[0]])
+        try await waitUntil { model.isReady && model.preview != nil }
+        let first = try XCTUnwrap(model.session.selectedPhotoID)
+        XCTAssertEqual(model.backgroundAvailability, .unavailable(failure), "첫 준비의 인물 분석은 실패한다")
+        await model.importFromFiles(Array(files[1...]))
+        try await waitUntil { !model.isImporting }
+        XCTAssertEqual(queue.calls, 4, "사진마다 한 번씩 분석한다")
+        model.select(first)
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(queue.calls, 5, "밀려난 첫 사진을 다시 준비하며 다시 분석한다")
+        XCTAssertNil(model.photoInfo[first]?.personAnalysisFailure, "다시 준비한 분석이 이전 실패를 지운다")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        XCTAssertNil(model.presentedError)
+    }
+
     func testImportIsRejectedWhileBusyWithoutLeakingStagedFiles() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let importer = FakeImporter(passesThroughFileURLs: true)

@@ -35,9 +35,36 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     }
 }
 
+/// 호출마다 다음 인물 분석 결과를 돌려주고 마지막 결과는 계속 되풀이한다.
+/// 값 타입인 StubPersonAnalyzer가 복사돼도 같은 순서와 호출 횟수를 공유한다.
+final class PersonResultQueue: @unchecked Sendable {
+    private let lock = NSLock()
+    private var results: [Result<CIImage?, MellowError>]
+    private var callCount = 0
+
+    init(_ results: [Result<CIImage?, MellowError>]) {
+        self.results = results
+    }
+
+    var calls: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return callCount
+    }
+
+    func next() -> Result<CIImage?, MellowError> {
+        lock.lock()
+        defer { lock.unlock() }
+        callCount += 1
+        return results.count > 1 ? results.removeFirst() : results[0]
+    }
+}
+
 struct StubPersonAnalyzer: PersonAnalyzer {
     var result: Result<CIImage?, MellowError> = .success(nil)
-    func personMask(_ image: CIImage) throws -> CIImage? { try result.get() }
+    /// 있으면 result 대신 호출마다 이 순서의 다음 결과를 쓴다.
+    var queue: PersonResultQueue?
+    func personMask(_ image: CIImage) throws -> CIImage? { try (queue?.next() ?? result).get() }
 }
 
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.

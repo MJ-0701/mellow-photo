@@ -19,6 +19,23 @@ struct StubBodyAnalyzer: BodyAnalyzer {
     func analyze(_ image: CIImage) throws -> [BodyGeometry] { try result.get() }
 }
 
+/// 호출마다 다음 결과를 돌려주고 마지막 결과는 계속 되풀이한다. 다시 준비할 때 분석이 달라지는 경우를 흉내 낸다.
+final class SequencedBodyAnalyzer: BodyAnalyzer, @unchecked Sendable {
+    private let lock = NSLock()
+    private var results: [Result<[BodyGeometry], MellowError>]
+
+    init(_ results: [Result<[BodyGeometry], MellowError>]) {
+        self.results = results
+    }
+
+    func analyze(_ image: CIImage) throws -> [BodyGeometry] {
+        lock.lock()
+        let result = results.count > 1 ? results.removeFirst() : results[0]
+        lock.unlock()
+        return try result.get()
+    }
+}
+
 final class PhotoPipelineTests: XCTestCase {
     typealias Support = RenderingTestSupport
 
@@ -371,6 +388,40 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(prepared.bodyAnalysisFailure)
         let analysis = await pipeline.preparedAnalysis(id)
         XCTAssertEqual(analysis?.bodies, [])
+    }
+
+    func testReprepareReturnsNothingWhilePreviewIsCached() async throws {
+        let url = try writeSolidPNG()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let reprepared = try await pipeline.reprepareIfEvicted(id, at: url)
+        XCTAssertNil(reprepared, "캐시에 남아 있으면 다시 준비하지 않는다")
+    }
+
+    func testReprepareAfterEvictionReturnsFreshAnalysis() async throws {
+        let firstURL = try writeSolidPNG()
+        let secondURL = try writeSolidPNG()
+        var tuning = RenderTuning()
+        tuning.previewCacheCapacity = 1
+        let body = Support.standingBody(in: Support.standingBox)
+        let bodyAnalyzer = SequencedBodyAnalyzer([
+            .failure(.bodyAnalysisUnavailable(reason: "first")), .success([body]),
+        ])
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])), bodyAnalyzer: bodyAnalyzer, tuning: tuning)
+        let first = PhotoID()
+        let initial = try await pipeline.prepare(first, at: firstURL)
+        XCTAssertEqual(initial.bodyAnalysisFailure, .bodyAnalysisUnavailable(reason: "first"))
+        _ = try await pipeline.prepare(PhotoID(), at: secondURL)
+        let cached = await pipeline.cachedPreviewIDs
+        XCTAssertFalse(cached.contains(first), "두 번째 사진이 첫 사진을 밀어낸다")
+        let reprepared = try await pipeline.reprepareIfEvicted(first, at: firstURL)
+        let fresh = try XCTUnwrap(reprepared, "밀려난 사진은 다시 준비한 결과를 돌려준다")
+        XCTAssertNil(fresh.bodyAnalysisFailure, "다시 준비한 분석이 이전 실패를 대신한다")
+        XCTAssertTrue(fresh.hasBody)
+        let analysis = await pipeline.preparedAnalysis(first)
+        XCTAssertEqual(analysis?.bodies, [body])
     }
 
     func testPersonAnalysisFailureSkipsOnlyBackgroundBlur() async throws {
