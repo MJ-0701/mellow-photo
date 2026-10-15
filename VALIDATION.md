@@ -101,7 +101,7 @@
 
 - `./scripts/test-apple.sh` 종료 코드 0. 모듈 의존성·import 검사 통과, `swift format lint --strict` 통과, XcodeGen 2.46.0 재생성 후 xcodeproj 차이 없음.
 - 패키지 `swift test` 136개 통과: MellowShared 29, MellowRendering 56, MellowLibrary 29, MellowExport 4, MellowEditing 18.
-- 앱 XCTest: iPhone 18 Pro 시뮬레이터 43개, iPad Pro 13-inch (M5) 시뮬레이터 43개, macOS 44개 모두 통과. Mac이 하나 많은 것은 Mac 전용 폴더 저장 테스트 때문입니다.
+- 앱 XCTest: iPhone 18 Pro 시뮬레이터 46개, iPad Pro 13-inch (M5) 시뮬레이터 46개, macOS 47개 모두 통과. Mac이 하나 많은 것은 Mac 전용 폴더 저장 테스트 때문입니다.
 - `./scripts/build-apple.sh ios-device`: 서명 없는 Release iPhone/iPad arm64 빌드, Info.plist·PrivacyInfo 검사, 번들 ID·iPhoneOS·Assets.car 검사 통과.
 - `./scripts/build-apple.sh mac`: Release 빌드 arm64·x86_64 포함, 엄격한 서명 검사 통과.
 - 두 빌드의 경고는 기존 `WarpKernel.swift`의 Core Image 커널 API 지원 중단 경고 하나뿐입니다.
@@ -124,7 +124,7 @@
 
 이번 작업에서 새로 생긴 항목:
 
-- 도구 줄: iPhone 세로 화면에서 가로 스크롤과 캔버스를 가리는 정도, iPad·Mac 인스펙터에서 잘리지 않고 스크롤되는지, '자동'이 선택 상태 없이 버튼으로만 동작하는지.
+- 도구 줄: iPhone 세로 화면에서 가로 스크롤과 캔버스를 가리는 정도, iPad·Mac 인스펙터에서 잘리지 않고 스크롤되는지, Mac에서 마우스로 스크롤 막대를 끌어 잡티·변형까지 갈 수 있는지(트랙패드만 쓰는 오버레이 스크롤 막대 설정에서는 막대가 숨을 수 있음), '자동'이 선택 상태 없이 버튼으로만 동작하는지.
 - 필터 칩: 썸네일이 채워지기 전 스피너, 썸네일 표시, 강도 슬라이더가 필터를 고를 때만 나오는지.
 - 룩 10종을 실제 인물·풍경·실내 사진에서 보고 좋은지 판단하는 것. 좋지 않은 룩은 수치 조정이 필요합니다.
 - 자르기 화면: 바깥 어둡게, 손잡이 8개, 모서리·변 드래그와 안쪽 이동, 비율 고정 드래그, 확대한 상태에서의 드래그, 회전·반전 뒤 화면 모습.

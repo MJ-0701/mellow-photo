@@ -52,12 +52,16 @@ extension AppModel {
         }
     }
 
+    /// 드래그 하나가 실행 취소 한 단계다. 드래그 중에는 다시 그리지 않고 끝날 때 한 번 그린다.
     func beginCropDrag() {
+        isCropDragging = true
         beginSliderEdit()
     }
 
     func endCropDrag() {
         endSliderEdit()
+        isCropDragging = false
+        scheduleRender()
     }
 
     /// 기하만 기본값으로. 실행 취소 한 단계. 이미 기본값이면 빈 단계를 만들지 않는다.

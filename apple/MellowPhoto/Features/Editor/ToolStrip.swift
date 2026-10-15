@@ -23,8 +23,16 @@ struct ToolStrip: View {
                 ForEach([EditorTool.crop, .adjust, .portrait, .retouch, .warp]) { toolButton($0) }
             }
             .padding(.horizontal, 8)
+            #if os(macOS)
+                // 좁은 인스펙터에서는 도구가 다 보이지 않는다. 마우스로도 끝까지 갈 수 있게 스크롤 막대를 둔다.
+                .padding(.bottom, Theme.toolStripScrollerInset)
+            #endif
         }
-        .scrollIndicators(.hidden)
+        #if os(macOS)
+            .scrollIndicators(.visible)
+        #else
+            .scrollIndicators(.hidden)
+        #endif
     }
 
     private func toolButton(_ tool: EditorTool) -> some View {

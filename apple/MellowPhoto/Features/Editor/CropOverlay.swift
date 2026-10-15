@@ -6,6 +6,8 @@ struct CropOverlay: View {
     @Environment(AppModel.self) private var model
     let size: CGSize
     @State private var dragStartRect: NormalizedRect?
+    /// 제스처가 살아 있는 동안 true. SwiftUI가 onEnded 없이 제스처를 취소해도 false로 돌아와 드래그를 마무리한다.
+    @GestureState private var isGestureActive = false
 
     enum Handle: CaseIterable {
         case topLeft, top, topRight, left, right, bottomLeft, bottom, bottomRight
@@ -48,6 +50,11 @@ struct CropOverlay: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .onChange(of: isGestureActive) { _, active in
+            if !active {
+                finishDrag()
+            }
+        }
     }
 
     /// 정규화(원점 왼쪽 아래) → 뷰 픽셀(원점 왼쪽 위).
@@ -87,7 +94,9 @@ struct CropOverlay: View {
         return start
     }
 
+    /// 끝난 드래그든 취소된 드래그든 한 번만 마무리한다.
     private func finishDrag() {
+        guard dragStartRect != nil else { return }
         dragStartRect = nil
         model.endCropDrag()
     }
@@ -95,6 +104,7 @@ struct CropOverlay: View {
     /// 움직임 없는 탭은 빈 실행 취소 단계를 만들지 않도록 드래그로 치지 않는다.
     private func handleDrag(_ handle: Handle) -> some Gesture {
         DragGesture(minimumDistance: 1)
+            .updating($isGestureActive) { _, active, _ in active = true }
             .onChanged { value in
                 let start = startDragIfNeeded()
                 let delta = normalizedTranslation(value)
@@ -107,6 +117,7 @@ struct CropOverlay: View {
 
     private var moveDrag: some Gesture {
         DragGesture(minimumDistance: 1)
+            .updating($isGestureActive) { _, active, _ in active = true }
             .onChanged { value in
                 let start = startDragIfNeeded()
                 let delta = normalizedTranslation(value)
@@ -168,6 +179,14 @@ struct CropOverlay: View {
         } else {
             minY = maxY - height
         }
-        return NormalizedRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        return shiftedInsideUnitSquare(NormalizedRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY))
+    }
+
+    /// 위에서 남은 공간만큼 줄였으므로 보통은 그대로다.
+    /// 최소 변을 지키느라 남은 공간보다 커졌을 때만 크기와 비율을 그대로 두고 0…1 안으로 민다.
+    private static func shiftedInsideUnitSquare(_ rect: NormalizedRect) -> NormalizedRect {
+        let x = min(max(0, rect.x), 1 - rect.width)
+        let y = min(max(0, rect.y), 1 - rect.height)
+        return NormalizedRect(x: x, y: y, width: rect.width, height: rect.height)
     }
 }

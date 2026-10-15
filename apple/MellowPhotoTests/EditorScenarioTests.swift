@@ -39,14 +39,6 @@ final class EditorScenarioTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
-    private func waitUntil(_ condition: @escaping () -> Bool, timeout: TimeInterval = 10) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition() && Date() < deadline {
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
-        XCTAssertTrue(condition())
-    }
-
     private var demoPortraitURL: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

@@ -13,6 +13,8 @@ enum Theme {
     static let zoomRange = 1.0...4.0
     static let zoomStep = 0.5
     static let toolButtonSize = CGSize(width: 64, height: 56)
+    /// Mac 도구 줄 아래 스크롤 막대 자리. 막대가 버튼 글자를 가리지 않게 한다.
+    static let toolStripScrollerInset: CGFloat = 12
     static let lookChipSize = CGSize(width: 64, height: 76)
     static let cropHandleSize: CGFloat = 22
     /// 자르기 사각형의 최소 변. 정규화 단위.

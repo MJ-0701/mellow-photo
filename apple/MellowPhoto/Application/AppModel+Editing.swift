@@ -11,7 +11,9 @@ extension AppModel {
         if let error = session.lastPersistenceError {
             present(error)
         }
-        scheduleRender()
+        if !isCropDragging {
+            scheduleRender()
+        }
     }
 
     /// 드래그하는 동안은 세션 파일을 쓰지 않고 끝날 때 한 번 저장한다.
@@ -71,7 +73,9 @@ extension AppModel {
         statusMessage = UserMessage.appliedToAll
     }
 
+    /// 되돌린 자르기가 고른 비율과 맞는다는 보장이 없으므로 비율 선택을 비운다.
     func undo() {
+        cropAspect = nil
         mutateSelected { document in
             document.undo()
             return nil
@@ -79,6 +83,7 @@ extension AppModel {
     }
 
     func redo() {
+        cropAspect = nil
         mutateSelected { document in
             document.redo()
             return nil

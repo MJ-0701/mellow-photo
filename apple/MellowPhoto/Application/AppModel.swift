@@ -49,6 +49,8 @@ final class AppModel {
     /// 만드는 중인 룩 썸네일. 같은 사진을 두 번 요청하지 않는다.
     var lookThumbnailRequests: Set<PhotoID> = []
     var cropAspect: CropAspect?
+    /// 자르기 손잡이를 끄는 중. 자르기 화면은 자르기 전 이미지라 드래그 중에는 다시 그리지 않는다.
+    var isCropDragging = false
     var photoInfo: [PhotoID: PhotoInfo] = [:]
     var preview: CGImage?
     var original: CGImage?

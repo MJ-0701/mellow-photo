@@ -53,4 +53,15 @@ final class CropOverlayTests: XCTestCase {
         XCTAssertEqual(rect.width / rect.height, 2, accuracy: 1e-9)
         XCTAssertGreaterThanOrEqual(rect.height, Theme.cropMinimumSide - 1e-9)
     }
+
+    func testLockedRatioNearTopStaysInsideUnitSquare() {
+        let start = NormalizedRect(x: 0.4, y: 0.95, width: 0.2, height: 0.05)
+        let rect = CropOverlay.resized(start, handle: .top, dx: 0, dy: 0, lockedRatio: 0.5)
+        XCTAssertEqual(rect.width / rect.height, 0.5, accuracy: 1e-9)
+        XCTAssertGreaterThanOrEqual(rect.width, Theme.cropMinimumSide - 1e-9)
+        XCTAssertGreaterThanOrEqual(rect.minX, 0)
+        XCTAssertGreaterThanOrEqual(rect.minY, 0)
+        XCTAssertLessThanOrEqual(rect.maxX, 1 + 1e-9)
+        XCTAssertLessThanOrEqual(rect.maxY, 1 + 1e-9)
+    }
 }

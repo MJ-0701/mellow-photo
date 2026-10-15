@@ -19,14 +19,6 @@ final class AppModelTests: XCTestCase {
         try? FileManager.default.removeItem(at: root)
     }
 
-    private func waitUntil(_ condition: @escaping () -> Bool, timeout: TimeInterval = 5) async throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition() && Date() < deadline {
-            try await Task.sleep(nanoseconds: 20_000_000)
-        }
-        XCTAssertTrue(condition())
-    }
-
     func testImportSelectsFirstPhotoAndRendersPreview() async throws {
         let staged = try TestSupport.solidPNG(in: root, name: "IMG_1")
         let model = TestSupport.makeModel(
@@ -412,5 +404,40 @@ final class AppModelTests: XCTestCase {
         model.setCropAspect(.original)
         model.turnClockwise()
         XCTAssertEqual(model.cropAspect, .original)
+    }
+
+    func testUndoAndRedoClearCropAspect() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.crop)
+        model.setCropAspect(.nineSixteen)
+        model.undo()
+        XCTAssertNil(model.cropAspect, "되돌린 자르기는 9:16이 아니다")
+        model.setCropAspect(.square)
+        model.redo()
+        XCTAssertNil(model.cropAspect)
+    }
+
+    func testCropDragIsOneUndoStepAndRendersOnlyAtEnd() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.crop)
+        try await waitUntil { !model.isRendering }
+        let before = model.session.selected?.document.undoStack.count ?? 0
+        model.beginCropDrag()
+        for width in [0.9, 0.8, 0.7] {
+            model.edit(.crop(NormalizedRect(x: 0, y: 0, width: width, height: width)))
+            XCTAssertFalse(model.isRendering, "자르기 전 화면은 드래그 중에 바뀌지 않으므로 다시 그리지 않는다")
+        }
+        model.endCropDrag()
+        XCTAssertTrue(model.isRendering, "드래그가 끝나면 한 번 그린다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, before + 1)
+        XCTAssertEqual(model.currentRecipe.geometry.crop?.width, 0.7)
+        model.undo()
+        XCTAssertNil(model.currentRecipe.geometry.crop, "실행 취소 한 번에 드래그 전으로")
     }
 }

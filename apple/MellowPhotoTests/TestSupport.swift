@@ -70,6 +70,21 @@ final class RecordingDestination: ExportDestination, @unchecked Sendable {
     }
 }
 
+extension XCTestCase {
+    /// 조건이 참이 될 때까지 짧게 쉬며 기다린다. 시간 안에 참이 되지 않으면 실패로 남긴다.
+    @MainActor
+    func waitUntil(
+        _ condition: @escaping () -> Bool, timeout: TimeInterval = 10, file: StaticString = #filePath,
+        line: UInt = #line
+    ) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() && Date() < deadline {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(condition(), file: file, line: line)
+    }
+}
+
 enum TestSupport {
     static func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
