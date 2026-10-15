@@ -2,7 +2,8 @@ import CoreImage
 import MellowShared
 
 /// 메이크업. 대상 얼굴마다 FaceRegions 마스크 안에서만 색을 얹고 마스크 밖 픽셀은 그대로 둔다(스펙 6).
-/// 섞기는 Core Image 기본 섞기 모드를 작업 색공간에서 하고, 강도 = 부위 강도 × 부위 최대 불투명도(RenderTuning)로 원본과 섞는다.
+/// 섞기는 Core Image 기본 섞기 모드를 sRGB 감마 공간에서 하고(blended), 강도 = 부위 강도 × 부위 최대 불투명도(RenderTuning)로
+/// 작업 색공간(선형)에서 원본과 섞는다(mixed).
 /// 강도는 AdjustmentRange.unit으로 직접 자른다. 프리셋·일괄 적용 값은 편집 규칙의 클램프를 거치지 않는다.
 /// 색은 카탈로그의 그 부위 팔레트에서만 찾고, 없거나 모르는 색이면 그 부위만 건너뛴다(오류 아님).
 struct MakeupStage: RenderStage {
@@ -48,9 +49,13 @@ struct MakeupStage: RenderStage {
     }
 
     /// color를 image 위에 섞기 모드 mode로 얹은 결과를 bounds 안에서만 만든다.
+    /// 섞기는 sRGB 감마 공간에서 한다. 작업 색공간(선형)에서 섞으면 밝은 색(누드·MLBB·피치)의 중간 채널이
+    /// 선형 값으로 0.5 아래라 소프트 라이트가 그 채널을 어둡게 해 색이 탁해진다. 결과는 다시 선형으로 돌린다.
     static func blended(_ image: CIImage, with color: CIImage, mode: String, in bounds: CGRect) -> CIImage {
-        color.cropped(to: bounds).applyingFilter(mode, parameters: [kCIInputBackgroundImageKey: image])
-            .cropped(to: bounds)
+        let base = image.cropped(to: bounds).applyingFilter("CILinearToSRGBToneCurve")
+        let layer = color.cropped(to: bounds).applyingFilter("CILinearToSRGBToneCurve")
+        return layer.applyingFilter(mode, parameters: [kCIInputBackgroundImageKey: base])
+            .applyingFilter("CISRGBToneCurveToLinear").cropped(to: bounds)
     }
 
     /// foreground를 마스크 × amount 비율로 image 위에 섞는다. 마스크가 정확히 0인 곳(bounds 밖 포함)은 image 바이트 그대로다.
