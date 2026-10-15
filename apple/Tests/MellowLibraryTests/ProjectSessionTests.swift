@@ -165,4 +165,20 @@ final class ProjectSessionTests: XCTestCase {
         session.addPreset(named: "   ", values: PresetValues())
         XCTAssertEqual(session.presets.count, 1, "빈 이름은 무시")
     }
+
+    func testEndContinuousChangeDoesNotSave() throws {
+        let store = MemorySessionStore()
+        let session = ProjectSession(store: store, maxPhotos: 40)
+        let photo = entry("A")
+        try session.add(photo)
+        session.edit(photo.id) { document in
+            document.beginContinuousChange()
+            return document.set(.exposure(0.1))
+        }
+        let before = store.saveCount
+        session.endContinuousChange(photo.id)
+        XCTAssertEqual(store.saveCount, before, "플래그만 끄고 파일은 쓰지 않는다")
+        session.edit(photo.id) { $0.set(.exposure(0.2)) }
+        XCTAssertEqual(session.photos[0].document.undoStack.count, 2, "연속 변경이 끝났으므로 다음 편집은 체크포인트한다")
+    }
 }

@@ -170,13 +170,18 @@ final class AppModel {
     /// 드래그가 끝나지 않은 채 사진을 바꾸면 이전 사진의 연속 변경과 미룬 저장을 마무리한다.
     private func endContinuousChangeOnSelected() {
         if let previous = session.selectedPhotoID {
-            session.edit(previous) { document in
-                document.endContinuousChange()
-                return nil
-            }
+            session.endContinuousChange(previous)
         }
         if session.isPersistenceDeferred {
             session.endDeferredPersistence()
+        }
+    }
+
+    /// 백그라운드 진입처럼 드래그 종료 이벤트가 오지 않을 수 있는 시점에 열린 작업을 저장한다.
+    func flushPendingEdits() {
+        endContinuousChangeOnSelected()
+        if let error = session.lastPersistenceError {
+            present(error)
         }
     }
 

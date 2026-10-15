@@ -91,6 +91,12 @@ public final class ProjectSession {
         return rejection
     }
 
+    /// 연속 변경 플래그는 영속 상태가 아니므로 파일을 쓰지 않고 끝낸다.
+    public func endContinuousChange(_ id: PhotoID) {
+        guard let index = index(of: id) else { return }
+        photos[index].document.endContinuousChange()
+    }
+
     public func applyToAll(from id: PhotoID) {
         guard let source = photos.first(where: { $0.id == id }) else { return }
         let values = PresetValues(color: source.document.recipe.color, portrait: source.document.recipe.portrait)

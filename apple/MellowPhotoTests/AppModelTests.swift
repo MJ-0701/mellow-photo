@@ -251,4 +251,36 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotNil(store.recoveryFileURL)
         XCTAssertFalse(model.isBusy)
     }
+
+    func testSelectingAnotherPhotoSavesOnceNotTwice() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A")
+        let second = try TestSupport.solidPNG(in: root, name: "B")
+        let store = MemorySessionStore()
+        let importer = FakeImporter(staged: [
+            .success(StagedPhoto(url: first, displayName: "A")), .success(StagedPhoto(url: second, displayName: "B")),
+        ])
+        let model = TestSupport.makeModel(root: root, importer: importer, store: store)
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady }
+        let before = store.saveCount
+        model.select(model.session.photos[1].id)
+        XCTAssertEqual(store.saveCount, before + 1, "선택 변경은 세션을 한 번만 저장한다")
+    }
+
+    func testFlushPendingEditsSavesOpenDrag() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let store = MemorySessionStore()
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]),
+            store: store)
+        await model.importFromFiles([staged])
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.beginSliderEdit()
+        model.edit(.exposure(0.5))
+        let before = store.saveCount
+        model.flushPendingEdits()
+        XCTAssertEqual(store.saveCount, before + 1)
+        XCTAssertEqual(store.saved?.photos.first?.document.recipe.color.exposure, 0.5)
+        XCTAssertFalse(model.session.isPersistenceDeferred)
+    }
 }

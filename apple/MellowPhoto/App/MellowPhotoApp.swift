@@ -19,6 +19,7 @@ struct MellowPhotoApp: App {
                     if phase == .background {
                         model.cancelExport()
                         model.stopWork()
+                        model.flushPendingEdits()
                     }
                     if phase == .active {
                         model.resumeWork()
