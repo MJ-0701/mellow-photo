@@ -11,8 +11,11 @@ INSTALLED_XCODEGEN="$(xcodegen --version | sed -n 's/^Version: *//p')"
 (cd apple && swift test)
 IPHONE="$(mellow_first_simulator iPhone)"
 IPAD="$(mellow_first_simulator iPad)"
+# 시뮬레이터 병렬 테스트는 복제 기기를 켰다 지우면서 시뮬레이터 SpringBoard를 반복해서 죽인다. 기존 기기 하나로만 돌린다.
 for destination in "platform=iOS Simulator,id=$IPHONE" "platform=iOS Simulator,id=$IPAD" "platform=macOS"; do
   echo "== app tests: $destination"
-  xcodebuild "${MELLOW_PROJECT[@]}" -destination "$destination" CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
+  parallel=()
+  [[ "$destination" == *"iOS Simulator"* ]] && parallel=(-parallel-testing-enabled NO)
+  xcodebuild "${MELLOW_PROJECT[@]}" -destination "$destination" "${parallel[@]}" CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
   [[ "${PIPESTATUS[0]}" -eq 0 ]]
 done
