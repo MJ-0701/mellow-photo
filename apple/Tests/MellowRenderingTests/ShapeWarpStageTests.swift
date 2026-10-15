@@ -27,13 +27,39 @@ final class ShapeWarpStageTests: XCTestCase {
 
     private func bodyContext(
         _ body: BodyShapeAdjustments, bodies: [BodyGeometry], face: FaceShapeAdjustments = FaceShapeAdjustments(),
-        faces: [FaceGeometry] = []
+        faces: [FaceGeometry] = [], targetFace: Int? = nil, bodyAnalysisFailure: MellowError? = nil,
+        extent: CGRect? = nil
     ) -> RenderContext {
         var recipe = EditRecipe()
         recipe.body = body
         recipe.portrait.face = face
-        return RenderContext(
-            extent: extent, recipe: recipe, analysis: PhotoAnalysis(faces: faces, bodies: bodies), tuning: tuning)
+        recipe.portrait.targetFace = targetFace
+        let analysis = PhotoAnalysis(faces: faces, bodies: bodies, bodyAnalysisFailure: bodyAnalysisFailure)
+        return RenderContext(extent: extent ?? self.extent, recipe: recipe, analysis: analysis, tuning: tuning)
+    }
+
+    /// 허리 −1 원소 중 첫 push의 중심(한쪽 옆구리).
+    private func waistSide(of body: BodyGeometry, in extent: CGRect) throws -> CGPoint {
+        let primitives = BodyShapeRig.primitives(
+            body: body, adjustments: BodyShapeAdjustments(waist: -1), extent: extent, tuning: tuning)
+        let centers = primitives.compactMap { primitive -> CGPoint? in
+            guard case .push(let center, _, _) = primitive else { return nil }
+            return center
+        }
+        return try XCTUnwrap(centers.first, "허리 원소는 push다")
+    }
+
+    /// 표식 하나를 그린 이미지를 context로 변형해 그 표식이 움직인 거리(출력 − 입력 중심)를 잰다.
+    private func markerShift(at marker: CGPoint, in renderContext: RenderContext) throws -> CGVector {
+        let input = Support.markers([marker], extent: renderContext.extent)
+        let stage = ShapeWarpStage()
+        let primitives = stage.facePrimitives(in: renderContext) + stage.bodyPrimitives(in: renderContext)
+        let expected = Support.expectedPosition(
+            of: marker, primitives: primitives, limit: tuning.shapeDisplacementLimit)
+        let original = try XCTUnwrap(Support.markerCentroid(Support.grid(input), near: marker))
+        let moved = try XCTUnwrap(
+            Support.markerCentroid(Support.grid(stage.apply(input, in: renderContext)), near: expected))
+        return CGVector(dx: moved.x - original.x, dy: moved.y - original.y)
     }
 
     func testNoFaceEditReturnsInputUnchanged() throws {
@@ -146,17 +172,8 @@ final class ShapeWarpStageTests: XCTestCase {
     func testOnlyLargestBodyIsReshaped() throws {
         let large = Support.standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.5, height: 1))
         let small = Support.standingBody(in: NormalizedRect(x: 0.6, y: 0.3, width: 0.3, height: 0.5))
-        func waistSide(of body: BodyGeometry) throws -> CGPoint {
-            let primitives = BodyShapeRig.primitives(
-                body: body, adjustments: BodyShapeAdjustments(waist: -1), extent: extent, tuning: tuning)
-            let centers = primitives.compactMap { primitive -> CGPoint? in
-                guard case .push(let center, _, _) = primitive else { return nil }
-                return center
-            }
-            return try XCTUnwrap(centers.first, "허리 원소는 push다")
-        }
-        let largeSide = try waistSide(of: large)
-        let smallSide = try waistSide(of: small)
+        let largeSide = try waistSide(of: large, in: extent)
+        let smallSide = try waistSide(of: small, in: extent)
         let input = Support.markers([largeSide, smallSide], extent: extent)
         let before = try Support.grid(input)
         let renderContext = bodyContext(BodyShapeAdjustments(waist: -1), bodies: [large, small])
@@ -207,5 +224,69 @@ final class ShapeWarpStageTests: XCTestCase {
         XCTAssertEqual(
             try render(BodyShapeAdjustments(legLength: 1, waist: -1), bodies: []), try Support.bytes(image),
             "관절이 없으면 체형만 빠지고 오류가 없다")
+    }
+
+    func testBodyWarpScalesWithExtentLikePreviewAndExport() throws {
+        let body = Support.standingBody(in: Support.standingBox)
+        let adjustments = BodyShapeAdjustments(waist: -1, shoulders: 1)
+        /// 미리보기(1배)와 저장(4배)처럼 같은 사진을 다른 크기로 그린다. 정규화 관절이라 이동도 4배여야 한다.
+        let scale: CGFloat = 4
+        let small = CGRect(x: 0, y: 0, width: 256, height: 256)
+        let large = CGRect(x: 0, y: 0, width: small.width * scale, height: small.height * scale)
+        let smallSide = try waistSide(of: body, in: small)
+        let largeSide = CGPoint(x: smallSide.x * scale, y: smallSide.y * scale)
+        let smallShift = try markerShift(
+            at: smallSide, in: bodyContext(adjustments, bodies: [body], extent: small))
+        let largeShift = try markerShift(
+            at: largeSide, in: bodyContext(adjustments, bodies: [body], extent: large))
+        XCTAssertGreaterThan(abs(smallShift.dx), 3, "1배에서도 실제로 움직인다")
+        XCTAssertEqual(largeShift.dx, smallShift.dx * scale, accuracy: 1.5, "4배 크기에서는 4배 이동")
+        XCTAssertEqual(largeShift.dy, smallShift.dy * scale, accuracy: 1.5)
+    }
+
+    func testFailedBodyAnalysisStillWarpsFaceAndLeavesBodyAlone() throws {
+        let face = SyntheticFace.make().face
+        let body = Support.standingBody(in: Support.standingBox)
+        let contour = try contourPoint(1, of: face)
+        let side = try waistSide(of: body, in: extent)
+        let input = Support.markers([contour, side], extent: extent)
+        let faceEdit = FaceShapeAdjustments(width: -1)
+        let failure = MellowError.bodyAnalysisUnavailable(reason: "test")
+        let stage = ShapeWarpStage()
+        for bodyFailure in [failure, nil] {
+            let failed = bodyContext(
+                BodyShapeAdjustments(waist: -1), bodies: [], face: faceEdit, faces: [face],
+                bodyAnalysisFailure: bodyFailure)
+            XCTAssertTrue(stage.bodyPrimitives(in: failed).isEmpty, "관절이 없으면 체형 원소가 없다")
+            let faceOnly = bodyContext(BodyShapeAdjustments(), bodies: [], face: faceEdit, faces: [face])
+            let output = try stage.apply(input, in: failed)
+            XCTAssertEqual(
+                try Support.bytes(output), try Support.bytes(stage.apply(input, in: faceOnly)),
+                "체형 값은 픽셀을 하나도 바꾸지 않는다")
+            let shift = try markerShift(at: contour, in: failed)
+            XCTAssertGreaterThan(shift.dx, 4, "얼굴 윤곽은 그대로 좁아진다")
+        }
+    }
+
+    func testBodyWarpIgnoresTargetFace() throws {
+        let base = SyntheticFace.make().face
+        let leftFace = base.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25))
+        let rightFace = base.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25))
+        let body = Support.standingBody(in: Support.standingBox)
+        let side = try waistSide(of: body, in: extent)
+        let input = Support.markers([side], extent: extent)
+        let adjustments = BodyShapeAdjustments(waist: -1)
+        let stage = ShapeWarpStage()
+        let untargeted = bodyContext(adjustments, bodies: [body], faces: [leftFace, rightFace])
+        for target in [0, 1] {
+            let targeted = bodyContext(adjustments, bodies: [body], faces: [leftFace, rightFace], targetFace: target)
+            XCTAssertEqual(stage.bodyPrimitives(in: targeted), stage.bodyPrimitives(in: untargeted))
+            XCTAssertEqual(
+                try Support.bytes(stage.apply(input, in: targeted)),
+                try Support.bytes(stage.apply(input, in: untargeted)),
+                "고른 얼굴이 있어도 체형은 같게 바뀐다")
+            let shift = try markerShift(at: side, in: targeted)
+            XCTAssertGreaterThan(abs(shift.dx), 3, "얼굴 \(target)을 골라도 허리가 움직인다")
+        }
     }
 }

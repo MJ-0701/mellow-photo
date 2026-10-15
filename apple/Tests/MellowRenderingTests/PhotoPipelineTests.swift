@@ -503,7 +503,10 @@ final class PhotoPipelineTests: XCTestCase {
         let original = try await failing.renderOriginal(id, at: url, recipe: shaped, maxDimension: nil)
         let originalColor = try await failing.renderOriginal(id, at: url, recipe: colorOnly, maxDimension: nil)
         XCTAssertEqual(try Support.bytes(original), try Support.bytes(originalColor), "저장도 오류 없이 체형만 건너뛴다")
-        let unprepared = try await failing.renderOriginal(PhotoID(), at: url, recipe: shaped, maxDimension: nil)
+        let unprepared = try await working.renderOriginal(PhotoID(), at: url, recipe: shaped, maxDimension: nil)
+        let unpreparedColor = try await working.renderOriginal(PhotoID(), at: url, recipe: colorOnly, maxDimension: nil)
         XCTAssertEqual(unprepared.extent.size, CGSize(width: 256, height: 192), "준비 전 사진도 체형 때문에 저장을 막지 않는다")
+        XCTAssertEqual(
+            try Support.bytes(unprepared), try Support.bytes(unpreparedColor), "관절을 아는 파이프라인도 준비 전 사진은 체형을 건너뛴다")
     }
 }
