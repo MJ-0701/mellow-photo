@@ -10,6 +10,8 @@ public struct RenderContext: Sendable {
     public let targetFaces: [FaceGeometry]
     public let tuning: RenderTuning
     public let lookCatalog: LookCatalog
+    /// 메이크업 팔레트. 비어 있으면 색을 고르는 부위(립·블러셔·아이섀도)만 빠진다.
+    public let makeupCatalog: MakeupCatalog
     /// 자르기 도구 화면용. 기하 단계가 자르기만 건너뛴다.
     public let skipsCrop: Bool
     /// recipe.portrait.targetFace를 적용한 잡티.
@@ -17,13 +19,14 @@ public struct RenderContext: Sendable {
 
     public init(
         extent: CGRect, recipe: EditRecipe, analysis: PhotoAnalysis, tuning: RenderTuning,
-        lookCatalog: LookCatalog = .empty, skipsCrop: Bool = false
+        lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty, skipsCrop: Bool = false
     ) {
         self.extent = extent
         self.recipe = recipe
         self.analysis = analysis
         self.tuning = tuning
         self.lookCatalog = lookCatalog
+        self.makeupCatalog = makeupCatalog
         self.skipsCrop = skipsCrop
         let faces = analysis.faces
         let blemishes = analysis.blemishes
@@ -40,11 +43,12 @@ public struct RenderContext: Sendable {
     /// 새 분석 결과는 이 인자 목록에 더하지 않고 PhotoAnalysis에만 더한다.
     public init(
         extent: CGRect, recipe: EditRecipe, faces: [FaceGeometry], tuning: RenderTuning,
-        lookCatalog: LookCatalog = .empty, skipsCrop: Bool = false, blemishes: [BlemishSpot] = []
+        lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty, skipsCrop: Bool = false,
+        blemishes: [BlemishSpot] = []
     ) {
         self.init(
             extent: extent, recipe: recipe, analysis: PhotoAnalysis(faces: faces, blemishes: blemishes),
-            tuning: tuning, lookCatalog: lookCatalog, skipsCrop: skipsCrop)
+            tuning: tuning, lookCatalog: lookCatalog, makeupCatalog: makeupCatalog, skipsCrop: skipsCrop)
     }
 
     /// 왼쪽부터 정렬된 얼굴.

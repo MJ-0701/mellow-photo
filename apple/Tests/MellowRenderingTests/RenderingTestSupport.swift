@@ -42,6 +42,14 @@ enum RenderingTestSupport {
         return try LookCatalog(data: Data(contentsOf: url))
     }
 
+    static func sharedMakeupCatalog() throws -> MakeupCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("shared/makeup/makeup.v1.json")
+        return try MakeupCatalog(data: Data(contentsOf: url))
+    }
+
     static func render(_ image: CIImage, recipe: EditRecipe, faces: [FaceGeometry] = [], catalog: LookCatalog) throws
         -> CIImage
     {

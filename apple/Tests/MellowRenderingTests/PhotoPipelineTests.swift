@@ -509,4 +509,27 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(
             try Support.bytes(unprepared), try Support.bytes(unpreparedColor), "관절을 아는 파이프라인도 준비 전 사진은 체형을 건너뛴다")
     }
+
+    func testPreviewAndOriginalPaintMakeupOnlyWithPipelineCatalog() async throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let url = try Support.writePNG(synthetic.image, name: "face")
+        func bytes(_ image: CGImage) -> [UInt8] { Array(image.dataProvider!.data! as Data) }
+        var recipe = EditRecipe()
+        recipe.makeup.lip = MakeupTint(colorID: "lip-red", intensity: 1)
+        let id = PhotoID()
+        let painted = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: RenderTuning(),
+            makeupCatalog: try Support.sharedMakeupCatalog())
+        _ = try await painted.prepare(id, at: url)
+        let plain = try await painted.preview(id, recipe: EditRecipe())
+        let lipped = try await painted.preview(id, recipe: recipe)
+        XCTAssertNotEqual(bytes(lipped), bytes(plain), "미리보기에 립이 들어간다")
+        let plainOriginal = try await painted.renderOriginal(id, at: url, recipe: EditRecipe(), maxDimension: nil)
+        let lippedOriginal = try await painted.renderOriginal(id, at: url, recipe: recipe, maxDimension: nil)
+        XCTAssertNotEqual(try Support.bytes(lippedOriginal), try Support.bytes(plainOriginal), "저장에도 립이 들어간다")
+        let bare = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: RenderTuning())
+        _ = try await bare.prepare(id, at: url)
+        let skipped = try await bare.preview(id, recipe: recipe)
+        XCTAssertEqual(bytes(skipped), bytes(plain), "카탈로그가 없으면 립만 건너뛰고 오류를 던지지 않는다")
+    }
 }

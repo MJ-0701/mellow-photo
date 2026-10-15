@@ -129,6 +129,8 @@ public struct RenderTuning: Sendable {
     public var backgroundBlurMaxFraction: Double = 0.02
     /// 인물 마스크를 키운 뒤 흐리는 반지름. 짧은 변 비율. 512×384 마스크 한 칸(1600px 미리보기에서 약 3px)의 두 배를 넘겨 계단을 덮는다.
     public var backgroundMaskFeather: Double = 0.006
+    /// 립 1에서 소프트 라이트 결과를 섞는 비율. 소프트 라이트는 입술 명암을 남겨 1에 가까워도 질감이 유지된다.
+    public var makeupLipMaxOpacity: Double = 0.85
     /// 관절 신뢰도가 이보다 낮으면 없는 것으로 본다(스펙 5).
     public var bodyJointMinConfidence: Double = 0.3
     /// 체형 push 항목 하나의 이동 상한. 어깨 폭 비율(스펙 0.06, "몸 폭의 6% 이내"). 항목별 최대가 이보다 크면 이 값으로 자른다.

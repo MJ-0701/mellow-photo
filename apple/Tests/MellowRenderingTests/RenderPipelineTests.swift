@@ -130,7 +130,10 @@ final class RenderPipelineTests: XCTestCase {
             input, context: context)
         XCTAssertEqual(
             RenderPipeline.standard.stages.map(\.name),
-            ["skin", "feature", "background", "shapeWarp", "localEdit", "geometry", "color", "detail", "look"])
+            [
+                "skin", "feature", "makeup", "background", "shapeWarp", "localEdit", "geometry", "color", "detail",
+                "look",
+            ])
         XCTAssertNotEqual(try Support.bytes(standard), try Support.bytes(reversed))
     }
 

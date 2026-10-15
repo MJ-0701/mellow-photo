@@ -53,20 +53,24 @@ public actor PhotoPipeline {
     private let bodyAnalyzer: (any BodyAnalyzer)?
     private let tuning: RenderTuning
     private let lookCatalog: LookCatalog
+    private let makeupCatalog: MakeupCatalog
     /// 미리보기 이미지가 LRU로 밀려나도 일부러 남긴다. renderOriginal이 얼굴 좌표를 써야 한다.
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
     /// personAnalyzer·bodyAnalyzer가 nil이면 그 분석을 하지 않는다(사람 없음과 같다). 앱은 Vision 구현을 넘긴다.
+    /// makeupCatalog가 비어 있으면 색을 고르는 메이크업 부위만 빠진다.
     public init(
         analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil,
-        bodyAnalyzer: (any BodyAnalyzer)? = nil, tuning: RenderTuning, lookCatalog: LookCatalog = .empty
+        bodyAnalyzer: (any BodyAnalyzer)? = nil, tuning: RenderTuning, lookCatalog: LookCatalog = .empty,
+        makeupCatalog: MakeupCatalog = .empty
     ) {
         self.analyzer = analyzer
         self.personAnalyzer = personAnalyzer
         self.bodyAnalyzer = bodyAnalyzer
         self.tuning = tuning
         self.lookCatalog = lookCatalog
+        self.makeupCatalog = makeupCatalog
         cache = PreviewCache(capacity: tuning.previewCacheCapacity)
     }
 
@@ -121,7 +125,7 @@ public actor PhotoPipeline {
         }
         let context = RenderContext(
             extent: image.extent, recipe: recipe, analysis: entry.analysis, tuning: tuning, lookCatalog: lookCatalog,
-            skipsCrop: showsUncropped)
+            makeupCatalog: makeupCatalog, skipsCrop: showsUncropped)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 
@@ -172,7 +176,8 @@ public actor PhotoPipeline {
     private func render(url: URL, recipe: EditRecipe, analysis: PhotoAnalysis, maxDimension: Int?) throws -> CIImage {
         let image = try loader.load(url: url, maxDimension: maxDimension)
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, analysis: analysis, tuning: tuning, lookCatalog: lookCatalog)
+            extent: image.extent, recipe: recipe, analysis: analysis, tuning: tuning, lookCatalog: lookCatalog,
+            makeupCatalog: makeupCatalog)
         return try pipeline.render(image, context: context)
     }
 
