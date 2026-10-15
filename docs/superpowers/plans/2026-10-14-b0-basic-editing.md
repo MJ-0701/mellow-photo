@@ -10,6 +10,18 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-14-b0-basic-editing-design.md`
 
+## 사람이 확인할 것
+
+- **순서.** Task 1(A에서 보류한 결함 3건) → 2~5 데이터·규칙 → 6~10 렌더 단계·자동 보정·썸네일 → 11 AppModel → 12 화면 → 13 문서·검증. 13개 Task, 각 Task마다 Opus 구현 → 리뷰 → 수정 루프, 끝에 전체 리뷰.
+- **외부 효과가 있는 단계.** 없음. 푸시·태그·심사 제출은 이 계획에 없다(B0 뒤 사용자 결정).
+- **사용자 검증이 필요한 것.** 룩 10종의 실제 느낌(Task 12 실기동 캡처를 보고 수치 조정 요청 가능), iOS 대화형 실기동(셸에서 불가, 사용자가 시뮬레이터 패널로).
+- **되돌리기 쉬운 결정.** 룩 수치, 자동 보정 게인(`RenderTuning`), 도구 줄 순서. 되돌리기 어려운 결정은 스펙의 "사람이 확인할 것" 표 참조.
+- **예상 리스크.** 자르기 오버레이 제스처(iPad 핀치와 손잡이 드래그 충돌)는 실기동에서만 드러남. Core Image `CIHighlightShadowAdjust`가 원본 해상도에서 느릴 수 있음(진행률로 표시).
+
+---
+
+## 에이전트 참조
+
 ## Global Constraints
 
 - 작업 위치: 저장소 루트 `/Users/mj/IdeaProjects/mellow-photo`의 `main`에서 분기한 브랜치(worktree는 실행 시 using-git-worktrees가 만든다). 모든 명령 전에 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`. XcodeGen 2.46.0이 설치돼 있고 `apple/.xcodegen-version`이 그 버전을 고정한다.
