@@ -125,6 +125,10 @@ public struct RenderTuning: Sendable {
     public var lipSaturationMax: Double = 0.3
     /// 입술 생기 1에서 감마 Cr에 더하는 붉은기.
     public var lipRednessMax: Double = 0.02
+    /// 배경 흐림 1의 반지름. 짧은 변 비율. 미리보기(짧은 변 1200)에서 24px, 1200만 화소 원본(짧은 변 3024)에서 60px.
+    public var backgroundBlurMaxFraction: Double = 0.02
+    /// 인물 마스크를 키운 뒤 흐리는 반지름. 짧은 변 비율. 512×384 마스크 한 칸(1600px 미리보기에서 약 3px)의 두 배를 넘겨 계단을 덮는다.
+    public var backgroundMaskFeather: Double = 0.006
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000

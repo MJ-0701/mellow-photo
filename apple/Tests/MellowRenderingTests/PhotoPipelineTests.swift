@@ -27,6 +27,13 @@ final class PhotoPipelineTests: XCTestCase {
         return url
     }
 
+    /// 4px 폭 세로 줄무늬 PNG(256×192). 배경 흐림이 바뀐 것을 바이트로 알 수 있다.
+    private func writeStripesPNG() throws -> URL {
+        let image = CIFilter(name: "CIStripesGenerator", parameters: ["inputWidth": 4, "inputSharpness": 1])!
+            .outputImage!.cropped(to: CGRect(x: 0, y: 0, width: 256, height: 192))
+        return try Support.writePNG(image, name: "stripes")
+    }
+
     func testPrepareReportsSizeThumbnailAndFaces() async throws {
         let url = try writeSolidPNG()
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
@@ -303,5 +310,52 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(prepared.personAnalysisFailure)
         let analysis = await pipeline.preparedAnalysis(id)
         XCTAssertNil(analysis?.personMask)
+    }
+
+    func testPersonAnalysisFailureSkipsOnlyBackgroundBlur() async throws {
+        let url = try writeStripesPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            personAnalyzer: StubPersonAnalyzer(result: .failure(.personAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        var colorOnly = EditRecipe()
+        colorOnly.color.exposure = 0.2
+        var blurred = colorOnly
+        blurred.background.blur = 0.6
+        let previewBlurred = try await pipeline.preview(id, recipe: blurred)
+        let previewColor = try await pipeline.preview(id, recipe: colorOnly)
+        XCTAssertEqual(
+            Array(previewBlurred.dataProvider!.data! as Data), Array(previewColor.dataProvider!.data! as Data),
+            "미리보기는 흐림만 빼고 그린다")
+        let original = try await pipeline.renderOriginal(id, at: url, recipe: blurred, maxDimension: nil)
+        let originalColor = try await pipeline.renderOriginal(id, at: url, recipe: colorOnly, maxDimension: nil)
+        XCTAssertEqual(try Support.bytes(original), try Support.bytes(originalColor), "저장도 오류 없이 흐림만 건너뛴다")
+        let unprepared = try await pipeline.renderOriginal(PhotoID(), at: url, recipe: blurred, maxDimension: nil)
+        XCTAssertEqual(unprepared.extent.size, CGSize(width: 256, height: 192), "준비 전 사진도 흐림 때문에 저장을 막지 않는다")
+    }
+
+    func testOriginalRenderScalesPreviewMaskToOutputSize() async throws {
+        let url = try writeStripesPNG()
+        let id = PhotoID()
+        let mask = Support.personMask(
+            size: CGSize(width: 64, height: 64), person: CGRect(x: 24, y: 16, width: 16, height: 32))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(mask)), tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        var plain = EditRecipe()
+        plain.color.exposure = 0.2
+        var blurred = plain
+        blurred.background.blur = 1
+        let sharpImage = try await pipeline.renderOriginal(id, at: url, recipe: plain, maxDimension: 128)
+        let softImage = try await pipeline.renderOriginal(id, at: url, recipe: blurred, maxDimension: 128)
+        XCTAssertEqual(softImage.extent.size, CGSize(width: 128, height: 96))
+        let sharp = try Support.grid(sharpImage)
+        let soft = try Support.grid(softImage)
+        // 128×96 출력에서 사람은 x 48…80, y 24…72다.
+        XCTAssertEqual(soft.rgba(CGPoint(x: 64, y: 48)), sharp.rgba(CGPoint(x: 64, y: 48)), "작은 출력에서도 사람 가운데는 그대로")
+        XCTAssertNotEqual(soft.rgba(CGPoint(x: 10, y: 10)), sharp.rgba(CGPoint(x: 10, y: 10)), "배경은 흐려진다")
     }
 }

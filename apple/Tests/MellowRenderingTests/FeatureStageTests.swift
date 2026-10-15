@@ -110,4 +110,43 @@ final class FeatureStageTests: XCTestCase {
         XCTAssertGreaterThan(
             noPupils.red(SyntheticFace.scleraPoint), before.red(SyntheticFace.scleraPoint), "동공이 없어도 흰자는 보정한다")
     }
+
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. 비트맵으로 굳혀 마스크 밖 바이트를 그대로 비교한다.
+    func testTargetFaceChangesOnlyThatFace() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let half = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        let leftOffset = NormalizedPoint(x: 0, y: 0.25)
+        let rightOffset = NormalizedPoint(x: 0.5, y: 0.25)
+        let side = CGFloat(SyntheticFace.size)
+        let left = synthetic.image.transformed(by: half.concatenating(CGAffineTransform(translationX: 0, y: side / 4)))
+        let right = synthetic.image.transformed(
+            by: half.concatenating(CGAffineTransform(translationX: side / 2, y: side / 4)))
+        let composed = left.composited(over: right).composited(over: CIImage(color: .gray)).cropped(to: extent)
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(composed))
+        let faces = [
+            synthetic.face.transformed(scale: 0.5, offset: leftOffset),
+            synthetic.face.transformed(scale: 0.5, offset: rightOffset),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.features = FeatureAdjustments(eyeBrighten: 1, teethWhiten: 1, lipVitality: 1)
+        recipe.portrait.targetFace = 0
+        let context = RenderContext(extent: extent, recipe: recipe, faces: faces, tuning: RenderTuning())
+        let before = try Support.grid(image)
+        let after = try Support.grid(FeatureStage().apply(image, in: context))
+        var leftChanged = 0
+        var rightChanged = 0
+        for y in 0..<SyntheticFace.size {
+            for x in 0..<SyntheticFace.size {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if x < SyntheticFace.size / 2 {
+                    leftChanged += 1
+                } else {
+                    rightChanged += 1
+                }
+            }
+        }
+        XCTAssertGreaterThan(leftChanged, 0, "고른 얼굴은 보정된다")
+        XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
+    }
 }
