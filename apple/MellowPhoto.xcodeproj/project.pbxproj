@@ -32,6 +32,7 @@
 		7AECACDB18BF4C6D2FB965A3 /* PortraitPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76F486447BA968E93377EBF3 /* PortraitPanel.swift */; };
 		7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E1DB811347F53AB847DE61D2 /* Assets.xcassets */; };
 		7C24BB3E8309788DE6994157 /* ExportMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC98B66372F456AF761759B /* ExportMenu.swift */; };
+		8254D4A0F3372FE08F211357 /* looks.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 88D5662CFBE9D0374BC48B21 /* looks.v1.json */; };
 		865DD46860E65C891D8D186C /* SystemPhotoImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */; };
 		88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F0DE03B3D7090AE3713F35C /* AppModel.swift */; };
 		8B0070F52E5A1F0150111794 /* MellowEditing in Frameworks */ = {isa = PBXBuildFile; productRef = 2D215632597C957E5592C85D /* MellowEditing */; };
@@ -39,6 +40,7 @@
 		8D84CF1378E138B0D0E29826 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7503240254DB929DE6204 /* TestSupport.swift */; };
 		94DCFD6C43D5566F3B20C7F3 /* LegacyMacPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */; };
 		993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41FC59ED8903FB97642854A /* AppModel+Editing.swift */; };
+		9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		C32E30AA9490534A74C0ABA2 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */; };
@@ -91,6 +93,7 @@
 		7451F7A8E9DE87961267F974 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		76F486447BA968E93377EBF3 /* PortraitPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitPanel.swift; sourceTree = "<group>"; };
 		881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStripView.swift; sourceTree = "<group>"; };
+		88D5662CFBE9D0374BC48B21 /* looks.v1.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = looks.v1.json; sourceTree = "<group>"; };
 		898E1FD227433ABB414F380E /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		9AC98B66372F456AF761759B /* ExportMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportMenu.swift; sourceTree = "<group>"; };
@@ -115,6 +118,7 @@
 		DF065A9DFEF0B076E76F17FD /* LibrarySidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySidebar.swift; sourceTree = "<group>"; };
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
+		E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledLooksTests.swift; sourceTree = "<group>"; };
 		F465BA3A1339352022E907AA /* AppModel+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Live.swift"; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ports.swift; sourceTree = "<group>"; };
@@ -190,6 +194,7 @@
 				E1DB811347F53AB847DE61D2 /* Assets.xcassets */,
 				DD25AA90F8D05216BCD544F0 /* container-migration.plist */,
 				14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */,
+				88D5662CFBE9D0374BC48B21 /* looks.v1.json */,
 				0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */,
 				8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */,
 			);
@@ -234,6 +239,7 @@
 			isa = PBXGroup;
 			children = (
 				898E1FD227433ABB414F380E /* AppModelTests.swift */,
+				E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */,
 				D882DADCF0E8575966450368 /* ExportPhotosTests.swift */,
 				5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */,
 				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
@@ -417,6 +423,7 @@
 				CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */,
 				49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */,
 				C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */,
+				8254D4A0F3372FE08F211357 /* looks.v1.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -428,6 +435,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0FA73B0DF5725C84F333FF05 /* AppModelTests.swift in Sources */,
+				9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */,
 				8BBE3FCB108100426FA44D97 /* ExportPhotosTests.swift in Sources */,
 				E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */,
 				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
