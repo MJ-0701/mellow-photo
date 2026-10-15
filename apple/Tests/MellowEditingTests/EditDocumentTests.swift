@@ -233,6 +233,26 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.color.exposure, 0)
     }
 
+    func testApplyAutoKeepsTeethLipsAndBackgroundAndSetsOnlyEyeBrighten() {
+        var document = EditDocument()
+        document.set(.feature(.teethWhiten, 0.6))
+        document.set(.feature(.lipVitality, 0.4))
+        document.set(.backgroundBlur(0.5))
+        let before = document.undoStack.count
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(), detail: DetailAdjustments(),
+            portrait: PortraitAdjustments(features: FeatureAdjustments(eyeBrighten: 0.2)))
+        XCTAssertTrue(document.applyAuto(suggestion))
+        XCTAssertEqual(
+            document.recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.2, teethWhiten: 0.6, lipVitality: 0.4),
+            "자동 보정은 치아 미백·입술 생기를 지우지 않는다")
+        XCTAssertEqual(document.recipe.background.blur, 0.5, "자동 보정은 배경을 건드리지 않는다")
+        XCTAssertEqual(document.undoStack.count, before + 1)
+        document.undo()
+        XCTAssertEqual(
+            document.recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0, teethWhiten: 0.6, lipVitality: 0.4))
+    }
+
     func testResetIsUndoable() {
         var document = EditDocument()
         document.set(.exposure(0.4))
