@@ -166,13 +166,17 @@ final class EditorScenarioTests: XCTestCase {
     private static let demoFace = TestSupport.landmarkedFace(
         in: NormalizedRect(x: 0.33, y: 0.36, width: 0.38, height: 0.4))
 
+    /// 공용 픽스처에서 사람이 있는 영역을 어림한 스텁 인물 마스크. 얼굴과 어깨를 덮는다.
+    private static let demoPersonMask = TestSupport.personMask(NormalizedRect(x: 0.2, y: 0, width: 0.65, height: 0.85))
+
     private func previewBytes(_ model: AppModel) -> [UInt8] {
         model.preview.map { Array($0.dataProvider!.data! as Data) } ?? []
     }
 
-    func testBeautySkinThenFaceShapeThenExportSucceeds() async throws {
+    func testBeautySkinFaceFeaturesThenBackgroundThenExportSucceeds() async throws {
         let model = TestSupport.makeModel(
             root: root, analyzer: StubFaceAnalyzer(result: .success([Self.demoFace])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(Self.demoPersonMask)),
             importer: FakeImporter(passesThroughFileURLs: true))
         await model.importFromFiles([try demoPortraitCopy()])
         try await waitUntil { model.isReady && model.preview != nil }
@@ -196,9 +200,26 @@ final class EditorScenarioTests: XCTestCase {
         // 얼굴형만 바꿔도 미리보기가 바뀌어야 한다(바뀌지 않으면 시간 초과로 실패).
         try await waitUntil { !model.isRendering && self.previewBytes(model) != skinned }
 
+        model.beautyTab = .features
+        model.beginSliderEdit()
+        model.edit(.feature(.eyeBrighten, 0.5))
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering }
+        let featured = previewBytes(model)
+
+        model.selectTool(.background)
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        model.beginSliderEdit()
+        model.edit(.backgroundBlur(0.5))
+        model.endSliderEdit()
+        // 배경 흐림만 바꿔도 미리보기가 바뀌어야 한다.
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != featured }
+
         let recipe = model.currentRecipe
         XCTAssertEqual(recipe.portrait.skin, SkinAdjustments(smoothing: 0.5, autoBlemish: true))
         XCTAssertEqual(recipe.portrait.face, FaceShapeAdjustments(width: -0.5, eyeSize: 0.3, smile: 0.4))
+        XCTAssertEqual(recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.5))
+        XCTAssertEqual(recipe.background.blur, 0.5, accuracy: 1e-9)
         let size = try await exportedPixelSize(model)
         XCTAssertEqual(size.width, size.height, "정사각형 원본이 그대로 저장된다")
     }

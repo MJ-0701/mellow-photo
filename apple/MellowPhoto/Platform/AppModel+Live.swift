@@ -19,7 +19,8 @@ extension AppModel {
         let model = AppModel(
             session: session,
             pipeline: PhotoPipeline(
-                analyzer: VisionFaceAnalyzer(), tuning: RenderTuning.forCurrentDevice(), lookCatalog: lookCatalog),
+                analyzer: VisionFaceAnalyzer(), personAnalyzer: VisionPersonAnalyzer(),
+                tuning: RenderTuning.forCurrentDevice(), lookCatalog: lookCatalog),
             copies: copies,
             importer: SystemPhotoImporter(),
             exporter: Exporter(renderer: Renderer()),

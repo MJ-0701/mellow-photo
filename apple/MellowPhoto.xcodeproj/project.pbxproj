@@ -52,6 +52,7 @@
 		9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
+		C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */; };
 		C32E30AA9490534A74C0ABA2 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */; };
 		C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */ = {isa = PBXBuildFile; fileRef = DD25AA90F8D05216BCD544F0 /* container-migration.plist */; };
 		CA2F7C6B3781921168958191 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */; };
@@ -116,6 +117,7 @@
 		A03AC7B91F35D1BE3DDBF0BB /* PresetSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetSheet.swift; sourceTree = "<group>"; };
 		A541985795F5FEE15374903C /* BeautyTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeautyTab.swift; sourceTree = "<group>"; };
 		ADD5E80F3B80B364E7019C06 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
+		B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPhotoImporter.swift; sourceTree = "<group>"; };
 		BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerButton.swift; sourceTree = "<group>"; };
 		BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPhotoImporterTests.swift; sourceTree = "<group>"; };
@@ -224,6 +226,7 @@
 			children = (
 				E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */,
 				9AF0EE303D49BD5319CF4757 /* AdjustPanel.swift */,
+				B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */,
 				66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */,
 				67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */,
 				8610E11E70A395E3B9504730 /* CropOverlay.swift */,
@@ -489,6 +492,7 @@
 				1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */,
 				0E6ADDFED40162806D835BA1 /* AppModel+Looks.swift in Sources */,
 				88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */,
+				C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */,
 				505B12210B3B0B3403966121 /* BeautyPanel.swift in Sources */,
 				EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */,
 				0A057E2AF9D0378C785F1D3F /* BrushPanel.swift in Sources */,

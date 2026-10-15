@@ -35,6 +35,11 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     }
 }
 
+struct StubPersonAnalyzer: PersonAnalyzer {
+    var result: Result<CIImage?, MellowError> = .success(nil)
+    func personMask(_ image: CIImage) throws -> CIImage? { try result.get() }
+}
+
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
 final class StagingLog: @unchecked Sendable {
     var calls = 0
@@ -140,17 +145,31 @@ enum TestSupport {
             ])
     }
 
+    /// 스텁 인물 마스크의 한 변(픽셀). Vision 마스크처럼 사진과 크기·비율이 다르다.
+    static let personMaskSide = 64.0
+
+    /// 검은 바탕에 흰 사각형 사람이 있는 정사각형 인물 마스크. person은 정규화 사각형(원점 왼쪽 아래).
+    static func personMask(_ person: NormalizedRect) -> CIImage {
+        let extent = CGRect(x: 0, y: 0, width: personMaskSide, height: personMaskSide)
+        let rect = CGRect(
+            x: person.x * personMaskSide, y: person.y * personMaskSide, width: person.width * personMaskSide,
+            height: person.height * personMaskSide)
+        return CIImage(color: .white).cropped(to: rect).composited(over: CIImage(color: .black)).cropped(to: extent)
+    }
+
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
-        importer: FakeImporter = FakeImporter(), store: MemorySessionStore = MemorySessionStore()
+        personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), importer: FakeImporter = FakeImporter(),
+        store: MemorySessionStore = MemorySessionStore()
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
         try? copies.prepareDirectory()
         let catalog = (try? sharedLookCatalog()) ?? .empty
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
-            pipeline: PhotoPipeline(analyzer: analyzer, tuning: RenderTuning(), lookCatalog: catalog),
+            pipeline: PhotoPipeline(
+                analyzer: analyzer, personAnalyzer: personAnalyzer, tuning: RenderTuning(), lookCatalog: catalog),
             copies: copies,
             importer: importer,
             exporter: Exporter(renderer: Renderer()),

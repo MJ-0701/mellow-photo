@@ -557,4 +557,48 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.portrait.features.lipVitality, 0, "실행 취소 한 번에 마지막 슬라이더만")
         XCTAssertEqual(model.currentRecipe.portrait.features.teethWhiten, 0.6, accuracy: 1e-9)
     }
+
+    func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.3, y: 0, width: 0.4, height: 0.8))
+        let model = TestSupport.makeModel(
+            root: root, personAnalyzer: StubPersonAnalyzer(result: .success(mask)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.background)
+        XCTAssertEqual(EditorTool.background.title, "배경")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        model.beginSliderEdit()
+        model.edit(.backgroundBlur(0.3))
+        model.edit(.backgroundBlur(0.5))
+        model.endSliderEdit()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0.5, accuracy: 1e-9)
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.background.blur, 0, "드래그 한 번이 실행 취소 한 단계")
+    }
+
+    func testBackgroundToolReportsNoPersonAndAnalysisFailureWithoutBlockingRender() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let empty = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(empty, staged)
+        XCTAssertEqual(empty.backgroundAvailability, .noPerson)
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let failure = MellowError.personAnalysisUnavailable(reason: "test")
+        let failing = TestSupport.makeModel(
+            root: otherRoot, personAnalyzer: StubPersonAnalyzer(result: .failure(failure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(failing, otherStaged)
+        XCTAssertNil(failing.presentedError, "인물 분석 실패는 가져오기 경고로 띄우지 않는다")
+        XCTAssertEqual(failing.backgroundAvailability, .unavailable(failure))
+        failing.edit(.backgroundBlur(0.5))
+        try await waitUntil { !failing.isRendering }
+        XCTAssertEqual(failing.currentRecipe.background.blur, 0.5, "값은 저장된다")
+        XCTAssertNil(failing.presentedError, "렌더는 흐림만 건너뛰고 오류를 띄우지 않는다")
+    }
 }

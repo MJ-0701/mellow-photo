@@ -20,6 +20,17 @@ final class AppModel {
         var pixelSize: CGSize
         var faces: [FaceGeometry]
         var faceAnalysisFailure: MellowError?
+        /// 인물 마스크가 있는지. 배경 도구 안내에 쓴다.
+        var hasPerson = false
+        /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+        var personAnalysisFailure: MellowError?
+    }
+
+    /// 배경 도구가 보여줄 상태. 분석 실패가 사람 없음보다 먼저다.
+    enum BackgroundAvailability: Equatable {
+        case ready
+        case noPerson
+        case unavailable(MellowError)
     }
 
     enum Policy {
@@ -109,6 +120,13 @@ final class AppModel {
     var displayImage: CGImage? { isComparing ? original : (preview ?? original) }
     var selectedInfo: PhotoInfo? { session.selectedPhotoID.flatMap { photoInfo[$0] } }
     var faces: [FaceGeometry] { selectedInfo?.faces ?? [] }
+    /// 선택 사진의 배경 도구 상태.
+    var backgroundAvailability: BackgroundAvailability {
+        if let failure = selectedInfo?.personAnalysisFailure {
+            return .unavailable(failure)
+        }
+        return selectedInfo?.hasPerson == true ? .ready : .noPerson
+    }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }
 
@@ -180,7 +198,8 @@ final class AppModel {
     func remember(_ id: PhotoID, _ prepared: PreparedPhoto) {
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
-            pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure)
+            pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
+            hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure)
     }
 
     func select(_ id: PhotoID) {
