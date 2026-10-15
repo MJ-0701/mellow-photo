@@ -1149,4 +1149,1745 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ---
 
-> **작성 중단 지점 (2026-10-14, 사용량 한도):** Task 1~5 작성 완료. 남은 Task 6 DetailStage, 7 LookStage(+RenderContext.lookCatalog, PhotoPipeline lookCatalog), 8 GeometryStage(+파이프라인 extent·skipsCrop·preview showsUncropped), 9 AutoEnhancer(+PhotoPipeline.autoEnhanceSuggestion), 10 룩 썸네일(PhotoPipeline.lookThumbnails), 11 AppModel(autoEnhance·lookThumbnails·cropAspect·canvasShowsUncropped·outputTransform·탭 역변환·EditorTool 재구성), 12 화면(ToolStrip·LookPanel·AdjustPanel·CropPanel·CropOverlay), 13 문서·VALIDATION. 인터페이스 요약 절의 이름을 그대로 쓴다.
+### Task 6: DetailStage — 하이라이트·그림자·선명도·비네팅
+
+**Files:**
+- Create: `apple/Sources/MellowRendering/Domain/DetailStage.swift`
+- Modify: `apple/Sources/MellowRendering/API/RenderTuning.swift` (디테일 상수)
+- Modify: `apple/Sources/MellowRendering/API/RenderPipeline.swift` (`standard`에 `DetailStage()` 추가)
+- Test: `apple/Tests/MellowRenderingTests/DetailStageTests.swift`
+- Modify: `apple/Tests/MellowRenderingTests/RenderPipelineTests.swift` (`testStageOrderMatters`의 이름 배열)
+
+**Interfaces:**
+- Consumes: `DetailAdjustments`(Task 2), `RenderContext`, `RenderStage`.
+- Produces: `DetailStage`(internal, name `"detail"`), `RenderTuning.highlightReductionRange`(0.7), `highlightLiftAmount`(0.12), `sharpnessMax`(1.5), `vignetteRadius`(1.5). `RenderPipeline.standard` = `[SkinStage, FaceReshapeStage, LocalEditStage, ColorStage, DetailStage]`(Task 7·8이 뒤에 더 붙인다).
+
+- [ ] **Step 1: 실패하는 테스트 작성**
+
+`apple/Tests/MellowRenderingTests/DetailStageTests.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+import XCTest
+
+@testable import MellowRendering
+
+final class DetailStageTests: XCTestCase {
+    typealias Support = RenderingTestSupport
+
+    /// 한 줄(y=0)의 RGBA 바이트에서 R 채널의 최대·최소.
+    private func redRange(_ image: CIImage) throws -> (min: UInt8, max: UInt8) {
+        let bytes = try Support.bytes(image)
+        let reds = stride(from: 0, to: bytes.count, by: 4).map { bytes[$0] }
+        return (reds.min()!, reds.max()!)
+    }
+
+    func testDefaultDetailIsIdentity() throws {
+        let input = Support.gradient()
+        XCTAssertEqual(try Support.bytes(Support.render(input, recipe: EditRecipe())), try Support.bytes(input))
+    }
+
+    func testNegativeHighlightsLowerTheBrightestPixels() throws {
+        let input = Support.gradient()
+        var recipe = EditRecipe()
+        recipe.detail.highlights = -1
+        let result = try Support.render(input, recipe: recipe)
+        XCTAssertEqual(result.extent, input.extent)
+        XCTAssertLessThan(try redRange(result).max, try redRange(input).max)
+    }
+
+    func testPositiveShadowsRaiseTheDarkestPixels() throws {
+        let input = Support.gradient()
+        var recipe = EditRecipe()
+        recipe.detail.shadows = 1
+        XCTAssertGreaterThan(try redRange(Support.render(input, recipe: recipe)).min, try redRange(input).min)
+    }
+
+    func testVignetteDarkensCornersMoreThanCenter() throws {
+        let gray = Support.solid(CIColor(red: 0.6, green: 0.6, blue: 0.6), size: 128)
+        var recipe = EditRecipe()
+        recipe.detail.vignette = 1
+        let bytes = try Support.bytes(Support.render(gray, recipe: recipe))
+        let corner = bytes[0]
+        let centerIndex = (64 * 128 + 64) * 4
+        XCTAssertLessThan(corner, bytes[centerIndex])
+    }
+
+    func testSharpnessChangesBytesOnGradient() throws {
+        let input = Support.gradient()
+        var recipe = EditRecipe()
+        recipe.detail.sharpness = 1
+        XCTAssertNotEqual(try Support.bytes(Support.render(input, recipe: recipe)), try Support.bytes(input))
+    }
+}
+```
+
+`RenderPipelineTests.testStageOrderMatters`의 기대 이름 배열을 `["skin", "faceReshape", "localEdit", "color", "detail"]`로 바꾼다(Task 7·8에서 다시 늘린다).
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd apple && swift test --filter DetailStageTests` → `testDefaultDetailIsIdentity`는 통과하고 나머지 4개는 실패(단계가 없어 항등).
+
+- [ ] **Step 3: 구현**
+
+`RenderTuning.swift`에 추가:
+
+```swift
+    /// highlights −1에서 CIHighlightShadowAdjust의 highlightAmount가 1 − 이 값까지 내려간다.
+    public var highlightReductionRange: Double = 0.7
+    /// highlights +1에서 밝은 구간 톤 커브를 이만큼 올린다.
+    public var highlightLiftAmount: Double = 0.12
+    public var sharpnessMax: Double = 1.5
+    public var vignetteRadius: Double = 1.5
+```
+
+`apple/Sources/MellowRendering/Domain/DetailStage.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+
+/// 하이라이트·그림자·선명도·비네팅. 값이 전부 기본이면 항등.
+struct DetailStage: RenderStage {
+    let name = "detail"
+
+    func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
+        let detail = context.recipe.detail
+        guard !detail.isDefault else { return image }
+        let tuning = context.tuning
+        var result = image
+        if detail.highlights < 0 || detail.shadows != 0 {
+            let highlightAmount = 1 + min(0, detail.highlights) * tuning.highlightReductionRange
+            result = result.applyingFilter(
+                "CIHighlightShadowAdjust",
+                parameters: ["inputHighlightAmount": highlightAmount, "inputShadowAmount": detail.shadows, "inputRadius": 0])
+        }
+        if detail.highlights > 0 {
+            let lift = detail.highlights * tuning.highlightLiftAmount
+            result = result.applyingFilter(
+                "CIToneCurve",
+                parameters: [
+                    "inputPoint0": CIVector(x: 0, y: 0), "inputPoint1": CIVector(x: 0.25, y: 0.25),
+                    "inputPoint2": CIVector(x: 0.5, y: 0.5), "inputPoint3": CIVector(x: 0.75, y: min(1, 0.75 + lift)),
+                    "inputPoint4": CIVector(x: 1, y: 1),
+                ])
+        }
+        if detail.sharpness > 0 {
+            result = result.applyingFilter(
+                "CISharpenLuminance", parameters: ["inputSharpness": detail.sharpness * tuning.sharpnessMax])
+        }
+        if detail.vignette > 0 {
+            result = result.applyingFilter(
+                "CIVignette", parameters: ["inputIntensity": detail.vignette, "inputRadius": tuning.vignetteRadius])
+        }
+        return result.cropped(to: context.extent)
+    }
+}
+```
+
+`RenderPipeline.standard`: `[SkinStage(), FaceReshapeStage(), LocalEditStage(), ColorStage(), DetailStage()]`.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd apple && swift test --filter 'DetailStageTests|RenderPipelineTests'` → PASS. 전체 `swift test` PASS, lint PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/Sources/MellowRendering apple/Tests/MellowRenderingTests
+git commit -m "feat(rendering): 하이라이트·그림자·선명도·비네팅 디테일 단계 추가
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 7: LookStage — 룩 렌더와 강도 혼합
+
+**Files:**
+- Create: `apple/Sources/MellowRendering/Domain/LookStage.swift`
+- Modify: `apple/Sources/MellowRendering/API/RenderStage.swift` (`RenderContext.lookCatalog`, `skipsCrop`)
+- Modify: `apple/Sources/MellowRendering/API/RenderTuning.swift` (`lookTintRange`)
+- Modify: `apple/Sources/MellowRendering/API/RenderPipeline.swift` (`standard`에 `LookStage()`)
+- Modify: `apple/Sources/MellowRendering/API/PhotoPipeline.swift` (`init(analyzer:tuning:lookCatalog:)`, 두 `RenderContext` 생성에 카탈로그 전달)
+- Modify: `apple/Tests/MellowRenderingTests/RenderingTestSupport.swift` (`sharedLookCatalog()`, `render(_:recipe:faces:catalog:)`)
+- Test: `apple/Tests/MellowRenderingTests/LookStageTests.swift`
+- Modify: `apple/Tests/MellowRenderingTests/RenderPipelineTests.swift` (이름 배열에 `"look"`)
+
+**Interfaces:**
+- Consumes: `Look`, `LookCatalog`(Task 4), `LookSelection`(Task 2).
+- Produces: `RenderContext.init(extent:recipe:faces:tuning:lookCatalog:skipsCrop:)`(둘 다 기본값 `.empty`/`false`), `RenderContext.lookCatalog`, `RenderContext.skipsCrop`, `PhotoPipeline.init(analyzer:tuning:lookCatalog: LookCatalog = .empty)`, `LookStage`(name `"look"`), `RenderTuning.lookTintRange`(60).
+
+- [ ] **Step 1: 테스트 지원과 실패하는 테스트**
+
+`RenderingTestSupport.swift`에 추가:
+
+```swift
+    static func sharedLookCatalog() throws -> LookCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/looks/looks.v1.json")
+        return try LookCatalog(data: Data(contentsOf: url))
+    }
+
+    static func render(_ image: CIImage, recipe: EditRecipe, faces: [FaceGeometry] = [], catalog: LookCatalog) throws -> CIImage {
+        let context = RenderContext(
+            extent: image.extent, recipe: recipe, faces: faces, tuning: RenderTuning(), lookCatalog: catalog)
+        return try RenderPipeline.standard.render(image, context: context)
+    }
+```
+
+`apple/Tests/MellowRenderingTests/LookStageTests.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+import XCTest
+
+@testable import MellowRendering
+
+final class LookStageTests: XCTestCase {
+    typealias Support = RenderingTestSupport
+
+    func testIntensityZeroIsIdentityAndOneIsNot() throws {
+        let catalog = try Support.sharedLookCatalog()
+        let input = Support.gradient()
+        var recipe = EditRecipe()
+        recipe.look = LookSelection(id: "film", intensity: 0)
+        XCTAssertEqual(try Support.bytes(Support.render(input, recipe: recipe, catalog: catalog)), try Support.bytes(input))
+        recipe.look.intensity = 1
+        XCTAssertNotEqual(try Support.bytes(Support.render(input, recipe: recipe, catalog: catalog)), try Support.bytes(input))
+    }
+
+    func testEveryBuiltInLookRendersAndChangesTheImage() throws {
+        let catalog = try Support.sharedLookCatalog()
+        let input = Support.gradient()
+        let original = try Support.bytes(input)
+        for id in LookCatalog.builtInIDs {
+            var recipe = EditRecipe()
+            recipe.look = LookSelection(id: id, intensity: 1)
+            let result = try Support.render(input, recipe: recipe, catalog: catalog)
+            XCTAssertEqual(result.extent, input.extent, id)
+            XCTAssertNotEqual(try Support.bytes(result), original, "\(id)는 원본과 달라야 한다")
+        }
+    }
+
+    func testUnknownLookOrEmptyCatalogIsIdentity() throws {
+        let input = Support.gradient()
+        var recipe = EditRecipe()
+        recipe.look = LookSelection(id: "glitter", intensity: 1)
+        XCTAssertEqual(try Support.bytes(Support.render(input, recipe: recipe, catalog: try Support.sharedLookCatalog())), try Support.bytes(input))
+        recipe.look.id = "film"
+        XCTAssertEqual(try Support.bytes(Support.render(input, recipe: recipe, catalog: .empty)), try Support.bytes(input))
+    }
+
+    func testHalfIntensityLiesBetweenOriginalAndFullLook() throws {
+        let catalog = try Support.sharedLookCatalog()
+        let gray = Support.solid(CIColor(red: 0.5, green: 0.5, blue: 0.5), size: 8)
+        func red(_ intensity: Double) throws -> Int {
+            var recipe = EditRecipe()
+            recipe.look = LookSelection(id: "sepia", intensity: intensity)
+            return Int(try Support.bytes(Support.render(gray, recipe: recipe, catalog: catalog))[0])
+        }
+        let zero = try red(0)
+        let half = try red(0.5)
+        let full = try red(1)
+        XCTAssertNotEqual(zero, full)
+        XCTAssertTrue((min(zero, full)...max(zero, full)).contains(half))
+    }
+}
+```
+
+`RenderPipelineTests.testStageOrderMatters`의 이름 배열을 `[…, "color", "detail", "look"]`로.
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd apple && swift test --filter LookStageTests` → 컴파일 실패(`lookCatalog:` 인자 없음).
+
+- [ ] **Step 3: 구현**
+
+`RenderStage.swift`의 `RenderContext`:
+
+```swift
+public struct RenderContext: Sendable {
+    public let extent: CGRect
+    public let recipe: EditRecipe
+    public let faces: [FaceGeometry]
+    public let targetFaces: [FaceGeometry]
+    public let tuning: RenderTuning
+    public let lookCatalog: LookCatalog
+    /// 자르기 도구 화면용. 기하 단계가 자르기만 건너뛴다.
+    public let skipsCrop: Bool
+
+    public init(
+        extent: CGRect, recipe: EditRecipe, faces: [FaceGeometry], tuning: RenderTuning,
+        lookCatalog: LookCatalog = .empty, skipsCrop: Bool = false
+    ) {
+        … 기존 대입 + lookCatalog, skipsCrop …
+    }
+```
+
+`RenderTuning.swift`에 `public var lookTintRange: Double = 60`(tint ±1 → CITemperatureAndTint y ±60).
+
+`apple/Sources/MellowRendering/Domain/LookStage.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+
+/// 룩 파라미터를 Core Image 기본 필터로 조립하고 강도만큼 원본과 섞는다.
+struct LookStage: RenderStage {
+    let name = "look"
+
+    func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
+        let selection = context.recipe.look
+        guard selection.intensity > 0, let look = context.lookCatalog.look(id: selection.id) else { return image }
+        let styled = Self.styled(image, look: look, tuning: context.tuning).cropped(to: context.extent)
+        if selection.intensity >= 1 {
+            return styled
+        }
+        return styled.applyingFilter(
+            "CIMix", parameters: [kCIInputBackgroundImageKey: image, "inputAmount": selection.intensity]
+        ).cropped(to: context.extent)
+    }
+
+    /// 강도 1의 룩 결과. 룩 썸네일도 이 함수를 쓴다.
+    static func styled(_ image: CIImage, look: Look, tuning: RenderTuning) -> CIImage {
+        var result = image
+        if let curve = Self.curveParameters(look) {
+            result = result.applyingFilter("CIToneCurve", parameters: curve)
+        }
+        if look.saturation != 1 || look.contrast != 1 {
+            result = result.applyingFilter(
+                "CIColorControls", parameters: [kCIInputSaturationKey: look.saturation, kCIInputContrastKey: look.contrast])
+        }
+        if look.warmth != 0 || look.tint != 0 {
+            let warmth = max(-1, min(1, look.warmth))
+            result = result.applyingFilter(
+                "CITemperatureAndTint",
+                parameters: [
+                    "inputNeutral": CIVector(x: tuning.neutralKelvin, y: 0),
+                    "inputTargetNeutral": CIVector(
+                        x: tuning.neutralKelvin - warmth * tuning.warmthKelvinRange, y: look.tint * tuning.lookTintRange),
+                ])
+        }
+        if look.vignette > 0 {
+            result = result.applyingFilter(
+                "CIVignette", parameters: ["inputIntensity": look.vignette, "inputRadius": tuning.vignetteRadius])
+        }
+        return result
+    }
+
+    /// 점 5개짜리 커브. 첫 점은 fade만큼 올린다. 점이 5개가 아니면 커브를 건너뛴다.
+    private static func curveParameters(_ look: Look) -> [String: Any]? {
+        guard look.toneCurve.count == 5, look.toneCurve.allSatisfy({ $0.count == 2 }) else { return nil }
+        var parameters: [String: Any] = [:]
+        for (index, point) in look.toneCurve.enumerated() {
+            var y = point[1]
+            if index == 0 {
+                y = min(1, y + look.fade * Look.fadeLift)
+            }
+            parameters["inputPoint\(index)"] = CIVector(x: point[0], y: y)
+        }
+        return parameters
+    }
+}
+```
+
+`RenderPipeline.standard`: `[…, DetailStage(), LookStage()]`.
+
+`PhotoPipeline.swift`: `private let lookCatalog: LookCatalog`, `public init(analyzer: any FaceAnalyzer, tuning: RenderTuning, lookCatalog: LookCatalog = .empty)`, `preview`와 `render(url:…)`의 `RenderContext(…, tuning: tuning, lookCatalog: lookCatalog)`.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd apple && swift test` → PASS(LookStageTests 4). 데모 인물 사진으로 10종을 눈으로 확인하는 것은 Task 12 실기동에서 한다. lint PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/Sources/MellowRendering apple/Tests/MellowRenderingTests
+git commit -m "feat(rendering): 룩 단계 추가 — 데이터 정의 필터를 기본 필터로 조립하고 강도로 혼합
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 8: GeometryStage — 반전·회전·수평·자르기 (파이프라인 마지막)
+
+**Files:**
+- Create: `apple/Sources/MellowRendering/Domain/GeometryStage.swift`
+- Modify: `apple/Sources/MellowRendering/API/RenderPipeline.swift` (`standard`에 `GeometryStage()`, 마지막 `cropped(to:)` 제거)
+- Modify: `apple/Sources/MellowRendering/API/PhotoPipeline.swift` (`preview(_:recipe:showsUncropped:)`)
+- Test: `apple/Tests/MellowRenderingTests/GeometryStageTests.swift`
+- Modify: `apple/Tests/MellowRenderingTests/RenderPipelineTests.swift` (이름 배열 7개), `PhotoPipelineTests.swift` (`showsUncropped` 테스트)
+
+**Interfaces:**
+- Consumes: `GeometryAdjustments`, `GeometryTransform.straightenScale`(Task 3), `RenderContext.skipsCrop`(Task 7).
+- Produces: `GeometryStage`(name `"geometry"`), `PhotoPipeline.preview(_ id: PhotoID, recipe: EditRecipe, showsUncropped: Bool = false)`. 파이프라인 결과 extent는 기하 결과이며 원점 0.
+
+- [ ] **Step 1: 실패하는 테스트 작성**
+
+`apple/Tests/MellowRenderingTests/GeometryStageTests.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+import XCTest
+
+@testable import MellowRendering
+
+final class GeometryStageTests: XCTestCase {
+    typealias Support = RenderingTestSupport
+
+    private func render(_ geometry: GeometryAdjustments, skipsCrop: Bool = false, input: CIImage = RenderingTestSupport.gradient()) throws -> CIImage {
+        var recipe = EditRecipe()
+        recipe.geometry = geometry
+        let context = RenderContext(
+            extent: input.extent, recipe: recipe, faces: [], tuning: RenderTuning(), skipsCrop: skipsCrop)
+        return try RenderPipeline.standard.render(input, context: context)
+    }
+
+    func testIdentityKeepsExtentAndBytes() throws {
+        let input = Support.gradient()
+        let result = try render(GeometryAdjustments(), input: input)
+        XCTAssertEqual(result.extent, input.extent)
+        XCTAssertEqual(try Support.bytes(result), try Support.bytes(input))
+    }
+
+    func testSquareCropOf128By80Is80By80AtOrigin() throws {
+        let side = 80.0 / 128.0
+        let crop = NormalizedRect(x: (1 - side) / 2, y: 0, width: side, height: 1)
+        let result = try render(GeometryAdjustments(crop: crop))
+        XCTAssertEqual(result.extent, CGRect(x: 0, y: 0, width: 80, height: 80))
+    }
+
+    func testQuarterTurnSwapsWidthAndHeight() throws {
+        let result = try render(GeometryAdjustments(quarterTurns: 1))
+        XCTAssertEqual(result.extent, CGRect(x: 0, y: 0, width: 80, height: 128))
+        let threeTurns = try render(GeometryAdjustments(quarterTurns: 3))
+        XCTAssertEqual(threeTurns.extent, CGRect(x: 0, y: 0, width: 80, height: 128))
+        XCTAssertNotEqual(try Support.bytes(result), try Support.bytes(threeTurns), "1회와 3회 회전은 다른 방향")
+    }
+
+    func testFlipSwapsLeftAndRightColumns() throws {
+        let input = Support.gradient()
+        let original = try Support.bytes(input)
+        let flipped = try Support.bytes(render(GeometryAdjustments(flipHorizontal: true), input: input))
+        // 첫 행의 첫 픽셀 R과 마지막 픽셀 R이 서로 바뀐다.
+        let lastPixel = (128 - 1) * 4
+        XCTAssertEqual(Int(flipped[0]), Int(original[lastPixel]), accuracy: 2)
+        XCTAssertEqual(Int(flipped[lastPixel]), Int(original[0]), accuracy: 2)
+    }
+
+    func testStraightenKeepsExtentAndLeavesNoTransparentCorner() throws {
+        let gray = Support.solid(CIColor(red: 0.5, green: 0.5, blue: 0.5), size: 128)
+        let result = try render(GeometryAdjustments(straightenDegrees: 5), input: gray)
+        XCTAssertEqual(result.extent, gray.extent)
+        let bytes = try Support.bytes(result)
+        for cornerIndex in [0, (128 - 1) * 4, (128 * 127) * 4, (128 * 128 - 1) * 4] {
+            XCTAssertEqual(bytes[cornerIndex + 3], 255, "모서리 알파가 불투명해야 한다")
+        }
+    }
+
+    func testSkipsCropLeavesOnlyCropOut() throws {
+        let crop = NormalizedRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+        let geometry = GeometryAdjustments(flipHorizontal: true, quarterTurns: 1, crop: crop)
+        let cropped = try render(geometry)
+        let uncropped = try render(geometry, skipsCrop: true)
+        XCTAssertEqual(uncropped.extent, CGRect(x: 0, y: 0, width: 80, height: 128))
+        XCTAssertEqual(cropped.extent, CGRect(x: 0, y: 0, width: 40, height: 64))
+    }
+
+    func testGeometryOutputAspectMatchesTransform() throws {
+        let crop = NormalizedRect(x: 0.1, y: 0.2, width: 0.6, height: 0.5)
+        let geometry = GeometryAdjustments(quarterTurns: 1, straightenDegrees: 10, crop: crop)
+        let result = try render(geometry)
+        let transform = GeometryTransform(geometry: geometry, sourceAspect: 128.0 / 80.0)
+        XCTAssertEqual(Double(result.extent.width / result.extent.height), transform.outputAspect, accuracy: 0.02)
+    }
+}
+```
+
+`PhotoPipelineTests.swift`에 추가:
+
+```swift
+    func testPreviewShowsUncroppedWhenRequested() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        var recipe = EditRecipe()
+        recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5)
+        XCTAssertEqual(try await pipeline.preview(id, recipe: recipe).width, 128)
+        XCTAssertEqual(try await pipeline.preview(id, recipe: recipe, showsUncropped: true).width, 256)
+    }
+```
+
+`RenderPipelineTests.testStageOrderMatters`의 이름 배열을 7개 전체로.
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd apple && swift test --filter GeometryStageTests` → 항등 외 실패.
+
+- [ ] **Step 3: 구현**
+
+`apple/Sources/MellowRendering/Domain/GeometryStage.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+
+/// 반전 → 시계 방향 90° 회전 → 수평 보정(중심 회전 + 확대) → 자르기. 결과 extent는 원점 0.
+struct GeometryStage: RenderStage {
+    let name = "geometry"
+
+    func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
+        let geometry = context.recipe.geometry
+        guard !geometry.isIdentity else { return image }
+        var result = image
+        var extent = context.extent
+        if geometry.flipHorizontal {
+            let flip = CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: extent.minX + extent.maxX, ty: 0)
+            result = result.transformed(by: flip).cropped(to: extent)
+        }
+        for _ in 0..<geometry.normalizedQuarterTurns {
+            // (x, y) → (y, w − x): 시계 방향 90°.
+            let turn = CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: -extent.minY, ty: extent.maxX)
+            result = result.transformed(by: turn)
+            extent = CGRect(x: 0, y: 0, width: extent.height, height: extent.width)
+            result = Self.moveToOrigin(result).cropped(to: extent)
+        }
+        if geometry.straightenDegrees != 0 {
+            let radians = -geometry.straightenDegrees * .pi / 180
+            let scale = GeometryTransform.straightenScale(degrees: geometry.straightenDegrees, aspect: extent.width / extent.height)
+            let center = CGPoint(x: extent.midX, y: extent.midY)
+            let transform = CGAffineTransform(translationX: center.x, y: center.y)
+                .rotated(by: radians)
+                .scaledBy(x: scale, y: scale)
+                .translatedBy(x: -center.x, y: -center.y)
+            result = result.transformed(by: transform).cropped(to: extent)
+        }
+        if let crop = geometry.crop, !context.skipsCrop {
+            let pixelRect = CGRect(
+                x: extent.minX + crop.x * extent.width, y: extent.minY + crop.y * extent.height,
+                width: crop.width * extent.width, height: crop.height * extent.height
+            ).integral.intersection(extent)
+            guard !pixelRect.isEmpty else { throw MellowError.invalidRecipeValues }
+            result = Self.moveToOrigin(result.cropped(to: pixelRect))
+        }
+        return result
+    }
+
+    private static func moveToOrigin(_ image: CIImage) -> CIImage {
+        image.transformed(by: CGAffineTransform(translationX: -image.extent.minX, y: -image.extent.minY))
+    }
+}
+```
+
+회전 변환 검증: extent 원점이 0일 때 `tx = 0, ty = w`가 되어 `(x, y) → (y, w − x)`다. 회전 뒤 `moveToOrigin`으로 음수 원점을 없앤다.
+
+`RenderPipeline.render`: 마지막 줄을 `return result`로 바꾼다(각 단계가 자기 extent로 자른다). `standard`에 `GeometryStage()`를 마지막에 추가.
+
+`PhotoPipeline.preview`:
+
+```swift
+    public func preview(_ id: PhotoID, recipe: EditRecipe, showsUncropped: Bool = false) throws -> CGImage {
+        guard let entry = entries[id], let image = cache.image(for: id) else {
+            throw MellowError.cannotCreatePreview
+        }
+        let context = RenderContext(
+            extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog,
+            skipsCrop: showsUncropped)
+        return try renderer.makeCGImage(pipeline.render(image, context: context))
+    }
+```
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd apple && swift test` → PASS(기존 회귀 포함). `testStraighten…`의 알파가 255가 아니면 `scale`을 `1.001`배 더 곱해 경계 보간을 덮고 그 이유를 보고서에 적는다. lint PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/Sources/MellowRendering apple/Tests/MellowRenderingTests
+git commit -m "feat(rendering): 반전·회전·수평·자르기 기하 단계를 파이프라인 마지막에 추가
+
+얼굴·수동 편집 좌표는 원본 기준을 유지하고 출력 크기만 바뀐다.
+자르기 도구 화면을 위해 자르기만 건너뛰는 미리보기를 제공한다.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 9: AutoEnhancer — 히스토그램 기반 슬라이더 값 제안
+
+**Files:**
+- Create: `apple/Sources/MellowRendering/API/AutoEnhancer.swift`
+- Modify: `apple/Sources/MellowRendering/API/Renderer.swift` (`readPixels(_:)`)
+- Modify: `apple/Sources/MellowRendering/API/RenderTuning.swift` (auto 상수)
+- Modify: `apple/Sources/MellowRendering/API/PhotoPipeline.swift` (`autoEnhanceSuggestion(_:hasFaces:)`)
+- Test: `apple/Tests/MellowRenderingTests/AutoEnhancerTests.swift`, `PhotoPipelineTests.swift` (추가)
+
+**Interfaces:**
+- Consumes: `AutoEnhanceSuggestion`(Task 5), `Renderer`.
+- Produces: `Renderer.readPixels(_ image: CIImage) throws -> [Float]`(RGBAf, 행 우선, 좌하단부터), `AutoEnhancer(tuning:renderer:)`, `AutoEnhancer.suggestion(for:hasFaces:) throws -> AutoEnhanceSuggestion`, `PhotoPipeline.autoEnhanceSuggestion(_ id: PhotoID, hasFaces: Bool) throws -> AutoEnhanceSuggestion`(캐시된 미리보기 기준; 캐시 없으면 `cannotCreatePreview`), `RenderTuning` auto 상수 9개.
+
+- [ ] **Step 1: 실패하는 테스트 작성**
+
+`apple/Tests/MellowRenderingTests/AutoEnhancerTests.swift`:
+
+```swift
+import CoreImage
+import MellowShared
+import XCTest
+
+@testable import MellowRendering
+
+final class AutoEnhancerTests: XCTestCase {
+    typealias Support = RenderingTestSupport
+    private let enhancer = AutoEnhancer(tuning: RenderTuning(), renderer: RenderingTestSupport.renderer)
+
+    func testDarkImageGetsPositiveExposureAndBrightImageNegative() throws {
+        let dark = Support.solid(CIColor(red: 0.12, green: 0.12, blue: 0.12), size: 64)
+        let bright = Support.solid(CIColor(red: 0.9, green: 0.9, blue: 0.9), size: 64)
+        XCTAssertGreaterThan(try enhancer.suggestion(for: dark, hasFaces: false).color.exposure, 0)
+        XCTAssertLessThan(try enhancer.suggestion(for: bright, hasFaces: false).color.exposure, 0)
+    }
+
+    func testSolidImageOnlyAdjustsExposure() throws {
+        let gray = Support.solid(CIColor(red: 0.3, green: 0.3, blue: 0.3), size: 64)
+        let suggestion = try enhancer.suggestion(for: gray, hasFaces: false)
+        XCTAssertEqual(suggestion.detail, DetailAdjustments())
+        XCTAssertEqual(suggestion.color.warmth, 0)
+        XCTAssertEqual(suggestion.color.saturation, 1)
+        XCTAssertEqual(suggestion.color.contrast, 1)
+    }
+
+    func testGradientGetsHighlightAndShadowRecoveryWithinRanges() throws {
+        let suggestion = try enhancer.suggestion(for: Support.gradient(), hasFaces: false)
+        XCTAssertTrue((-1...0).contains(suggestion.detail.highlights))
+        XCTAssertTrue((0...1).contains(suggestion.detail.shadows))
+        XCTAssertEqual(suggestion.color.saturation, RenderTuning().autoSaturation)
+        XCTAssertEqual(suggestion.color.contrast, RenderTuning().autoContrast)
+        XCTAssertTrue((-1...1).contains(suggestion.color.exposure))
+    }
+
+    func testWarmCastIsNeutralizedTowardCool() throws {
+        let warm = Support.solid(CIColor(red: 0.7, green: 0.5, blue: 0.3), size: 64)
+        let suggestion = try enhancer.suggestion(for: warm, hasFaces: false)
+        XCTAssertLessThan(suggestion.color.warmth, 0, "붉은 캐스트는 차갑게 보정")
+        XCTAssertGreaterThanOrEqual(suggestion.color.warmth, -RenderTuning().autoWarmthLimit)
+    }
+
+    func testFacesAddPortraitValues() throws {
+        let image = Support.gradient()
+        XCTAssertEqual(try enhancer.suggestion(for: image, hasFaces: false).portrait, PortraitAdjustments())
+        let withFaces = try enhancer.suggestion(for: image, hasFaces: true).portrait
+        XCTAssertEqual(withFaces.skinSmoothing, RenderTuning().autoSkinSmoothing)
+        XCTAssertEqual(withFaces.faceSlim, RenderTuning().autoFaceSlim)
+        XCTAssertNil(withFaces.targetFace)
+    }
+
+    func testSuggestionDoesNotDependOnCurrentRecipe() throws {
+        let image = Support.gradient()
+        XCTAssertEqual(try enhancer.suggestion(for: image, hasFaces: true), try enhancer.suggestion(for: image, hasFaces: true))
+    }
+}
+```
+
+`PhotoPipelineTests.swift`에 추가:
+
+```swift
+    func testAutoEnhanceSuggestionUsesCachedPreview() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        let suggestion = try await pipeline.autoEnhanceSuggestion(id, hasFaces: false)
+        XCTAssertTrue(suggestion.color.exposure.isFinite)
+        await pipeline.evict(id)
+        do {
+            _ = try await pipeline.autoEnhanceSuggestion(id, hasFaces: false)
+            XCTFail("캐시가 없으면 제안할 수 없다")
+        } catch {
+            XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
+        }
+    }
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd apple && swift test --filter AutoEnhancerTests` → 컴파일 실패.
+
+- [ ] **Step 3: 구현**
+
+`RenderTuning.swift`에 추가:
+
+```swift
+    public var autoTargetLuminance: Double = 0.45
+    public var autoWarmthGain: Double = 0.5
+    public var autoWarmthLimit: Double = 0.3
+    public var autoHighlightThreshold: Double = 0.97
+    public var autoShadowThreshold: Double = 0.03
+    public var autoSaturation: Double = 1.08
+    public var autoContrast: Double = 1.04
+    public var autoSkinSmoothing: Double = 0.3
+    public var autoFaceSlim: Double = 0.15
+    /// 상·하위 백분위 차이가 이보다 작으면 단색으로 보고 노출만 조정한다.
+    public var autoFlatRange: Double = 0.05
+    public var autoExposureLimit: Double = 1
+    public var autoHistogramBins: Int = 64
+```
+
+`Renderer.swift`에 추가:
+
+```swift
+    /// RGBAf로 읽는다. 행 우선, 왼쪽 아래 픽셀부터. 히스토그램·평균처럼 작은 이미지에만 쓴다.
+    public func readPixels(_ image: CIImage) throws -> [Float] {
+        let width = Int(image.extent.width.rounded())
+        let height = Int(image.extent.height.rounded())
+        guard width > 0, height > 0 else { throw MellowError.renderFailed }
+        var pixels = [Float](repeating: 0, count: width * height * 4)
+        let rowBytes = width * 4 * MemoryLayout<Float>.size
+        pixels.withUnsafeMutableBytes { buffer in
+            context.render(
+                image, toBitmap: buffer.baseAddress!, rowBytes: rowBytes, bounds: image.extent, format: .RGBAf,
+                colorSpace: CGColorSpace(name: CGColorSpace.linearSRGB))
+        }
+        return pixels
+    }
+```
+
+`apple/Sources/MellowRendering/API/AutoEnhancer.swift`:
+
+```swift
+import CoreImage
+import Foundation
+import MellowShared
+
+/// 휘도 히스토그램과 평균색으로 슬라이더 값을 제안한다. 같은 수식을 다른 플랫폼이 재현할 수 있다.
+public struct AutoEnhancer: Sendable {
+    private let tuning: RenderTuning
+    private let renderer: Renderer
+
+    public init(tuning: RenderTuning, renderer: Renderer) {
+        self.tuning = tuning
+        self.renderer = renderer
+    }
+
+    public func suggestion(for image: CIImage, hasFaces: Bool) throws -> AutoEnhanceSuggestion {
+        let bins = try luminanceHistogram(image)
+        let mean = bins.enumerated().reduce(0.0) { $0 + (Double($1.offset) + 0.5) / Double(bins.count) * $1.element }
+        let low = percentile(bins, 0.01)
+        let high = percentile(bins, 0.99)
+        var color = ColorAdjustments()
+        var detail = DetailAdjustments()
+        let limit = tuning.autoExposureLimit
+        color.exposure = max(-limit, min(limit, log2(tuning.autoTargetLuminance / max(mean, 0.001))))
+        if high - low >= tuning.autoFlatRange {
+            if high >= tuning.autoHighlightThreshold {
+                detail.highlights = -min(1, (high - 0.9) * 5)
+            }
+            if low <= tuning.autoShadowThreshold {
+                detail.shadows = min(1, (0.1 - low) * 5)
+            }
+            color.saturation = tuning.autoSaturation
+            color.contrast = tuning.autoContrast
+            color.warmth = try warmthCorrection(image)
+        }
+        var portrait = PortraitAdjustments()
+        if hasFaces {
+            portrait.skinSmoothing = tuning.autoSkinSmoothing
+            portrait.faceSlim = tuning.autoFaceSlim
+        }
+        return AutoEnhanceSuggestion(color: color, detail: detail, portrait: portrait)
+    }
+
+    /// 정규화된 휘도 히스토그램(합 1).
+    private func luminanceHistogram(_ image: CIImage) throws -> [Double] {
+        let gray = image.applyingFilter("CIColorControls", parameters: [kCIInputSaturationKey: 0])
+        let histogram = gray.applyingFilter(
+            "CIAreaHistogram",
+            parameters: [
+                "inputExtent": CIVector(cgRect: image.extent), "inputCount": tuning.autoHistogramBins, "inputScale": 1,
+            ])
+        let pixels = try renderer.readPixels(histogram)
+        let counts = stride(from: 0, to: pixels.count, by: 4).map { Double(pixels[$0]) }
+        let total = counts.reduce(0, +)
+        guard total > 0 else { throw MellowError.renderFailed }
+        return counts.map { $0 / total }
+    }
+
+    private func percentile(_ bins: [Double], _ fraction: Double) -> Double {
+        var cumulative = 0.0
+        for (index, weight) in bins.enumerated() {
+            cumulative += weight
+            if cumulative >= fraction {
+                return (Double(index) + 0.5) / Double(bins.count)
+            }
+        }
+        return 1
+    }
+
+    /// 그레이 월드: 평균 R이 B보다 크면(따뜻한 캐스트) 차갑게, 반대면 따뜻하게.
+    private func warmthCorrection(_ image: CIImage) throws -> Double {
+        let average = image.applyingFilter("CIAreaAverage", parameters: ["inputExtent": CIVector(cgRect: image.extent)])
+        let pixels = try renderer.readPixels(average)
+        let red = Double(pixels[0])
+        let blue = Double(pixels[2])
+        guard red + blue > 0 else { return 0 }
+        let cast = (red - blue) / (red + blue)
+        let correction = -cast * tuning.autoWarmthGain
+        return max(-tuning.autoWarmthLimit, min(tuning.autoWarmthLimit, correction))
+    }
+}
+```
+
+`PhotoPipeline.swift`에 추가:
+
+```swift
+    /// 원본 분석 기준의 제안. 현재 레시피와 무관하다.
+    public func autoEnhanceSuggestion(_ id: PhotoID, hasFaces: Bool) throws -> AutoEnhanceSuggestion {
+        guard let image = cache.image(for: id) else { throw MellowError.cannotCreatePreview }
+        return try AutoEnhancer(tuning: tuning, renderer: renderer).suggestion(for: image, hasFaces: hasFaces)
+    }
+```
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd apple && swift test` → PASS. 단색 테스트에서 `high - low`가 0.05를 넘으면(필터 보간 노이즈) `autoFlatRange`를 0.08까지 올릴 수 있으나 그 이유를 보고서에 적는다. lint PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/Sources/MellowRendering apple/Tests/MellowRenderingTests
+git commit -m "feat(rendering): 히스토그램 기반 자동 보정 제안 추가
+
+Apple의 불투명한 자동 필터 대신 재현 가능한 수식으로 노출·하이라이트·
+그림자·따뜻함과 인물 값을 제안한다.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 10: 룩 썸네일
+
+**Files:**
+- Modify: `apple/Sources/MellowRendering/API/PhotoPipeline.swift` (`Entry.thumbnail`, `lookThumbnails(_:)`)
+- Test: `apple/Tests/MellowRenderingTests/PhotoPipelineTests.swift` (추가)
+
+**Interfaces:**
+- Consumes: `LookStage.styled(_:look:tuning:)`(Task 7), `LookCatalog`.
+- Produces: `PhotoPipeline.lookThumbnails(_ id: PhotoID) throws -> [String: CGImage]`(카탈로그의 모든 룩 id → 강도 1 썸네일; 준비 안 된 사진이면 `cannotCreatePreview`).
+
+- [ ] **Step 1: 실패하는 테스트 작성**
+
+`PhotoPipelineTests.swift`에 추가:
+
+```swift
+    func testLookThumbnailsCoverCatalogAndDiffer() async throws {
+        let url = try writeSolidPNG(size: 512)
+        let id = PhotoID()
+        let catalog = try RenderingTestSupport.sharedLookCatalog()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning(), lookCatalog: catalog)
+        _ = try await pipeline.prepare(id, at: url)
+        let thumbnails = try await pipeline.lookThumbnails(id)
+        XCTAssertEqual(Set(thumbnails.keys), Set(LookCatalog.builtInIDs))
+        for (lookID, image) in thumbnails {
+            XCTAssertLessThanOrEqual(max(image.width, image.height), RenderTuning().thumbnailMaxDimension, lookID)
+        }
+        let mono = try XCTUnwrap(thumbnails["mono"])
+        let vivid = try XCTUnwrap(thumbnails["vivid"])
+        XCTAssertNotEqual(Array(mono.dataProvider!.data! as Data), Array(vivid.dataProvider!.data! as Data))
+    }
+
+    func testLookThumbnailsRequirePreparedPhoto() async throws {
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning(), lookCatalog: try RenderingTestSupport.sharedLookCatalog())
+        do {
+            _ = try await pipeline.lookThumbnails(PhotoID())
+            XCTFail()
+        } catch {
+            XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
+        }
+    }
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `cd apple && swift test --filter PhotoPipelineTests` → 컴파일 실패.
+
+- [ ] **Step 3: 구현**
+
+`PhotoPipeline.swift`: `Entry`에 `var thumbnail: CIImage`를 추가하고 `prepare`에서 `let thumbnailImage = Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension)`를 만들어 `Entry(faces:faceAnalysisFailure:thumbnail: thumbnailImage)`로 저장한 뒤 `renderer.makeCGImage(thumbnailImage)`를 돌려준다. 추가:
+
+```swift
+    /// 카탈로그의 모든 룩을 강도 1로 입힌 썸네일. 룩 단계만 적용한다(전체 파이프라인이 아님).
+    public func lookThumbnails(_ id: PhotoID) throws -> [String: CGImage] {
+        guard let entry = entries[id] else { throw MellowError.cannotCreatePreview }
+        var result: [String: CGImage] = [:]
+        for look in lookCatalog.all {
+            let styled = LookStage.styled(entry.thumbnail, look: look, tuning: tuning).cropped(to: entry.thumbnail.extent)
+            result[look.id] = try renderer.makeCGImage(styled)
+        }
+        return result
+    }
+```
+
+- [ ] **Step 4: 통과 확인**
+
+Run: `cd apple && swift test` → PASS. lint PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/Sources/MellowRendering/API/PhotoPipeline.swift apple/Tests/MellowRenderingTests/PhotoPipelineTests.swift
+git commit -m "feat(rendering): 룩 썸네일 렌더 추가
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 11: AppModel — 자동 보정·룩·자르기 상태와 좌표 역변환
+
+**Files:**
+- Modify: `apple/MellowPhoto/Application/EditorTool.swift` (케이스 재구성)
+- Modify: `apple/MellowPhoto/Application/UserMessage.swift` (문구 추가)
+- Modify: `apple/MellowPhoto/Application/AppModel.swift` (`lookCatalog`, `lookThumbnails`, `cropAspect`, `canvasShowsUncropped`, `outputTransform`, `cloneSourceOnCanvas`, `selectTool`, `select`의 원본 렌더)
+- Create: `apple/MellowPhoto/Application/AppModel+Looks.swift` (`loadLookThumbnails`, `autoEnhance`)
+- Create: `apple/MellowPhoto/Application/AppModel+Geometry.swift` (`CropAspect`, `setCropAspect`, `beginCropDrag`, `endCropDrag`, `resetGeometry`)
+- Modify: `apple/MellowPhoto/Application/AppModel+Editing.swift` (`touch` 역변환, `.color`→`.adjust`)
+- Modify: `apple/MellowPhoto/Platform/AppModel+Live.swift` (번들 카탈로그 로드)
+- Modify: `apple/MellowPhoto/Features/Editor/EditorScene.swift`, `AppModel+Library.swift` 등 `.color` 참조(컴파일 유지만; 화면 교체는 Task 12)
+- Modify: `apple/MellowPhotoTests/TestSupport.swift` (`makeModel`이 shared 카탈로그 주입)
+- Test: `apple/MellowPhotoTests/AppModelTests.swift` (추가)
+
+**Interfaces:**
+- Consumes: Task 5·8·9·10의 API, `GeometryTransform`(Task 3).
+- Produces: `EditorTool { look, crop, adjust, portrait, retouch, warp }`, `AppModel.lookCatalog`, `lookThumbnails: [PhotoID: [String: CGImage]]`, `cropAspect: CropAspect?`, `canvasShowsUncropped`, `outputTransform: GeometryTransform?`, `cloneSourceOnCanvas: NormalizedPoint?`, `selectTool(_:)`, `autoEnhance() async`, `loadLookThumbnails()`, `setCropAspect(_:)`, `beginCropDrag()`, `endCropDrag()`, `resetGeometry()`, `UserMessage.autoEnhanced/toolLook/toolCrop/toolAdjust/toolAuto/lookCatalogUnavailable`. Task 12 화면이 쓴다.
+
+- [ ] **Step 1: 실패하는 테스트 작성**
+
+`TestSupport.swift`의 `makeModel`에 카탈로그를 넣는다:
+
+```swift
+    static func sharedLookCatalog() throws -> LookCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/looks/looks.v1.json")
+        return try LookCatalog(data: Data(contentsOf: url))
+    }
+    // makeModel: let catalog = (try? sharedLookCatalog()) ?? .empty
+    //   pipeline: PhotoPipeline(analyzer: analyzer, tuning: RenderTuning(), lookCatalog: catalog)
+    //   AppModel(…, lookCatalog: catalog, renderDebounce: …)
+```
+
+`AppModelTests.swift`에 추가:
+
+```swift
+    private func importOne(_ model: AppModel, _ url: URL) async throws {
+        await model.importFromFiles([url])
+        try await waitUntil { model.isReady && model.preview != nil }
+    }
+
+    func testAutoEnhanceIsOneUndoStepAndIdempotent() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        await model.autoEnhance()
+        let first = model.currentRecipe
+        XCTAssertNotEqual(first, EditRecipe())
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1)
+        await model.autoEnhance()
+        XCTAssertEqual(model.currentRecipe, first, "두 번 눌러도 누적되지 않는다")
+        model.undo()
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.isDefault)
+    }
+
+    func testCropToolShowsUncroppedPreview() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.crop(NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5)))
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.preview?.width, 100)
+        model.selectTool(.crop)
+        try await waitUntil { !model.isRendering && model.preview?.width == 200 }
+        XCTAssertTrue(model.canvasShowsUncropped)
+        model.selectTool(.adjust)
+        try await waitUntil { !model.isRendering && model.preview?.width == 100 }
+    }
+
+    func testRetouchTapWhileCroppedIsStoredInOriginalCoordinates() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.crop(NormalizedRect(x: 0.5, y: 0.5, width: 0.5, height: 0.5)))
+        try await waitUntil { !model.isRendering }
+        model.selectTool(.retouch)
+        // 화면 중앙(0.5, 0.5)은 원본의 (0.75, 0.75).
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertEqual(model.cloneSource?.x ?? 0, 0.75, accuracy: 1e-9)
+        XCTAssertEqual(model.cloneSourceOnCanvas?.x ?? 0, 0.5, accuracy: 1e-9)
+        model.touch(from: NormalizedPoint(x: 0.2, y: 0.2), to: NormalizedPoint(x: 0.2, y: 0.2))
+        let spot = try XCTUnwrap(model.currentRecipe.spots.first)
+        XCTAssertEqual(spot.x, 0.6, accuracy: 1e-9)
+        XCTAssertEqual(spot.sourceX, 0.75, accuracy: 1e-9)
+    }
+
+    func testLookThumbnailsIgnoreStaleResults() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A", size: 300)
+        let second = try TestSupport.solidPNG(in: root, name: "B", size: 300)
+        let importer = FakeImporter(staged: [
+            .success(StagedPhoto(url: first, displayName: "A")), .success(StagedPhoto(url: second, displayName: "B")),
+        ])
+        let model = TestSupport.makeModel(root: root, importer: importer)
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady }
+        let a = model.session.photos[0].id
+        let b = model.session.photos[1].id
+        model.selectTool(.look)
+        model.select(b)
+        try await waitUntil { model.lookThumbnails[a]?.count == 10 || model.lookThumbnails[b]?.count == 10 }
+        try await waitUntil { model.lookThumbnails[b]?.count == 10 }
+        XCTAssertNotNil(model.lookThumbnails[b]?["mono"])
+        if let aThumbs = model.lookThumbnails[a] {
+            XCTAssertEqual(aThumbs.count, 10, "A의 결과가 왔다면 A 키 아래에만 있다")
+        }
+    }
+
+    func testCropAspectSetsCenteredRectAndResetGeometryIsOneUndoStep() async throws {
+        let staged = try TestSupport.solidPNG(in: root, size: 200)
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.setCropAspect(.square)
+        XCTAssertEqual(model.currentRecipe.geometry.crop, NormalizedRect(x: 0, y: 0, width: 1, height: 1))
+        model.edit(.quarterTurns(1))
+        model.setCropAspect(.nineSixteen)
+        let crop = try XCTUnwrap(model.currentRecipe.geometry.crop)
+        XCTAssertEqual(crop.width, 9.0 / 16.0, accuracy: 1e-9)
+        XCTAssertEqual(crop.x, (1 - 9.0 / 16.0) / 2, accuracy: 1e-9)
+        let before = model.session.selected?.document.undoStack.count ?? 0
+        model.resetGeometry()
+        XCTAssertTrue(model.currentRecipe.geometry.isIdentity)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, before + 1)
+    }
+```
+
+- [ ] **Step 2: 실패 확인**
+
+Run: `xcodegen generate && xcodebuild -project apple/MellowPhoto.xcodeproj -scheme MellowPhoto -destination 'platform=macOS' build-for-testing 2>&1 | grep -c "error:"` → 0보다 큼.
+
+- [ ] **Step 3: 구현**
+
+`EditorTool.swift`:
+
+```swift
+enum EditorTool: CaseIterable, Identifiable {
+    case look
+    case crop
+    case adjust
+    case portrait
+    case retouch
+    case warp
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .look: return UserMessage.toolLook
+        case .crop: return UserMessage.toolCrop
+        case .adjust: return UserMessage.toolAdjust
+        case .portrait: return UserMessage.toolPortrait
+        case .retouch: return UserMessage.toolRetouch
+        case .warp: return UserMessage.toolWarp
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .look: return "camera.filters"
+        case .crop: return "crop.rotate"
+        case .adjust: return "slider.horizontal.3"
+        case .portrait: return "face.smiling"
+        case .retouch: return "bandage"
+        case .warp: return "arrow.up.left.and.arrow.down.right"
+        }
+    }
+
+    var usesCanvasTouch: Bool { self == .retouch || self == .warp }
+}
+```
+
+`UserMessage.swift`에 추가: `toolLook = "필터"`, `toolCrop = "자르기"`, `toolAdjust = "조정"`, `toolAuto = "자동"`, `autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."`, `lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."`, `toolColor` 삭제.
+
+`AppModel.swift` 변경:
+
+```swift
+    let lookCatalog: LookCatalog
+    var lookThumbnails: [PhotoID: [String: CGImage]] = [:]
+    var cropAspect: CropAspect?
+    var tool: EditorTool = .look
+    /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
+    var canvasShowsUncropped: Bool { tool == .crop }
+    // init에 `lookCatalog: LookCatalog = .empty` 추가 (renderDebounce 앞)
+
+    /// 캔버스(출력) 좌표와 원본 좌표 사이의 변환. 자르기 도구에서는 자르기만 뺀 기하를 쓴다.
+    var outputTransform: GeometryTransform? {
+        guard let size = selectedInfo?.pixelSize, size.height > 0 else { return nil }
+        var geometry = currentRecipe.geometry
+        if canvasShowsUncropped {
+            geometry.crop = nil
+        }
+        return GeometryTransform(geometry: geometry, sourceAspect: size.width / size.height)
+    }
+
+    /// 복제 샘플 마커를 그릴 캔버스 좌표. 자른 영역 밖이면 nil.
+    var cloneSourceOnCanvas: NormalizedPoint? {
+        guard let source = cloneSource else { return nil }
+        guard let transform = outputTransform else { return source }
+        return transform.toOutput(source)
+    }
+
+    func selectTool(_ newTool: EditorTool) {
+        let showedUncropped = canvasShowsUncropped
+        tool = newTool
+        if canvasShowsUncropped != showedUncropped {
+            scheduleRender()
+        }
+        if newTool == .look {
+            loadLookThumbnails()
+        }
+    }
+```
+
+`scheduleRender`의 렌더 클로저는 `showsUncropped`를 캡처해 `pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)`를 부르고, 성공 콜백에서 `refreshOriginalIfNeeded(id:geometry:)`를 호출한다. 원본(비교용)은 기하만 적용한 레시피로 그린다:
+
+```swift
+    /// 비교 화면의 원본은 같은 기하(자르기·회전)로 보여야 한다.
+    private var originalGeometry: GeometryAdjustments?
+
+    private func refreshOriginalIfNeeded(id: PhotoID, showsUncropped: Bool) {
+        var geometry = currentRecipe.geometry
+        if showsUncropped {
+            geometry.crop = nil
+        }
+        guard originalGeometry != geometry else { return }
+        originalGeometry = geometry
+        let recipe = EditRecipe(geometry: geometry)
+        let pipeline = self.pipeline
+        Task { [weak self] in
+            guard let image = try? await pipeline.preview(id, recipe: recipe) else { return }
+            guard let self, session.selectedPhotoID == id else { return }
+            original = image
+        }
+    }
+```
+
+`select`에서 `originalGeometry = nil`로 초기화하고, 기존 `pipeline.preview(id, recipe: EditRecipe())`로 `original`을 처음 채우는 부분은 유지한다(기하가 없을 때의 기본). `lookThumbnails`는 사진을 빼면(`removeSelectedPhoto`) 해당 키를 지운다.
+
+`AppModel+Looks.swift`:
+
+```swift
+import MellowEditing
+import MellowShared
+
+extension AppModel {
+    /// 선택 사진의 룩 썸네일을 한 번만 만든다. 늦게 온 결과는 사진 id 키로 들어가므로 다른 사진에 붙지 않는다.
+    func loadLookThumbnails() {
+        guard let entry = session.selected, isReady, lookThumbnails[entry.id] == nil, !lookCatalog.all.isEmpty else { return }
+        let id = entry.id
+        let pipeline = self.pipeline
+        let url = copies.url(for: entry.filename)
+        Task { [weak self] in
+            do {
+                try await pipeline.reprepareIfEvicted(id, at: url)
+                let thumbnails = try await pipeline.lookThumbnails(id)
+                self?.lookThumbnails[id] = thumbnails
+            } catch {
+                self?.present(error)
+            }
+        }
+    }
+
+    /// 원본 분석으로 제안을 받아 체크포인트 한 번으로 적용한다.
+    func autoEnhance() async {
+        guard let entry = session.selected, isReady, !isBusy else { return }
+        do {
+            try await pipeline.reprepareIfEvicted(entry.id, at: copies.url(for: entry.filename))
+            let suggestion = try await pipeline.autoEnhanceSuggestion(entry.id, hasFaces: !faces.isEmpty)
+            guard session.selectedPhotoID == entry.id else { return }
+            applyAutoSuggestion(suggestion)
+            statusMessage = UserMessage.autoEnhanced
+        } catch {
+            present(error)
+        }
+    }
+}
+```
+
+`AppModel+Editing.swift`에 `applyAutoSuggestion`을 추가(`mutateSelected { $0.applyAuto(suggestion); return nil }`)하고, `touch`를 역변환하도록 바꾼다:
+
+```swift
+    func touch(from: NormalizedPoint, to: NormalizedPoint) {
+        guard isReady, !isBusy, !isComparing, !isRendering, !canvasShowsUncropped else { return }
+        let transform = outputTransform
+        let fromOriginal = transform?.toOriginal(from) ?? from
+        let toOriginal = transform?.toOriginal(to) ?? to
+        switch tool {
+        case .retouch: … 기존 로직에서 `to`→`toOriginal` …
+        case .warp: … `from`/`to` → `fromOriginal`/`toOriginal` …
+        case .look, .crop, .adjust, .portrait:
+            return
+        }
+    }
+```
+
+`AppModel+Geometry.swift`:
+
+```swift
+import MellowEditing
+import MellowShared
+
+enum CropAspect: CaseIterable, Identifiable {
+    case original
+    case square
+    case fourFive
+    case threeFour
+    case nineSixteen
+
+    var id: Self { self }
+
+    /// 가로/세로. original은 nil(회전 뒤 이미지 비율 그대로).
+    var ratio: Double? {
+        switch self {
+        case .original: return nil
+        case .square: return 1
+        case .fourFive: return 4.0 / 5.0
+        case .threeFour: return 3.0 / 4.0
+        case .nineSixteen: return 9.0 / 16.0
+        }
+    }
+}
+
+extension AppModel {
+    /// 비율에 맞는 가장 큰 중앙 사각형을 자르기로 넣는다. 원본 비율이면 자르기를 없앤다.
+    func setCropAspect(_ aspect: CropAspect) {
+        cropAspect = aspect
+        guard let transform = outputTransform else { return }
+        guard let ratio = aspect.ratio else {
+            edit(.crop(nil))
+            return
+        }
+        edit(.crop(Self.centeredCrop(ratio: ratio, imageAspect: transform.turnedAspect)))
+    }
+
+    /// 정규화 공간에서 가로/세로 = ratio가 되는 가장 큰 중앙 사각형.
+    static func centeredCrop(ratio: Double, imageAspect: Double) -> NormalizedRect {
+        let width = min(1, ratio / imageAspect)
+        let height = min(1, imageAspect / ratio)
+        return NormalizedRect(x: (1 - width) / 2, y: (1 - height) / 2, width: width, height: height)
+    }
+
+    func beginCropDrag() {
+        beginSliderEdit()
+    }
+
+    func endCropDrag() {
+        endSliderEdit()
+    }
+
+    /// 기하만 기본값으로. 실행 취소 한 단계.
+    func resetGeometry() {
+        cropAspect = nil
+        beginSliderEdit()
+        edit(.crop(nil))
+        edit(.straightenDegrees(0))
+        edit(.quarterTurns(0))
+        edit(.flipHorizontal(false))
+        endSliderEdit()
+    }
+}
+```
+
+`setCropAspect(.square)` 검증: 이미지 비율 1(200×200)에 ratio 1 → width 1, height 1, 원점 0 ✓. 회전 1회 뒤 `turnedAspect` 1에 ratio 9/16 → width 9/16, height 1, x=(1−9/16)/2 ✓.
+
+`AppModel+Live.swift`: 번들에서 카탈로그를 읽어 `PhotoPipeline(…, lookCatalog:)`와 `AppModel(…, lookCatalog:)`에 넘긴다. 실패하면 `.empty`로 만들고 `model.present(message: UserMessage.lookCatalogUnavailable)`.
+
+`.color` 참조는 전부 `.adjust`로 바꾼다(`EditorScene`의 `toolPanel`, 기타). 화면 자체는 Task 12에서 교체하므로 여기서는 컴파일만 유지한다.
+
+- [ ] **Step 4: 통과 확인**
+
+Run: macOS와 iPhone 시뮬레이터 앱 테스트 → TEST SUCCEEDED(30 + 5 = 35, iPhone 34). lint PASS. `./scripts/verify-modules.sh` PASS.
+
+- [ ] **Step 5: 커밋**
+
+```bash
+git add apple/MellowPhoto apple/MellowPhotoTests apple/MellowPhoto.xcodeproj
+git commit -m "feat(app): 자동 보정·룩 썸네일·자르기 상태와 캔버스 좌표 역변환 추가
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 12: 화면 — 도구 줄, 필터·조정·자르기 패널, 자르기 오버레이
+
+**Files:**
+- Create: `apple/MellowPhoto/Features/Editor/ToolStrip.swift`
+- Create: `apple/MellowPhoto/Features/Editor/LookPanel.swift`
+- Create: `apple/MellowPhoto/Features/Editor/CropPanel.swift`
+- Create: `apple/MellowPhoto/Features/Editor/CropOverlay.swift`
+- Rename: `apple/MellowPhoto/Features/Editor/ColorPanel.swift` → `AdjustPanel.swift` (내용 교체)
+- Modify: `apple/MellowPhoto/Features/Editor/EditorScene.swift` (세그먼트 피커 → `ToolStrip`, `toolPanel` 분기)
+- Modify: `apple/MellowPhoto/Features/Editor/PhotoCanvasView.swift` (자르기 오버레이, `cloneSourceOnCanvas`)
+- Modify: `apple/MellowPhoto/Features/Shared/Theme.swift` (`lookChipSize`, `cropHandleSize`, `toolButtonSize`)
+- Modify: `apple/MellowPhoto/Features/Shared/AdjustmentSlider.swift` (변경 없음이면 그대로)
+- Test: 없음 (실기동으로 검증; Step 6)
+
+**Interfaces:**
+- Consumes: Task 11의 `AppModel` API 전체, `CropAspect`, `EditorTool`, `Theme`.
+- Produces: 화면. 이후 Task가 참조하지 않는다.
+
+- [ ] **Step 1: Theme 상수와 도구 줄**
+
+`Theme.swift`에 추가:
+
+```swift
+    static let toolButtonSize = CGSize(width: 64, height: 56)
+    static let lookChipSize = CGSize(width: 64, height: 76)
+    static let cropHandleSize: CGFloat = 22
+    static let cropMinimumSide = 0.1
+```
+
+`apple/MellowPhoto/Features/Editor/ToolStrip.swift`:
+
+```swift
+import SwiftUI
+
+/// 가로 스크롤 도구 줄. '자동'은 도구가 아니라 즉시 적용 버튼이다.
+struct ToolStrip: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                toolButton(.look)
+                Button {
+                    Task { await model.autoEnhance() }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: "wand.and.stars").font(.title3)
+                        Text(UserMessage.toolAuto).font(.caption2)
+                    }
+                    .frame(width: Theme.toolButtonSize.width, height: Theme.toolButtonSize.height)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Theme.accent)
+                .accessibilityLabel("자동 보정")
+                ForEach([EditorTool.crop, .adjust, .portrait, .retouch, .warp]) { toolButton($0) }
+            }
+            .padding(.horizontal, 8)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private func toolButton(_ tool: EditorTool) -> some View {
+        let selected = model.tool == tool
+        return Button {
+            model.selectTool(tool)
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: tool.symbol).font(.title3)
+                Text(tool.title).font(.caption2)
+            }
+            .frame(width: Theme.toolButtonSize.width, height: Theme.toolButtonSize.height)
+            .background(selected ? Color.white.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 10))
+            .foregroundStyle(selected ? Theme.accent : .secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tool.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+```
+
+- [ ] **Step 2: 필터·조정 패널**
+
+`apple/MellowPhoto/Features/Editor/LookPanel.swift`:
+
+```swift
+import MellowShared
+import SwiftUI
+
+struct LookPanel: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let selection = model.currentRecipe.look
+        let thumbnails = model.session.selectedPhotoID.flatMap { model.lookThumbnails[$0] } ?? [:]
+        ScrollView(.horizontal) {
+            HStack(spacing: 10) {
+                chip(id: nil, name: "원본", image: model.session.selectedPhotoID.flatMap { model.thumbnails[$0] }, selected: selection.id == nil)
+                ForEach(model.lookCatalog.all) { look in
+                    chip(id: look.id, name: look.name, image: thumbnails[look.id], selected: selection.id == look.id)
+                }
+            }
+            .padding(.vertical, 4)
+        }
+        .scrollIndicators(.hidden)
+        .onAppear { model.loadLookThumbnails() }
+        if selection.id != nil {
+            AdjustmentSlider(title: "강도", value: selection.intensity, range: 0...1) { .lookIntensity($0) }
+        }
+        if model.lookCatalog.all.isEmpty {
+            Text(UserMessage.lookCatalogUnavailable).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func chip(id: String?, name: String, image: CGImage?, selected: Bool) -> some View {
+        Button {
+            model.edit(.lookID(selected ? nil : id))
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Rectangle().fill(.secondary.opacity(0.2))
+                    if let image {
+                        Image(cgImage: image).resizable().scaledToFill()
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                }
+                .frame(width: Theme.lookChipSize.width, height: Theme.lookChipSize.width)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(selected ? Theme.accent : .clear, lineWidth: 2))
+                Text(name).font(.caption2).foregroundStyle(selected ? Theme.accent : .secondary)
+            }
+            .frame(width: Theme.lookChipSize.width, height: Theme.lookChipSize.height)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+```
+
+`apple/MellowPhoto/Features/Editor/AdjustPanel.swift`(`ColorPanel.swift`를 `git mv`로 이름 바꾼 뒤 내용 교체; 구조체 이름 `AdjustPanel`):
+
+```swift
+import MellowShared
+import SwiftUI
+
+/// 분위기 프리셋 + 색감 슬라이더 + 디테일 슬라이더.
+struct AdjustPanel: View {
+    @Environment(AppModel.self) private var model
+    @Binding var presetSheet: Bool
+
+    var body: some View {
+        let recipe = model.currentRecipe
+        ScrollView(.horizontal) {
+            HStack {
+                ForEach(BuiltInPresets.all + model.session.presets) { preset in
+                    Button(preset.name) { model.applyPreset(preset.values) }
+                }
+                Button {
+                    presetSheet = true
+                } label: {
+                    Label("저장", systemImage: "plus")
+                }
+            }
+            .buttonStyle(.bordered).font(.caption)
+        }
+        .scrollIndicators(.hidden)
+        AdjustmentSlider(title: "노출", value: recipe.color.exposure, range: -1.5...1.5) { .exposure($0) }
+        AdjustmentSlider(title: "대비", value: recipe.color.contrast, range: 0.7...1.3) { .contrast($0) }
+        AdjustmentSlider(title: "채도", value: recipe.color.saturation, range: 0...1.5) { .saturation($0) }
+        AdjustmentSlider(title: "따뜻함", value: recipe.color.warmth, range: -1...1) { .warmth($0) }
+        Divider().opacity(0.4)
+        AdjustmentSlider(title: "하이라이트", value: recipe.detail.highlights, range: -1...1) { .highlights($0) }
+        AdjustmentSlider(title: "그림자", value: recipe.detail.shadows, range: -1...1) { .shadows($0) }
+        AdjustmentSlider(title: "선명도", value: recipe.detail.sharpness, range: 0...1) { .sharpness($0) }
+        AdjustmentSlider(title: "비네팅", value: recipe.detail.vignette, range: 0...1) { .vignette($0) }
+    }
+}
+```
+
+`savePreset`은 Task 11 전에 이미 `PresetValues(color:portrait:)`를 쓰므로 `detail: currentRecipe.detail`을 추가한다(`AppModel+Editing.swift`).
+
+- [ ] **Step 3: 자르기 패널과 오버레이**
+
+`apple/MellowPhoto/Features/Editor/CropPanel.swift`:
+
+```swift
+import MellowShared
+import SwiftUI
+
+struct CropPanel: View {
+    @Environment(AppModel.self) private var model
+
+    private static let aspectTitles: [CropAspect: String] = [
+        .original: "원본", .square: "1:1", .fourFive: "4:5", .threeFour: "3:4", .nineSixteen: "9:16",
+    ]
+
+    var body: some View {
+        let geometry = model.currentRecipe.geometry
+        ScrollView(.horizontal) {
+            HStack {
+                ForEach(CropAspect.allCases) { aspect in
+                    Button(Self.aspectTitles[aspect] ?? "") { model.setCropAspect(aspect) }
+                        .tint(model.cropAspect == aspect ? Theme.accent : .secondary)
+                }
+            }
+            .buttonStyle(.bordered).font(.caption)
+        }
+        .scrollIndicators(.hidden)
+        HStack(spacing: 16) {
+            Button {
+                model.edit(.quarterTurns(geometry.quarterTurns + 1))
+            } label: {
+                Label("90° 회전", systemImage: "rotate.right")
+            }
+            Button {
+                model.edit(.flipHorizontal(!geometry.flipHorizontal))
+            } label: {
+                Label("좌우 반전", systemImage: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+            }
+            Spacer()
+            Button("되돌리기") { model.resetGeometry() }.disabled(geometry.isIdentity)
+        }
+        .buttonStyle(.bordered).font(.caption)
+        AdjustmentSlider(
+            title: "수평", value: geometry.straightenDegrees,
+            range: -GeometryAdjustments.maxStraightenDegrees...GeometryAdjustments.maxStraightenDegrees
+        ) { .straightenDegrees($0) }
+        Text("사각형의 모서리를 끌어 자를 부분을 정해요. 잡티·변형 위치는 원본 기준으로 그대로 남아요.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+}
+```
+
+`apple/MellowPhoto/Features/Editor/CropOverlay.swift`:
+
+```swift
+import MellowShared
+import SwiftUI
+
+/// 자르기 전 이미지 위의 사각형과 손잡이 8개. 좌표는 정규화·원점 왼쪽 아래로 모델에 넘긴다.
+struct CropOverlay: View {
+    @Environment(AppModel.self) private var model
+    let size: CGSize
+    @State private var dragStartRect: NormalizedRect?
+
+    private enum Handle: CaseIterable {
+        case topLeft, top, topRight, left, right, bottomLeft, bottom, bottomRight
+    }
+
+    private var rect: NormalizedRect {
+        model.currentRecipe.geometry.crop ?? NormalizedRect(x: 0, y: 0, width: 1, height: 1)
+    }
+
+    var body: some View {
+        let frame = pixelFrame(rect)
+        ZStack(alignment: .topLeading) {
+            Color.black.opacity(0.45)
+                .mask(
+                    Rectangle().overlay(Rectangle().frame(width: frame.width, height: frame.height).position(x: frame.midX, y: frame.midY).blendMode(.destinationOut))
+                )
+                .allowsHitTesting(false)
+            Rectangle().stroke(Theme.accent, lineWidth: 1.5)
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .allowsHitTesting(false)
+            ForEach(Handle.allCases, id: \.self) { handle in
+                Circle().fill(Theme.accent)
+                    .frame(width: Theme.cropHandleSize, height: Theme.cropHandleSize)
+                    .position(handlePosition(handle, in: frame))
+                    .gesture(handleDrag(handle))
+            }
+            Color.clear.contentShape(Rectangle())
+                .frame(width: frame.width, height: frame.height)
+                .position(x: frame.midX, y: frame.midY)
+                .gesture(moveDrag)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    /// 정규화(원점 왼쪽 아래) → 뷰 픽셀(원점 왼쪽 위).
+    private func pixelFrame(_ rect: NormalizedRect) -> CGRect {
+        CGRect(
+            x: rect.x * size.width, y: (1 - rect.maxY) * size.height,
+            width: rect.width * size.width, height: rect.height * size.height)
+    }
+
+    private func handlePosition(_ handle: Handle, in frame: CGRect) -> CGPoint {
+        switch handle {
+        case .topLeft: return CGPoint(x: frame.minX, y: frame.minY)
+        case .top: return CGPoint(x: frame.midX, y: frame.minY)
+        case .topRight: return CGPoint(x: frame.maxX, y: frame.minY)
+        case .left: return CGPoint(x: frame.minX, y: frame.midY)
+        case .right: return CGPoint(x: frame.maxX, y: frame.midY)
+        case .bottomLeft: return CGPoint(x: frame.minX, y: frame.maxY)
+        case .bottom: return CGPoint(x: frame.midX, y: frame.maxY)
+        case .bottomRight: return CGPoint(x: frame.maxX, y: frame.maxY)
+        }
+    }
+
+    private func handleDrag(_ handle: Handle) -> some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                if dragStartRect == nil {
+                    dragStartRect = rect
+                    model.beginCropDrag()
+                }
+                guard let start = dragStartRect else { return }
+                let dx = Double(value.translation.width / size.width)
+                let dy = -Double(value.translation.height / size.height)
+                model.edit(.crop(Self.resized(start, handle: handle, dx: dx, dy: dy, lockedRatio: lockedRatio)))
+            }
+            .onEnded { _ in
+                dragStartRect = nil
+                model.endCropDrag()
+            }
+    }
+
+    private var moveDrag: some Gesture {
+        DragGesture(minimumDistance: 1)
+            .onChanged { value in
+                if dragStartRect == nil {
+                    dragStartRect = rect
+                    model.beginCropDrag()
+                }
+                guard let start = dragStartRect else { return }
+                let dx = Double(value.translation.width / size.width)
+                let dy = -Double(value.translation.height / size.height)
+                let x = min(max(0, start.x + dx), 1 - start.width)
+                let y = min(max(0, start.y + dy), 1 - start.height)
+                model.edit(.crop(NormalizedRect(x: x, y: y, width: start.width, height: start.height)))
+            }
+            .onEnded { _ in
+                dragStartRect = nil
+                model.endCropDrag()
+            }
+    }
+
+    /// 비율 고정 시 정규화 공간에서의 width/height 비(이미지 비율 반영).
+    private var lockedRatio: Double? {
+        guard let ratio = model.cropAspect?.ratio, let transform = model.outputTransform else { return nil }
+        return ratio / transform.turnedAspect
+    }
+
+    /// 손잡이를 끈 결과. 최소 변 Theme.cropMinimumSide, 0…1로 제한. 비율 고정이면 높이를 너비에 맞춘다.
+    static func resized(_ start: NormalizedRect, handle: Handle, dx: Double, dy: Double, lockedRatio: Double?) -> NormalizedRect {
+        var minX = start.minX
+        var maxX = start.maxX
+        var minY = start.minY
+        var maxY = start.maxY
+        switch handle {
+        case .topLeft: minX += dx; maxY += dy
+        case .top: maxY += dy
+        case .topRight: maxX += dx; maxY += dy
+        case .left: minX += dx
+        case .right: maxX += dx
+        case .bottomLeft: minX += dx; minY += dy
+        case .bottom: minY += dy
+        case .bottomRight: maxX += dx; minY += dy
+        }
+        minX = max(0, min(minX, maxX - Theme.cropMinimumSide))
+        maxX = min(1, max(maxX, minX + Theme.cropMinimumSide))
+        minY = max(0, min(minY, maxY - Theme.cropMinimumSide))
+        maxY = min(1, max(maxY, minY + Theme.cropMinimumSide))
+        if let lockedRatio {
+            let width = maxX - minX
+            let height = min(1, width / lockedRatio)
+            if [.top, .topLeft, .topRight].contains(handle) {
+                maxY = min(1, minY + height)
+            } else {
+                minY = max(0, maxY - height)
+            }
+        }
+        return NormalizedRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+}
+```
+
+`switch`의 한 줄 두 문장(`minX += dx; maxY += dy`)은 세미콜론 금지 규칙에 걸리므로 각각 두 줄로 쓴다.
+
+- [ ] **Step 4: 캔버스와 장면 연결**
+
+`PhotoCanvasView.swift`: `.overlay { touchLayer(in: size) }` 뒤에 `.overlay { if model.tool == .crop, !model.isComparing { CropOverlay(size: size) } }`를 추가한다. `cloneSourceMarker`는 `model.cloneSourceOnCanvas`를 쓴다. 자르기 도구에서는 `touchLayer`가 비활성(`usesCanvasTouch`가 false라 이미 그렇다). `MagnifyGesture`는 자르기 도구에서도 동작하되 오버레이 손잡이 드래그가 우선이도록 오버레이를 가장 위에 둔다.
+
+`EditorScene.swift`: compact·regular 모두 `Picker(…).pickerStyle(.segmented)`를 `ToolStrip()`으로 바꾸고, `toolPanel`을
+
+```swift
+        switch model.tool {
+        case .look: LookPanel()
+        case .crop: CropPanel()
+        case .adjust: AdjustPanel(presetSheet: $presetSheet)
+        case .portrait: PortraitPanel()
+        case .retouch, .warp: BrushPanel()
+        }
+```
+
+로. compact의 `Theme.compactControlsHeight`는 182에서 200으로 올린다(슬라이더 8개 스크롤).
+
+- [ ] **Step 5: 빌드·테스트**
+
+Run: `xcodegen generate`, iOS 시뮬레이터 빌드, macOS 빌드, macOS·iPhone 앱 테스트 → 모두 성공, 새 경고 없음, lint PASS.
+
+- [ ] **Step 6: 실기동 (Task 14 상당)**
+
+Mac Release 앱을 접근성 액션으로 구동(Task 11·14 보고서의 방법 재사용, 전역 키 입력 금지): `shared/fixtures/demo-portrait.png` 가져오기(파일 열기 패널이 자동화되지 않으면 Mac 컨테이너에 세션을 시드), 필터 "필름" 선택 → 강도 0.5 → "자동" → 조정 탭에서 하이라이트 −0.5 → 자르기 1:1 → 수평 5° → 90° 회전 → 저장 → 저장 파일 크기가 정사각형인지 확인. 화면 캡처를 SDD 작업 폴더에 둔다. iPhone·iPad 시뮬레이터는 시드된 세션으로 필터 패널·자르기 패널 화면을 캡처한다. 결과를 보고서에 적는다(통과하지 않은 것은 통과로 적지 않는다).
+
+- [ ] **Step 7: 커밋**
+
+```bash
+git add apple/MellowPhoto apple/MellowPhoto.xcodeproj
+git commit -m "feat(app): 도구 줄·필터·조정·자르기 화면 추가
+
+세그먼트 피커를 가로 도구 줄로 바꾸고 필터 칩, 자동 보정 버튼,
+자르기 오버레이를 더한다.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+### Task 13: 문서·검증 기록
+
+**Files:**
+- Modify: `README.md`(기능 목록·첫 보정 단계), `docs/APPLE.md`(사용법·테스트 수), `docs/architecture/modules.md`(Shared·Rendering 캔버스에 새 타입·단계, Rendering 규칙에 "기하 단계는 마지막"), `shared/recipe-schema/README.md`(Task 2에서 갱신했는지 확인), `shared/looks/README.md`(확인), `VALIDATION.md`(새 절)
+- Test: 없음
+
+- [ ] **Step 1: 문서 갱신**
+
+README "구현된 범위"에 필터 10종·자동 보정·자르기·디테일 슬라이더를 추가하고 "첫 보정" 단계를 필터 → 자동 → 자르기 → 조정 순으로 다시 쓴다. "첫 버전의 한계"에서 "자동 잡티 탐지 없음"은 유지한다. `docs/APPLE.md`의 사용 절에 도구 줄 순서와 자르기 도구 설명, 테스트 수(`./scripts/test-apple.sh` 결과)를 적는다. `modules.md`: Shared 공개 API에 `DetailAdjustments, LookSelection, GeometryAdjustments, Look, LookCatalog, GeometryTransform, AutoEnhanceSuggestion`, Rendering 공개 API에 `AutoEnhancer`, 파이프라인 7단계 이름, `PhotoPipeline`의 새 메서드. `scripts/verify-modules.sh`는 바뀌지 않는다.
+
+- [ ] **Step 2: VALIDATION.md**
+
+`## B0 기본 편집 세트 (2026-10-15)` 절: 자동 검증 수(패키지·앱별), Task 12의 실기동 결과(플랫폼별, 방법별), 룩 10종을 데모 사진에서 본 결과(좋지 않은 룩이 있으면 수치 조정 여부와 근거), 미검증 목록(실기기, iOS 대화형, 48MP에서 CIHighlightShadowAdjust 속도, Option+클릭 등 이전 미검증 항목 승계).
+
+- [ ] **Step 3: 최종 검증과 커밋**
+
+Run: `./scripts/test-apple.sh && ./scripts/build-apple.sh ios-device && ./scripts/build-apple.sh mac` → 전부 성공.
+
+```bash
+git add README.md docs/APPLE.md docs/architecture/modules.md VALIDATION.md shared
+git commit -m "docs: 기본 편집 세트 사용법·모듈 캔버스·검증 기록 갱신
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+---
+
+## 자체 검토 결과
+
+- **스펙 대조:** §2 레시피 → Task 2. §3 룩 데이터 → Task 4. §4 파이프라인·좌표 변환 → Task 3·6·7·8. §5 자동 보정 → Task 5(applyAuto)·9(AutoEnhancer)·11(autoEnhance). §6 화면 → Task 11(상태)·12(뷰). §7 오류 → Task 9(renderFailed)·11(lookCatalogUnavailable). §8 테스트 → 각 Task. §9 선행 작업 → Task 1. §10 위험 → Task 7 Step 4(수치 조정 근거), Task 10(썸네일은 룩 단계만), Task 9(클램프·보수적 게인).
+- **스펙과 다르게 정한 점:** `RenderContext.skipsCrop`과 `PhotoPipeline.preview(_:recipe:showsUncropped:)`는 스펙 §6의 "RenderContext.skipsCrop" 그대로. 비교용 원본은 "기하만 적용한 레시피"로 그려 자른 결과와 크기가 맞게 했다(스펙은 명시하지 않음). `AutoEnhancer`는 Rendering `API/`에 public으로 둔다(스펙은 모듈 내부 위치를 정하지 않음).
+- **타입 일관성:** `GeometryTransform.turnedAspect`는 Task 3에서 public으로 선언하고 Task 11·12가 쓴다. `LookStage.styled`는 internal static이며 Task 10이 같은 모듈에서 쓴다. `EditChange` 케이스 이름(`lookID`, `lookIntensity`, `quarterTurns`, `straightenDegrees`, `crop`)을 Task 5·11·12에서 동일하게 썼다. `PhotoPipeline.init`의 `lookCatalog` 기본값 `.empty`로 기존 테스트가 그대로 컴파일된다. `CropAspect`는 Task 11에 정의되고 Task 12가 쓴다. `Theme.cropMinimumSide`·`cropHandleSize`·`lookChipSize`·`toolButtonSize`는 Task 12 Step 1에서 정의된다.
+- **Review Focus 매핑:** 1→Task 2, 2→Task 11, 3→Task 11, 4→Task 9+11, 5→Task 8. 모두 테스트 코드가 있다.
+- **플레이스홀더 점검:** "TBD/TODO/나중에" 없음. Task 11의 `touch` 변경은 바뀌는 부분만 적었으므로 구현자는 기존 본문(Task 9에서 작성된 `AppModel+Editing.swift`)을 읽고 `to`/`from`을 원본 좌표로 치환한다.
