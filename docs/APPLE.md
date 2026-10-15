@@ -90,7 +90,9 @@ Mac 앱은 App Sandbox(사용자가 고른 파일 읽기·쓰기)에서 실행�
 - 태그 절차: `scripts/release.sh apple X.Y.Z`로 버전 커밋과 태그를 만든 뒤 `git push origin main apple-vX.Y.Z`로 올립니다.
 - `appstore` 모드는 App Store Connect에 편집 가능한 다른 버전이 남아 있으면 빌드 전에 멈춥니다. 예전 편집 중 버전(예: 0.2.0)을 먼저 정리해야 합니다. `testflight` 모드는 이 조건과 상관없이 올라갑니다.
 - 내부 테스터는 App Store Connect의 내부 테스트 그룹으로 빌드를 받습니다. 그룹이 새 빌드를 자동으로 받도록 설정되어 있으면 Apple의 빌드 처리가 끝난 뒤 따로 할 일이 없습니다. 외부 테스터 배포와 베타 심사 제출은 하지 않습니다.
-- `testflight` 모드는 아직 실제로 돌려 보지 않았습니다. 다음 태그 배포로 확인합니다.
+- `testflight` 모드는 2026-10-15 `apple-v0.3.1`, `apple-v1.1.0`으로 업로드까지 확인했습니다.
+- 버전 번호는 이미 올린 가장 높은 버전(1.0.0)보다 커야 TestFlight에서 최신으로 보입니다.
+- 업로드 뒤 Apple 쪽 처리 상태와 내부 그룹 설정은 Actions의 `Apple TestFlight status` 워크플로를 수동 실행해 확인합니다. 읽기만 하고 아무것도 바꾸지 않습니다.
 
 App Store 자동화는 [IOS_RELEASE.md](IOS_RELEASE.md), 제출 자료는 [APP_STORE_SUBMISSION.md](APP_STORE_SUBMISSION.md), Mac 전달본은 [MAC_INSTALL.md](MAC_INSTALL.md)를 참조하세요.
 

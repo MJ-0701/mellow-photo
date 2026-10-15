@@ -171,4 +171,39 @@ platform :ios do
         skip_waiting_for_build_processing: true, distribute_external: false, skip_submission: true)
     end
   end
+
+  desc 'Read-only: print recent TestFlight builds and beta groups (no tester emails, no changes)'
+  lane :build_status do
+    app_store_connect_api_key(key_id: required('ASC_KEY_ID'), issuer_id: required('ASC_ISSUER_ID'),
+      key_content: required('ASC_KEY_BASE64'), is_key_content_base64: true, in_house: false)
+    app = Spaceship::ConnectAPI::App.find('com.mj.mellowphoto')
+    UI.user_error!('App com.mj.mellowphoto not found') unless app
+    builds = Spaceship::ConnectAPI::Build.all(app_id: app.id, sort: '-uploadedDate', limit: 10,
+      includes: 'preReleaseVersion,buildBetaDetail')
+    UI.header('Recent builds (newest first)')
+    builds.each do |build|
+      detail = build.build_beta_detail
+      columns = [
+        "version=#{build.app_version}",
+        "build=#{build.version}",
+        "uploaded=#{build.uploaded_date}",
+        "processing=#{build.processing_state}",
+        "internal=#{detail&.internal_build_state || '-'}",
+        "external=#{detail&.external_build_state || '-'}",
+        "expired=#{build.expired}",
+        "encryption=#{build.uses_non_exempt_encryption.inspect}"
+      ]
+      UI.message(columns.join('  '))
+    end
+    UI.header('Beta groups')
+    app.get_beta_groups.each do |group|
+      testers = begin
+        Spaceship::ConnectAPI.get_beta_testers(filter: { betaGroups: group.id }, limit: 200).to_models.size
+      rescue StandardError
+        'unknown'
+      end
+      all_builds = group.respond_to?(:has_access_to_all_builds) ? group.has_access_to_all_builds.inspect : 'unknown'
+      UI.message("name=#{group.name}  internal=#{group.is_internal_group}  testers=#{testers}  all_builds=#{all_builds}")
+    end
+  end
 end
