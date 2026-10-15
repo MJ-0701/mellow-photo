@@ -13,6 +13,7 @@
 | 색을 바꾸는 얼굴 보정은 원본 좌표에서 먼저, 얼굴·체형 변형은 그 뒤 한 번만 | 화면이 덜 깨지고 영역 계산이 단순해짐 | **큼** |
 | 얼굴 10개·체형 7개 슬라이더를 이동량 지도 하나로 합쳐 한 번만 다시 그림 | 여러 번 변형하면 화질이 떨어짐 | **큼** |
 | (C 구현 중 변경) 이동량 지도를 그라데이션 덧셈 대신 Core Image 커널 언어 색 커널로 그리고, 이동 원소가 닿는 영역의 합집합 안에서만 계산한 뒤 원본 위에 합성 | 그라데이션 덧셈은 음수 이동량을 보존하지 못함. 영역 제한으로 Mac 8000×6000·얼굴 1개 최대 메모리 875 → 832 MB. 커널 언어는 지원 중단 경고가 늘어남(기존 피부 커널과 같은 처지) | 작음 |
+| (D 구현 중 변경) 사진 준비 때의 분석(얼굴·잡티·인물 마스크)을 `RenderContext` 개별 필드 대신 `PhotoAnalysis` 묶음 하나로 넘기고, 다각형 마스크 비트맵은 묶음 안 사진별 캐시(`RegionMaskCache`)가 한 번만 그림 | B 최종 리뷰 이월 사항. 분석이 늘 때마다(E 관절점) 생성자 인자가 늘지 않고, 같은 사진의 눈·입·피부 마스크를 렌더마다 다시 그리지 않음. 옛 생성자를 남겨 기존 호출부·테스트는 그대로 | 작음 |
 | 얼굴 보정은 찾은 얼굴 모두(기존 대상 얼굴 선택 유지), 체형은 가장 큰 사람 한 명 | 단체 사진에서 체형 변형이 서로 간섭함 | 작음 |
 | 얼굴형·체형 슬라이더는 가운데 0인 양방향(미소·다리 길게만 한 방향) | Evoto·메이투와 같은 조작감 | 작음 |
 | 수동 잡티·변형 편집이 있으면 얼굴형·체형 슬라이더도 잠김 | 수동 편집 좌표가 변형 뒤에서 어긋남(기존 얼굴 미세 조정과 같은 규칙) | 작음 |
@@ -117,10 +118,10 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 `PhotoPipeline.prepare`가 얼굴에 이어 순서대로 계산해 `Entry`에 둠:
 1. 얼굴(기존).
 2. 잡티 목록(얼굴이 있을 때) — `BlemishDetector`.
-3. 인물 마스크 — `PersonAnalyzer.personMask(_:) throws -> CIImage?`(미리보기 크기 회색조, 사람 1·배경 0). 렌더 시 원본 extent로 확대.
+3. 인물 마스크 — `PersonAnalyzer.personMask(_:) throws -> CIImage?`(회색조, 사람 1·배경 0, 미리보기 이미지로 계산). 받은 크기 그대로(원점 (0, 0)) 보관하고 렌더 시 extent로 가로·세로를 따로 확대. `VisionPersonAnalyzer`(`.balanced` 품질)의 결과는 입력 비율과 무관하게 512×384 고정이라 축마다 배율이 다르다. 마스크 픽셀 중 128/255 이상이 1% 미만이면 "사람 없음"으로 nil. (D 구현 중 변경: 처음 문구는 "미리보기 크기" 마스크를 원본 extent로 확대.)
 4. 관절점 — `BodyAnalyzer.analyze(_:) throws -> [BodyGeometry]`, 면적이 가장 큰 사람을 앞에.
 
-각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. `RenderContext`에 `blemishes: [BlemishSpot]`, `personMask: CIImage?`, `bodies: [BodyGeometry]`, `makeupCatalog: MakeupCatalog` 추가(기본값 있음).
+각 분석은 독립적으로 실패할 수 있고 실패는 `PreparedPhoto`에 `personAnalysisFailure`·`bodyAnalysisFailure`로 남김(얼굴과 같은 방식). 레시피가 그 분석에 의존하는데 실패했으면 렌더는 해당 단계만 건너뜀(오류를 던지지 않음), 앱은 패널에 안내 문구를 표시. 분석 결과는 `PhotoAnalysis`(MellowRendering/API, `faces`·`faceAnalysisFailure`·`blemishes`·`personMask`·`personAnalysisFailure`, E에서 `bodies` 추가) 하나로 묶어 `RenderContext.analysis`로 넘기고, `RenderContext.faces`·`blemishes`·`personMask`는 묶음을 읽는 계산 속성이다. 새 분석은 이 묶음에만 더하고 `RenderContext`·`PhotoPipeline`의 인자 목록은 늘리지 않는다. 다각형 마스크 비트맵은 묶음의 `RegionMaskCache`(다각형·extent 키, 32개 상한)가 사진마다 한 번만 그리며, 미리보기 캐시에서 밀려난 사진의 비트맵은 놓는다. 옛 생성자 `RenderContext(extent:recipe:faces:…blemishes:)`는 묶음을 만들어 넘기는 형태로 남긴다. `makeupCatalog: MakeupCatalog`는 F에서 `RenderContext`에 추가(기본값 있음). (D 구현 중 변경: 처음 문구는 `RenderContext`에 `blemishes`·`personMask`·`bodies` 개별 필드 추가.)
 
 `PhotoPipeline.init`에 `personAnalyzer`, `bodyAnalyzer` 인자 추가(테스트는 스텁). 앱 `AppModel+Live.swift`가 Vision 구현을 주입.
 
@@ -163,10 +164,11 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 
 ### 4. D 눈·치아·입술·배경
 
+- **색 계산(D 구현 중 정함):** 흰자·치아 판별과 색 이동은 `FeatureKernels`의 CIKL 색 커널에서 sRGB 감마 값으로 바꾼 뒤 BT.601 YCbCr(휘도 BT.601, Cb·Cr은 `SkinKernels`와 같은 계수)로 계산하고 다시 선형으로 되돌린다. 눈 높이는 눈 다각형 경계 상자의 짧은 변, "얼굴 면적"은 얼굴 상자 넓이, 노란기 제거는 음의 Cb를 0 쪽으로 옮기는 것이다. 특징점이 없는 얼굴은 해당 보정만 건너뛴다.
 - **눈 또렷하게(`FeatureStage`):** `FaceRegions.eyeMask`(눈 다각형). 마스크 안에서 휘도 상위·채도 낮은 픽셀(흰자)을 `eyeWhiteLift × 값`만큼 밝게, 눈동자 원(동공 중심, 반지름 = 눈 높이 × 0.5) 안을 `CISharpenLuminance`로 `eyeIrisSharpen × 값`.
 - **치아 미백:** `FaceRegions.teethMask` = 안쪽 입술 다각형 × (휘도 > `teethLumaMin`) × (Cr < `teethRednessMax`). 다각형 면적이 얼굴 면적의 `mouthOpenMinArea`보다 작으면 생략. 마스크 안 노란기(Cb 쪽 이동) 제거 + 밝기 `teethLift × 값`.
 - **입술 생기:** 바깥−안쪽 입술 다각형, 채도 +`lipSaturationMax × 값`, 붉은기 소폭.
-- **배경 흐림(`BackgroundStage`):** `personMask`를 확대·`backgroundMaskFeather`로 부드럽게 한 뒤 반전해 `CIMaskedVariableBlur`(반지름 = 짧은 변 × `backgroundBlurMaxFraction` × 값). 마스크가 없으면 입력 그대로.
+- **배경 흐림(`BackgroundStage`):** `personMask`를 extent로 가로·세로 따로 확대·`backgroundMaskFeather`로 부드럽게 한 뒤 반전해 `CIMaskedVariableBlur`(반지름 = 짧은 변 × `backgroundBlurMaxFraction` × 값), 같은 반전 마스크로 원본 위에 합성해 사람 안쪽은 원본 바이트로 둔다. 마스크가 없으면(사람 없음·인물 분석 실패·준비 전) 입력 그대로.
 - **UI:** 뷰티 › 눈·입: 슬라이더 3개. 배경 도구: 흐림 슬라이더 + 사람 없음 안내.
 - **테스트:** 마스크 밖 픽셀 불변(눈·치아·입술 각각), 붉은 입술 픽셀은 치아 마스크에서 제외, 입 다문 얼굴은 치아 무변화, 스텁 인물 마스크에서 사람 영역 불변·배경만 변화.
 

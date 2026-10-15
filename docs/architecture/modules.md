@@ -44,7 +44,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 공개 API | `EditDocument`, `EditChange`, `EditingPolicy` |
 | 의존 | MellowShared |
 | 포트 | 없음 |
-| 규칙 | 변경 전 체크포인트, 수동 편집 시 얼굴형(`faceShape`)·대상 잠금(E에서 체형 추가), 프리셋·일괄 적용 시 잠긴 얼굴형·체형 보존, 자동 보정은 색·디테일·피부·눈입만 바꿈, 자동 보정(`applyAuto`)은 체크포인트 한 번이고 값이 같으면 아무것도 바꾸지 않음, `quarterTurns`·`flipHorizontal` 변경은 `GeometryAdjustments`의 회전·반전 함수를 거침, 룩·기하 변경은 잠금과 무관, 값 범위는 `EditingPolicy`(unitRange·bipolarRange·faceShapeRange, 값은 MellowShared `AdjustmentRange`를 그대로 내보냄), 히스토리 40 |
+| 규칙 | 변경 전 체크포인트, 수동 편집 시 얼굴형(`faceShape`)·대상 잠금(E에서 체형 추가), 프리셋·일괄 적용 시 잠긴 얼굴형·체형 보존, 자동 보정은 색·디테일·피부·눈입만 바꿈, 자동 보정(`applyAuto`)은 체크포인트 한 번이고 값이 같으면 아무것도 바꾸지 않음, `quarterTurns`·`flipHorizontal` 변경은 `GeometryAdjustments`의 회전·반전 함수를 거침, 룩·기하 변경은 잠금과 무관, `EditChange.feature`·`backgroundBlur`는 0…1로 자르고 잠기지 않음, 값 범위는 `EditingPolicy`(unitRange·bipolarRange·faceShapeRange, 값은 MellowShared `AdjustmentRange`를 그대로 내보냄), 히스토리 40 |
 | 테스트 | `apple/Tests/MellowEditingTests` (GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:editing`, C++ `mellow_editing` |
 
@@ -66,15 +66,15 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 ### MellowRendering
 | 항목 | 내용 |
 |---|---|
-| 책임 | 사진 읽기, 얼굴 분석, 레시피 렌더, 미리보기 캐시 |
-| 공개 API | `PhotoPipeline`, `PreparedPhoto`, `RenderPipeline`, `RenderStage`, `RenderContext`, `RenderTuning`, `Renderer`, `FaceAnalyzer`, `ImageLoader`, `ImageMetadata`, `AutoEnhancer` |
+| 책임 | 사진 읽기, 얼굴·인물 분석, 레시피 렌더, 미리보기 캐시 |
+| 공개 API | `PhotoPipeline`, `PreparedPhoto`, `RenderPipeline`, `RenderStage`, `RenderContext`, `RenderTuning`, `Renderer`, `FaceAnalyzer`, `PhotoAnalysis`, `PersonAnalyzer`, `VisionPersonAnalyzer`, `ImageLoader`, `ImageMetadata`, `AutoEnhancer` |
 | 의존 | MellowShared (CoreImage, Vision, ImageIO) |
-| 포트 | `FaceAnalyzer` (`analyze(CIImage) throws -> [FaceGeometry]`). 기본 구현 `VisionFaceAnalyzer`는 `Infrastructure/`에 있으며 앱이 조립할 수 있도록 `public`입니다 |
-| 규칙 | 단계 순서 `skin` → `shapeWarp` → `localEdit` → `geometry` → `color` → `detail` → `look` 고정(기하 단계는 좌표 기반 단계 뒤, 색 보정 앞이라 얼굴·수동 편집 좌표는 원본 기준이고 비네팅·선명도·룩은 자른 프레임 기준), 기하 단계는 반전 → 90° 회전 → 수평 보정(빈 모서리 없는 최소 확대) → 자르기 순서이고 자르기 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림, `RenderContext.skipsCrop`이면 자르기만 건너뜀(자르기 도구 미리보기), `AutoEnhancer`는 sRGB 감마 값의 64구간 휘도 히스토그램(구간 대표값은 중심 (i + 0.5)/64)과 평균색으로 제안, 미리보기 LRU 3장 캐시(미리보기 렌더는 디스크를 읽지 않음), 미리보기 긴 변은 메모리 8GB 이상 1600px·미만 1200px, 원본 렌더는 준비 때의 정규화 얼굴 좌표 재사용, 얼굴 의존 레시피인데 분석이 실패했거나 준비 전이면 `faceAnalysisUnavailable`, 수치 상수는 `RenderTuning`, `CIWarpKernel`은 `WarpKernel` 하나만 감쌈, 얼굴 영역 마스크는 `FaceRegions` 한 곳(윤곽 다각형을 `CGContext` 회색 비트맵으로 그리고 볼 평균과의 Cb·Cr 거리로 가중), 피부 CIKL 색 커널은 `SkinKernels` 한 곳, `PhotoPipeline.prepare`가 얼굴 뒤에 `BlemishDetector`로 잡티를 찾아 `RenderContext.blemishes`로 넘김(실패하면 빈 목록), `skin` 단계는 자동 잡티 패치 복구 → 피부 마스크 안 세 대역 주파수 분리, 얼굴형·체형 변형은 `ShapeWarpStage` 하나가 이동 원소(`ShapePrimitive` push·scale·band)를 모아 `DisplacementWarp`로 한 번만 샘플링(out(p) = in(p − D(p)), 원소마다 반지름 × `shapeDisplacementLimit`), 이동량 지도 CIKL 커널은 `DisplacementWarp` 한 곳(색 커널로 이동량을 그리고 일반 커널로 샘플링, 원소 영향 경계의 합집합 안에서만 그린 뒤 `CIBlendWithMask`로 원본 위에 합성), 얼굴형 원소는 `FaceShapeRig`가 `FaceFrame`(눈동자 기준 얼굴 좌표)에서 만들고 값을 `AdjustmentRange`로 직접 자름(유한하지 않은 값은 0), |yaw| > `faceShapeYawThreshold`면 cos 비율로 약화, 윤곽점이 없으면 원소 없음, 체형 원소 자리 `bodyPrimitives`는 E까지 빈 배열 |
-| 테스트 | `apple/Tests/MellowRenderingTests` (GPU 회귀, 단계 순서, 캐시 동등성, 데모 인물 랜드마크, 디테일·룩·기하 픽셀 검사, 자동 보정 제안, 합성 얼굴의 피부 마스크·주파수 분리·잡티 검출과 복구, 타원 마스크 윤곽, 이동량 지도(점 표식 이동·원소 합·띠 단조성), 얼굴 좌표계(기울기·뒤집힘·대체 경로), 얼굴형 원소 방향·대칭·회전·클램프·접힘 검사·데모 사진 특징점, 얼굴 단계 렌더. macOS) |
+| 포트 | `FaceAnalyzer` (`analyze(CIImage) throws -> [FaceGeometry]`). 기본 구현 `VisionFaceAnalyzer`는 `Infrastructure/`에 있으며 앱이 조립할 수 있도록 `public`입니다. `PersonAnalyzer` (`personMask(CIImage) throws -> CIImage?`, 사람 없으면 nil). 기본 구현 `VisionPersonAnalyzer`(`VNGeneratePersonSegmentationRequest`, `.balanced` 품질이라 결과는 512×384 고정, 0…255 중 128 이상인 사람 픽셀이 1% 미만이면 nil)도 `Infrastructure/`의 `public` |
+| 규칙 | 단계 순서 `skin` → `feature` → `background` → `shapeWarp` → `localEdit` → `geometry` → `color` → `detail` → `look` 고정(기하 단계는 좌표 기반 단계 뒤, 색 보정 앞이라 얼굴·수동 편집 좌표는 원본 기준이고 비네팅·선명도·룩은 자른 프레임 기준), 기하 단계는 반전 → 90° 회전 → 수평 보정(빈 모서리 없는 최소 확대) → 자르기 순서이고 자르기 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림, `RenderContext.skipsCrop`이면 자르기만 건너뜀(자르기 도구 미리보기), `AutoEnhancer`는 sRGB 감마 값의 64구간 휘도 히스토그램(구간 대표값은 중심 (i + 0.5)/64)과 평균색으로 제안, 미리보기 LRU 3장 캐시(미리보기 렌더는 디스크를 읽지 않음), 미리보기 긴 변은 메모리 8GB 이상 1600px·미만 1200px, 원본 렌더는 준비 때의 정규화 얼굴 좌표 재사용, 얼굴 의존 레시피인데 분석이 실패했거나 준비 전이면 `faceAnalysisUnavailable`, 수치 상수는 `RenderTuning`, `CIWarpKernel`은 `WarpKernel` 하나만 감쌈, 얼굴 영역 마스크는 `FaceRegions` 한 곳(윤곽 다각형을 `CGContext` 회색 비트맵으로 그리고 볼 평균과의 Cb·Cr 거리로 가중), 피부 CIKL 색 커널은 `SkinKernels` 한 곳, `PhotoPipeline.prepare`가 얼굴 뒤에 `BlemishDetector`로 잡티를 찾아 `RenderContext.blemishes`로 넘김(실패하면 빈 목록), `skin` 단계는 자동 잡티 패치 복구 → 피부 마스크 안 세 대역 주파수 분리, 얼굴형·체형 변형은 `ShapeWarpStage` 하나가 이동 원소(`ShapePrimitive` push·scale·band)를 모아 `DisplacementWarp`로 한 번만 샘플링(out(p) = in(p − D(p)), 원소마다 반지름 × `shapeDisplacementLimit`), 이동량 지도 CIKL 커널은 `DisplacementWarp` 한 곳(색 커널로 이동량을 그리고 일반 커널로 샘플링, 원소 영향 경계의 합집합 안에서만 그린 뒤 `CIBlendWithMask`로 원본 위에 합성), 얼굴형 원소는 `FaceShapeRig`가 `FaceFrame`(눈동자 기준 얼굴 좌표)에서 만들고 값을 `AdjustmentRange`로 직접 자름(유한하지 않은 값은 0), |yaw| > `faceShapeYawThreshold`면 cos 비율로 약화, 윤곽점이 없으면 원소 없음, 체형 원소 자리 `bodyPrimitives`는 E까지 빈 배열, 사진 준비 때의 분석(얼굴·잡티·인물 마스크)은 `PhotoAnalysis` 하나로 `RenderContext.analysis`에 넘기고 새 분석은 이 묶음에만 더함, 다각형 마스크 비트맵은 `PhotoAnalysis`의 `RegionMaskCache`(다각형·extent 키, 32개 상한)가 사진마다 한 번만 그리고 미리보기 캐시에서 밀려난 사진은 놓음, 인물 분석 실패는 `PreparedPhoto.personAnalysisFailure`이고 렌더는 배경 단계만 건너뜀(오류 아님), 눈·눈동자·입술·치아 마스크도 `FaceRegions` 한 곳, 눈·입 CIKL 색 커널은 `FeatureKernels` 한 곳(감마 BT.601 YCbCr 가중치·색 이동), `feature` 단계는 마스크 영역만 계산해 원본 위에 합성(마스크 밖 같은 바이트), 다문 입(안쪽 입술 넓이 < 얼굴 상자 × `mouthOpenMinArea`)은 치아를 건너뜀, `background` 단계는 인물 마스크를 extent로 가로·세로 따로 키워 흐리고 반전한 지도로 `CIMaskedVariableBlur` 후 같은 마스크로 원본 위에 합성 |
+| 테스트 | `apple/Tests/MellowRenderingTests` (GPU 회귀, 단계 순서, 캐시 동등성, 데모 인물 랜드마크, 디테일·룩·기하 픽셀 검사, 자동 보정 제안, 합성 얼굴의 피부 마스크·주파수 분리·잡티 검출과 복구, 타원 마스크 윤곽, 이동량 지도(점 표식 이동·원소 합·띠 단조성), 얼굴 좌표계(기울기·뒤집힘·대체 경로), 얼굴형 원소 방향·대칭·회전·클램프·접힘 검사·데모 사진 특징점, 얼굴 단계 렌더, 분석 묶음·마스크 캐시, 인물 분석(데모 사진·빈 사진·스텁 실패), 눈·입술·치아 마스크(붉은 입술 제외·다문 입·특징점 누락·데모 사진), 눈·치아·입술 렌더(마스크 밖 불변·범위 밖 값), 배경 흐림(사람 안쪽 같은 바이트·축별 배율·가장자리·실패 시 건너뜀·원본 해상도). macOS) |
 | 다른 플랫폼 대응 | Kotlin `:rendering`, C++ `mellow_rendering` |
 
-`PhotoPipeline`은 `init(analyzer:tuning:lookCatalog:)`로 룩 카탈로그를 받습니다(기본값 `.empty`). B0에서 더한 메서드는 `preview(_:recipe:showsUncropped:)`(true면 자르기만 건너뛴 미리보기), `autoEnhanceSuggestion(_:hasFaces:)`(캐시된 미리보기를 분석, 현재 레시피와 무관), `lookThumbnails(_:)`(사진 썸네일에 룩 단계만 강도 1로 입힌 `[룩 id: CGImage]`)입니다.
+`PhotoPipeline`은 `init(analyzer:personAnalyzer:tuning:lookCatalog:)`로 인물 분석기(기본 nil = 분석 안 함)와 룩 카탈로그(기본값 `.empty`)를 받습니다. B0에서 더한 메서드는 `preview(_:recipe:showsUncropped:)`(true면 자르기만 건너뛴 미리보기), `autoEnhanceSuggestion(_:hasFaces:)`(캐시된 미리보기를 분석, 현재 레시피와 무관), `lookThumbnails(_:)`(사진 썸네일에 룩 단계만 강도 1로 입힌 `[룩 id: CGImage]`)입니다.
 
 얼굴 분석 실패는 오류가 아니라 `PreparedPhoto.faceAnalysisFailure`로 전달합니다. 색감·수동 편집은 계속할 수 있습니다. 오류 사유는 영어 식별자(예: `PhotoPipeline.unpreparedReason` = `photo-not-prepared`)이며 사용자 문구는 앱의 `UserMessage`가 정합니다.
 
@@ -96,12 +96,12 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 폴더 | 역할 |
 |---|---|
 | `App/` | `MellowPhotoApp`, 창, 명령(⌘Z·⇧⌘Z). 장면 전환 시 내보내기 취소와 작업 중단·재개 |
-| `Application/` | `AppModel`(composition root, `@Observable`·`@MainActor`)과 기능별 extension(`+Editing`, `+Library`, `+Export`, `+Geometry`(자르기 비율·회전), `+Looks`(룩 썸네일·자동 보정)), 도구 목록 `EditorTool`(`look, crop, adjust, beauty, retouch, warp`), 뷰티 패널 탭 `BeautyTab`(피부·얼굴), 유스케이스 `ImportPhotos`·`ExportPhotos`, `RenderScheduler`(디바운스와 세대 토큰으로 마지막 요청만 렌더), 포트 `PhotoImporter`(`Ports.swift`), 모든 한국어 문구 `UserMessage` |
+| `Application/` | `AppModel`(composition root, `@Observable`·`@MainActor`)과 기능별 extension(`+Editing`, `+Library`, `+Export`, `+Geometry`(자르기 비율·회전), `+Looks`(룩 썸네일·자동 보정)), 도구 목록 `EditorTool`(`look, crop, adjust, beauty, background, retouch, warp`), 뷰티 패널 탭 `BeautyTab`(피부·얼굴·눈·입), 유스케이스 `ImportPhotos`·`ExportPhotos`, `RenderScheduler`(디바운스와 세대 토큰으로 마지막 요청만 렌더), 포트 `PhotoImporter`(`Ports.swift`), 모든 한국어 문구 `UserMessage` |
 | `Features/` | SwiftUI 화면. `Library`, `Editor`, `Export`, `Presets`, `Info`, `Shared`. compact(iPhone 세로)는 세로 스택, regular(iPad·Mac)는 라이브러리·캔버스·인스펙터 3단 |
 | `Platform/` | 포트 어댑터와 실기기 조립 |
 | `Resources/` | 에셋, `Localizable.xcstrings`, Info.plist(iOS·macOS), `PrivacyInfo.xcprivacy`, Mac 엔타이틀먼트(App Sandbox), `container-migration.plist` |
 
-`AppModel`은 `ProjectSession`(안에 `SessionStore`), `PhotoPipeline`(안에 `FaceAnalyzer`), `WorkingCopyStore`, `PhotoImporter`, `Exporter`를 생성자로 받습니다. `ExportDestination`은 내보낼 때마다 넘깁니다. 테스트(`apple/MellowPhotoTests`)는 가짜 어댑터로 같은 생성자를 씁니다.
+`AppModel`은 `ProjectSession`(안에 `SessionStore`), `PhotoPipeline`(안에 `FaceAnalyzer`·`PersonAnalyzer`), `WorkingCopyStore`, `PhotoImporter`, `Exporter`를 생성자로 받습니다. `ExportDestination`은 내보낼 때마다 넘깁니다. 테스트(`apple/MellowPhotoTests`)는 가짜 어댑터로 같은 생성자를 씁니다.
 
 유스케이스는 두 개뿐입니다.
 
@@ -116,7 +116,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | `PhotoLibraryDestination` | iOS·iPadOS `ExportDestination`. 사진 앱에 새 사진으로 추가(addOnly 권한) |
 | `FolderDestination` | macOS `ExportDestination`. 사용자가 고른 폴더에 복사, `FileNamingPolicy`로 충돌 회피 |
 | `LegacyMacPresets` | 구 Mac 앱의 `presets.json`을 세션 복원 뒤 한 번 흡수하고 `presets.json.imported`로 이름 변경 |
-| `AppModel+Live` | 실기기 조립. `Application Support/MellowPhoto/session.json`, `…/Library/` 작업 사본, `VisionFaceAnalyzer`, 기기별 `LibraryPolicy`·`RenderTuning` |
+| `AppModel+Live` | 실기기 조립. `Application Support/MellowPhoto/session.json`, `…/Library/` 작업 사본, `VisionFaceAnalyzer`, `VisionPersonAnalyzer`, 기기별 `LibraryPolicy`·`RenderTuning` |
 
 ## 검증
 
