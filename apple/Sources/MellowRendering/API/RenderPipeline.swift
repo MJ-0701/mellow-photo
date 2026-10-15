@@ -8,9 +8,10 @@ public struct RenderPipeline: Sendable {
         self.stages = stages
     }
 
-    /// 자동 보정이 기반이 되고 수동 편집이 그 위에, 색감은 마지막에.
+    /// 자동 보정이 기반이 되고 수동 편집이 그 위에, 기하가 출력 화면을 정하고, 색감은 마지막에.
+    /// 좌표 기반 단계는 기하 앞이라 원본 좌표를 쓰고, 비네팅·선명도는 기하 뒤라 잘린 화면을 따른다.
     public static let standard = RenderPipeline(stages: [
-        SkinStage(), FaceReshapeStage(), LocalEditStage(), ColorStage(), DetailStage(), LookStage(),
+        SkinStage(), FaceReshapeStage(), LocalEditStage(), GeometryStage(), ColorStage(), DetailStage(), LookStage(),
     ])
 
     public func render(_ image: CIImage, context: RenderContext) throws -> CIImage {
@@ -20,6 +21,7 @@ public struct RenderPipeline: Sendable {
         for stage in stages {
             result = try stage.apply(result, in: context)
         }
-        return result.cropped(to: context.extent)
+        // 각 단계가 자기 extent로 자른다. 기하 단계가 extent를 바꾸므로 원본 extent로 다시 자르지 않는다.
+        return result
     }
 }

@@ -67,12 +67,14 @@ public actor PhotoPipeline {
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.
-    public func preview(_ id: PhotoID, recipe: EditRecipe) throws -> CGImage {
+    /// `showsUncropped`이면 자르기만 건너뛴다. 자르기 도구 화면이 전체 이미지 위에 자르기 틀을 그린다.
+    public func preview(_ id: PhotoID, recipe: EditRecipe, showsUncropped: Bool = false) throws -> CGImage {
         guard let entry = entries[id], let image = cache.image(for: id) else {
             throw MellowError.cannotCreatePreview
         }
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog)
+            extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog,
+            skipsCrop: showsUncropped)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
     }
 

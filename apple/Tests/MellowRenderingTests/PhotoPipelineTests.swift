@@ -59,6 +59,19 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(Array(cached.dataProvider!.data! as Data), Array(fresh.dataProvider!.data! as Data))
     }
 
+    func testPreviewShowsUncroppedWhenRequested() async throws {
+        let url = try writeSolidPNG()
+        let id = PhotoID()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        _ = try await pipeline.prepare(id, at: url)
+        var recipe = EditRecipe()
+        recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5)
+        let cropped = try await pipeline.preview(id, recipe: recipe)
+        let uncropped = try await pipeline.preview(id, recipe: recipe, showsUncropped: true)
+        XCTAssertEqual(cropped.width, 128)
+        XCTAssertEqual(uncropped.width, 256)
+    }
+
     func testPreviewOfUnpreparedPhotoThrows() async throws {
         let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
         do {

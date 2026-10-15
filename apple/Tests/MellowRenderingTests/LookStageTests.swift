@@ -56,6 +56,7 @@ final class LookStageTests: XCTestCase {
         let half = try red(0.5)
         let full = try red(1)
         XCTAssertNotEqual(zero, full)
+        XCTAssertNotEqual(half, zero)
         XCTAssertTrue((min(zero, full)...max(zero, full)).contains(half))
     }
 }
