@@ -130,6 +130,8 @@ enum UserMessage {
         case .faceAnalysisUnavailable(let reason):
             let detail = reason == PhotoPipeline.unpreparedReason ? photoNotPrepared : reason
             return "얼굴 분석을 사용할 수 없습니다. 색감·수동 보정은 사용할 수 있어요. (\(detail))"
+        case .personAnalysisUnavailable(let reason):
+            return "인물 영역을 분석할 수 없어 배경 흐림을 쓸 수 없습니다. 다른 보정은 사용할 수 있어요. (\(reason))"
         case .sessionUnreadable: return sessionUnreadable
         case .sessionWriteFailed(let reason): return "편집 기록 저장 실패: \(reason)"
         case .photoLibraryAccessDenied:

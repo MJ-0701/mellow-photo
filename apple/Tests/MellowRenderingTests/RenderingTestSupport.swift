@@ -111,6 +111,12 @@ enum RenderingTestSupport {
         return gradient.transformed(by: transform).cropped(to: extent)
     }
 
+    /// 검은 바탕에 흰 사각형 사람이 있는 인물 마스크. size는 마스크 크기, person은 마스크 안 사람 사각형(픽셀).
+    static func personMask(size: CGSize, person: CGRect) -> CIImage {
+        let extent = CGRect(origin: .zero, size: size)
+        return CIImage(color: .white).cropped(to: person).composited(over: CIImage(color: .black)).cropped(to: extent)
+    }
+
     /// 변형 테스트의 점 표식 반지름(픽셀).
     static let markerRadius: CGFloat = 3
     /// 이 빨강 값보다 어두운 픽셀을 표식으로 본다. 바탕(0.9 회색)은 sRGB 바이트로 약 230이다.

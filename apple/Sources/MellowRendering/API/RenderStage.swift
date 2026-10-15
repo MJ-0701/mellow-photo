@@ -51,6 +51,8 @@ public struct RenderContext: Sendable {
     public var faces: [FaceGeometry] { analysis.faces }
     /// 사진 준비 때 찾은 자동 잡티. 영속화하지 않는다.
     public var blemishes: [BlemishSpot] { analysis.blemishes }
+    /// 사진 준비 때 만든 인물 마스크. 사람이 없거나 분석이 실패했으면 nil이고 배경 단계가 건너뛴다.
+    public var personMask: CIImage? { analysis.personMask }
     /// 같은 사진의 다각형 마스크 비트맵 캐시.
     var regionMasks: RegionMaskCache { analysis.regionMasks }
 

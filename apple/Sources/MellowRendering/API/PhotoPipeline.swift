@@ -8,12 +8,21 @@ public struct PreparedPhoto: Sendable {
     public let faces: [FaceGeometry]
     /// 분석이 실패했으면 그 이유. 얼굴이 없는 것과 구분한다.
     public let faceAnalysisFailure: MellowError?
+    /// 인물 마스크가 있으면 true. 배경 도구의 "사람 없음" 안내에 쓴다.
+    public let hasPerson: Bool
+    /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
+    public let personAnalysisFailure: MellowError?
 
-    public init(pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?) {
+    public init(
+        pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
+        hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil
+    ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
         self.faces = faces
         self.faceAnalysisFailure = faceAnalysisFailure
+        self.hasPerson = hasPerson
+        self.personAnalysisFailure = personAnalysisFailure
     }
 }
 
@@ -33,14 +42,20 @@ public actor PhotoPipeline {
     private let renderer = Renderer()
     private let pipeline = RenderPipeline.standard
     private let analyzer: any FaceAnalyzer
+    private let personAnalyzer: (any PersonAnalyzer)?
     private let tuning: RenderTuning
     private let lookCatalog: LookCatalog
     /// 미리보기 이미지가 LRU로 밀려나도 일부러 남긴다. renderOriginal이 얼굴 좌표를 써야 한다.
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
-    public init(analyzer: any FaceAnalyzer, tuning: RenderTuning, lookCatalog: LookCatalog = .empty) {
+    /// personAnalyzer가 nil이면 인물 분석을 하지 않는다(사람 없음과 같다). 앱은 VisionPersonAnalyzer를 넘긴다.
+    public init(
+        analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil, tuning: RenderTuning,
+        lookCatalog: LookCatalog = .empty
+    ) {
         self.analyzer = analyzer
+        self.personAnalyzer = personAnalyzer
         self.tuning = tuning
         self.lookCatalog = lookCatalog
         cache = PreviewCache(capacity: tuning.previewCacheCapacity)
@@ -71,14 +86,17 @@ public actor PhotoPipeline {
         } catch {
             failure = .faceAnalysisUnavailable(reason: error.localizedDescription)
         }
+        let person = analyzePerson(in: preview)
         let analysis = PhotoAnalysis(
-            faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces))
+            faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces),
+            personMask: person.mask, personAnalysisFailure: person.failure)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
         entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
         releaseMasksOfEvictedPreviews()
         return PreparedPhoto(
-            pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure)
+            pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
+            hasPerson: person.mask != nil, personAnalysisFailure: person.failure)
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.
@@ -128,7 +146,8 @@ public actor PhotoPipeline {
             throw failure
         }
         let rendered = try render(url: url, recipe: recipe, analysis: entry.analysis, maxDimension: maxDimension)
-        // 원본 해상도 마스크는 다시 쓸 일이 드물다. 이미 만든 렌더 그래프는 비트맵을 붙잡고 있어 비워도 안전하다.
+        // 미리보기가 밀려난 사진의 마스크만 놓는다. 캐시에 남은 이 사진은 원본 해상도 마스크를 RegionMaskCache 상한까지 계속 들고 있다.
+        // 이미 만든 렌더 그래프는 비트맵을 붙잡고 있어 놓아도 안전하다.
         releaseMasksOfEvictedPreviews()
         return rendered
     }
@@ -141,9 +160,22 @@ public actor PhotoPipeline {
     }
 
     /// 잡티 분석이 실패해도 사진 준비는 막지 않는다. 자동 잡티만 동작하지 않는다.
+    /// 자동 잡티가 꺼져 있어도 준비 때 찾는다(사진당 약 0.06초). 분석은 준비 때 한 번이고(스펙 1.4) 스위치를 켤 때 지연이 없다.
     private func detectBlemishes(in image: CIImage, faces: [FaceGeometry]) -> [BlemishSpot] {
         guard !faces.isEmpty else { return [] }
         return (try? BlemishDetector(tuning: tuning, renderer: renderer).detect(image: image, faces: faces)) ?? []
+    }
+
+    /// 인물 분석이 실패해도 사진 준비는 막지 않는다. 배경 흐림 단계만 건너뛴다(스펙 1.4).
+    private func analyzePerson(in image: CIImage) -> (mask: CIImage?, failure: MellowError?) {
+        guard let personAnalyzer else { return (nil, nil) }
+        do {
+            return (try personAnalyzer.personMask(image), nil)
+        } catch let error as MellowError {
+            return (nil, error)
+        } catch {
+            return (nil, .personAnalysisUnavailable(reason: error.localizedDescription))
+        }
     }
 
     /// 미리보기 캐시에 없는 사진의 마스크 비트맵을 놓는다. 메모리를 최근 사진 몇 장 몫으로 묶는다.

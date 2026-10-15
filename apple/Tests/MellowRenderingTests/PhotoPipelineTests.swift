@@ -9,6 +9,11 @@ struct StubFaceAnalyzer: FaceAnalyzer {
     func analyze(_ image: CIImage) throws -> [FaceGeometry] { try result.get() }
 }
 
+struct StubPersonAnalyzer: PersonAnalyzer {
+    var result: Result<CIImage?, MellowError>
+    func personMask(_ image: CIImage) throws -> CIImage? { try result.get() }
+}
+
 final class PhotoPipelineTests: XCTestCase {
     typealias Support = RenderingTestSupport
 
@@ -258,5 +263,45 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(analysis.regionMasks.count, 1)
         _ = try await pipeline.prepare(PhotoID(), at: try writeSolidPNG())
         XCTAssertEqual(analysis.regionMasks.count, 0, "미리보기가 캐시에서 밀려나면 마스크 비트맵도 놓는다")
+    }
+
+    func testPrepareStoresPersonMaskAndReportsPresence() async throws {
+        let url = try writeSolidPNG()
+        let mask = Support.personMask(
+            size: CGSize(width: 64, height: 48), person: CGRect(x: 16, y: 8, width: 32, height: 32))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(mask)), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertTrue(prepared.hasPerson)
+        XCTAssertNil(prepared.personAnalysisFailure)
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertEqual(analysis?.personMask?.extent, mask.extent, "마스크는 받은 크기 그대로 보관한다")
+    }
+
+    func testPersonAnalysisFailureIsReportedNotThrown() async throws {
+        let url = try writeSolidPNG()
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .failure(.personAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        let prepared = try await pipeline.prepare(PhotoID(), at: url)
+        XCTAssertFalse(prepared.hasPerson)
+        XCTAssertEqual(prepared.personAnalysisFailure, .personAnalysisUnavailable(reason: "test"))
+        XCTAssertEqual(prepared.faces, [face], "인물 분석 실패가 얼굴 분석에 영향을 주지 않는다")
+        XCTAssertNil(prepared.faceAnalysisFailure)
+    }
+
+    func testWithoutPersonAnalyzerThereIsNoPerson() async throws {
+        let url = try writeSolidPNG()
+        let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertFalse(prepared.hasPerson)
+        XCTAssertNil(prepared.personAnalysisFailure)
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertNil(analysis?.personMask)
     }
 }
