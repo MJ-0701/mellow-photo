@@ -14,6 +14,11 @@ public enum EditingPolicy {
         AdjustmentRange.faceShape(key)
     }
 
+    /// 다리 길게만 한 방향이다.
+    public static func bodyShapeRange(_ key: BodyShapeKey) -> ClosedRange<Double> {
+        AdjustmentRange.bodyShape(key)
+    }
+
     /// NaN은 범위의 아래 끝이 된다.
     public static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
         AdjustmentRange.clamped(value, to: range)

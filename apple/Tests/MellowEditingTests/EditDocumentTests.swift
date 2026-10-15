@@ -136,6 +136,31 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.portrait.features.teethWhiten, 1)
     }
 
+    func testBodyShapeChangesClampAndAreOneUndoStepEach() {
+        var document = EditDocument()
+        XCTAssertNil(document.set(.bodyShape(.waist, -1.7)))
+        XCTAssertNil(document.set(.bodyShape(.legLength, -0.4)), "다리 길게는 0 아래로 가지 않는다")
+        XCTAssertNil(document.set(.bodyShape(.legLength, 2)))
+        XCTAssertNil(document.set(.bodyShape(.neck, 0.3)))
+        XCTAssertEqual(document.recipe.body, BodyShapeAdjustments(legLength: 1, waist: -1, neck: 0.3))
+        XCTAssertEqual(EditingPolicy.bodyShapeRange(.legLength), EditingPolicy.unitRange)
+        XCTAssertEqual(EditingPolicy.bodyShapeRange(.arms), EditingPolicy.bipolarRange)
+        document.undo()
+        XCTAssertEqual(document.recipe.body.neck, 0, "변경마다 실행 취소 한 단계")
+        XCTAssertEqual(document.recipe.body.legLength, 1)
+    }
+
+    func testBodyShapeIsLockedByLocalEditsLikeFaceShape() {
+        var document = EditDocument()
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        XCTAssertTrue(EditChange.bodyShape(.waist, -0.5).affectsGeometry)
+        for key in BodyShapeKey.allCases {
+            XCTAssertEqual(document.set(.bodyShape(key, 0.5)), .geometryLocked, "\(key)는 잠긴다")
+        }
+        XCTAssertEqual(document.recipe.body, BodyShapeAdjustments())
+        XCTAssertEqual(document.undoStack.count, 1, "거절된 변경은 실행 취소 단계를 만들지 않는다")
+    }
+
     func testPresetAndBatchCarryFeaturesAndBackground() {
         let values = PresetValues(
             portrait: PortraitAdjustments(features: FeatureAdjustments(eyeBrighten: 0.3, lipVitality: 0.2)),
@@ -251,6 +276,26 @@ final class EditDocumentTests: XCTestCase {
         document.undo()
         XCTAssertEqual(
             document.recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0, teethWhiten: 0.6, lipVitality: 0.4))
+    }
+
+    func testApplyAutoKeepsBodyShapeAndBackgroundBlur() {
+        var document = EditDocument()
+        document.set(.bodyShape(.legLength, 0.4))
+        document.set(.bodyShape(.waist, -0.3))
+        document.set(.backgroundBlur(0.5))
+        let body = document.recipe.body
+        let before = document.undoStack.count
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.2), detail: DetailAdjustments(),
+            portrait: PortraitAdjustments(skin: SkinAdjustments(smoothing: 0.3)))
+        XCTAssertTrue(document.applyAuto(suggestion))
+        XCTAssertEqual(document.recipe.body, body, "자동 보정은 체형을 건드리지 않는다")
+        XCTAssertEqual(document.recipe.background.blur, 0.5, "자동 보정은 배경을 건드리지 않는다")
+        XCTAssertEqual(document.undoStack.count, before + 1, "자동 보정은 실행 취소 한 단계")
+        document.undo()
+        XCTAssertEqual(document.recipe.color.exposure, 0)
+        XCTAssertEqual(document.recipe.body, body)
+        XCTAssertEqual(document.recipe.background.blur, 0.5)
     }
 
     func testResetIsUndoable() {

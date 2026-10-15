@@ -14,6 +14,11 @@ public enum AdjustmentRange {
         key == .smile ? unit : bipolar
     }
 
+    /// 다리 길게만 한 방향이다.
+    public static func bodyShape(_ key: BodyShapeKey) -> ClosedRange<Double> {
+        key == .legLength ? unit : bipolar
+    }
+
     /// NaN은 범위의 아래 끝이 된다.
     public static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
         min(range.upperBound, max(range.lowerBound, value))

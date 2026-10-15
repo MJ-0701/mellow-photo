@@ -25,7 +25,7 @@ public struct EditDocument: Equatable, Sendable {
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
     public var hasEdits: Bool { !recipe.isDefault }
-    /// 수동 편집 좌표가 어긋나지 않도록 얼굴 형태와 대상 얼굴을 고정한다.
+    /// 수동 편집 좌표가 어긋나지 않도록 얼굴형·체형과 대상 얼굴을 고정한다.
     public var isGeometryLocked: Bool { recipe.hasLocalEdits }
 
     public mutating func beginContinuousChange() {
@@ -58,6 +58,8 @@ public struct EditDocument: Equatable, Sendable {
             updated.portrait.features[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .backgroundBlur(let value):
             updated.background.blur = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .bodyShape(let key, let value):
+            updated.body[key] = EditingPolicy.clamped(value, to: EditingPolicy.bodyShapeRange(key))
         case .highlights(let value): updated.detail.highlights = value
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value
