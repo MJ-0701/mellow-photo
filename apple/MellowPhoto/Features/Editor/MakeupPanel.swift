@@ -4,6 +4,7 @@ import SwiftUI
 
 /// 메이크업 도구. 룩 칩(없음 + 5개)이 위, 부위 탭이 아래, 부위마다 색 칩과 강도 슬라이더(스펙 7).
 /// 색만 바꾸므로 수동 편집이 있어도 끄지 않는다. 얼굴이 없거나 특징점이 없으면 안내를 보인다.
+/// 얼굴 분석이 실패하면 없음 칩만 남기고 끈다(canAdjustMakeup).
 struct MakeupPanel: View {
     @Environment(AppModel.self) private var model
 
@@ -31,6 +32,7 @@ struct MakeupPanel: View {
                 lookChip(id: nil, name: UserMessage.makeupNoLook, selected: makeup == MakeupAdjustments())
                 ForEach(catalog.looks) { look in
                     lookChip(id: look.id, name: look.name, selected: makeup.lookID == look.id)
+                        .disabled(!model.canAdjustMakeup)
                 }
             }
             .padding(.vertical, 4)
@@ -50,10 +52,12 @@ struct MakeupPanel: View {
                 .padding(.vertical, 4)
             }
             .scrollIndicators(.hidden)
+            .disabled(!model.canAdjustMakeup)
         }
         AdjustmentSlider(
             title: UserMessage.makeupIntensity, value: makeup.intensity(of: part), range: EditingPolicy.unitRange
         ) { .makeupIntensity(part, $0) }
+        .disabled(!model.canAdjustMakeup)
         Text(UserMessage.makeupHint).font(.caption).foregroundStyle(.secondary)
     }
 

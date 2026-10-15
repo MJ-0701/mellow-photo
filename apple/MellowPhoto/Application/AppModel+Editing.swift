@@ -38,7 +38,7 @@ extension AppModel {
 
     /// 드래그 도중 들어온 한 번짜리 편집은 진행 중인 연속 변경을 먼저 끝내 자기 체크포인트를 갖게 한다.
     /// 드래그 중이 아니면 아무것도 하지 않는다(세션을 한 번 더 쓰지 않는다).
-    private func endSliderEditIfActive() {
+    func endSliderEditIfActive() {
         guard session.isPersistenceDeferred else { return }
         endSliderEdit()
     }

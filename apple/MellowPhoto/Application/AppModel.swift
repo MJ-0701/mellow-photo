@@ -186,6 +186,12 @@ final class AppModel {
     func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
         !isGeometryLocked && (isSliderEditActive || bodyAvailability == .ready || currentRecipe.body[key] != 0)
     }
+    /// 메이크업 룩·색·강도를 바꿀 수 있는지. 얼굴 분석이 실패한 사진에 메이크업을 넣으면 저장이 실패하므로 끈다.
+    /// 이미 들어온 메이크업은 줄이거나 지울 수 있게 켜고, 드래그 중에는 0에 닿아도 끄지 않는다. 얼굴이 없을 뿐이면 저장은 되므로 켠다.
+    var canAdjustMakeup: Bool {
+        guard case .unavailable = faceAvailability else { return true }
+        return isSliderEditActive || currentRecipe.makeup.hasEffect
+    }
     /// 자르기 도구에서는 자르기 전 이미지를 보여준다.
     var canvasShowsUncropped: Bool { tool == .crop }
 
@@ -206,8 +212,9 @@ final class AppModel {
         return transform.toOutput(source)
     }
 
-    /// 도구를 바꾼다. 자르기 화면을 드나들면 미리보기를 다시 그리고, 필터 도구는 썸네일을 준비한다.
+    /// 도구를 바꾼다. 열린 드래그는 먼저 끝낸다. 자르기 화면을 드나들면 미리보기를 다시 그리고, 필터 도구는 썸네일을 준비한다.
     func selectTool(_ newTool: EditorTool) {
+        endSliderEditIfActive()
         let showedUncropped = canvasShowsUncropped
         tool = newTool
         if canvasShowsUncropped != showedUncropped {
