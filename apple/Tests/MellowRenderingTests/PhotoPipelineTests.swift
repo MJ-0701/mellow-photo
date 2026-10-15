@@ -470,4 +470,40 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(soft.rgba(CGPoint(x: 64, y: 48)), sharp.rgba(CGPoint(x: 64, y: 48)), "작은 출력에서도 사람 가운데는 그대로")
         XCTAssertNotEqual(soft.rgba(CGPoint(x: 10, y: 10)), sharp.rgba(CGPoint(x: 10, y: 10)), "배경은 흐려진다")
     }
+
+    func testBodyAnalysisFailureSkipsOnlyBodyWarp() async throws {
+        let url = try writeStripesPNG()
+        var colorOnly = EditRecipe()
+        colorOnly.color.exposure = 0.2
+        var shaped = colorOnly
+        shaped.body = BodyShapeAdjustments(legLength: 1, waist: -1)
+
+        let working = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([Support.standingBody(in: Support.standingBox)])),
+            tuning: RenderTuning())
+        let workingID = PhotoID()
+        _ = try await working.prepare(workingID, at: url)
+        let reshaped = try await working.preview(workingID, recipe: shaped)
+        let plain = try await working.preview(workingID, recipe: colorOnly)
+        XCTAssertNotEqual(
+            Array(reshaped.dataProvider!.data! as Data), Array(plain.dataProvider!.data! as Data), "관절이 있으면 허리가 바뀐다")
+
+        let failing = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .failure(.bodyAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await failing.prepare(id, at: url)
+        let previewShaped = try await failing.preview(id, recipe: shaped)
+        let previewColor = try await failing.preview(id, recipe: colorOnly)
+        XCTAssertEqual(
+            Array(previewShaped.dataProvider!.data! as Data), Array(previewColor.dataProvider!.data! as Data),
+            "미리보기는 체형만 빼고 그린다")
+        let original = try await failing.renderOriginal(id, at: url, recipe: shaped, maxDimension: nil)
+        let originalColor = try await failing.renderOriginal(id, at: url, recipe: colorOnly, maxDimension: nil)
+        XCTAssertEqual(try Support.bytes(original), try Support.bytes(originalColor), "저장도 오류 없이 체형만 건너뛴다")
+        let unprepared = try await failing.renderOriginal(PhotoID(), at: url, recipe: shaped, maxDimension: nil)
+        XCTAssertEqual(unprepared.extent.size, CGSize(width: 256, height: 192), "준비 전 사진도 체형 때문에 저장을 막지 않는다")
+    }
 }
