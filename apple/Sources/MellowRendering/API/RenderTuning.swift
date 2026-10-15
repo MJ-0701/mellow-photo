@@ -131,6 +131,12 @@ public struct RenderTuning: Sendable {
     public var backgroundMaskFeather: Double = 0.006
     /// 립 1에서 소프트 라이트 결과를 섞는 비율. 소프트 라이트는 입술 명암을 남겨 1에 가까워도 질감이 유지된다.
     public var makeupLipMaxOpacity: Double = 0.85
+    /// 블러셔 1에서 소프트 라이트 결과를 섞는 비율.
+    public var makeupBlushMaxOpacity: Double = 0.6
+    /// 아이섀도 1에서 곱하기 결과를 섞는 비율. 곱하기는 진하게 어두워져 립보다 낮게 둔다.
+    public var makeupEyeshadowMaxOpacity: Double = 0.45
+    /// 아이섀도 띠를 흐리는 반지름. 얼굴 폭 비율. 300px 얼굴에서 2.4px라 눈 안쪽까지 번지지 않는다.
+    public var makeupEyeshadowFeather: Double = 0.008
     /// 관절 신뢰도가 이보다 낮으면 없는 것으로 본다(스펙 5).
     public var bodyJointMinConfidence: Double = 0.3
     /// 체형 push 항목 하나의 이동 상한. 어깨 폭 비율(스펙 0.06, "몸 폭의 6% 이내"). 항목별 최대가 이보다 크면 이 값으로 자른다.

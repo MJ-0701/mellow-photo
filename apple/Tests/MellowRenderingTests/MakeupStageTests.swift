@@ -76,4 +76,32 @@ final class MakeupStageTests: XCTestCase {
         XCTAssertEqual(try rendered(3), try rendered(1))
         XCTAssertEqual(try rendered(-0.5), try Support.bytes(synthetic.image), "음수는 0")
     }
+
+    func testBlushTintsCheeksOnly() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(
+            output(synthetic, MakeupAdjustments(blush: MakeupTint(colorID: "blush-pink", intensity: 1))))
+        XCTAssertNotEqual(after.rgba(SyntheticFace.cheek), before.rgba(SyntheticFace.cheek), "볼 색이 바뀐다")
+        let outside = [
+            SyntheticFace.outside, SyntheticFace.mouth, SyntheticFace.lipPoint, SyntheticFace.scleraPoint,
+            SyntheticFace.forehead,
+        ]
+        for point in outside {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "블러셔 밖 \(point)")
+        }
+    }
+
+    func testEyeshadowDarkensTheLidOnly() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(
+            output(synthetic, MakeupAdjustments(eyeshadow: MakeupTint(colorID: "shadow-smoky", intensity: 1))))
+        XCTAssertLessThanOrEqual(
+            brightness(after.rgba(SyntheticFace.lidSkin)), brightness(before.rgba(SyntheticFace.lidSkin)) - 15,
+            "눈꺼풀이 어두워진다")
+        for point in [SyntheticFace.scleraPoint, SyntheticFace.leftEye, SyntheticFace.cheek, SyntheticFace.lipPoint] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "아이섀도 밖 \(point)")
+        }
+    }
 }

@@ -17,6 +17,8 @@ struct MakeupStage: RenderStage {
         guard makeup.hasEffect, !context.targetFaces.isEmpty else { return image }
         var result = image
         for face in context.targetFaces {
+            result = paintBlush(result, face: face, tint: makeup.blush, context: context)
+            result = shadeEyelids(result, face: face, tint: makeup.eyeshadow, context: context)
             result = paintLips(result, face: face, tint: makeup.lip, context: context)
         }
         return result.cropped(to: context.extent)
@@ -63,6 +65,30 @@ struct MakeupStage: RenderStage {
                 "inputBVector": CIVector(x: 0, y: 0, z: amount, w: 0),
             ])
         return MaskBuilder.blend(foreground.cropped(to: mask.bounds), over: image, mask: scaled).cropped(to: extent)
+    }
+
+    /// 볼에 고른 색을 소프트 라이트로 얹는다.
+    private func paintBlush(_ image: CIImage, face: FaceGeometry, tint: MakeupTint, context: RenderContext) -> CIImage {
+        guard let color = Self.colorImage(tint, part: .blush, context: context),
+            let cheeks = FaceRegions.blushMask(
+                face: face, extent: context.extent, tuning: context.tuning, cache: context.regionMasks)
+        else { return image }
+        let lit = Self.blended(image, with: color, mode: Self.softLight, in: cheeks.bounds)
+        let amount = tint.intensity * context.tuning.makeupBlushMaxOpacity
+        return Self.mixed(lit, over: image, mask: cheeks, amount: amount, extent: context.extent)
+    }
+
+    /// 눈꺼풀에 고른 색을 곱한다.
+    private func shadeEyelids(_ image: CIImage, face: FaceGeometry, tint: MakeupTint, context: RenderContext)
+        -> CIImage
+    {
+        guard let color = Self.colorImage(tint, part: .eyeshadow, context: context),
+            let lids = FaceRegions.eyeshadowMask(
+                face: face, extent: context.extent, tuning: context.tuning, cache: context.regionMasks)
+        else { return image }
+        let shaded = Self.blended(image, with: color, mode: Self.multiply, in: lids.bounds)
+        let amount = tint.intensity * context.tuning.makeupEyeshadowMaxOpacity
+        return Self.mixed(shaded, over: image, mask: lids, amount: amount, extent: context.extent)
     }
 
     /// 입술(바깥 − 안쪽)에 고른 색을 소프트 라이트로 얹는다. 소프트 라이트는 입술 명암(질감)을 남긴다.

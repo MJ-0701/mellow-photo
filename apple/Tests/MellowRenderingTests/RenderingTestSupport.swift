@@ -492,6 +492,17 @@ extension SyntheticFace {
     }
 }
 
+/// 메이크업 영역 표본 점. 얼굴 좌표(원점 (256, 200), 얼굴 폭 280, 눈 높이 100, 입 높이 −60)에서 계산한 위치다.
+extension SyntheticFace {
+    /// 블러셔 중심. u = 눈동자 u ±56 × 1.15, v = −60 + 160 × 0.45 = 12.
+    static let leftBlush = CGPoint(x: 191.6, y: 212)
+    static let rightBlush = CGPoint(x: 320.4, y: 212)
+    /// 얼굴을 중심 둘레로 30° 돌렸을 때의 블러셔 중심과 lidSkin 자리.
+    static let rolledLeftBlush = CGPoint(x: 194.2, y: 178.2)
+    static let rolledRightBlush = CGPoint(x: 305.8, y: 242.6)
+    static let rolledLidSkin = CGPoint(x: 145.5, y: 279.4)
+}
+
 extension FaceGeometry {
     /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
     func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {

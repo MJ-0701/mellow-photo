@@ -21,7 +21,7 @@ enum FaceRegions {
     /// 타원 다각형의 점 수.
     private static let ellipseSegments = 24
     /// 마스크 계산 영역의 여백. 흐림 반지름의 배수.
-    private static let boundsPaddingInFeathers: CGFloat = 4
+    static let boundsPaddingInFeathers: CGFloat = 4
     /// 래스터 영역 여백(픽셀). 안티에일리어싱 가장자리를 담는다.
     private static let rasterPadding: CGFloat = 1
     /// 볼 표본 정사각형의 한 변. 눈 폭 대비.
@@ -29,7 +29,7 @@ enum FaceRegions {
     /// 다각형 하나가 되려면 필요한 점 수.
     private static let minimumPolygonPoints = 3
     /// 눈·입 마스크의 cut 선 굵기. 0은 CGContext의 가장 가는 선이라 cut 경계를 넓히지 않는다.
-    private static let featureCutWidth: CGFloat = 0
+    static let featureCutWidth: CGFloat = 0
 
     /// 특징점이 없을 때 쓰는 부위 위치. 얼굴 상자 안의 비율이다.
     private enum FallbackFeature {
@@ -65,11 +65,7 @@ enum FaceRegions {
         let black = CIImage(color: .black).cropped(to: extent)
         let bounds = maskBounds(face: face, extent: extent, tuning: tuning)
         guard !bounds.isEmpty else { return black }
-        let cutWidth = faceWidth(face, extent: extent) * CGFloat(tuning.skinFeatureFeather) * 2
-        var mask = polygonMask(
-            fill: [skinPolygon(face: face, extent: extent, tuning: tuning)],
-            cut: protectedPolygons(face: face, extent: extent), cutWidth: cutWidth, extent: extent, tuning: tuning,
-            cache: cache)
+        var mask = skinPolygonRaster(face: face, extent: extent, tuning: tuning, cache: cache)
         let cheeks = cheekRects(face: face, extent: extent)
         if let left = cheeks.first, let right = cheeks.last {
             let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
@@ -90,6 +86,17 @@ enum FaceRegions {
                 ])
         }
         return feathered.cropped(to: bounds).composited(over: black)
+    }
+
+    /// 피부 다각형(윤곽 + 이마 호)에서 넓힌 눈·눈썹·입술을 뺀 비트맵(흐리기 전). skinMask와 메이크업 마스크가 같은 캐시 항목을 쓴다.
+    static func skinPolygonRaster(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache?)
+        -> CIImage
+    {
+        let cutWidth = faceWidth(face, extent: extent) * CGFloat(tuning.skinFeatureFeather) * 2
+        return polygonMask(
+            fill: [skinPolygon(face: face, extent: extent, tuning: tuning)],
+            cut: protectedPolygons(face: face, extent: extent), cutWidth: cutWidth, extent: extent, tuning: tuning,
+            cache: cache)
     }
 
     /// 마스크가 0이 아닐 수 있는 영역. 이 밖은 계산하지 않아도 된다.
@@ -351,14 +358,17 @@ enum FaceRegions {
         return { point in paths.contains { $0.contains(point) } }
     }
 
-    /// 다각형 마스크를 얼굴 폭 × featureMaskFeather로 흐리고 경계 상자 + 흐림 4배 여백 밖을 0으로 자른다.
+    /// 다각형 마스크를 feather(기본은 얼굴 폭 × featureMaskFeather)로 흐리고 경계 상자 + 흐림 4배 여백 밖을 0으로 자른다.
     /// cut은 넓히지 않는다(featureCutWidth).
-    private static func featheredPolygonMask(
+    static func featheredPolygonMask(
         fill: [[CGPoint]], cut: [[CGPoint]], face: FaceGeometry, extent: CGRect, tuning: RenderTuning,
-        cache: RegionMaskCache?
+        cache: RegionMaskCache?, feather: CGFloat? = nil
     ) -> RegionMask? {
-        let feather = max(
-            CGFloat(tuning.skinBlurMinimumRadius), faceWidth(face, extent: extent) * CGFloat(tuning.featureMaskFeather))
+        let feather =
+            feather
+            ?? max(
+                CGFloat(tuning.skinBlurMinimumRadius),
+                faceWidth(face, extent: extent) * CGFloat(tuning.featureMaskFeather))
         let padding = feather * boundsPaddingInFeathers
         let bounds = boundingRect(fill.flatMap { $0 }).insetBy(dx: -padding, dy: -padding).intersection(extent).integral
         guard !bounds.isEmpty else { return nil }
@@ -371,7 +381,7 @@ enum FaceRegions {
         return RegionMask(image: image, bounds: bounds)
     }
 
-    private static func featherRadius(_ face: FaceGeometry, _ extent: CGRect, _ tuning: RenderTuning) -> CGFloat {
+    static func featherRadius(_ face: FaceGeometry, _ extent: CGRect, _ tuning: RenderTuning) -> CGFloat {
         max(CGFloat(tuning.skinBlurMinimumRadius), faceWidth(face, extent: extent) * CGFloat(tuning.skinMaskFeather))
     }
 
@@ -419,7 +429,7 @@ enum FaceRegions {
         }
     }
 
-    private static func boundingRect(_ points: [CGPoint]) -> CGRect {
+    static func boundingRect(_ points: [CGPoint]) -> CGRect {
         guard let first = points.first else { return .null }
         var rect = CGRect(origin: first, size: .zero)
         for point in points.dropFirst() {
