@@ -294,6 +294,11 @@ struct SyntheticFace {
 
     static var extent: CGRect { CGRect(x: 0, y: 0, width: size, height: size) }
 
+    /// 얼굴 상자 중심(256, 200)의 정규화 좌표. 회전 테스트의 회전 중심.
+    static var pivot: NormalizedPoint {
+        NormalizedPoint(x: Double(box.midX) / Double(size), y: Double(box.midY) / Double(size))
+    }
+
     static func make(withBlemishes: Bool = false, landmarks: Bool = true) -> SyntheticFace {
         let backgroundColor = CIColor(red: 0.2, green: 0.35, blue: 0.75)
         var image = CIImage(color: backgroundColor).cropped(to: extent)
@@ -372,5 +377,31 @@ struct SyntheticFace {
                 .outerLips: ellipse(mouth, mouthRadii), .innerLips: ellipse(mouth, innerMouthRadii),
                 .nose: nose.map(normalized), .leftPupil: [normalized(leftEye)], .rightPupil: [normalized(rightEye)],
             ])
+    }
+}
+
+extension FaceGeometry {
+    /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
+    func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {
+        let cosine = cos(angle)
+        let sine = sin(angle)
+        var turned: [FaceLandmark: [NormalizedPoint]] = [:]
+        for (landmark, points) in landmarks {
+            turned[landmark] = points.map { point in
+                let dx = point.x - pivot.x
+                let dy = point.y - pivot.y
+                return NormalizedPoint(x: pivot.x + dx * cosine - dy * sine, y: pivot.y + dx * sine + dy * cosine)
+            }
+        }
+        return FaceGeometry(boundingBox: boundingBox, landmarks: turned, roll: angle, yaw: yaw)
+    }
+
+    /// 주어진 특징점을 뺀다.
+    func removing(_ removed: [FaceLandmark]) -> FaceGeometry {
+        var copy = self
+        for landmark in removed {
+            copy.landmarks[landmark] = nil
+        }
+        return copy
     }
 }

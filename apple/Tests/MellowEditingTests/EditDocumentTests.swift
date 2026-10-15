@@ -108,6 +108,17 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(EditingPolicy.faceShapeRange(.jaw), -1...1)
     }
 
+    func testEditingPolicyForwardsSharedRanges() {
+        XCTAssertEqual(EditingPolicy.unitRange, AdjustmentRange.unit)
+        XCTAssertEqual(EditingPolicy.bipolarRange, AdjustmentRange.bipolar)
+        for key in FaceShapeKey.allCases {
+            XCTAssertEqual(EditingPolicy.faceShapeRange(key), AdjustmentRange.faceShape(key), "\(key)")
+        }
+        XCTAssertEqual(AdjustmentRange.faceShape(.smile), 0...1)
+        XCTAssertEqual(AdjustmentRange.clamped(.nan, to: AdjustmentRange.bipolar), -1, "NaN은 아래 끝")
+        XCTAssertEqual(EditingPolicy.clamped(4, to: AdjustmentRange.unit), 1)
+    }
+
     func testPresetPreservesFaceShapeWhenLocked() {
         var document = EditDocument()
         document.set(.faceShape(.width, -0.2))
