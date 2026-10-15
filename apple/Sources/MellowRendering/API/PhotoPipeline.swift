@@ -25,6 +25,8 @@ public actor PhotoPipeline {
     private struct Entry {
         var faces: [FaceGeometry]
         var faceAnalysisFailure: MellowError?
+        /// 렌더해 둔 작은 비트맵에서 만든다. 미리보기 CIImage를 참조하지 않아 LRU로 밀려난 미리보기를 붙잡지 않는다.
+        var thumbnail: CIImage
     }
 
     private let loader = ImageLoader()
@@ -59,9 +61,9 @@ public actor PhotoPipeline {
         } catch {
             failure = .faceAnalysisUnavailable(reason: error.localizedDescription)
         }
-        entries[id] = Entry(faces: faces, faceAnalysisFailure: failure)
-        cache.insert(preview, for: id)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
+        entries[id] = Entry(faces: faces, faceAnalysisFailure: failure, thumbnail: CIImage(cgImage: thumbnail))
+        cache.insert(preview, for: id)
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure)
     }
@@ -76,6 +78,17 @@ public actor PhotoPipeline {
             extent: image.extent, recipe: recipe, faces: entry.faces, tuning: tuning, lookCatalog: lookCatalog,
             skipsCrop: showsUncropped)
         return try renderer.makeCGImage(pipeline.render(image, context: context))
+    }
+
+    /// 카탈로그의 모든 룩을 강도 1로 입힌 썸네일. 룩 단계만 적용한다(전체 파이프라인이 아님).
+    public func lookThumbnails(_ id: PhotoID) throws -> [String: CGImage] {
+        guard let entry = entries[id] else { throw MellowError.cannotCreatePreview }
+        var result: [String: CGImage] = [:]
+        for look in lookCatalog.all {
+            let styled = LookStage.styled(entry.thumbnail, look: look, tuning: tuning)
+            result[look.id] = try renderer.makeCGImage(styled.cropped(to: entry.thumbnail.extent))
+        }
+        return result
     }
 
     /// 원본 분석 기준의 제안. 현재 레시피와 무관하다.

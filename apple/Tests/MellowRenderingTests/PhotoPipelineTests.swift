@@ -162,4 +162,33 @@ final class PhotoPipelineTests: XCTestCase {
             XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
         }
     }
+
+    func testLookThumbnailsCoverCatalogAndDiffer() async throws {
+        let url = try writeSolidPNG(size: 512)
+        let id = PhotoID()
+        let catalog = try Support.sharedLookCatalog()
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning(), lookCatalog: catalog)
+        _ = try await pipeline.prepare(id, at: url)
+        let thumbnails = try await pipeline.lookThumbnails(id)
+        XCTAssertEqual(Set(thumbnails.keys), Set(LookCatalog.builtInIDs))
+        for (lookID, image) in thumbnails {
+            XCTAssertLessThanOrEqual(max(image.width, image.height), RenderTuning().thumbnailMaxDimension, lookID)
+        }
+        let mono = try XCTUnwrap(thumbnails["mono"])
+        let vivid = try XCTUnwrap(thumbnails["vivid"])
+        XCTAssertNotEqual(Array(mono.dataProvider!.data! as Data), Array(vivid.dataProvider!.data! as Data))
+    }
+
+    func testLookThumbnailsRequirePreparedPhoto() async throws {
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])), tuning: RenderTuning(),
+            lookCatalog: try Support.sharedLookCatalog())
+        do {
+            _ = try await pipeline.lookThumbnails(PhotoID())
+            XCTFail("준비 안 된 사진은 썸네일을 만들 수 없다")
+        } catch {
+            XCTAssertEqual(error as? MellowError, .cannotCreatePreview)
+        }
+    }
 }
