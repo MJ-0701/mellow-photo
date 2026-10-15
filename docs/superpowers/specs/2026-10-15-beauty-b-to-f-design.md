@@ -14,6 +14,11 @@
 | 얼굴 10개·체형 7개 슬라이더를 이동량 지도 하나로 합쳐 한 번만 다시 그림 | 여러 번 변형하면 화질이 떨어짐 | **큼** |
 | (C 구현 중 변경) 이동량 지도를 그라데이션 덧셈 대신 Core Image 커널 언어 색 커널로 그리고, 이동 원소가 닿는 영역의 합집합 안에서만 계산한 뒤 원본 위에 합성 | 그라데이션 덧셈은 음수 이동량을 보존하지 못함. 영역 제한으로 Mac 8000×6000·얼굴 1개 최대 메모리 875 → 832 MB. 커널 언어는 지원 중단 경고가 늘어남(기존 피부 커널과 같은 처지) | 작음 |
 | (D 구현 중 변경) 사진 준비 때의 분석(얼굴·잡티·인물 마스크)을 `RenderContext` 개별 필드 대신 `PhotoAnalysis` 묶음 하나로 넘기고, 다각형 마스크 비트맵은 묶음 안 사진별 캐시(`RegionMaskCache`)가 한 번만 그림 | B 최종 리뷰 이월 사항. 분석이 늘 때마다(E 관절점) 생성자 인자가 늘지 않고, 같은 사진의 눈·입·피부 마스크를 렌더마다 다시 그리지 않음. 옛 생성자를 남겨 기존 호출부·테스트는 그대로 | 작음 |
+| (E 구현 중 변경) 다리 길게 띠는 이동량 지도에 그리지 않고 다시 그리는 커널이 식으로 계산하고, 띠 양 끝(골반·발목)을 부드럽게 시작·끝냄. 다시 그리는 범위는 골반 행부터 사진 먼 가장자리까지 | 큰 사진에서 다리를 바꿀 때 사진 크기 이동량 지도가 생기지 않고 큰 이동도 반 픽셀 계단이 없음. 골반에서 늘림이 꺾이지 않는 대신 무릎 근처가 가장 많이 늘어남 | 작음 |
+| (E 구현 중 변경) 체형 이동 상한을 하나(몸 폭의 6%)가 아니라 항목마다 따로 둠(허리 6%·몸 전체 3.5%·팔 2%·허벅지 3.5%·어깨 4%·목 3%, 모두 6% 이하) | 팔·목처럼 가는 부위에 6%를 그대로 주면 과함. 수치는 한 곳에서 조정 | 작음 |
+| (E 구현 중 변경) 목 보정은 목 관절 바로 위 좁은 범위만 밀고 턱·입은 움직이지 않음 | 처음 범위는 턱 끝과 입술까지 닿아 목 대신 얼굴 아래쪽이 변형됨(리뷰 지적). 고개를 숙였거나 목이 짧은 사람은 턱 아래가 조금 움직일 수 있음 | 작음 |
+| (E 구현 중 변경) 두 어깨가 모두 보여야 체형으로 인정(아니면 "전신 없음" 안내). 다리 길게는 두 엉덩이와 발목 하나 이상이 보일 때만 동작하고 거꾸로·누운 사람은 건너뜀 | 어깨 폭이 모든 체형 이동의 기준 길이라 하나만 보이면 크기를 정할 수 없음. 상반신 사진에서 다리 길게 슬라이더는 켜져 있지만 효과가 없음 | 작음 |
+| (E 구현 중 변경) 화면 이름 "전체 날씬"을 "몸 전체"로 부름 | 가운데 0인 양방향 슬라이더라 "날씬"만 가리키는 이름이 맞지 않음 | 작음 |
 | 얼굴 보정은 찾은 얼굴 모두(기존 대상 얼굴 선택 유지), 체형은 가장 큰 사람 한 명 | 단체 사진에서 체형 변형이 서로 간섭함 | 작음 |
 | 얼굴형·체형 슬라이더는 가운데 0인 양방향(미소·다리 길게만 한 방향) | Evoto·메이투와 같은 조작감 | 작음 |
 | 수동 잡티·변형 편집이 있으면 얼굴형·체형 슬라이더도 잠김 | 수동 편집 좌표가 변형 뒤에서 어긋남(기존 얼굴 미세 조정과 같은 규칙) | 작음 |
@@ -28,7 +33,7 @@
 | B 피부 | 질감 유지 피부 보정(기존 "피부 정돈" 슬라이더를 대체), 자동 잡티 스위치 |
 | C 얼굴 | 얼굴 폭·턱선·광대·눈 크기·눈 간격·코 폭·입 크기·미소·이마·턱 길이 (기존 "얼굴 미세 조정"은 얼굴 폭으로 흡수) |
 | D 디테일 | 눈 또렷하게, 치아 미백, 입술 생기, 배경 흐림 |
-| E 체형 | 다리 길게, 허리, 전체 날씬, 팔, 허벅지, 어깨, 목 |
+| E 체형 | 다리 길게, 허리, 몸 전체(처음 이름 "전체 날씬"), 팔, 허벅지, 어깨, 목 |
 | F 메이크업 | 립(6색)·블러셔(4색)·아이섀도(4색)·눈썹 진하게·쉐딩/하이라이터, 메이크업 룩 5종(데일리·쿨톤·웜피치·로지·스모키) |
 
 ### 범위 밖
@@ -127,8 +132,8 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 
 #### 1.5 이동량 지도 (`DisplacementWarp`)
 
-- 이동 원소 `ShapePrimitive`: `.push(center, vector, radius)`(반지름 안에서 smoothstep 감쇠로 vector만큼 이동), `.scale(center, factor, radius)`(반경 방향 확대·축소), `.band(yStart, yEnd, stretch)`(가로 띠 세로 늘림, 다리 길게 전용).
-- 모든 원소를 더한 이동량 `D(p)`를 RG float 이미지로 만들고(원소 종류마다 CIKL `CIColorKernel(source:)` 하나(`pushField`·`scaleField`·`bandField`)가 앞 지도에 자기 이동량을 더함, 음수 보존, 작업 색공간 float), 일반 커널(`CIKernel(source:)`) 하나로 `out(p) = in(p − D(p))`를 샘플링. 원소별 이동 길이는 `radius × RenderTuning.shapeDisplacementLimit`로 제한. 지도와 샘플링은 `DisplacementWarp.influenceBounds`(limit 적용 원소의 영향 경계 합집합 ∩ extent, band는 extent 전체) 안에서만 하고 `CIBlendWithMask`로 원본 위에 합성. (C 구현 중 변경: 처음 문구는 `CIRadialGradient`·`CIConstantColor`·`CIAdditionCompositing` 덧셈과 전체 extent 지도였음.)
+- 이동 원소 `ShapePrimitive`: `.push(center, vector, radius)`(반지름 안에서 smoothstep 감쇠로 vector만큼 이동), `.scale(center, factor, radius)`(반경 방향 확대·축소), `.band(yStart, yEnd, stretch)`(가로 띠 세로 늘림, 다리 길게 전용). 띠 안 이동은 stretch × span × smoothstep(t).
+- 모든 원소를 더한 이동량 `D(p)`를 RG float 이미지로 만들고(push·scale마다 CIKL `CIColorKernel(source:)` 하나(`pushField`·`scaleField`)가 앞 지도에 자기 이동량을 더함, 음수 보존, 작업 색공간 float), 일반 커널(`CIKernel(source:)`) 하나로 `out(p) = in(p − D(p))`를 샘플링. 원소별 이동 길이는 `radius × RenderTuning.shapeDisplacementLimit`로 제한. 지도와 샘플링은 `DisplacementWarp.influenceBounds`(limit 적용 원소의 영향 경계 합집합 ∩ extent, band는 지도에 넣지 않고 샘플링 커널이 같은 식으로 더하며 띠는 하나만, 패치는 띠 시작 행부터 먼 가장자리까지) 안에서만 하고 `CIBlendWithMask`로 원본 위에 합성. (C 구현 중 변경: 처음 문구는 `CIRadialGradient`·`CIConstantColor`·`CIAdditionCompositing` 덧셈과 전체 extent 지도였음.) (E 구현 중 변경: 처음 문구는 bandField 색 커널과 band 영향 = extent 전체.)
 - 기존 수동 변형(`LocalEditStage.applyWarp`)은 그대로 둠.
 - 테스트: 원소 0개면 입력과 같은 바이트, push 하나가 지정 방향으로 픽셀을 옮김, 두 원소 합이 각각의 이동 합과 근사.
 
@@ -176,6 +181,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 
 - **`BodyGeometry`:** `joints: [BodyJoint: NormalizedPoint]`, `confidence: [BodyJoint: Double]`, `boundingBox`. 관절: neck, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist, leftHip, rightHip, leftKnee, rightKnee, leftAnkle, rightAnkle, root. 신뢰도 < `bodyJointMinConfidence`(0.3)인 관절은 없는 것으로.
 - **`BodyShapeRig.primitives(body:adjustments:extent:)`:** 상한 = 몸통 폭(어깨 사이) × `bodyShapeMaxShift`(0.06).
+- 항목별 최대는 `RenderTuning`(허리 0.06·몸 전체 0.035·팔 0.02·허벅지 0.035·어깨 0.04·목 0.03, 모두 `bodyShapeMaxShift` 이하), push 이동 = 어깨 폭 × 값 × min(항목 최대, `bodyShapeMaxShift`), push 반지름 ≥ 이동 / `shapeDisplacementLimit`, 음수는 가늘게·좁게·짧게. 화면 이름은 overall을 "몸 전체"로 부름. 두 어깨가 없으면 체형 없음(안내 대상). 다리 띠는 두 엉덩이와 발목 하나 이상이 있고 엉덩이 중점이 발목 평균보다 어깨 폭 × 0.5 이상 위일 때만. 목 push는 중심이 목 관절 위 어깨 폭 × 0.1, 반지름 어깨 폭 × 0.15라 관절 위 0.25W에서 0(턱 끝 0.28W 이동 0px). (E 구현 중 정함, 목 범위는 E 리뷰 후 변경: 처음 구현은 중심 0.2W·반지름 0.3W.)
 
 | 항목 | 원소 |
 |---|---|
@@ -185,7 +191,7 @@ skin → feature → makeup → background → shapeWarp → localEdit → geome
 | arms | 어깨-팔꿈치, 팔꿈치-손목 선분 중점의 양옆을 선분 쪽 push |
 | thighs | 골반-무릎 선분 중점의 양옆을 선분 쪽 push |
 | shoulders | 양 어깨 관절을 바깥(+)·안쪽(−) push |
-| neck | 목~턱 사이 위쪽 영역을 위로 push |
+| neck | 목 관절과 턱 사이를 위(+)·아래(−)로 push, 턱 아래에서 끝남 |
 
 - 필요한 관절이 없으면 그 항목만 건너뜀. 체형은 `bodies.first`(가장 큰 사람)만.
 - **UI:** 체형 도구: 슬라이더 7개, 관절이 없으면 "전신이 보이는 사진에서 동작합니다" 표시.
