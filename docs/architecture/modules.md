@@ -30,11 +30,11 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 항목 | 내용 |
 |---|---|
 | 책임 | 플랫폼 간 계약이 되는 값 타입과 오류 (공유 커널) |
-| 공개 API | `EditRecipe`, `ColorAdjustments`, `PortraitAdjustments`, `LocalEdit`, `RetouchSpot`, `WarpStroke`, `NormalizedPoint`, `NormalizedRect`, `PhotoID`, `FaceGeometry`, `FaceLandmark`, `Preset`, `PresetValues`, `BuiltInPresets`, `MellowError` |
+| 공개 API | `EditRecipe`, `ColorAdjustments`, `PortraitAdjustments`, `LocalEdit`, `RetouchSpot`, `WarpStroke`, `NormalizedPoint`, `NormalizedRect`, `PhotoID`, `FaceGeometry`, `FaceLandmark`, `Preset`, `PresetValues`, `BuiltInPresets`, `DetailAdjustments`, `LookSelection`, `GeometryAdjustments`, `Look`, `LookCatalog`, `GeometryTransform`, `AutoEnhanceSuggestion`, `MellowError` |
 | 의존 | 없음 (Foundation, CoreGraphics) |
 | 포트 | 없음 |
-| 규칙 | 레시피는 v2로만 인코드하고 빠진 키는 기본값으로 디코드, 좌표는 방향 보정 이미지 기준 정규화(원점 왼쪽 아래), 내장 프리셋(내추럴·포근한·클린)은 `BuiltInPresets` 한 곳, 한국어 사용자 문구 없음 |
-| 테스트 | `apple/Tests/MellowSharedTests` (레시피 코딩, 얼굴 기하, `edit-recipe.v2` 스키마 키 대조. GPU 불필요) |
+| 규칙 | 레시피는 v2로만 인코드하고 빠진 키는 기본값으로 디코드, 좌표는 방향 보정 이미지 기준 정규화(원점 왼쪽 아래), 내장 프리셋(내추럴·포근한·클린)은 `BuiltInPresets` 한 곳, 룩은 `shared/looks/looks.v1.json` 데이터를 `LookCatalog`로 읽고 모르는 id는 `look(id:)`가 nil, 기하 좌표 변환(출력 ↔ 원본)은 순수 수학 `GeometryTransform`, 90° 회전과 화면 기준 좌우 반전은 `GeometryAdjustments.turnedClockwise()`·`flippedHorizontally()`가 자르기 영역·수평 보정을 이미지와 함께 옮김, 한국어 사용자 문구 없음 |
+| 테스트 | `apple/Tests/MellowSharedTests` (레시피 코딩, 얼굴 기하, `edit-recipe.v2` 스키마 키 대조, `GeometryTransform` 왕복, 회전·반전 시 같은 원본 픽셀 유지, 룩 카탈로그. GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:shared`, C++ `mellow_shared` |
 
 ### MellowEditing
@@ -44,7 +44,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 공개 API | `EditDocument`, `EditChange`, `EditingPolicy` |
 | 의존 | MellowShared |
 | 포트 | 없음 |
-| 규칙 | 변경 전 체크포인트, 수동 편집 시 얼굴 형태·대상 잠금, 프리셋·일괄 적용 시 잠긴 값 보존, 히스토리 40 |
+| 규칙 | 변경 전 체크포인트, 수동 편집 시 얼굴 형태·대상 잠금, 프리셋·일괄 적용·자동 보정 시 잠긴 값 보존, 자동 보정(`applyAuto`)은 체크포인트 한 번이고 값이 같으면 아무것도 바꾸지 않음, `quarterTurns`·`flipHorizontal` 변경은 `GeometryAdjustments`의 회전·반전 함수를 거침, 룩·기하 변경은 잠금과 무관, 히스토리 40 |
 | 테스트 | `apple/Tests/MellowEditingTests` (GPU 불필요) |
 | 다른 플랫폼 대응 | Kotlin `:editing`, C++ `mellow_editing` |
 
@@ -67,12 +67,14 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 항목 | 내용 |
 |---|---|
 | 책임 | 사진 읽기, 얼굴 분석, 레시피 렌더, 미리보기 캐시 |
-| 공개 API | `PhotoPipeline`, `PreparedPhoto`, `RenderPipeline`, `RenderStage`, `RenderContext`, `RenderTuning`, `Renderer`, `FaceAnalyzer`, `ImageLoader`, `ImageMetadata` |
+| 공개 API | `PhotoPipeline`, `PreparedPhoto`, `RenderPipeline`, `RenderStage`, `RenderContext`, `RenderTuning`, `Renderer`, `FaceAnalyzer`, `ImageLoader`, `ImageMetadata`, `AutoEnhancer` |
 | 의존 | MellowShared (CoreImage, Vision, ImageIO) |
 | 포트 | `FaceAnalyzer` (`analyze(CIImage) throws -> [FaceGeometry]`). 기본 구현 `VisionFaceAnalyzer`는 `Infrastructure/`에 있으며 앱이 조립할 수 있도록 `public`입니다 |
-| 규칙 | 단계 순서 `SkinStage` → `FaceReshapeStage` → `LocalEditStage` → `ColorStage` 고정, 미리보기 LRU 3장 캐시(미리보기 렌더는 디스크를 읽지 않음), 미리보기 긴 변은 메모리 8GB 이상 1600px·미만 1200px, 원본 렌더는 준비 때의 정규화 얼굴 좌표 재사용, 얼굴 의존 레시피인데 분석이 실패했거나 준비 전이면 `faceAnalysisUnavailable`, 수치 상수는 `RenderTuning`, `CIWarpKernel`은 `WarpKernel` 하나만 감쌈 |
-| 테스트 | `apple/Tests/MellowRenderingTests` (GPU 회귀, 단계 순서, 캐시 동등성, 데모 인물 랜드마크. macOS) |
+| 규칙 | 단계 순서 `skin` → `faceReshape` → `localEdit` → `geometry` → `color` → `detail` → `look` 고정(기하 단계는 좌표 기반 단계 뒤, 색 보정 앞이라 얼굴·수동 편집 좌표는 원본 기준이고 비네팅·선명도·룩은 자른 프레임 기준), 기하 단계는 반전 → 90° 회전 → 수평 보정(빈 모서리 없는 최소 확대) → 자르기 순서이고 자르기 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림, `RenderContext.skipsCrop`이면 자르기만 건너뜀(자르기 도구 미리보기), `AutoEnhancer`는 sRGB 감마 값의 64구간 휘도 히스토그램(구간 대표값은 중심 (i + 0.5)/64)과 평균색으로 제안, 미리보기 LRU 3장 캐시(미리보기 렌더는 디스크를 읽지 않음), 미리보기 긴 변은 메모리 8GB 이상 1600px·미만 1200px, 원본 렌더는 준비 때의 정규화 얼굴 좌표 재사용, 얼굴 의존 레시피인데 분석이 실패했거나 준비 전이면 `faceAnalysisUnavailable`, 수치 상수는 `RenderTuning`, `CIWarpKernel`은 `WarpKernel` 하나만 감쌈 |
+| 테스트 | `apple/Tests/MellowRenderingTests` (GPU 회귀, 단계 순서, 캐시 동등성, 데모 인물 랜드마크, 디테일·룩·기하 픽셀 검사, 자동 보정 제안. macOS) |
 | 다른 플랫폼 대응 | Kotlin `:rendering`, C++ `mellow_rendering` |
+
+`PhotoPipeline`은 `init(analyzer:tuning:lookCatalog:)`로 룩 카탈로그를 받습니다(기본값 `.empty`). B0에서 더한 메서드는 `preview(_:recipe:showsUncropped:)`(true면 자르기만 건너뛴 미리보기), `autoEnhanceSuggestion(_:hasFaces:)`(캐시된 미리보기를 분석, 현재 레시피와 무관), `lookThumbnails(_:)`(사진 썸네일에 룩 단계만 강도 1로 입힌 `[룩 id: CGImage]`)입니다.
 
 얼굴 분석 실패는 오류가 아니라 `PreparedPhoto.faceAnalysisFailure`로 전달합니다. 색감·수동 편집은 계속할 수 있습니다. 오류 사유는 영어 식별자(예: `PhotoPipeline.unpreparedReason` = `photo-not-prepared`)이며 사용자 문구는 앱의 `UserMessage`가 정합니다.
 
@@ -94,7 +96,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 폴더 | 역할 |
 |---|---|
 | `App/` | `MellowPhotoApp`, 창, 명령(⌘Z·⇧⌘Z). 장면 전환 시 내보내기 취소와 작업 중단·재개 |
-| `Application/` | `AppModel`(composition root, `@Observable`·`@MainActor`)과 기능별 extension(`+Editing`, `+Library`, `+Export`), 유스케이스 `ImportPhotos`·`ExportPhotos`, `RenderScheduler`(디바운스와 세대 토큰으로 마지막 요청만 렌더), 포트 `PhotoImporter`(`Ports.swift`), 모든 한국어 문구 `UserMessage` |
+| `Application/` | `AppModel`(composition root, `@Observable`·`@MainActor`)과 기능별 extension(`+Editing`, `+Library`, `+Export`, `+Geometry`(자르기 비율·회전), `+Looks`(룩 썸네일·자동 보정)), 도구 목록 `EditorTool`, 유스케이스 `ImportPhotos`·`ExportPhotos`, `RenderScheduler`(디바운스와 세대 토큰으로 마지막 요청만 렌더), 포트 `PhotoImporter`(`Ports.swift`), 모든 한국어 문구 `UserMessage` |
 | `Features/` | SwiftUI 화면. `Library`, `Editor`, `Export`, `Presets`, `Info`, `Shared`. compact(iPhone 세로)는 세로 스택, regular(iPad·Mac)는 라이브러리·캔버스·인스펙터 3단 |
 | `Platform/` | 포트 어댑터와 실기기 조립 |
 | `Resources/` | 에셋, `Localizable.xcstrings`, Info.plist(iOS·macOS), `PrivacyInfo.xcprivacy`, Mac 엔타이틀먼트(App Sandbox), `container-migration.plist` |

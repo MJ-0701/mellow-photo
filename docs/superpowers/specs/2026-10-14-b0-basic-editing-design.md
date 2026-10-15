@@ -1,6 +1,6 @@
 # B0 기본 편집 세트 설계
 
-작성일 2026-10-14. 기준 커밋 `7c3c3e5`(하위 프로젝트 A 머지 직후). 설계 Claude Fable 5.1, 구현 Claude Opus 5.5.
+작성일 2026-10-14. 기준 커밋 `7c3c3e5`(하위 프로젝트 A 머지 직후). 설계 Claude Fable 5.1, 구현 Claude Opus 5.5. 2026-10-15 구현 중 바뀐 결정을 반영했다(표의 "구현 중 변경" 표시).
 
 ## 사람이 확인할 것
 
@@ -13,14 +13,18 @@
 | 결정 | 내용 | 바꿀 때 비용 |
 |---|---|---|
 | 룩을 데이터로 정의 | `shared/looks/looks.v1.json`의 파라미터. Apple 필터 이름을 저장하지 않음 | 큼: 레시피 계약과 Android·Windows 재현에 영향 |
-| 기하(자르기·회전)는 파이프라인 마지막 | 얼굴·잡티·변형 좌표는 원본 기준 유지 | 큼: 좌표 체계 전체 |
-| 자동 보정 = 슬라이더 값 기입 | 플래그 아님. ⌘Z 한 번에 되돌림. 얼굴 있으면 피부 0.3·미세 0.15 포함 | 중간 |
+| 기하(자르기·회전)는 좌표 기반 단계 뒤, 색 보정 앞 — **구현 중 변경** | 처음 결정은 "파이프라인 맨 마지막". 순서를 피부 → 얼굴 형태 → 수동 편집 → 기하 → 색 → 디테일 → 룩으로 바꿈. 얼굴·잡티·변형 좌표는 여전히 원본 기준. 비네팅·선명도·룩 비네팅이 자른 화면 기준이 되고, 자른 픽셀만 처리해 빠름 | 큼: 좌표 체계와 다른 플랫폼의 렌더 결과 |
+| 회전·반전하면 자르기 영역도 함께 움직임 — **구현 중 추가** | 같은 부분이 계속 보이게(SNOW·Lightroom 방식). "좌우 반전"은 화면에 보이는 그대로의 좌우. 수평 보정 각도는 반전 때 부호가 바뀜. 회전하면 4:5·3:4·9:16 비율 선택은 풀리고 1:1·원본은 남음. 처음 설계는 회전값만 바꿔 3:2 사진의 1:1 자르기가 회전 뒤 정사각형이 아니게 됐음 | 중간: 다른 플랫폼도 같은 규칙을 따라야 함 |
+| 자동 보정 = 슬라이더 값 기입 | 플래그 아님. ⌘Z 한 번에 되돌림(연타해도 기록이 늘지 않음). 얼굴 있으면 피부 0.3·미세 0.15 포함 | 중간 |
+| 자동 보정의 밝기 판단은 화면 밝기 기준 — **구현 중 결정** | 설계가 정하지 않은 부분. 빛의 물리량 기준으로 재면 보통 사진도 어둡게 읽혀 거의 모든 사진에 노출이 크게 올라감 | 작음 |
 | 필터와 분위기 프리셋 분리 | 룩은 사진별, 프리셋은 슬라이더 값(detail 포함) | 작음 |
 | 자르기 풀세트 | 비율 5종·자유·90° 회전·반전·수평 ±15° | 작음 |
 
 **범위 밖.** LUT 룩, 텍스트·스티커, 사용자 필터 제작, 필터 자동 추천, Android·Windows.
 
-**위험.** 룩 10종 수치는 데모 사진 기준 시작값이라 실제 사진에서 조정이 필요할 수 있음(구현 중 세 장으로 확인). 자르기 후 탭 좌표 어긋남은 왕복 테스트로 막음. 자동 보정 과도함은 클램프와 보수적 게인으로 시작.
+**위험.** 룩 10종 수치는 시작값이라 실제 사진에서 조정이 필요할 수 있음. 구현 중 실제 사진으로 보는 확인은 하지 못했고 사용자 확인으로 넘겼음(`VALIDATION.md`). 세피아만 자동 테스트에서 따뜻함과 비네팅이 서로 상쇄돼 수치를 조금 바꿨음. 자르기 후 탭 좌표 어긋남은 왕복 테스트로 막음. 자동 보정 과도함은 클램프와 보수적 게인으로 시작.
+
+**검증 방식 변경(구현 중).** 계획의 화면 자동 조작 실기동은 사용자 Mac을 건드리지 않는다는 규칙과 맞지 않아 앱 모델 단위의 시나리오 테스트로 바꿨음. 화면을 보는 확인은 전부 사용자 몫으로 `VALIDATION.md`에 남김.
 
 **사용자가 직접 할 것(B0 뒤).** GitHub `production` 환경에 `apple-v*` 태그 규칙 추가 → `main` 푸시 → `scripts/release.sh apple 0.3.0` → 태그 푸시 → TestFlight 내부 테스터 2명. 0.2.0 심사 건은 App Store Connect에서 확인.
 
@@ -45,7 +49,18 @@ B0의 목표는 비전문가가 **사진 한 장을 열어 30초 안에 필터�
 | 자르기 | 비율 프리셋(원본·1:1·4:5·3:4·9:16) + 자유 드래그 + 90° 회전 + 좌우 반전 + 수평 슬라이더 ±15°. |
 | 필터와 프리셋 | 분리 유지. 필터(룩)는 사진별, 분위기 프리셋은 슬라이더 값. |
 | 필터 정의 | Apple 필터 이름이 아니라 파라미터 데이터(`shared/looks/`). Android·Windows가 같은 JSON을 읽는다. LUT 전환 경로는 `look.id` 계약으로 열어 둔다. |
-| 기하 적용 위치 | 파이프라인 맨 마지막. 얼굴·수동 편집 좌표는 원본 기준 유지. |
+| 기하 적용 위치 | 좌표 기반 단계(skin·faceReshape·localEdit) 뒤, 색 보정(color) 앞. 얼굴·수동 편집 좌표는 원본 기준 유지. (구현 중 변경: 처음 결정은 파이프라인 맨 마지막. Task 6에서 비네팅·선명도가 자르기 전 프레임 기준이 되는 문제로 바꿈.) |
+| 회전·반전과 자르기 | 회전·반전은 자르기 영역과 수평 보정을 이미지와 함께 옮긴다. 좌우 반전은 화면 기준. 아래 "기하 의미" 참조. (구현 중 추가, Task 12) |
+
+### 기하 의미 (구현 중 보강, Task 12)
+
+저장 값의 의미는 §2 그대로다(반전 → 회전 → 수평 보정 → 자르기, `crop`은 앞 단계가 끝난 이미지 기준). 바뀐 것은 사용자의 회전·반전 조작이 저장 값을 바꾸는 방식이다. 다른 플랫폼도 같은 순수 함수를 재현한다.
+
+- 90° 회전 = `GeometryAdjustments.turnedClockwise()`: `quarterTurns`를 (정규화 값 + 1) mod 4로, `crop` (x, y, w, h) → (y, 1 − x − w, h, w). 정규화 좌표는 원점 왼쪽 아래이고 시계 방향 90°는 (x, y) → (y, 1 − x)다. 수평 보정은 중심 회전이라 그대로 둔다.
+- 좌우 반전 = `GeometryAdjustments.flippedHorizontally()`: 화면에 보이는 그대로의 좌우 거울. `flipHorizontal`을 뒤집고, 회전이 홀수(90°·270°)면 `quarterTurns`에 2를 더한다(Mx ∘ T = T ∘ My, My = T² ∘ Mx). `crop`은 늘 x → 1 − x − w. `straightenDegrees`는 부호를 바꾸되 0은 그대로 둔다(−0 저장 방지).
+- `EditDocument.set`: `.quarterTurns(n)`은 `turnedClockwise()`를 ((n − 현재) mod 4)번 적용한다. `.flipHorizontal(b)`는 b가 현재 값과 다를 때만 `flippedHorizontally()`를 적용한다. 다른 곳에서 두 값을 직접 대입하지 않는다.
+- `AppModel.turnClockwise()`: 실제로 돌았고 `cropAspect`가 `.square`·`.original`이 아니면 `cropAspect = nil`.
+- 자르기 픽셀 사각형은 변마다 가장 가까운 픽셀로 반올림한다(`.integral`처럼 바깥으로 넓히지 않음). 결과가 `.integral`보다 1px 작을 수 있다.
 
 ## 2. 레시피 확장 (schemaVersion 2 유지)
 
@@ -71,7 +86,7 @@ B0의 목표는 비전문가가 **사진 한 장을 열어 30초 안에 필터�
 | `detail.vignette` | 0…1 | 가장자리 어둡게 |
 | `look.id` | 룩 카탈로그 id 또는 null | 필터. 모르는 id는 디코드 성공·렌더 시 무시(항등) |
 | `look.intensity` | 0…1 | 원본과 룩 결과의 혼합 비율 |
-| `geometry.flipHorizontal` | bool | 좌우 반전 |
+| `geometry.flipHorizontal` | bool | 원본 기준 좌우 반전 플래그(화면 기준 반전 조작은 §1 "기하 의미") |
 | `geometry.quarterTurns` | 0…3 | 시계 방향 90° 회전 횟수 |
 | `geometry.straightenDegrees` | −15…15 | 수평 보정 각도(양수 = 시계 방향) |
 | `geometry.crop` | 정규화 사각형 또는 null | 반전·회전·수평 보정이 끝난 이미지 기준. null이면 전체 |
@@ -116,17 +131,17 @@ B0의 목표는 비전문가가 **사진 한 장을 열어 30초 안에 필터�
 | `pastel` | 파스텔 | 밝기 ↑, 대비 ↓, 채도 ↓ |
 | `night` | 밤 | 어둡고 차가움, 비네팅 |
 
-룩 필드: `toneCurve`(휘도 점 5개, x 오름차순, 0…1), `saturation`(0…2), `contrast`(0.5…1.5), `warmth`(−1…1, 색감 단계와 같은 켈빈 환산), `tint`(−1…1), `vignette`(0…1), `fade`(0…1, 블랙 리프트 = 커브 시작점을 `fade * 0.15`만큼 올림). 정확한 수치는 구현 단계에서 데모 인물 사진으로 보며 정하되, 각 룩은 "강도 1에서 원본과 눈에 띄게 다르고 피부가 깨지지 않는" 것을 기준으로 한다.
+룩 필드: `toneCurve`(휘도 점 5개, x 오름차순, 0…1), `saturation`(0…2), `contrast`(0.5…1.5), `warmth`(−1…1, 색감 단계와 같은 켈빈 환산), `tint`(−1…1), `vignette`(0…1), `fade`(0…1, 블랙 리프트 = 커브 시작점을 `fade * 0.15`만큼 올림). 정확한 수치는 구현 단계에서 데모 인물 사진으로 보며 정하되, 각 룩은 "강도 1에서 원본과 눈에 띄게 다르고 피부가 깨지지 않는" 것을 기준으로 한다. 구현 중 조정: `sepia`의 `warmth` 0.6 → 0.7, `vignette` 0.15 → 0.1(작은 회색 이미지 모서리에서 두 효과가 상쇄돼 강도 0.5 결과가 원본과 같아짐, Task 7). 두 JSON 사본 모두.
 
 MellowShared에 `Look`(Codable)과 `LookCatalog`(`init(data:)`, `look(id:)`, `all`)을 둔다. 카탈로그 로딩은 앱이 번들에서 한 번 하고 `AppModel`이 보관한다. 모르는 id는 `look(id:)`가 nil을 돌려주고 렌더는 항등이다.
 
 ## 4. 파이프라인
 
-`RenderPipeline.standard`를 7단계로 확장한다. 이름은 `"skin"`, `"faceReshape"`, `"localEdit"`, `"color"`, `"detail"`, `"look"`, `"geometry"`.
+`RenderPipeline.standard`를 7단계로 확장한다. 이름은 `"skin"`, `"faceReshape"`, `"localEdit"`, `"geometry"`, `"color"`, `"detail"`, `"look"` 순서다(구현 중 변경: 처음엔 `geometry`가 맨 끝). 좌표를 쓰는 단계는 기하 앞이라 원본 좌표를 그대로 쓰고, 기하 뒤 단계(DetailStage·LookStage)는 `context.extent`가 아니라 입력 `image.extent`로 자른다.
 
 - **DetailStage**: `CIHighlightShadowAdjust`(highlightAmount = 1 + highlights, shadowAmount = shadows), `CISharpenLuminance`(sharpness × `RenderTuning.sharpnessMax`), `CIVignette`(intensity = vignette × `RenderTuning.vignetteMax`, radius는 짧은 변 비례). 값이 전부 0이면 항등.
 - **LookStage**: 룩 파라미터를 `CIToneCurve` → `CIColorControls`(saturation·contrast) → `CITemperatureAndTint`(warmth·tint) → `CIVignette`로 조립한 뒤, `CIMix`(또는 `CIDissolveTransition`)로 원본과 `intensity` 비율로 섞는다. id가 없거나 모르면 항등. `RenderContext`에 `lookCatalog`를 추가한다.
-- **GeometryStage**: 순서는 좌우 반전 → 90° 회전 → 수평 보정 → 자르기. 수평 보정은 중심 기준 회전 뒤 빈 모서리가 생기지 않는 최소 배율로 확대하고 원래 크기로 자른다(배율 = `cos|θ| + sin|θ| × max(w/h, h/w)`). 자르기는 그 결과 이미지 기준 정규화 사각형을 픽셀로 바꿔 자른다. 결과 extent는 원점 0으로 평행 이동한다.
+- **GeometryStage**: 순서는 좌우 반전 → 90° 회전 → 수평 보정 → 자르기. 수평 보정은 중심 기준 회전 뒤 빈 모서리가 생기지 않는 최소 배율로 확대하고 원래 크기로 자른다(배율 = `cos|θ| + sin|θ| × max(w/h, h/w)`). 자르기는 그 결과 이미지 기준 정규화 사각형을 픽셀로 바꿔 자른다. 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림한다(구현 중 변경, `.integral` 아님). 결과 extent는 항상 원점 0으로 평행 이동한다.
 
 `RenderPipeline.render`는 마지막에 `context.extent`로 자르던 것을 **기하 단계가 돌려준 extent**로 바꾼다. 기하 단계 이전 단계는 지금처럼 원본 extent를 유지한다. 모든 새 상수는 `RenderTuning`에 둔다.
 
@@ -151,15 +166,15 @@ public struct GeometryTransform: Sendable {
 
 MellowRendering에 `AutoEnhancer`를 둔다. 입력은 미리보기 `CIImage`와 얼굴 유무, 출력은 `AutoEnhanceSuggestion { color, detail, portrait }`.
 
-- 휘도 히스토그램(`CIAreaHistogram`, 64구간)에서 평균 휘도 L̄, 1·99 백분위 L₁·L₉₉를 구한다.
+- 휘도 히스토그램(`CIAreaHistogram`, 64구간)에서 평균 휘도 L̄, 1·99 백분위 L₁·L₉₉를 구한다. 휘도는 채도 0 이미지에 `CILinearToSRGBToneCurve`를 건 **sRGB 감마 값**이다(구현 중 결정: 선형 값이면 중간 회색이 0.21로 읽혀 거의 모든 사진에 +1 노출). 구간 i의 대표값은 중심 (i + 0.5)/64이고 평균과 백분위 모두 이 값을 쓴다. 다른 플랫폼도 감마 변환과 구간 중심 양자화를 똑같이 한다.
 - 노출: `exposure = clamp(log2(target / L̄), −1, 1)`, target = `RenderTuning.autoTargetLuminance`(0.45).
 - 하이라이트: L₉₉가 0.97 이상이면 `highlights = −min(1, (L₉₉ − 0.9) × 5)`, 아니면 0. 그림자: L₁이 0.03 이하면 `shadows = min(1, (0.1 − L₁) × 5)`, 아니면 0.
 - 따뜻함: `CIAreaAverage`의 평균 RGB에서 그레이 월드 편차 `(r − b) / (r + b)`를 −1…1로 스케일한 값의 음수 × `RenderTuning.autoWarmthGain`(0.5)로 중성화(클램프 −0.3…0.3).
 - 채도: `saturation = 1.08`. 대비: `1.04`.
 - 얼굴이 하나 이상이면 `portrait.skinSmoothing = 0.3`, `faceSlim = 0.15`, `targetFace`는 유지(nil).
-- 모든 값은 UI 범위로 클램프한다. 입력이 단색처럼 분산이 없으면 노출만 조정한다.
+- 모든 값은 UI 범위로 클램프한다. 입력이 단색처럼 분산이 없으면(L₉₉ − L₁ < `RenderTuning.autoFlatRange` 0.05) 노출만 조정한다.
 
-적용은 `EditDocument.applyAuto(_ suggestion:)`: 체크포인트 한 번, `color`·`detail`·`portrait` 값을 덮어쓰되 잠긴 사진의 `faceSlim`·`targetFace`는 보존한다(프리셋과 같은 규칙). `look`·`geometry`·`operations`는 건드리지 않는다. `AppModel.autoEnhance()`가 파이프라인에서 제안을 받아 적용하고 렌더를 예약한다. 상태 문구는 "자동 보정을 적용했어요. ⌘Z로 되돌릴 수 있어요." 자동 보정 버튼은 토글이 아니라 "적용" 동작이며, 되돌리기는 실행 취소다.
+적용은 `EditDocument.applyAuto(_ suggestion:) -> Bool`: 적용 결과가 현재 레시피와 같으면 아무것도 하지 않고 false(연타해도 ⌘Z 한 번으로 되돌아감), 다르면 체크포인트 한 번, `color`·`detail`·`portrait` 값을 덮어쓰되 잠긴 사진의 `faceSlim`·`targetFace`는 보존한다(프리셋과 같은 규칙). `look`·`geometry`·`operations`는 건드리지 않는다. `AppModel.autoEnhance()`가 파이프라인에서 제안을 받아 적용하고 렌더를 예약한다. 상태 문구는 "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."(`UserMessage.autoEnhanced`)이며 실제로 바뀐 때만 띄운다. 자동 보정 버튼은 토글이 아니라 "적용" 동작이며, 되돌리기는 실행 취소다.
 
 ## 6. 화면
 
@@ -186,7 +201,7 @@ MellowRendering에 `AutoEnhancer`를 둔다. 입력은 미리보기 `CIImage`와
 | Library | `detail` 없는 구 프리셋 디코드; `applyAuto`가 잠긴 사진의 faceSlim 보존. |
 | Editing | `applyAuto`가 체크포인트 1회; `look`·`geometry` 변경이 잠금과 무관. |
 | App | `autoEnhance()`가 undo 1단계·렌더 예약; 자르기 도구 진입 시 미리보기가 자르기 전; 잡티 탭이 `toOriginal`을 거쳐 원본 좌표로 기록; 룩 썸네일 캐시가 사진·룩별로 1회 렌더. |
-| 실기동 | Mac: 필터 선택→강도→자동 보정→자르기 1:1→수평→저장(파일 크기 확인). iPhone·iPad 시뮬레이터 화면 캡처. |
+| 실기동 | (구현 중 변경) 화면 자동 조작 대신 `EditorScenarioTests`: 정사각 사진으로 가져오기→필름 0.5→자동→하이라이트 −0.5→1:1→수평 5°→90°→내보내기→정사각 파일, 3:2 사진으로 1:1→회전 뒤 정사각 출력, 1:1→반전 뒤 같은 픽셀. 화면 확인(Mac·iPhone·iPad)은 사용자 조치로 `VALIDATION.md`에 미검증 기재. |
 
 ## 9. 범위 밖과 선행 작업
 

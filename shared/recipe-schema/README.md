@@ -23,6 +23,10 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 - `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
 - `look`은 필터 선택입니다. `id`는 `shared/looks/looks.v1.json`의 룩 id이고, 값이 없으면 필터를 쓰지 않습니다. `intensity`는 원본과 룩 결과의 혼합 비율이며 기본값은 1입니다.
 - `geometry`는 반전(`flipHorizontal`) → 시계 방향 90° 회전(`quarterTurns`, 0~3) → 수평 보정(`straightenDegrees`, 양수면 시계 방향) → 자르기(`crop`) 순서로 적용합니다. `crop`은 그 앞 단계가 끝난 이미지 기준 정규화 사각형(`x`, `y`, `width`, `height`)이고, 값이 없으면 자르지 않습니다.
+- 사용자가 회전·반전을 누르면 자르기 영역과 수평 보정도 이미지와 함께 옮겨 같은 부분이 계속 보이게 합니다. 모든 플랫폼이 같은 규칙으로 `geometry`를 고칩니다(Apple 기준 구현 `GeometryAdjustments.turnedClockwise()`·`flippedHorizontally()`).
+  - 시계 방향 90° 회전: `quarterTurns` → (`quarterTurns` mod 4 + 1) mod 4, `crop` (x, y, w, h) → (y, 1 − x − w, h, w). `straightenDegrees`는 그대로입니다.
+  - 좌우 반전은 화면에 보이는 그대로의 좌우입니다. `flipHorizontal`을 뒤집고, 회전이 홀수(1·3)면 `quarterTurns`에 2를 더합니다(mod 4). `crop`은 x → 1 − x − w, `straightenDegrees`는 부호를 바꿉니다(0은 0 그대로).
+  - 렌더할 때 `crop`의 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림합니다. 바깥으로 넓히지 않습니다.
 - 프리셋 `values`는 `color`·`portrait`와 함께 `detail`을 담습니다. `detail`이 없는 프리셋은 기본값으로 읽습니다. 룩과 기하는 프리셋에 담지 않습니다.
 - `operations`는 사용자가 기록한 순서대로 재생합니다. 각 항목은 `"type": "spot"` 또는 `"type": "warp"`와 그 값을 같은 객체에 평평하게 담습니다.
 - 사진별 `undo`는 최대 40개입니다(`EditingPolicy.historyLimit`). 프리셋 이름은 최대 30자입니다(`LibraryPolicy.presetNameLimit`).
