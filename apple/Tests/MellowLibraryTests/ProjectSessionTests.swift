@@ -181,4 +181,15 @@ final class ProjectSessionTests: XCTestCase {
         session.edit(photo.id) { $0.set(.exposure(0.2)) }
         XCTAssertEqual(session.photos[0].document.undoStack.count, 2, "연속 변경이 끝났으므로 다음 편집은 체크포인트한다")
     }
+
+    func testApplyToAllCopiesDetail() throws {
+        let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        session.edit(source.id) { $0.set(.vignette(0.4)) }
+        session.applyToAll(from: source.id)
+        XCTAssertEqual(session.photos[1].document.recipe.detail.vignette, 0.4)
+    }
 }

@@ -129,4 +129,61 @@ final class EditDocumentTests: XCTestCase {
         document.undo()
         XCTAssertEqual(document.recipe.operations.count, 1)
     }
+
+    func testNewChangesAreNotLockedByLocalEdits() {
+        var document = EditDocument()
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        XCTAssertNil(document.set(.highlights(-0.5)))
+        XCTAssertNil(document.set(.lookID("film")))
+        XCTAssertNil(document.set(.lookIntensity(0.4)))
+        XCTAssertNil(document.set(.quarterTurns(1)))
+        XCTAssertNil(document.set(.crop(NormalizedRect(x: 0, y: 0, width: 0.5, height: 0.5))))
+        XCTAssertEqual(document.recipe.detail.highlights, -0.5)
+        XCTAssertEqual(document.recipe.look.id, "film")
+        XCTAssertEqual(document.recipe.look.intensity, 0.4)
+        XCTAssertEqual(document.recipe.geometry.quarterTurns, 1)
+        XCTAssertEqual(document.recipe.geometry.crop?.width, 0.5)
+    }
+
+    func testQuarterTurnsWrapAndStraightenClamps() {
+        var document = EditDocument()
+        document.set(.quarterTurns(5))
+        XCTAssertEqual(document.recipe.geometry.quarterTurns, 1)
+        document.set(.straightenDegrees(40))
+        XCTAssertEqual(document.recipe.geometry.straightenDegrees, GeometryAdjustments.maxStraightenDegrees)
+    }
+
+    func testPresetCarriesDetailButNotLookOrGeometry() {
+        var document = EditDocument()
+        document.set(.lookID("mono"))
+        document.set(.quarterTurns(2))
+        document.apply(PresetValues(detail: DetailAdjustments(vignette: 0.4)))
+        XCTAssertEqual(document.recipe.detail.vignette, 0.4)
+        XCTAssertEqual(document.recipe.look.id, "mono")
+        XCTAssertEqual(document.recipe.geometry.quarterTurns, 2)
+    }
+
+    func testApplyAutoIsOneUndoStepAndKeepsLockedGeometry() {
+        var document = EditDocument()
+        document.set(.faceSlim(0.2))
+        document.set(.targetFace(1))
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        document.set(.lookID("film"))
+        let before = document.undoStack.count
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.3, saturation: 1.08),
+            detail: DetailAdjustments(highlights: -0.2),
+            portrait: PortraitAdjustments(skinSmoothing: 0.3, faceSlim: 0.15))
+        document.applyAuto(suggestion)
+        XCTAssertEqual(document.undoStack.count, before + 1)
+        XCTAssertEqual(document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(document.recipe.detail.highlights, -0.2)
+        XCTAssertEqual(document.recipe.portrait.skinSmoothing, 0.3)
+        XCTAssertEqual(document.recipe.portrait.faceSlim, 0.2, "잠긴 사진은 얼굴 형태 유지")
+        XCTAssertEqual(document.recipe.portrait.targetFace, 1)
+        XCTAssertEqual(document.recipe.look.id, "film", "자동 보정은 룩을 건드리지 않는다")
+        XCTAssertEqual(document.recipe.operations.count, 1)
+        document.undo()
+        XCTAssertEqual(document.recipe.color.exposure, 0)
+    }
 }

@@ -99,7 +99,8 @@ public final class ProjectSession {
 
     public func applyToAll(from id: PhotoID) {
         guard let source = photos.first(where: { $0.id == id }) else { return }
-        let values = PresetValues(color: source.document.recipe.color, portrait: source.document.recipe.portrait)
+        let recipe = source.document.recipe
+        let values = PresetValues(color: recipe.color, portrait: recipe.portrait, detail: recipe.detail)
         for index in photos.indices where photos[index].id != id {
             photos[index].document.applyFromBatch(values)
         }

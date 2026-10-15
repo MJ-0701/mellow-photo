@@ -51,6 +51,20 @@ public struct EditDocument: Equatable, Sendable {
         case .skinSmoothing(let value): updated.portrait.skinSmoothing = value
         case .faceSlim(let value): updated.portrait.faceSlim = value
         case .targetFace(let index): updated.portrait.targetFace = index
+        case .highlights(let value): updated.detail.highlights = value
+        case .shadows(let value): updated.detail.shadows = value
+        case .sharpness(let value): updated.detail.sharpness = value
+        case .vignette(let value): updated.detail.vignette = value
+        case .lookID(let id): updated.look.id = id
+        case .lookIntensity(let value): updated.look.intensity = value
+        case .flipHorizontal(let flag): updated.geometry.flipHorizontal = flag
+        case .quarterTurns(let turns):
+            updated.geometry.quarterTurns = turns
+            updated.geometry.quarterTurns = updated.geometry.normalizedQuarterTurns
+        case .straightenDegrees(let degrees):
+            let limit = GeometryAdjustments.maxStraightenDegrees
+            updated.geometry.straightenDegrees = max(-limit, min(limit, degrees))
+        case .crop(let rect): updated.geometry.crop = rect
         }
         // 값이 그대로면 실행 취소 단계를 만들지 않는다.
         guard updated != recipe else { return nil }
@@ -69,6 +83,7 @@ public struct EditDocument: Equatable, Sendable {
             portrait.faceSlim = recipe.portrait.faceSlim
         }
         recipe.color = values.color
+        recipe.detail = values.detail
         recipe.portrait = portrait
     }
 
@@ -83,6 +98,20 @@ public struct EditDocument: Equatable, Sendable {
             portrait.targetFace = nil
         }
         recipe.color = values.color
+        recipe.detail = values.detail
+        recipe.portrait = portrait
+    }
+
+    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 룩·기하·수동 편집은 건드리지 않는다.
+    public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) {
+        checkpoint()
+        var portrait = suggestion.portrait
+        portrait.targetFace = recipe.portrait.targetFace
+        if isGeometryLocked {
+            portrait.faceSlim = recipe.portrait.faceSlim
+        }
+        recipe.color = suggestion.color
+        recipe.detail = suggestion.detail
         recipe.portrait = portrait
     }
 
