@@ -205,6 +205,35 @@ platform :ios do
       app_version: version, build_number: build, app_platform: 'ios', **testflight_distribution(version))
   end
 
+  # Internal testers must be App Store Connect users. Marketing is the least-privileged role Apple allows for internal testing.
+  desc 'Invite an internal tester as an App Store Connect user, then (after acceptance) add them to the internal group'
+  lane :internal_tester do
+    email = required('TESTER_EMAIL')
+    first_name = required('TESTER_FIRST_NAME')
+    last_name = required('TESTER_LAST_NAME')
+    app_store_connect_api_key(key_id: required('ASC_KEY_ID'), issuer_id: required('ASC_ISSUER_ID'),
+      key_content: required('ASC_KEY_BASE64'), is_key_content_base64: true, in_house: false)
+    app = Spaceship::ConnectAPI::App.find('com.mj.mellowphoto')
+    UI.user_error!('App com.mj.mellowphoto not found') unless app
+    user = Spaceship::ConnectAPI::User.find(email: email).first
+    unless user
+      if Spaceship::ConnectAPI::UserInvitation.find(email: email).first
+        UI.important('Invitation already sent. Run this again after the tester accepts it.')
+      else
+        Spaceship::ConnectAPI::UserInvitation.create(email: email, first_name: first_name, last_name: last_name,
+          roles: ['MARKETING'], provisioning_allowed: false, all_apps_visible: true)
+        UI.success('Invitation sent. Run this again after the tester accepts it.')
+      end
+      next
+    end
+    group = app.get_beta_groups.find { |candidate| candidate.name == TESTFLIGHT_GROUPS.first }
+    UI.user_error!("Beta group #{TESTFLIGHT_GROUPS.first} not found") unless group
+    group.post_bulk_beta_tester_assignments(beta_testers: [
+      { email: email, firstName: first_name, lastName: last_name, errors: [] }
+    ])
+    UI.success("Added to #{group.name}. Builds already in that group are available now.")
+  end
+
   desc 'Read-only: print recent TestFlight builds and beta groups (no tester emails, no changes)'
   lane :build_status do
     app_store_connect_api_key(key_id: required('ASC_KEY_ID'), issuer_id: required('ASC_ISSUER_ID'),

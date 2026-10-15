@@ -1,0 +1,41 @@
+name: Apple internal tester
+# Run once to invite the person as an App Store Connect user (Marketing role),
+# then run again after they accept to add them to the internal TestFlight group.
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: 'Apple ID email of the tester'
+        required: true
+      first_name:
+        description: 'First name shown in App Store Connect'
+        required: true
+      last_name:
+        description: 'Last name shown in App Store Connect'
+        required: true
+permissions:
+  contents: read
+jobs:
+  invite:
+    runs-on: macos-15
+    environment: production
+    timeout-minutes: 15
+    env:
+      FASTLANE_SKIP_UPDATE_CHECK: '1'
+      FASTLANE_HIDE_CHANGELOG: '1'
+      FASTLANE_DISABLE_COLORS: '1'
+      TESTER_EMAIL: ${{ inputs.email }}
+      TESTER_FIRST_NAME: ${{ inputs.first_name }}
+      TESTER_LAST_NAME: ${{ inputs.last_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - name: Invite or add internal tester
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_BASE64: ${{ secrets.ASC_KEY_BASE64 }}
+        run: bundle exec fastlane ios internal_tester
