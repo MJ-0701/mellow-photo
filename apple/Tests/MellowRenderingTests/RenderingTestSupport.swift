@@ -111,6 +111,59 @@ enum RenderingTestSupport {
         return gradient.transformed(by: transform).cropped(to: extent)
     }
 
+    /// 변형 테스트의 점 표식 반지름(픽셀).
+    static let markerRadius: CGFloat = 3
+    /// 이 빨강 값보다 어두운 픽셀을 표식으로 본다. 바탕(0.9 회색)은 sRGB 바이트로 약 230이다.
+    static let markerThreshold: UInt8 = 200
+    /// 픽셀 (x, y)의 중심은 (x + 0.5, y + 0.5)다.
+    static let pixelCenterOffset = 0.5
+    /// expectedPosition의 고정점 반복 횟수. 이동량 기울기가 0.5 아래라 30번이면 충분히 수렴한다.
+    static let fixedPointIterations = 30
+
+    /// 밝은 회색(0.9) 바탕에 반지름 markerRadius인 검은 점들. 점은 hardEllipse로 픽셀 크기에서 그린다.
+    static func markers(_ centers: [CGPoint], extent: CGRect) -> CIImage {
+        var image = CIImage(color: CIColor(red: 0.9, green: 0.9, blue: 0.9)).cropped(to: extent)
+        let dot = CIImage(color: .black)
+        let radii = CGSize(width: markerRadius, height: markerRadius)
+        for center in centers {
+            let mask = hardEllipse(center: center, radii: radii, extent: extent)
+            image = dot.applyingFilter(
+                "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: image, kCIInputMaskImageKey: mask]
+            ).cropped(to: extent)
+        }
+        return image
+    }
+
+    /// point 둘레 ±window 픽셀 안 어두운 픽셀의 가중 중심(가중치 = markerThreshold − 빨강). 없으면 nil.
+    static func markerCentroid(_ grid: PixelGrid, near point: CGPoint, window: Int = 16) -> CGPoint? {
+        var total: Double = 0
+        var sumX: Double = 0
+        var sumY: Double = 0
+        let centerX = Int(point.x)
+        let centerY = Int(point.y)
+        for y in max(0, centerY - window)...min(grid.height - 1, centerY + window) {
+            for x in max(0, centerX - window)...min(grid.width - 1, centerX + window) {
+                let weight = Double(markerThreshold) - Double(grid.red(CGPoint(x: x, y: y)))
+                guard weight > 0 else { continue }
+                total += weight
+                sumX += weight * (Double(x) + pixelCenterOffset)
+                sumY += weight * (Double(y) + pixelCenterOffset)
+            }
+        }
+        guard total > 0 else { return nil }
+        return CGPoint(x: sumX / total, y: sumY / total)
+    }
+
+    /// out(p) = in(p − D(p))에서 입력의 marker가 나타나는 출력 위치. p = marker + D(p)를 고정점 반복으로 푼다.
+    static func expectedPosition(of marker: CGPoint, primitives: [ShapePrimitive], limit: Double) -> CGPoint {
+        var position = marker
+        for _ in 0..<fixedPointIterations {
+            let shift = DisplacementWarp.displacement(at: position, of: primitives, limit: limit)
+            position = CGPoint(x: marker.x + shift.dx, y: marker.y + shift.dy)
+        }
+        return position
+    }
+
     /// 피부색 바탕에 모공(픽셀 단위 잡음 ±4%)과 얼룩(흐린 잡음으로 섞은 밝고 어두운 피부)을 넣는다.
     /// CIRandomGenerator는 늘 같은 무늬라 테스트가 결정적이다.
     static func skinTexture(size: Int) -> CIImage {

@@ -53,6 +53,9 @@ public struct RenderTuning: Sendable {
 
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25
+    /// 얼굴형·체형 원소 하나가 옮기는 최대 거리. push는 반지름 비율, scale은 배율, band는 늘림 비율.
+    /// smoothstep 감쇠의 최대 기울기가 1.5 / 반지름이라 0.25면 원소 하나의 야코비안이 0.625 이상으로 접히지 않는다.
+    public var shapeDisplacementLimit: Double = 0.25
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
