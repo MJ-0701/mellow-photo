@@ -131,6 +131,35 @@ public struct RenderTuning: Sendable {
     public var backgroundMaskFeather: Double = 0.006
     /// 관절 신뢰도가 이보다 낮으면 없는 것으로 본다(스펙 5).
     public var bodyJointMinConfidence: Double = 0.3
+    /// 체형 push 항목 하나의 이동 상한. 어깨 폭 비율(스펙 0.06, "몸 폭의 6% 이내"). 항목별 최대가 이보다 크면 이 값으로 자른다.
+    public var bodyShapeMaxShift: Double = 0.06
+    /// 허리 ±1에서 한쪽 옆구리를 미는 양. 어깨 폭 40cm면 2.4cm라 허리 폭(약 28cm)이 −1에서 약 17% 줄어든다.
+    public var bodyWaistMaxShift: Double = 0.06
+    /// 몸 전체. 가슴·골반·허벅지 바깥 세 곳을 각각 어깨 폭의 3.5%(약 1.4cm).
+    public var bodyOverallMaxShift: Double = 0.035
+    /// 팔. 위팔 양옆을 각각 어깨 폭의 2%(약 0.8cm, 위팔 폭 약 9.6cm의 17%). 아래팔은 그 75%.
+    public var bodyArmMaxShift: Double = 0.02
+    /// 허벅지. 양옆을 각각 어깨 폭의 3.5%(약 1.4cm, 허벅지 폭 약 16cm의 17%).
+    public var bodyThighMaxShift: Double = 0.035
+    /// 어깨. 각 어깨 관절을 어깨 폭의 4%(약 1.6cm)라 어깨 폭이 ±8% 바뀐다.
+    public var bodyShoulderMaxShift: Double = 0.04
+    /// 목. 목~턱 사이 위쪽을 어깨 폭의 3%(약 1.2cm) 올리거나 내린다.
+    public var bodyNeckMaxShift: Double = 0.03
+    /// 다리 길게 1의 띠 늘림 비율(스펙 0.08). 골반~발목이 8% 길어지고 발 아래는 그만큼 사진 밖으로 밀린다.
+    public var legLengthMaxStretch: Double = 0.08
+
+    /// 체형 항목별 최대. legLength는 띠 늘림 비율, 나머지는 어깨 폭 비율의 push 이동이다.
+    public func bodyItemMaxShift(_ key: BodyShapeKey) -> Double {
+        switch key {
+        case .legLength: return legLengthMaxStretch
+        case .waist: return bodyWaistMaxShift
+        case .overall: return bodyOverallMaxShift
+        case .arms: return bodyArmMaxShift
+        case .thighs: return bodyThighMaxShift
+        case .shoulders: return bodyShoulderMaxShift
+        case .neck: return bodyNeckMaxShift
+        }
+    }
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
