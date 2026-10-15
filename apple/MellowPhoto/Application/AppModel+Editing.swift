@@ -67,6 +67,17 @@ extension AppModel {
         return applied
     }
 
+    /// 카탈로그의 룩을 체크포인트 한 번으로 적용한다. nil은 메이크업을 모두 지운다(없음). 모르는 id는 무시한다.
+    func applyMakeupLook(id: String?) {
+        let look = makeupCatalog.look(id: id)
+        guard id == nil || look != nil else { return }
+        endSliderEditIfActive()
+        mutateSelected { document in
+            document.applyMakeupLook(look)
+            return nil
+        }
+    }
+
     func applyToAll() {
         guard let id = session.selectedPhotoID, !isBusy else { return }
         session.applyToAll(from: id)
@@ -146,7 +157,7 @@ extension AppModel {
                 document.appendLocalEdit(.warp(stroke))
                 return nil
             }
-        case .look, .crop, .adjust, .beauty, .body, .background:
+        case .look, .crop, .adjust, .beauty, .makeup, .body, .background:
             return
         }
     }

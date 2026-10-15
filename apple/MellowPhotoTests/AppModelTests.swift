@@ -632,7 +632,8 @@ final class AppModelTests: XCTestCase {
             root: root, bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
-        XCTAssertEqual(EditorTool.allCases, [.look, .crop, .adjust, .beauty, .body, .background, .retouch, .warp])
+        XCTAssertEqual(
+            EditorTool.allCases, [.look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
         model.selectTool(.body)
         XCTAssertEqual(EditorTool.body.title, "체형")
         XCTAssertEqual(model.bodyAvailability, .ready)
@@ -769,5 +770,73 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.canAdjustBodyShape(.waist))
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
+    }
+
+    func testMakeupToolAppliesLookOnceAndPartEditsDetachLook() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.makeup)
+        XCTAssertEqual(EditorTool.makeup.title, "메이크업")
+        XCTAssertEqual(model.makeupCatalog.looks.map(\.name), ["데일리", "쿨톤", "웜피치", "로지", "스모키"])
+        XCTAssertEqual(
+            MakeupPart.allCases.map(UserMessage.makeupPartTitle), ["립", "블러셔", "아이섀도", "눈썹", "쉐딩"])
+        let daily = try XCTUnwrap(model.makeupCatalog.look(id: "daily"))
+        model.applyMakeupLook(id: "daily")
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments)
+        model.applyMakeupLook(id: "nope")
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments, "모르는 룩은 무시한다")
+        model.makeupPart = .blush
+        model.beginSliderEdit()
+        model.edit(.makeupIntensity(.blush, 0.6))
+        model.edit(.makeupIntensity(.blush, 0.8))
+        model.endSliderEdit()
+        XCTAssertEqual(model.currentRecipe.makeup.blush.intensity, 0.8, accuracy: 1e-9)
+        XCTAssertNil(model.currentRecipe.makeup.lookID, "부위를 바꾸면 룩 이름이 풀린다")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, daily.adjustments, "드래그 한 번이 실행 취소 한 단계")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "룩 적용도 실행 취소 한 번")
+        model.redo()
+        model.applyMakeupLook(id: nil)
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "없음은 메이크업을 모두 지운다")
+    }
+
+    func testMakeupWorksWithLocalEditsAndFallsBackWithoutCatalog() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.tool = .retouch
+        model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(model.isGeometryLocked)
+        model.selectTool(.makeup)
+        model.edit(.makeupColor(.lip, "lip-coral"))
+        XCTAssertEqual(model.currentRecipe.makeup.lip.colorID, "lip-coral", "메이크업은 수동 편집이 있어도 잠기지 않는다")
+        XCTAssertNotEqual(model.statusMessage, UserMessage.geometryLocked)
+        model.applyMakeupLook(id: "smoky")
+        XCTAssertEqual(model.currentRecipe.makeup.lookID, "smoky")
+
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let otherStaged = try TestSupport.solidPNG(in: otherRoot)
+        let bare = TestSupport.makeModel(
+            root: otherRoot, makeupCatalog: .empty,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: otherStaged, displayName: nil))]))
+        try await importOne(bare, otherStaged)
+        bare.applyMakeupLook(id: "daily")
+        XCTAssertEqual(bare.currentRecipe.makeup, MakeupAdjustments(), "카탈로그가 없으면 룩을 고를 수 없다")
+        XCTAssertTrue(bare.makeupCatalog.isEmpty)
+        XCTAssertTrue(UserMessage.makeupCatalogUnavailable.contains("메이크업"))
+        XCTAssertNil(
+            AppModel.bundledMakeupCatalog(in: Bundle(for: AppModelTests.self)), "파일이 없는 번들은 nil(안내 문구로 바뀐다)")
+        XCTAssertEqual(AppModel.bundledMakeupCatalog()?.looks.count, 5, "앱 번들에서는 읽힌다")
     }
 }

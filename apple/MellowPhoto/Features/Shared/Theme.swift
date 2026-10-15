@@ -16,6 +16,11 @@ enum Theme {
     /// Mac 도구 줄 아래 스크롤 막대 자리. 막대가 버튼 글자를 가리지 않게 한다.
     static let toolStripScrollerInset: CGFloat = 12
     static let lookChipSize = CGSize(width: 64, height: 76)
+    /// 메이크업 룩 이름 칩의 최소 크기와 좌우 여백.
+    static let makeupChipSize = CGSize(width: 56, height: 30)
+    static let makeupChipPadding: CGFloat = 10
+    /// 메이크업 색 칩 지름.
+    static let makeupSwatchSize: CGFloat = 28
     static let cropHandleSize: CGFloat = 22
     /// 자르기 사각형의 최소 변. 정규화 단위.
     static let cropMinimumSide = 0.1

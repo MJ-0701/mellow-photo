@@ -154,6 +154,14 @@ enum TestSupport {
         return try LookCatalog(data: Data(contentsOf: url))
     }
 
+    /// 저장소의 공용 메이크업 카탈로그. 앱 번들과 같은 파일이다.
+    static func sharedMakeupCatalog() throws -> MakeupCatalog {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/makeup/makeup.v1.json")
+        return try MakeupCatalog(data: Data(contentsOf: url))
+    }
+
     /// box 안에 비율로 놓은 가짜 특징점 얼굴. 윤곽은 Vision처럼 한쪽 관자놀이에서 턱을 지나 반대쪽까지 17점이다.
     static func landmarkedFace(in box: NormalizedRect) -> FaceGeometry {
         func point(_ x: Double, _ y: Double) -> NormalizedPoint {
@@ -209,24 +217,28 @@ enum TestSupport {
         return BodyGeometry(joints: joints, confidence: joints.mapValues { _ in 1 })
     }
 
+    /// makeupCatalog가 nil이면 공용 파일을 읽는다. 카탈로그가 없는 경우는 .empty를 넘긴다.
     @MainActor
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
         personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), bodyAnalyzer: StubBodyAnalyzer = StubBodyAnalyzer(),
-        importer: FakeImporter = FakeImporter(), store: MemorySessionStore = MemorySessionStore()
+        makeupCatalog: MakeupCatalog? = nil, importer: FakeImporter = FakeImporter(),
+        store: MemorySessionStore = MemorySessionStore()
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
         try? copies.prepareDirectory()
         let catalog = (try? sharedLookCatalog()) ?? .empty
+        let makeup = makeupCatalog ?? (try? sharedMakeupCatalog()) ?? .empty
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
             pipeline: PhotoPipeline(
                 analyzer: analyzer, personAnalyzer: personAnalyzer, bodyAnalyzer: bodyAnalyzer, tuning: RenderTuning(),
-                lookCatalog: catalog),
+                lookCatalog: catalog, makeupCatalog: makeup),
             copies: copies,
             importer: importer,
             exporter: Exporter(renderer: Renderer()),
             lookCatalog: catalog,
+            makeupCatalog: makeup,
             renderDebounce: .milliseconds(10))
     }
 }

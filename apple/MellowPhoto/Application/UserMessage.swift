@@ -36,6 +36,12 @@ enum UserMessage {
     static let noBodyDetected = "몸의 관절을 찾지 못했어요"
     static let noBodyHint = "전신이 보이는 사진에서 동작합니다."
     static let bodyAnalysisUnavailableTitle = "체형 분석을 사용할 수 없어요"
+    static let toolMakeup = "메이크업"
+    static let makeupNoLook = "없음"
+    static let makeupPartsLabel = "메이크업 부위"
+    static let makeupIntensity = "강도"
+    static let makeupHint = "룩을 고른 뒤 부위마다 색과 강도를 바꿀 수 있어요. 부위를 바꾸면 룩 선택은 풀려요."
+    static let makeupCatalogUnavailable = "메이크업 목록을 읽지 못해 룩과 색을 쓸 수 없습니다."
     static let beautyTabSkin = "피부"
     static let beautyTabFace = "얼굴"
     static let beautyTabFeatures = "눈·입"
@@ -146,6 +152,17 @@ enum UserMessage {
         case .thighs: return "허벅지"
         case .shoulders: return "어깨"
         case .neck: return "목"
+        }
+    }
+
+    /// 메이크업 부위 탭 이름. 화면 순서는 MakeupPart.allCases.
+    static func makeupPartTitle(_ part: MakeupPart) -> String {
+        switch part {
+        case .lip: return "립"
+        case .blush: return "블러셔"
+        case .eyeshadow: return "아이섀도"
+        case .brow: return "눈썹"
+        case .contour: return "쉐딩"
         }
     }
 

@@ -65,6 +65,9 @@ final class AppModel {
         /// 앱 번들에 든 룩 카탈로그 파일. shared/looks/looks.v1.json과 같은 내용이다.
         static let bundledLookCatalogName = "looks.v1"
         static let bundledLookCatalogExtension = "json"
+        /// 앱 번들에 든 메이크업 카탈로그 파일. shared/makeup/makeup.v1.json과 같은 내용이다.
+        static let bundledMakeupCatalogName = "makeup.v1"
+        static let bundledMakeupCatalogExtension = "json"
     }
 
     let session: ProjectSession
@@ -73,6 +76,7 @@ final class AppModel {
     let importer: any PhotoImporter
     let exporter: Exporter
     let lookCatalog: LookCatalog
+    let makeupCatalog: MakeupCatalog
 
     var thumbnails: [PhotoID: CGImage] = [:]
     /// 사진별 룩 썸네일. 키가 사진 id라서 늦게 온 결과가 다른 사진에 붙지 않는다.
@@ -100,6 +104,8 @@ final class AppModel {
     var tool: EditorTool = .look
     /// 뷰티 도구에서 마지막으로 본 탭. 도구를 바꿔도 유지한다.
     var beautyTab: BeautyTab = .skin
+    /// 메이크업 도구에서 마지막으로 본 부위. 도구를 바꿔도 유지한다.
+    var makeupPart: MakeupPart = .lip
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
@@ -121,7 +127,8 @@ final class AppModel {
 
     init(
         session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
-        exporter: Exporter, lookCatalog: LookCatalog = .empty, renderDebounce: Duration = Policy.renderDebounce
+        exporter: Exporter, lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty,
+        renderDebounce: Duration = Policy.renderDebounce
     ) {
         self.session = session
         self.pipeline = pipeline
@@ -129,6 +136,7 @@ final class AppModel {
         self.importer = importer
         self.exporter = exporter
         self.lookCatalog = lookCatalog
+        self.makeupCatalog = makeupCatalog
         renderScheduler = RenderScheduler(debounce: renderDebounce)
     }
 

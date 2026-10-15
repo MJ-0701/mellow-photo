@@ -69,6 +69,7 @@
 		EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */; };
 		EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541985795F5FEE15374903C /* BeautyTab.swift */; };
 		F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7451F7A8E9DE87961267F974 /* Theme.swift */; };
+		F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119D17BD418BDE81F1E2622E /* MakeupPanel.swift */; };
 		F5DF1BAF787449CB212DA9A0 /* InfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540B90F0C598F262D4039570 /* InfoSheet.swift */; };
 		FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205D153168A529D037BF40EE /* ThumbnailCell.swift */; };
 /* End PBXBuildFile section */
@@ -90,6 +91,7 @@
 		0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotosTests.swift; sourceTree = "<group>"; };
 		0D9139D4C642B3B57F110390 /* CropPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropPanel.swift; sourceTree = "<group>"; };
 		0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MellowPhoto-macOS.entitlements"; sourceTree = "<group>"; };
+		119D17BD418BDE81F1E2622E /* MakeupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MakeupPanel.swift; sourceTree = "<group>"; };
 		14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		205D153168A529D037BF40EE /* ThumbnailCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCell.swift; sourceTree = "<group>"; };
 		22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresets.swift; sourceTree = "<group>"; };
@@ -239,6 +241,7 @@
 				0D9139D4C642B3B57F110390 /* CropPanel.swift */,
 				C0C781535D14BC45ED308E3C /* EditorScene.swift */,
 				3FB3268705F4B92286899B4B /* LookPanel.swift */,
+				119D17BD418BDE81F1E2622E /* MakeupPanel.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
 				0AFA6571D26629D5ED075E50 /* ToolStrip.swift */,
 			);
@@ -516,6 +519,7 @@
 				94DCFD6C43D5566F3B20C7F3 /* LegacyMacPresets.swift in Sources */,
 				5BFCA6346B9B46D2B0F73FFD /* LibrarySidebar.swift in Sources */,
 				61873CD9B42105AA437C882A /* LookPanel.swift in Sources */,
+				F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */,
 				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
 				CF26FC52CE99423A4017446D /* PhotoCanvasView.swift in Sources */,
 				BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */,
