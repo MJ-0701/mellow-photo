@@ -111,6 +111,20 @@ public struct RenderTuning: Sendable {
     /// 치아로 보는 붉은기(감마 Cr) 상한과 0이 되는 폭. 누런 치아는 0.04 안팎, 잇몸·혀·입술은 0.15 이상이다.
     public var teethRednessMax: Double = 0.08
     public var teethRednessRamp: Double = 0.04
+    /// 눈 또렷하게 1에서 흰자를 흰색 쪽으로 섞는 비율(sRGB 감마 값). sRGB 199 회색 흰자가 약 210이 된다.
+    public var eyeWhiteLift: Double = 0.2
+    /// 눈 또렷하게 1에서 홍채의 CISharpenLuminance 선명도. 필터 기본값 0.4의 두 배.
+    public var eyeIrisSharpen: Double = 0.8
+    /// 홍채 선명하게의 반지름. 눈동자 반지름 비율. 미리보기 눈동자 15px에서 1.5px, 원본에서는 비례해 커진다.
+    public var eyeIrisSharpenRadiusFraction: Double = 0.1
+    /// 치아 미백 1에서 노란기(음의 감마 Cb)를 0 쪽으로 옮기는 비율.
+    public var teethYellowRemoval: Double = 0.7
+    /// 치아 미백 1에서 흰색 쪽으로 섞는 비율.
+    public var teethLift: Double = 0.12
+    /// 입술 생기 1에서 Cb·Cr 배율에 더하는 값(1.3배).
+    public var lipSaturationMax: Double = 0.3
+    /// 입술 생기 1에서 감마 Cr에 더하는 붉은기.
+    public var lipRednessMax: Double = 0.02
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000

@@ -10,6 +10,15 @@ final class FeatureRegionsTests: XCTestCase {
     private let extent = SyntheticFace.extent
     private let tuning = RenderTuning()
 
+    /// 왼눈 위끝(314) 바로 위 눈꺼풀.
+    private static let upperLid = CGPoint(x: 200, y: 316)
+    /// 가중치 표본 단색 이미지의 한 변(픽셀).
+    private static let weightSampleSize = 8
+    /// 흰자 휘도 시작점(0.45)보다 어두운 회색.
+    private static let darkGray = CIColor(red: 0.3, green: 0.3, blue: 0.3)
+    /// 흰자만큼 밝지만 채도가 높은 피부.
+    private static let brightSkin = CIColor(red: 0.95, green: 0.72, blue: 0.6)
+
     func testEyeMaskCoversEyesAndIsZeroOutsideTheirBounds() throws {
         let face = SyntheticFace.makeFeatures().face
         let mask = try XCTUnwrap(FaceRegions.eyeMask(face: face, extent: extent, tuning: tuning))
@@ -38,6 +47,30 @@ final class FeatureRegionsTests: XCTestCase {
         XCTAssertEqual(fallback.count, 2)
         XCTAssertEqual(fallback[1].center.x, SyntheticFace.rightEye.x, accuracy: 1e-6, "동공이 없으면 눈 다각형 가운데")
         XCTAssertEqual(fallback[1].center.y, SyntheticFace.rightEye.y, accuracy: 1e-6)
+    }
+
+    func testIrisMaskCoversIrisOnly() throws {
+        let face = SyntheticFace.makeFeatures().face
+        let mask = try XCTUnwrap(FaceRegions.irisMask(face: face, extent: extent, tuning: tuning))
+        let pixels = try Support.grid(mask.image)
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.leftEye), 250, "눈동자 가운데")
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.rightEye), 250)
+        XCTAssertEqual(pixels.red(SyntheticFace.scleraPoint), 0, "눈 안이지만 눈동자 밖(흰자)")
+        XCTAssertEqual(pixels.red(Self.upperLid), 0, "위 눈꺼풀")
+        XCTAssertEqual(pixels.red(SyntheticFace.lidSkin), 0)
+    }
+
+    func testScleraWeightKeepsBrightPlainPixelsOnly() throws {
+        let rule = ToneRule.sclera(tuning)
+        func weight(_ color: CIColor) throws -> Float {
+            let image = Support.solid(color, size: Self.weightSampleSize)
+            let weighted = try FeatureKernels.shared.weight(of: image, rule: rule, extent: image.extent)
+            return try Support.renderer.readPixels(weighted)[0]
+        }
+        XCTAssertGreaterThan(try weight(SyntheticFace.scleraColor), 0.9, "밝고 무채색인 흰자")
+        XCTAssertLessThan(try weight(Self.darkGray), 0.1, "어두운 회색")
+        XCTAssertLessThan(try weight(Self.brightSkin), 0.1, "밝지만 색이 있는 피부")
+        XCTAssertLessThan(try weight(SyntheticFace.irisRingColors[1]), 0.1, "홍채")
     }
 
     func testTeethMaskKeepsTeethAndDropsRedLipInsideThePolygon() throws {

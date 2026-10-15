@@ -28,6 +28,8 @@ enum FaceRegions {
     private static let cheekSampleScale: CGFloat = 0.6
     /// 다각형 하나가 되려면 필요한 점 수.
     private static let minimumPolygonPoints = 3
+    /// 눈·입 마스크의 cut 선 굵기. 0은 CGContext의 가장 가는 선이라 cut 경계를 넓히지 않는다.
+    private static let featureCutWidth: CGFloat = 0
 
     /// 특징점이 없을 때 쓰는 부위 위치. 얼굴 상자 안의 비율이다.
     private enum FallbackFeature {
@@ -350,7 +352,7 @@ enum FaceRegions {
     }
 
     /// 다각형 마스크를 얼굴 폭 × featureMaskFeather로 흐리고 경계 상자 + 흐림 4배 여백 밖을 0으로 자른다.
-    /// cut은 넓히지 않는다(선 굵기 0은 CGContext의 가장 가는 선이다).
+    /// cut은 넓히지 않는다(featureCutWidth).
     private static func featheredPolygonMask(
         fill: [[CGPoint]], cut: [[CGPoint]], face: FaceGeometry, extent: CGRect, tuning: RenderTuning,
         cache: RegionMaskCache?
@@ -360,7 +362,8 @@ enum FaceRegions {
         let padding = feather * boundsPaddingInFeathers
         let bounds = boundingRect(fill.flatMap { $0 }).insetBy(dx: -padding, dy: -padding).intersection(extent).integral
         guard !bounds.isEmpty else { return nil }
-        let raster = polygonMask(fill: fill, cut: cut, cutWidth: 0, extent: extent, tuning: tuning, cache: cache)
+        let raster = polygonMask(
+            fill: fill, cut: cut, cutWidth: featureCutWidth, extent: extent, tuning: tuning, cache: cache)
         let black = CIImage(color: .black).cropped(to: extent)
         let image = raster.clampedToExtent()
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: feather])
