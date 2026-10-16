@@ -229,9 +229,9 @@ platform :ios do
     end
     group = app.get_beta_groups.find { |candidate| candidate.name == TESTFLIGHT_GROUPS.first }
     UI.user_error!("Beta group #{TESTFLIGHT_GROUPS.first} not found") unless group
-    group.post_bulk_beta_tester_assignments(beta_testers: [
-      { email: email, firstName: first_name, lastName: last_name, errors: [] }
-    ])
+    # Apple removed bulkBetaTesterAssignments; POST /v1/betaTesters with the group relationship is the supported path.
+    Spaceship::ConnectAPI.post_beta_tester_assignment(beta_group_ids: [group.id],
+      attributes: { email: email, firstName: first_name, lastName: last_name })
     UI.success("Added to #{group.name}. Builds already in that group are available now.")
   end
 
