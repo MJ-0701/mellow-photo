@@ -231,7 +231,7 @@ platform :ios do
     UI.user_error!("Beta group #{TESTFLIGHT_GROUPS.first} not found") unless group
     # Apple removed bulkBetaTesterAssignments. A person already known as a tester (e.g. external) is linked
     # to the group by id; only a brand-new tester is created with the group relationship.
-    existing = Spaceship::ConnectAPI::BetaTester.find(email: email).first
+    existing = Spaceship::ConnectAPI::BetaTester.find(email: email)
     if existing
       group.add_beta_testers(beta_tester_ids: [existing.id])
     else
