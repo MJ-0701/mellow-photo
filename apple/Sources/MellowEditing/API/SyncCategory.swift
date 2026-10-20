@@ -26,4 +26,16 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
         case .color, .effects, .background, .body, .bodySkin: return false
         }
     }
+
+    /// 이 항목이 층에서 다루는 키.
+    /// 얼굴 의존 항목만 값이 있다.
+    public var portraitKeys: Set<PortraitKey>? {
+        switch self {
+        case .skin: return PortraitKey.skin
+        case .faceShape: return PortraitKey.faceShape
+        case .features: return PortraitKey.features
+        case .makeup: return PortraitKey.makeup
+        case .color, .effects, .background, .body, .bodySkin: return nil
+        }
+    }
 }

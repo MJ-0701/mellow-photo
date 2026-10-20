@@ -141,22 +141,26 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
-    /// 잠긴 사진은 얼굴형·체형도 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
+    /// 전체 층과 성별 그룹 층을 통째로 바꾸고 개인 층·성별 지정은 그대로 둔다.
+    /// 잠긴 사진은 전체 층과 그룹 층의 얼굴형·체형을 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
     public mutating func apply(_ values: PresetValues) {
-        let updated = merged(values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all)
+        let updated = merged(
+            values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all, clearsIndividuals: false)
         guard updated != recipe else { return }
         checkpoint()
         recipe = updated
     }
 
-    /// 다른 사진의 설정을 일괄 복사. 고른 항목만 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
+    /// 다른 사진의 설정을 일괄 복사. 고른 항목만 전체·그룹 층에 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
+    /// 복사한 얼굴 의존 항목은 받는 사진의 개인 층에서 그 키를 지운다. 성별 지정·anchor는 그대로다.
     /// 잠기지 않은 사진은 얼굴 의존 항목을 복사할 때만 대상 얼굴을 전체로 되돌린다.
     /// 바뀌는 값이 없으면(잠긴 사진에 얼굴형만 복사하는 경우 등) 실행 취소 단계를 만들지 않는다.
     public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
         guard !categories.isEmpty else { return }
         let resetsTarget = !isGeometryLocked && categories.contains { $0.dependsOnFaces }
         let updated = merged(
-            values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories)
+            values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories,
+            clearsIndividuals: true)
         guard updated != recipe else { return }
         checkpoint()
         recipe = updated
@@ -204,38 +208,79 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 고른 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
-    private func merged(_ values: PresetValues, targetFace: Int?, categories: Set<SyncCategory>) -> EditRecipe {
+    /// 얼굴 의존 항목은 그룹 층의 그 키도 바꾸고, clearsIndividuals면 개인 층에서 그 키를 지운다.
+    /// 잠긴 사진에서 건너뛴 얼굴형은 개인 층에서도 지우지 않는다.
+    private func merged(
+        _ values: PresetValues, targetFace: Int?, categories: Set<SyncCategory>, clearsIndividuals: Bool
+    ) -> EditRecipe {
         var updated = recipe
-        if categories.contains(.color) {
+        var applied = categories
+        if isGeometryLocked {
+            applied.remove(.faceShape)
+            applied.remove(.body)
+        }
+        if applied.contains(.color) {
             updated.color = values.color
             updated.detail = values.detail
         }
-        if categories.contains(.effects) {
+        if applied.contains(.effects) {
             updated.effects = values.effects
         }
-        if categories.contains(.skin) {
+        if applied.contains(.skin) {
             updated.portrait.skin = values.portrait.skin
         }
-        if categories.contains(.faceShape), !isGeometryLocked {
+        if applied.contains(.faceShape) {
             updated.portrait.face = values.portrait.face
         }
-        if categories.contains(.features) {
+        if applied.contains(.features) {
             updated.portrait.features = values.portrait.features
         }
-        if categories.contains(.makeup) {
+        if applied.contains(.makeup) {
             updated.makeup = values.makeup
         }
-        if categories.contains(.background) {
+        if applied.contains(.background) {
             updated.background = values.background
         }
-        if categories.contains(.body), !isGeometryLocked {
+        if applied.contains(.body) {
             updated.body = values.body
         }
-        if categories.contains(.bodySkin) {
+        if applied.contains(.bodySkin) {
             updated.bodySkin = values.bodySkin
         }
+        for keys in applied.compactMap(\.portraitKeys) {
+            for gender in Gender.allCases {
+                var group = updated.people.groups[gender] ?? PortraitLayer()
+                Self.copy(keys, from: values.people.groups[gender] ?? PortraitLayer(), into: &group)
+                updated.people.groups[gender] = group
+            }
+            if clearsIndividuals {
+                for index in updated.people.individuals.indices {
+                    updated.people.individuals[index].layer.remove(keys)
+                }
+            }
+        }
+        updated.people.prune()
         updated.portrait.targetFace = targetFace
         return updated
+    }
+
+    /// target의 keys를 source의 값으로 바꾼다(source에 없는 키는 지움).
+    /// 메이크업 전부를 옮기면 룩 이름도 옮긴다.
+    private static func copy(_ keys: Set<PortraitKey>, from source: PortraitLayer, into target: inout PortraitLayer) {
+        target.remove(keys)
+        for key in keys.intersection(source.overriddenKeys) {
+            switch key {
+            case .skinSmoothing: target.skinSmoothing = source.skinSmoothing
+            case .autoBlemish: target.autoBlemish = source.autoBlemish
+            case .skinRefinement(let refinement): target.skinRefinement[refinement] = source.skinRefinement[refinement]
+            case .faceShape(let shape): target.face[shape] = source.face[shape]
+            case .feature(let feature): target.features[feature] = source.features[feature]
+            case .makeupPart(let part): target.makeup[part] = source.makeup[part]
+            }
+        }
+        if keys.isSuperset(of: PortraitKey.makeup) {
+            target.makeupLookID = source.makeupLookID
+        }
     }
 
     /// 빈 기록과 빈 그룹 층을 지운 뒤 값이 그대로면 체크포인트 없이 끝낸다.

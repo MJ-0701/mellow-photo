@@ -239,4 +239,26 @@ final class ProjectSessionTests: XCTestCase {
         session.applyToAll(from: source.id, categories: [.color])
         XCTAssertEqual(store.saveCount, edited + 1, "바뀐 사진이 있으면 한 번 저장한다")
     }
+
+    func testApplyToAllCarriesGroupLayersNotIndividuals() throws {
+        let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        let anchor = PersonAnchor(x: 0.3, y: 0.5, width: 0.2)
+        session.edit(source.id) { $0.set(.skinSmoothing(0.6), in: .gender(.female)) }
+        session.edit(source.id) { $0.set(.skinSmoothing(0.9), forPersonAt: anchor) }
+        session.edit(other.id) { $0.set(.gender(.male), forPersonAt: anchor) }
+        session.edit(other.id) { $0.set(.skinSmoothing(0.2), forPersonAt: anchor) }
+        session.applyToAll(from: source.id, categories: [.skin])
+        let received = session.photos[1].document.recipe
+        XCTAssertEqual(received.people.groups[.female], PortraitLayer(skinSmoothing: 0.6), "그룹 층은 복사")
+        XCTAssertEqual(received.people.individuals.count, 1)
+        XCTAssertEqual(received.people.individuals[0].gender, .male, "받는 사진의 성별 지정은 남는다")
+        XCTAssertTrue(received.people.individuals[0].layer.isEmpty, "받는 사진의 개인 피부 키는 빠진다")
+        XCTAssertEqual(
+            session.photos[0].document.recipe.people.individuals[0].layer.skinSmoothing, 0.9,
+            "원본의 개인 층은 복사되지 않고 그대로")
+    }
 }

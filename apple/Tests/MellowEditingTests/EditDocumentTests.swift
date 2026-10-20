@@ -620,15 +620,16 @@ final class EditDocumentTests: XCTestCase {
         for key in EffectKey.allCases {
             values.effects[key] = 0.3
         }
+        values.people.groups[.male] = PortraitLayer(skinSmoothing: 0.4, face: [.jaw: -0.2])
+        values.people.groups[.female] = PortraitLayer(
+            features: [.eyeBrighten: 0.3], makeup: [.lip: MakeupTint(colorID: "lip-test", intensity: 0.5)])
         return values
     }
 
     func testBatchWithAllCategoriesCopiesEveryPresetGroup() {
         let values = filledPresetValues()
         let defaults = PresetValues()
-        // people(성별 그룹 층)은 H2 Task 4가 동기화 층 규칙을 넣을 때 채우고 이 제외를 지운다.
-        let groups = zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children)
-        for (filled, empty) in groups where filled.label != "people" {
+        for (filled, empty) in zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children) {
             XCTAssertNotEqual(
                 String(describing: filled.value), String(describing: empty.value), "\(filled.label ?? "") 그룹을 채운다")
         }
@@ -811,5 +812,73 @@ final class EditDocumentTests: XCTestCase {
         looked.applyMakeupLook(nil, in: .gender(.female))
         XCTAssertEqual(looked.recipe.people.groups[.female]?.makeup.count, 5, "층의 룩 없음은 다섯 부위를 0으로 덮어쓴다")
         XCTAssertTrue(looked.recipe.people.groups[.female]!.makeup.values.allSatisfy { $0.intensity == 0 })
+    }
+
+    func testPresetKeepsIndividualsAndGenderButReplacesGroups() {
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.8), in: .gender(.female))
+        document.set(.gender(.female), forPersonAt: faceAnchor)
+        document.set(.faceShape(.width, -0.3), forPersonAt: faceAnchor)
+        let id = document.recipe.people.individuals[0].id
+        var values = PresetValues(color: ColorAdjustments(exposure: 0.2))
+        values.people.groups[.male] = PortraitLayer(skinSmoothing: 0.1)
+        document.apply(values)
+        XCTAssertEqual(document.recipe.people.groups, [.male: PortraitLayer(skinSmoothing: 0.1)], "그룹 층은 통째로 바뀐다")
+        XCTAssertEqual(document.recipe.people.person(id)?.gender, .female)
+        XCTAssertEqual(document.recipe.people.person(id)?.layer, PortraitLayer(face: [.width: -0.3]), "개인 층은 그대로")
+        var locked = EditDocument()
+        locked.set(.faceShape(.jaw, 0.2), in: .gender(.female))
+        locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        var shaping = PresetValues()
+        shaping.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, face: [.jaw: 0.9])
+        locked.apply(shaping)
+        XCTAssertEqual(
+            locked.recipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.5, face: [.jaw: 0.2]),
+            "잠긴 사진은 그룹의 얼굴형도 보존하고 나머지는 받는다")
+        XCTAssertNil(SyncCategory.color.portraitKeys)
+        XCTAssertEqual(SyncCategory.skin.portraitKeys, PortraitKey.skin)
+        XCTAssertEqual(SyncCategory.makeup.portraitKeys, PortraitKey.makeup)
+    }
+
+    func testBatchSyncCopiesGroupsAndClearsIndividualKeysOfSyncedCategories() {
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.9), in: .gender(.male))
+        document.set(.gender(.female), forPersonAt: faceAnchor)
+        document.set(.skinSmoothing(0.7), forPersonAt: faceAnchor)
+        document.set(.faceShape(.width, -0.3), forPersonAt: faceAnchor)
+        document.set(.makeupColor(.lip, "lip-rose"), forPersonAt: faceAnchor)
+        let id = document.recipe.people.individuals[0].id
+        var values = PresetValues(color: ColorAdjustments(exposure: 0.3))
+        values.portrait.skin.smoothing = 0.4
+        values.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, face: [.jaw: 0.2])
+        document.applyFromBatch(values, categories: [.color])
+        XCTAssertEqual(document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(document.recipe.people.groups[.male], PortraitLayer(skinSmoothing: 0.9), "색감만이면 그룹도 그대로")
+        XCTAssertEqual(
+            document.recipe.people.person(id)?.layer.overriddenKeys,
+            [.skinSmoothing, .faceShape(.width), .makeupPart(.lip)])
+        document.applyFromBatch(values, categories: [.skin])
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.4)
+        XCTAssertNil(document.recipe.people.groups[.male], "원본에 없는 그룹의 피부 키는 지운다")
+        XCTAssertEqual(
+            document.recipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.5), "그룹의 피부 키만 복사하고 얼굴형은 아직 아님")
+        let person = document.recipe.people.person(id)
+        XCTAssertEqual(person?.layer.overriddenKeys, [.faceShape(.width), .makeupPart(.lip)], "개인 층의 피부 키만 빠진다")
+        XCTAssertEqual(person?.gender, .female, "성별 지정은 남는다")
+        XCTAssertEqual(person?.anchor, faceAnchor)
+        var locked = document
+        locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        locked.applyFromBatch(values, categories: [.faceShape, .makeup])
+        XCTAssertEqual(
+            locked.recipe.people.person(id)?.layer.overriddenKeys, [.faceShape(.width)],
+            "잠긴 사진은 얼굴형을 건너뛰어 개인 얼굴형 키도 남는다")
+        XCTAssertNil(locked.recipe.people.groups[.female]?.face[.jaw])
+        document.applyFromBatch(values, categories: [.faceShape, .makeup])
+        XCTAssertEqual(document.recipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.5, face: [.jaw: 0.2]))
+        XCTAssertEqual(document.recipe.people.person(id)?.layer, PortraitLayer(), "얼굴형·메이크업 키까지 빠져 층이 빈다")
+        XCTAssertEqual(document.recipe.people.person(id)?.gender, .female, "성별이 있어 기록은 남는다")
+        let steps = document.undoStack.count
+        document.applyFromBatch(values, categories: [.faceShape, .makeup])
+        XCTAssertEqual(document.undoStack.count, steps, "바뀐 것이 없는 동기화는 단계를 만들지 않는다")
     }
 }
