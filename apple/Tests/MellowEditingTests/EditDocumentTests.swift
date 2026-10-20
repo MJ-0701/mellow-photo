@@ -767,6 +767,44 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertNil(document.resetOverrides([.skinSmoothing], in: .gender(.male)), "얼굴형이 아닌 키만이면 허용")
         XCTAssertEqual(document.recipe.people.groups[.male], PortraitLayer(face: [.jaw: 0.4]))
         XCTAssertEqual(document.resetOverrides(in: .person(PersonID())), .unknownPerson)
+        XCTAssertNil(document.resetOverrides([.faceShape(.width)], in: .all), "전체 층에서 이미 0인 얼굴형은 잠겨도 되돌릴 수 있다")
+        var locked = EditDocument()
+        locked.set(.faceShape(.jaw, 0.2))
+        locked.set(.skinSmoothing(0.5))
+        locked.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        XCTAssertEqual(
+            locked.resetOverrides([.faceShape(.jaw)], in: .all), .geometryLocked, "0이 아닌 얼굴형을 되돌리면 거절")
+        XCTAssertEqual(locked.resetOverrides(in: .all), .geometryLocked, "전체 초기화도 얼굴형이 바뀌면 거절")
+        XCTAssertNil(locked.resetOverrides(PortraitKey.skin, in: .all))
+        XCTAssertEqual(locked.recipe.portrait.skin.smoothing, 0)
+        XCTAssertEqual(locked.recipe.portrait.face.jaw, 0.2)
+    }
+
+    func testRebindAndRemoveOnALockedPhotoRespectTheGenderGroupFaceShape() {
+        let spot = LocalEdit.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02))
+        let elsewhere = PersonAnchor(faceBox: twoFaces[1])
+        var grouped = EditDocument()
+        grouped.set(.gender(.female), forFace: 0, of: twoFaces)
+        grouped.set(.skinSmoothing(0.4), forFace: 0, of: twoFaces)
+        grouped.set(.faceShape(.jaw, 0.3), in: .gender(.female))
+        let id = grouped.recipe.people.individuals[0].id
+        grouped.appendLocalEdit(spot)
+        XCTAssertEqual(grouped.rebindPerson(id, to: elsewhere), .geometryLocked, "여성 그룹의 얼굴형이 다른 얼굴로 옮겨 간다")
+        XCTAssertEqual(grouped.removePerson(id), .geometryLocked, "지우면 여성 그룹의 얼굴형이 그 얼굴에서 빠진다")
+        XCTAssertEqual(grouped.recipe.people.person(id)?.anchor, faceAnchor)
+        var otherGroup = EditDocument()
+        otherGroup.set(.gender(.female), forFace: 0, of: twoFaces)
+        otherGroup.set(.faceShape(.jaw, 0.3), in: .gender(.male))
+        let otherID = otherGroup.recipe.people.individuals[0].id
+        otherGroup.appendLocalEdit(spot)
+        XCTAssertNil(otherGroup.rebindPerson(otherID, to: elsewhere), "다른 그룹의 얼굴형은 이 사람에게 걸리지 않는다")
+        XCTAssertNil(otherGroup.removePerson(otherID))
+        XCTAssertTrue(otherGroup.recipe.people.individuals.isEmpty)
+        var own = EditDocument()
+        own.set(.faceShape(.width, -0.2), forFace: 0, of: twoFaces)
+        let ownID = own.recipe.people.individuals[0].id
+        own.appendLocalEdit(spot)
+        XCTAssertEqual(own.removePerson(ownID), .geometryLocked, "기록 층의 얼굴형도 그대로 잠근다")
     }
 
     func testRebindRemoveBindLegacyAndScopedLookAreOneUndoStep() throws {

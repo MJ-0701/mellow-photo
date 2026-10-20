@@ -131,7 +131,8 @@ enum UserMessage {
         }
     }
 
-    /// 찾은 얼굴 대상 이름. 왼쪽부터 센 번호다.
+    /// 찾은 얼굴 대상 이름.
+    /// 왼쪽부터 센 번호다.
     static func beautyTargetFace(_ number: Int) -> String {
         "사람 \(number)"
     }

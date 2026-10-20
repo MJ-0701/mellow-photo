@@ -528,6 +528,12 @@ final class EditRecipeCodingTests: XCTestCase {
         manual.migrateLegacyTargetFace(2)
         XCTAssertEqual(manual.people.individuals[0].id, .legacy(index: 2))
         XCTAssertEqual(manual.portrait.skin.smoothing, 0)
+        var withPeople = EditRecipe()
+        withPeople.portrait.skin.smoothing = 0.3
+        withPeople.people.individuals = [PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male)]
+        let before = withPeople
+        withPeople.migrateLegacyTargetFace(0)
+        XCTAssertEqual(withPeople, before, "사람 기록이 이미 있으면 이행하지 않고 기존 기록을 덮어쓰지 않는다")
     }
 
     func testPortraitAdjustmentsNoLongerCarryATargetFace() throws {

@@ -1,6 +1,7 @@
 import MellowShared
 
-/// "전체 사진에 적용"이 복사할 수 있는 항목. 레시피 그룹과의 대응과 잠금·개인 층 규칙은 EditDocument.applyFromBatch에 있다.
+/// "전체 사진에 적용"이 복사할 수 있는 항목.
+/// 레시피 그룹과의 대응과 잠금·개인 층 규칙은 EditDocument.applyFromBatch에 있다.
 public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     /// 색감 + 디테일.
     case color
@@ -19,7 +20,8 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
     public var id: Self { self }
     public static let all = Set(allCases)
 
-    /// 얼굴에 의존하는 항목. 복사하면 받는 사진의 개인 층에서 그 항목의 키를 지운다.
+    /// 얼굴에 의존하는 항목.
+    /// 복사하면 받는 사진의 개인 층에서 그 항목의 키를 지운다.
     public var dependsOnFaces: Bool {
         switch self {
         case .skin, .faceShape, .features, .makeup: return true

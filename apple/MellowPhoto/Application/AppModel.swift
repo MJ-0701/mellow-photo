@@ -269,7 +269,8 @@ final class AppModel {
         }
     }
 
-    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상이 가리키는 얼굴(전체·그룹이면 전부)에 특징점이 없으면 noLandmarks다.
+    /// 선택 사진의 뷰티·메이크업 얼굴 상태.
+    /// 대상이 가리키는 얼굴(전체·그룹이면 전부)에 특징점이 없으면 noLandmarks다.
     var faceAvailability: FaceAvailability {
         if let failure = selectedInfo?.faceAnalysisFailure {
             return .unavailable(failure)

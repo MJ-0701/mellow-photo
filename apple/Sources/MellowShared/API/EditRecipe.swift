@@ -89,7 +89,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     /// 옮길 값이 없으면 기록을 만들지 않는다.
     /// 음수·거대한 인덱스(손상 파일)는 범위의 마지막 값으로 모은다.
     /// 어느 얼굴과도 짝이 되지 않아 옛 결과(빈 대상)와 같다.
+    /// 사람 기록이 이미 있으면 아무것도 하지 않는다(디코더와 같은 조건, 기존 기록을 덮어쓰지 않는다).
     public mutating func migrateLegacyTargetFace(_ index: Int) {
+        guard people.individuals.isEmpty else { return }
         let layer = PortraitLayer.difference(portrait: portrait, makeup: makeup)
         portrait = PortraitAdjustments()
         makeup = MakeupAdjustments()

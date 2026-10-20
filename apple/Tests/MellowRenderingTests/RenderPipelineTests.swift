@@ -97,6 +97,19 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(
             try Support.bytes(Support.render(input, recipe: outOfRange, faces: [left, right])),
             try Support.bytes(input), "범위 밖 인덱스는 아무 얼굴도 고치지 않는다")
+        // 옛 세션은 anchor 없이 legacyIndex로 읽혀 짝짓기의 legacyIndex 폴백으로 그 얼굴에 걸린다.
+        let legacyJSON = #"{"schemaVersion":2,"portrait":{"targetFace":1,"skin":{"smoothing":1}}}"#
+        let legacy = try JSONDecoder().decode(EditRecipe.self, from: Data(legacyJSON.utf8))
+        XCTAssertNil(legacy.people.individuals.first?.anchor)
+        XCTAssertEqual(legacy.people.individuals.first?.legacyIndex, 1)
+        let legacyBytes = try Support.bytes(Support.render(input, recipe: legacy, faces: [left, right]))
+        XCTAssertEqual(
+            legacyBytes,
+            try Support.bytes(
+                Support.render(
+                    input, recipe: Support.restricted(all, toFace: 1, of: [left, right]), faces: [left, right])),
+            "옛 targetFace 1은 오른쪽 얼굴에만 건 것과 같은 바이트")
+        XCTAssertNotEqual(legacyBytes, try Support.bytes(Support.render(input, recipe: all, faces: [left, right])))
     }
 
     func testFaceWidthWorksInBothDirections() throws {

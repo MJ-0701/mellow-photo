@@ -161,7 +161,8 @@ extension AppModel {
         }
     }
 
-    /// 프리셋은 사람을 고르지 않는다. 개인 층은 사진마다 사람이 달라 저장하지 않는다.
+    /// 프리셋은 사람을 고르지 않는다.
+    /// 개인 층은 사진마다 사람이 달라 저장하지 않는다.
     func savePreset(named name: String) {
         // 프리셋은 전체 층과 성별 그룹 층만 담는다(PresetValues(of:)가 개인 층을 버린다).
         session.addPreset(named: name, values: PresetValues(of: currentRecipe))

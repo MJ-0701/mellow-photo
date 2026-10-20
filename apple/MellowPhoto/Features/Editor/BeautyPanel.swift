@@ -2,7 +2,8 @@ import MellowEditing
 import MellowShared
 import SwiftUI
 
-/// 뷰티 도구. 대상 선택은 탭 위에 두고, 탭마다 대상 층까지 겹친 값을 슬라이더로 보여준다.
+/// 뷰티 도구.
+/// 대상 선택은 탭 위에 두고, 탭마다 대상 층까지 겹친 값을 슬라이더로 보여준다.
 struct BeautyPanel: View {
     @Environment(AppModel.self) private var model
 

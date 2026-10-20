@@ -1,6 +1,7 @@
 import MellowShared
 
-/// 사진 한 장의 편집 상태. 체크포인트·잠금·보존 규칙은 전부 여기에만 있다.
+/// 사진 한 장의 편집 상태.
+/// 체크포인트·잠금·보존 규칙은 전부 여기에만 있다.
 public struct EditDocument: Equatable, Sendable {
     public enum Rejection: Equatable, Sendable {
         case geometryLocked
@@ -104,11 +105,11 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 찾지 못한 사람을 다른 얼굴에 연결한다(체크포인트 한 번).
-    /// 얼굴형 키가 있고 잠겼으면 거절한다.
+    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형 키가 있으면 거절한다(carriesFaceShape).
     @discardableResult
     public mutating func rebindPerson(_ id: PersonID, to anchor: PersonAnchor) -> Rejection? {
         guard let index = recipe.people.individuals.firstIndex(where: { $0.id == id }) else { return .unknownPerson }
-        if isGeometryLocked, recipe.people.individuals[index].layer.overriddenKeys.contains(where: \.isFaceShape) {
+        if isGeometryLocked, carriesFaceShape(recipe.people.individuals[index]) {
             return .geometryLocked
         }
         var updated = recipe
@@ -118,16 +119,24 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사람 기록을 지운다(체크포인트 한 번).
-    /// 얼굴형 키가 있고 잠겼으면 거절한다.
+    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형 키가 있으면 거절한다(carriesFaceShape).
     @discardableResult
     public mutating func removePerson(_ id: PersonID) -> Rejection? {
         guard let index = recipe.people.individuals.firstIndex(where: { $0.id == id }) else { return .unknownPerson }
-        if isGeometryLocked, recipe.people.individuals[index].layer.overriddenKeys.contains(where: \.isFaceShape) {
+        if isGeometryLocked, carriesFaceShape(recipe.people.individuals[index]) {
             return .geometryLocked
         }
         var updated = recipe
         updated.people.individuals.remove(at: index)
         return commit(updated)
+    }
+
+    /// 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형 키가 있는지.
+    /// 그 기록을 옮기거나 지우면 그 얼굴형 값이 얼굴 사이를 옮겨 가 수동 편집 좌표가 어긋난다.
+    /// 편집 규칙은 자동 추정을 모르므로 그룹은 수동 성별로만 고른다.
+    private func carriesFaceShape(_ record: PersonRecord) -> Bool {
+        let group = record.gender.flatMap { recipe.people.groups[$0] } ?? PortraitLayer()
+        return record.layer.overriddenKeys.union(group.overriddenKeys).contains(where: \.isFaceShape)
     }
 
     /// legacyIndex만 있는 기록에 faces[legacyIndex]의 anchor를 채운다.
@@ -146,9 +155,11 @@ public struct EditDocument: Equatable, Sendable {
         return changed
     }
 
-    /// 사용자가 고른 프리셋. 프리셋은 사람을 고르지 않는다.
+    /// 사용자가 고른 프리셋.
+    /// 프리셋은 사람을 고르지 않는다.
     /// 전체 층과 성별 그룹 층을 통째로 바꾸고 개인 층·성별 지정은 그대로 둔다.
-    /// 잠긴 사진은 전체 층과 그룹 층의 얼굴형·체형을 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
+    /// 잠긴 사진은 전체 층과 그룹 층의 얼굴형·체형을 유지한다.
+    /// 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
     public mutating func apply(_ values: PresetValues) {
         let updated = merged(values, categories: SyncCategory.all, clearsIndividuals: false)
         guard updated != recipe else { return }
@@ -156,8 +167,11 @@ public struct EditDocument: Equatable, Sendable {
         recipe = updated
     }
 
-    /// 다른 사진의 설정을 일괄 복사. 고른 항목만 전체·그룹 층에 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
-    /// 복사한 얼굴 의존 항목은 받는 사진의 개인 층에서 그 키를 지운다. 성별 지정·anchor는 그대로다.
+    /// 다른 사진의 설정을 일괄 복사.
+    /// 고른 항목만 전체·그룹 층에 덮어쓴다(기본은 전부).
+    /// 빈 선택은 아무것도 하지 않는다.
+    /// 복사한 얼굴 의존 항목은 받는 사진의 개인 층에서 그 키를 지운다.
+    /// 성별 지정·anchor는 그대로다.
     /// 바뀌는 값이 없으면(잠긴 사진에 얼굴형만 복사하는 경우 등) 실행 취소 단계를 만들지 않는다.
     public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
         guard !categories.isEmpty else { return }
@@ -167,9 +181,11 @@ public struct EditDocument: Equatable, Sendable {
         recipe = updated
     }
 
-    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
+    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다.
+    /// 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
     /// 피부 정밀·치아 미백·입술 생기·성별 그룹·개인 층·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
-    /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
+    /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다.
+    /// 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         var updated = recipe
@@ -187,7 +203,9 @@ public struct EditDocument: Equatable, Sendable {
     /// 룩의 부위 값 다섯 개를 scope 층의 메이크업에 써 넣고 lookID를 기록한다(스펙 6).
     /// 전체 층에서 nil이면 메이크업을 모두 지운다(룩 "없음").
     /// 그룹·개인 층에서 nil은 다섯 부위를 0으로 덮어쓴다(상속으로 돌리는 것은 재설정).
-    /// 체크포인트 한 번이다. 색만 바꾸므로 수동 편집이 있어도 잠기지 않는다. 이미 같은 값이면 아무것도 하지 않는다.
+    /// 체크포인트 한 번이다.
+    /// 색만 바꾸므로 수동 편집이 있어도 잠기지 않는다.
+    /// 이미 같은 값이면 아무것도 하지 않는다.
     /// 모르는 사람이면 아무것도 하지 않는다.
     public mutating func applyMakeupLook(_ look: MakeupLook?, in scope: PortraitScope = .all) {
         let adjustments = look?.adjustments ?? MakeupAdjustments()
@@ -208,7 +226,8 @@ public struct EditDocument: Equatable, Sendable {
         recipe = updated
     }
 
-    /// 고른 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
+    /// 고른 그룹을 프리셋 값으로 바꾼다.
+    /// 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
     /// 얼굴 의존 항목은 그룹 층의 그 키도 바꾸고, clearsIndividuals면 개인 층에서 그 키를 지운다.
     /// 잠긴 사진에서 건너뛴 얼굴형은 개인 층에서도 지우지 않는다.
     private func merged(
@@ -481,7 +500,8 @@ public struct EditDocument: Equatable, Sendable {
         }
     }
 
-    /// 부위 값이 실제로 바뀌었으면 룩 이름을 지운다(스펙 6). 같은 값이면 룩을 유지한다.
+    /// 부위 값이 실제로 바뀌었으면 룩 이름을 지운다(스펙 6).
+    /// 같은 값이면 룩을 유지한다.
     private static func editedMakeup(
         _ previous: MakeupAdjustments, _ change: (inout MakeupAdjustments) -> Void
     ) -> MakeupAdjustments {
@@ -498,7 +518,8 @@ public struct EditDocument: Equatable, Sendable {
         recipe.operations.append(edit)
     }
 
-    /// 실행 취소·다시 실행·초기화는 진행 중이던 연속 변경을 끝낸다. 이후 편집은 다시 체크포인트한다.
+    /// 실행 취소·다시 실행·초기화는 진행 중이던 연속 변경을 끝낸다.
+    /// 이후 편집은 다시 체크포인트한다.
     public mutating func undo() {
         isContinuousChange = false
         guard let previous = undoStack.popLast() else { return }
