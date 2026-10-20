@@ -66,7 +66,8 @@ enum UserMessage {
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
     static let noFaceDetected = "감지된 얼굴이 없어요"
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
-    static let noLandmarksHint = "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정과 잡티·변형 도구는 쓸 수 있어요."
+    static let noLandmarksHint =
+        "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정·얼룩 고르기·붉은기·번들거림과 잡티·변형 도구는 쓸 수 있고, 주름 밝히기 4종은 특징점이 있어야 바뀌어요."
     static let allFaces = "모든 얼굴"
     static let autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."
     static let lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."

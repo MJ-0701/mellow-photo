@@ -47,7 +47,7 @@ final class AppModel {
     /// 뷰티·메이크업 도구가 보여줄 얼굴 상태. 분석 실패가 얼굴 없음보다 먼저다.
     enum FaceAvailability: Equatable {
         case ready
-        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정만 동작한다.
+        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정·얼룩 고르기·붉은기·번들거림만 동작하고 주름 밝히기 4종은 빠진다.
         case noLandmarks
         case noFace
         case unavailable(MellowError)

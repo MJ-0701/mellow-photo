@@ -873,6 +873,10 @@ final class AppModelTests: XCTestCase {
         model.edit(.targetFace(1))
         XCTAssertEqual(model.faceAvailability, .noLandmarks)
         XCTAssertTrue(UserMessage.noLandmarksHint.contains("메이크업"))
+        for tool in ["피부 보정", "얼룩 고르기", "붉은기", "번들거림", "잡티·변형"] {
+            XCTAssertTrue(UserMessage.noLandmarksHint.contains(tool), "특징점 없이 쓸 수 있는 도구를 알린다: \(tool)")
+        }
+        XCTAssertTrue(UserMessage.noLandmarksHint.contains("주름 밝히기"), "특징점이 있어야 하는 주름 슬라이더를 알린다")
         model.edit(.targetFace(0))
         XCTAssertEqual(model.faceAvailability, .ready)
 
