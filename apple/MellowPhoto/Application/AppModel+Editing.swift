@@ -78,10 +78,22 @@ extension AppModel {
         }
     }
 
+    /// 전체 사진에 적용을 누를 수 있는지. 사진이 둘 이상이고 복사할 항목이 하나라도 있어야 한다.
+    var canApplyToAll: Bool { session.photos.count >= 2 && !syncCategories.isEmpty }
+
+    func setSyncCategory(_ category: SyncCategory, enabled: Bool) {
+        if enabled {
+            syncCategories.insert(category)
+        } else {
+            syncCategories.remove(category)
+        }
+    }
+
     func applyToAll() {
-        guard let id = session.selectedPhotoID, !isBusy else { return }
-        session.applyToAll(from: id)
-        statusMessage = UserMessage.appliedToAll
+        guard let id = session.selectedPhotoID, !isBusy, !syncCategories.isEmpty else { return }
+        session.applyToAll(from: id, categories: syncCategories)
+        statusMessage = UserMessage.appliedToAll(
+            categoryCount: syncCategories.count, total: SyncCategory.allCases.count)
     }
 
     /// 되돌린 자르기가 고른 비율과 맞는다는 보장이 없으므로 비율 선택을 비운다.

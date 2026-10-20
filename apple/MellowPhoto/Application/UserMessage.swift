@@ -1,4 +1,5 @@
 import Foundation
+import MellowEditing
 import MellowRendering
 import MellowShared
 
@@ -9,6 +10,7 @@ enum UserMessage {
     static let chooseCloneSource = "① 깨끗한 피부를 톡 눌러 샘플을 골라주세요."
     static let chooseCloneTarget = "② 지우고 싶은 작은 잡티를 톡 눌러주세요."
     static let appliedToAll = "전체 사진에 슬라이더 설정을 적용했어요."
+    static let syncMenuLabel = "동기화 항목"
     static let sessionUnreadable = "작업 기록을 읽지 못해 복구용 사본을 보관했습니다. 기존 작업 사진도 보존됩니다. 사진을 다시 골라 편집할 수 있어요."
     static let somePhotosUnreadable = "일부 작업 사진을 열지 못했습니다. 해당 사진을 다시 가져오세요."
     static let selectionUnreadable = "이 작업 사진을 열 수 없습니다. 다시 시도하거나 편집에서 뺀 뒤 사진을 다시 골라주세요."
@@ -176,6 +178,26 @@ enum UserMessage {
         switch key {
         case .grain: return "그레인"
         case .glow: return "글로우"
+        }
+    }
+
+    /// 전부 골랐으면 기존 문구, 아니면 고른 개수를 알린다.
+    static func appliedToAll(categoryCount: Int, total: Int) -> String {
+        categoryCount == total ? appliedToAll : "전체 사진에 고른 \(categoryCount)개 항목을 적용했어요."
+    }
+
+    /// 동기화 메뉴 항목 이름. 화면 순서는 SyncCategory.allCases.
+    static func syncCategoryTitle(_ category: SyncCategory) -> String {
+        switch category {
+        case .color: return "색감·디테일"
+        case .effects: return "효과"
+        case .skin: return "피부"
+        case .faceShape: return "얼굴형"
+        case .features: return "눈·입"
+        case .makeup: return "메이크업"
+        case .background: return "배경"
+        case .body: return "체형"
+        case .bodySkin: return "피부톤"
         }
     }
 

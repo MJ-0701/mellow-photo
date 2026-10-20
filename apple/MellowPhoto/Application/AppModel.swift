@@ -110,6 +110,8 @@ final class AppModel {
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
     var isComparing = false
+    /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
+    var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
     /// 이름 입력 시트가 떠 있는 동안 true. 메뉴의 ⌘Z/⇧⌘Z가 입력란의 실행 취소를 가로채지 않게 한다.
     var isTextEntryActive = false

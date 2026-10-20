@@ -320,6 +320,37 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.effects, EffectAdjustments(grain: 0.6))
     }
 
+    func testApplyToAllCopiesOnlyChosenCategories() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A")
+        let second = try TestSupport.solidPNG(in: root, name: "B")
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(model.session.photos.count, 2)
+        XCTAssertEqual(model.syncCategories, SyncCategory.all, "기본은 전부")
+        XCTAssertTrue(model.canApplyToAll)
+        model.edit(.exposure(0.3))
+        model.edit(.skinSmoothing(0.4))
+        model.setSyncCategory(.skin, enabled: false)
+        model.applyToAll()
+        let other = model.session.photos[1].document.recipe
+        XCTAssertEqual(other.color.exposure, 0.3)
+        XCTAssertEqual(other.portrait.skin.smoothing, 0, "끈 항목은 복사하지 않는다")
+        XCTAssertEqual(model.statusMessage, UserMessage.appliedToAll(categoryCount: 8, total: 9))
+        for category in SyncCategory.allCases {
+            model.setSyncCategory(category, enabled: false)
+        }
+        XCTAssertFalse(model.canApplyToAll, "아무것도 고르지 않으면 끈다")
+        model.edit(.exposure(0.5))
+        model.applyToAll()
+        XCTAssertEqual(model.session.photos[1].document.recipe.color.exposure, 0.3, "빈 선택은 적용하지 않는다")
+        model.setSyncCategory(.color, enabled: true)
+        XCTAssertEqual(model.syncCategories, [.color])
+        XCTAssertEqual(
+            SyncCategory.allCases.map(UserMessage.syncCategoryTitle),
+            ["색감·디테일", "효과", "피부", "얼굴형", "눈·입", "메이크업", "배경", "체형", "피부톤"])
+    }
+
     private func importOne(_ model: AppModel, _ url: URL) async throws {
         await model.importFromFiles([url])
         try await waitUntil { model.isReady && model.preview != nil }

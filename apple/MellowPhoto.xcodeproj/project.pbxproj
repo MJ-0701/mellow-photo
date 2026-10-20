@@ -71,6 +71,7 @@
 		EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541985795F5FEE15374903C /* BeautyTab.swift */; };
 		F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7451F7A8E9DE87961267F974 /* Theme.swift */; };
 		F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119D17BD418BDE81F1E2622E /* MakeupPanel.swift */; };
+		F45D6414E50067A97D199532 /* SyncMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = C329A06E195C3E422C0EFF76 /* SyncMenu.swift */; };
 		F5DF1BAF787449CB212DA9A0 /* InfoSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540B90F0C598F262D4039570 /* InfoSheet.swift */; };
 		FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 205D153168A529D037BF40EE /* ThumbnailCell.swift */; };
 /* End PBXBuildFile section */
@@ -138,6 +139,7 @@
 		BD2538784DB91D254D98C9CA /* AdjustmentSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustmentSlider.swift; sourceTree = "<group>"; };
 		C0C781535D14BC45ED308E3C /* EditorScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorScene.swift; sourceTree = "<group>"; };
 		C1219E8E2E4AA4621805C516 /* Version.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Version.xcconfig; sourceTree = "<group>"; };
+		C329A06E195C3E422C0EFF76 /* SyncMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMenu.swift; sourceTree = "<group>"; };
 		C4711AEF3097752E578444CB /* ImportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotos.swift; sourceTree = "<group>"; };
 		CDC8069CC675408C9A682CA6 /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
 		CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayTests.swift; sourceTree = "<group>"; };
@@ -261,6 +263,7 @@
 				3FB3268705F4B92286899B4B /* LookPanel.swift */,
 				119D17BD418BDE81F1E2622E /* MakeupPanel.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
+				C329A06E195C3E422C0EFF76 /* SyncMenu.swift */,
 				0AFA6571D26629D5ED075E50 /* ToolStrip.swift */,
 			);
 			path = Editor;
@@ -580,6 +583,7 @@
 				676C118D9E438D7EE534C2F1 /* PresetSheet.swift in Sources */,
 				E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */,
 				D7785F99F50B89FFF24DB692 /* StatusBar.swift in Sources */,
+				F45D6414E50067A97D199532 /* SyncMenu.swift in Sources */,
 				3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */,
 				F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */,
 				FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */,

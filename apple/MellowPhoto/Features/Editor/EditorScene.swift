@@ -100,7 +100,8 @@ struct EditorScene: View {
             }
             .frame(height: Theme.compactControlsHeight)
             HStack {
-                Button("전체 사진에 적용") { model.applyToAll() }.disabled(model.session.photos.count < 2)
+                Button("전체 사진에 적용") { model.applyToAll() }.disabled(!model.canApplyToAll)
+                SyncMenu()
                 Spacer()
                 Button("초기화") { resetConfirmation = true }
             }
@@ -129,12 +130,15 @@ struct EditorScene: View {
                 }
                 Divider()
                 VStack(spacing: 10) {
-                    Button {
-                        model.applyToAll()
-                    } label: {
-                        Label("이 설정을 전체 사진에", systemImage: "square.on.square").frame(maxWidth: .infinity)
+                    HStack {
+                        Button {
+                            model.applyToAll()
+                        } label: {
+                            Label("이 설정을 전체 사진에", systemImage: "square.on.square").frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered).disabled(!model.canApplyToAll)
+                        SyncMenu()
                     }
-                    .buttonStyle(.bordered).disabled(model.session.photos.count < 2)
                     Button("이 사진 초기화") { resetConfirmation = true }.font(.caption).buttonStyle(.plain)
                 }
                 .padding(18)
