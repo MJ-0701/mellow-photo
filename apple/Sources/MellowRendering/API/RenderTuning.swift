@@ -51,7 +51,8 @@ public struct RenderTuning: Sendable {
     public var foldLowBandFraction: Double = 0.015
     /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3.5~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
     public var foldSurroundFraction: Double = 0.12
-    /// 주름 밝히기 1에서 "주변 평균 − 국소 저주파"의 양수 차이를 더하는 비율. 100%면 평평해 보인다.
+    /// 주름 밝히기 1에서 국소 휘도에 대한 휘도 차이("주변 평균 − 국소 저주파"의 양수 부분)를 배율에 반영하는 비율.
+    /// 배율 = 1 + foldLiftMax × 휘도 차이 ÷ 국소 휘도라 1이면 그늘이 주변 평균까지 올라 평평해 보인다.
     public var foldLiftMax: Double = 0.9
     /// 주름 밝히기 배율(1 + 휘도 차이 ÷ 국소 휘도)의 상한.
     /// 선형 휘도를 40% 잃은 그늘을 foldLiftMax 0.9로 올리는 배율(1 + 0.9 × 0.4 / 0.6)이 1.6이다.

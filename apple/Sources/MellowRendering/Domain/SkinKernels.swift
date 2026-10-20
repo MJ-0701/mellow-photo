@@ -102,11 +102,12 @@ final class SkinKernels: @unchecked Sendable {
 
     /// 주변 평균(surround)이 국소 저주파(low)보다 밝은 휘도(BT.601) 비율만큼 세 채널에 같은 배율을 곱한다.
     /// 배율 = min(1 + amount × 휘도 차이 ÷ max(국소 휘도, lumaFloor), maxGain). 둘레가 어두우면 배율 1이다.
+    /// lumaFloor가 0 이하이거나 maxGain이 1보다 작으면(어둡게 만드는 상한) 렌더 실패다.
     func foldLift(
         image: CIImage, low: CIImage, surround: CIImage, amount: Double, maxGain: Double, lumaFloor: Double,
         extent: CGRect
     ) throws -> CIImage {
-        guard let fold, lumaFloor > 0 else { throw MellowError.renderFailed }
+        guard let fold, lumaFloor > 0, maxGain >= 1 else { throw MellowError.renderFailed }
         let arguments: [Any] = [image, low, surround, amount, maxGain, lumaFloor]
         guard let lifted = fold.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return lifted

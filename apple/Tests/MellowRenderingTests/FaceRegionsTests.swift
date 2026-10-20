@@ -60,6 +60,21 @@ final class FaceRegionsTests: XCTestCase {
         XCTAssertGreaterThan(grid.red(cheek), 128, "실제 사진의 눈 아래 볼은 피부 마스크 안")
     }
 
+    /// 피부 단계는 strength 1 마스크를 한 번 만들어 skinMaskMaxStrength로 줄여 쓴다. 예전 strength 인자와 같은 바이트여야 한다.
+    func testScaledUnitSkinMaskMatchesStrengthMask() throws {
+        let synthetic = SyntheticFace.make()
+        let tuning = RenderTuning()
+        func mask(strength: Double) throws -> CIImage {
+            try FaceRegions.skinMask(
+                face: synthetic.face, image: synthetic.image, extent: synthetic.image.extent, tuning: tuning,
+                strength: strength)
+        }
+        let scaled = MaskBuilder.scaled(try mask(strength: 1), by: tuning.skinMaskMaxStrength)
+        XCTAssertTrue(
+            try Support.bytes(scaled) == Support.bytes(mask(strength: tuning.skinMaskMaxStrength)),
+            "줄인 마스크와 strength 마스크가 같은 바이트")
+    }
+
     func testPolygonMaskCacheReusesRasterAndMatchesUncached() throws {
         let synthetic = SyntheticFace.make()
         let extent = synthetic.image.extent

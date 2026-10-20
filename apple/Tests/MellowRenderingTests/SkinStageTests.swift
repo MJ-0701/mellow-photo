@@ -352,7 +352,15 @@ final class SkinStageTests: XCTestCase {
                 chroma(after.rgba(point)), chroma(before.rgba(point)), accuracy: Self.liftedChromaTolerance,
                 "\(point) 밝힌 그늘의 색조·채도가 그대로다")
         }
+        XCTAssertThrowsError(
+            try SkinKernels.shared.foldLift(
+                image: image, low: image, surround: image, amount: 1, maxGain: Self.darkeningGain,
+                lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
+            "배율 상한이 1보다 작으면 그늘을 어둡게 하므로 렌더 실패")
     }
+
+    /// 1보다 작은(어둡게 만드는) 배율 상한.
+    private static let darkeningGain = 0.9
 
     func testMissingLandmarksSkipOnlyThatFold() throws {
         let base = SyntheticFace.make()
