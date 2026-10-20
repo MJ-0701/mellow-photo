@@ -17,7 +17,7 @@
 | 붉은기는 가운데 0인 양방향: − 쪽은 볼 기준보다 붉은 만큼만 줄이고(맑게), + 쪽은 Cr을 고르게 더함(혈색) | 반점만 줄이려면 기준이 필요하고, 혈색은 균일하게 올리는 것이 자연스러움 | 작음 |
 | 몸 피부·톤은 새 단계 `bodySkin`: 인물 마스크 × 가장 큰 얼굴의 볼 기준 피부색 가중치 − 눈·눈썹·입 영역(특징점이 없으면 대체 타원). 밝기·톤은 얼굴 포함 보이는 피부 전체, 매끄럽게는 얼굴 피부 다각형 전체(눈가·입가 포함)를 뺀 나머지. (G2 구현 중 변경: 눈썹도 빼고, 매끄럽게 제외 영역을 잘라내지 않은 얼굴 다각형으로 넓힘. 리뷰에서 눈가·입가 고리가 두 번 매끄럽게 되고 눈썹이 하얗게 들리는 문제가 나옴) | Evoto와 같이 얼굴·팔·배에 함께 걸리고 옷·배경은 피부색 가중치가 뺌. 얼굴은 자기 슬라이더가 있어 두 번 매끄럽게 하지 않음 | 중간 |
 | 얼굴이 없으면(얼굴 없음·얼굴 분석 실패 모두) 몸 피부는 조용히 건너뜀(오류 아님). 고정 피부색 사전 분포로 대체하지 않음. 피부톤 탭은 기존 얼굴 없음 안내만 보임 | 사용자 결정(처음 제안으로 되돌림). 고정 기준색 하나는 그 색과 많이 다른 피부를 덜 고치거나 얼룩지게 하고, 허용 범위를 넓히면 옷·나무로 번짐. 얼굴 없는 사진은 드물고 대체 모드는 기준색·안내·패널 분기·테스트를 더함. 나중 후보는 손목·팔 관절점 근처에서 그 사람의 실제 피부색을 재는 방식 | 중간 |
-| 몸 피부는 `dependsOnPerson`에만 넣고 `dependsOnFaces`에는 넣지 않음. 얼굴 분석이 실패한 사진에 몸 피부 값이 있어도 저장은 되고(몸 피부만 빠짐) 미리보기와 같음 | `dependsOnFaces`에 넣으면 얼굴 분석 실패 사진의 저장이 `faceAnalysisUnavailable`로 막힘. 배경 흐림과 같은 "해당 단계만 건너뜀" 규칙이 맞고, 패널이 얼굴 없음을 먼저 안내하므로 조용히 빠져도 놀라지 않음 | 작음 |
+| 몸 피부는 `dependsOnPerson`에만 넣고 `dependsOnFaces`에는 넣지 않음. 얼굴 분석이 실패한 사진에 몸 피부 값이 있어도 저장은 되고(몸 피부만 빠짐) 미리보기와 같음. `dependsOnPerson`은 지금 읽는 곳이 없는 표시이고 저장·분석을 막거나 고르지 않음(인물 분석은 사진을 준비할 때 늘 돎) | `dependsOnFaces`에 넣으면 얼굴 분석 실패 사진의 저장이 `faceAnalysisUnavailable`로 막힘. 배경 흐림과 같은 "해당 단계만 건너뜀" 규칙이 맞고, 패널이 얼굴 없음을 먼저 안내하므로 조용히 빠져도 놀라지 않음 | 작음 |
 | 피부 밝기는 0…1 한 방향(흰색 쪽으로 섞음), 피부 톤은 −1…1(따뜻 ↔ 차가움), 바디 매끄럽게 0…1 | Evoto "피부색 변경"은 밝히는 방향만 측정됨. 어둡게는 조정 도구의 노출로 충분 | 작음 |
 | 레시피: `portrait.skin`에 키 7개 추가, 최상위 `bodySkin`·`effects` 추가, `schemaVersion` 2 유지, 기본값은 모두 항등 | B~F "키 추가만" 규칙. 옛 세션은 기본값으로 읽혀 결과가 같음 | 중간 (플랫폼 공통 계약) |
 | 효과는 룩 뒤 새 단계 `effect`: 글로우(흐린 사본을 제곱해 밝은 곳에 모은 빛을 스크린 합성) → 그레인(짧은 변에 비례한 회색 잡음을 오버레이). 두 슬라이더 0…1 (G3 구현 중 변경: `CIBloom`은 고르게 밝은 영역을 밝히지 않아 하이라이트에 빛이 번지지 않았음) | Core Image 기본 필터만으로 됨. 그레인 크기를 짧은 변에 비례시켜 미리보기와 저장본이 같아 보임 | 작음 |
@@ -101,7 +101,7 @@
 
 - 범위: `skin.redness`·`bodySkin.tone` −1…1(`AdjustmentRange.bipolar`), 나머지 0…1(`AdjustmentRange.unit`). `AdjustmentRange.skinRefinement(_:)`·`bodySkin(_:)`가 키별 범위를 돌려주고 `EditingPolicy`가 같은 이름으로 내보낸다.
 - `SkinAdjustments.hasEffect`는 새 값 중 0이 아닌 것이 있으면 true(그래서 `dependsOnFaces`는 자동으로 포함). `numericValues`는 `[smoothing] + SkinRefinementKey.allCases 순서`.
-- `EditRecipe.dependsOnPerson = background.hasEffect || bodySkin.hasEffect`. `dependsOnFaces`는 바뀌지 않는다(몸 피부는 포함하지 않음 — 얼굴이 없으면 단계만 건너뛰고 저장은 막지 않는다, 결정 표).
+- `EditRecipe.dependsOnPerson = background.hasEffect || bodySkin.hasEffect`. 지금 이 값을 읽는 코드는 없다. 저장(`Exporter`)도 사진 준비(`PhotoPipeline.prepare`)도 이 값으로 갈리지 않고, 인물 분석은 준비 때 늘 돌며 실패는 해당 단계만 건너뛴다. `dependsOnFaces`는 바뀌지 않는다(몸 피부는 포함하지 않음 — 얼굴이 없으면 단계만 건너뛰고 저장은 막지 않는다, 결정 표).
 - `allValuesFinite`에 새 스칼라 12개 전부 포함.
 - `PresetValues`에 `bodySkin`·`effects` 그룹 추가(없으면 기본값으로 디코드). 프리셋 저장·적용·일괄 적용이 새 값을 나른다.
 - `shared/recipe-schema/edit-recipe.v2.schema.json`에 키 추가(`additionalProperties: false`라 필수), `session-file.v2.schema.json`의 프리셋 `values`에 `bodySkin`·`effects` `$ref` 추가, README 요점·범위 표·"키를 추가할 때의 규칙" 절에 G 항목 추가.
@@ -149,7 +149,7 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 | `foldLiftMaxGain` | 1.6 | 밝히기 배율 상한. 선형 휘도를 40% 잃은 그늘을 0.9로 올리는 배율(1 + 0.9 × 0.4 / 0.6). 눈가처럼 국소 휘도가 아주 낮은 곳에서 배율이 튀지 않음 |
 | `foldLumaFloor` | 0.01 | 배율 분모(국소 선형 휘도)의 하한 |
 
-**대역 합성** (`FrequencySeparation.refined`): 기존 `low + mid × keep + fine`에서 `low`를 바꾼다. `wideNum = blur(image × unitMask, r_tone)`, `wideDen = blur(unitMask, r_tone)`, `wide = wideNum / max(wideDen, ε)`(마스크 가중 평균이라 경계에서 머리카락·배경이 섞이지 않음), `r_tone = faceWidth × toneBandFraction`. 커널 `toneMix`:
+**대역 합성** (`FrequencySeparation.refined`): 기존 `low + mid × keep + fine`에서 `low`를 바꾼다. `wideNum = blur(image × unitMask, r_tone)`, `wideDen = blur(unitMask, r_tone)`, `wide = wideNum / max(wideDen, ε)`(마스크 가중 평균이라 경계에서 머리카락·배경이 섞이지 않음), `r_tone = max(bandRadii.mid, faceWidth × toneBandFraction)`(넓은 평균이 얼룩 대역보다 좁아지지 않게). 커널 `toneMix`:
 
 ```
 even' = max(even, shine × w)            // w = 번들거림 가중치
@@ -159,7 +159,7 @@ mid  = (fineBlur − midBlur) × (1 − shine × w)
 out  = low + mid × keep + (image − fineBlur)
 ```
 
-`reference`는 볼 두 곳의 선형 평균(`CIAreaAverage` 두 개를 `CIMix` 0.5로 섞은 무한 이미지), `even = toneEvening × toneEveningMax`, `shine = shineValue × shineReductionMax`, `keep = 1 − smoothing × midReductionMax`. 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다(G1 구현 중 변경: 저주파만 당기면 반지름 12px 반사광이 11바이트만 줄었다). 모공 대역은 그대로다. 세 값이 모두 0이면 기존 `bandMix` 경로(넓은 흐림을 만들지 않음). `smoothing`만 0이 아니면 결과는 지금과 바이트 단위로 같아야 한다(회귀 테스트).
+`reference`는 볼 두 곳의 선형 평균(`CIAreaAverage` 두 개를 `CIMix` 0.5로 섞은 무한 이미지), `even = toneEvening × toneEveningMax`, `shine = shineValue × shineReductionMax`, `keep = 1 − smoothing × midReductionMax`. 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다(G1 구현 중 변경: 저주파만 당기면 반지름 12px 반사광이 11바이트만 줄었다). 모공 대역은 그대로다. 얼룩 고르기·번들거림이 둘 다 0이면(피부 보정은 0보다 클 수 있음) 기존 세 대역 경로 `FrequencySeparation.smoothed`를 쓴다(넓은 흐림을 만들지 않음). 피부 보정·얼룩 고르기·번들거림 세 값이 모두 0이면 대역 합성 단계를 건너뛴다. `smoothing`만 0이 아니면 결과는 지금과 바이트 단위로 같아야 한다(회귀 테스트).
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
@@ -178,7 +178,7 @@ out  = low + mid × keep + (image − fineBlur)
 
 **몸 피부** (`BodySkinStage`): `personMask`가 없거나 `faces`가 비면 입력 그대로(오류 아님). 기준 얼굴 = 가장 넓은 얼굴. `encoded = image(sRGB 감마)`, `(left, right) = FaceRegions.cheekAverages(of: encoded, face:, extent:)`(볼 상자가 하나도 없으면 건너뜀). `person = BackgroundStage.personMask(personMask, extent:, feather: shortSide × bodySkinMaskFeather)`(배경 마스크를 만들던 확대·흐림을 반전 없이 돌려주는 새 정적 함수, `backgroundMask`는 이것을 반전). `chroma = SkinKernels.chromaWeight(encoded, left, right, sigma: bodySkinChromaSigma, extent)`. 모든 얼굴의 보호 영역(눈·눈썹·바깥 입술, 눈·입 특징점이 없으면 상자 비율 대체 타원)을 한 비트맵으로 그린 `features = FaceRegions.featureMask(faces:extent:tuning:cache:)`를 반전해 곱한다(사진당 해상도마다 캐시 항목 1개 → `entriesPerFacePerResolution` 9). `toneMask = person × chroma × (1 − features)`. `smoothMask = toneMask × (1 − FaceRegions.wholeFaceMask(...))`: 모든 얼굴의 피부 다각형(윤곽 + 이마 호)을 눈·입을 잘라내지 않고 채워 얼굴 피부 마스크와 같은 반지름으로 흐린 마스크다. (G2 구현 중 변경: 처음 식은 눈썹을 빼지 않고 잘라낸 피부 다각형만 빼서 눈가·입가 고리가 두 번 매끄럽게 되고 눈썹이 하얗게 들렸다.)
 - 밝기·톤: `FeatureKernels.shifted(image, by: ToneShift(lift: brightness × bodySkinLiftMax, blueness: −tone × bodySkinToneMax, redness: tone × bodySkinToneMax), extent)`를 `toneMask`로 합성. `ToneShift`에 `blueness`(Cb 가산)를 더하고 커널 인자를 하나 늘린다(기본 0이라 기존 호출 결과 불변).
-- 매끄럽게: `FrequencySeparation.smoothed(image, bounds: extent, faceWidth: shortSide × bodySkinBandScale, smoothing:, tuning:)`를 `smoothMask`로 합성. 반지름은 `fine = max(0.5, shortSide × bodySkinFineBandFraction)`, `mid = shortSide × bodySkinMidBandFraction`이 되도록 `faceWidth` 인자 대신 반지름을 직접 받는 오버로드 `smoothed(_:bounds:radii:smoothing:tuning:)`를 추가한다.
+- 매끄럽게: 반지름을 직접 받는 오버로드 `FrequencySeparation.smoothed(_:bounds:radii:smoothing:tuning:)`로 `fine = max(skinBlurMinimumRadius, shortSide × bodySkinFineBandFraction)`, `mid = max(fine, shortSide × bodySkinMidBandFraction)`을 넘기고 결과를 `smoothMask`로 합성한다.
 - 적용 순서: 매끄럽게 → 밝기·톤(밝기 뒤에 매끄럽게 하면 밝기 경계가 번짐).
 
 | 상수 | 시작값 | 뜻 |
@@ -190,7 +190,7 @@ out  = low + mid × keep + (image − fineBlur)
 | `bodySkinFineBandFraction` | 0.002 | 몸 모공 대역 반지름(짧은 변 비율) |
 | `bodySkinMidBandFraction` | 0.012 | 몸 얼룩 대역 반지름 |
 
-**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 0…1로 자름(1을 넘는 밝은 입력에서 스크린 합성이 원본을 어둡게 하지 않게) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤 sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
+**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 0…1로 자름(1을 넘는 밝은 입력에서 스크린 합성이 원본을 어둡게 하지 않게) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤(확대는 `samplingNearest()`로 가장 가까운 화소를 뽑아 미리보기·저장 배율 모두 알갱이 경계가 번지지 않음) sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
@@ -220,9 +220,9 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
 }
 ```
 
-- `EditDocument.applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all)`. 빈 집합이면 아무것도 하지 않는다(체크포인트 없음). `apply(_:)`(프리셋)는 전부 복사로 그대로.
+- `EditDocument.applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all)`. 빈 집합이면 아무것도 하지 않는다(체크포인트 없음). `apply(_:)`(프리셋)는 전부 복사로 그대로. 둘 다 병합 결과를 먼저 계산하고 레시피와 같으면 체크포인트 없이 끝난다(잠긴 사진에 얼굴형만 복사, 같은 프리셋 다시 고르기).
 - `merged(values, targetFace:, categories:)`: 고른 그룹만 덮어쓴다. `faceShape`·`body`는 잠긴 사진에서 건너뛴다. 대상 얼굴은 잠겼으면 유지, 아니면 `categories.contains(where: \.dependsOnFaces)`일 때만 nil.
-- `ProjectSession.applyToAll(from id:, categories: Set<SyncCategory> = SyncCategory.all)`.
+- `ProjectSession.applyToAll(from id:, categories: Set<SyncCategory> = SyncCategory.all)`. 빈 선택이거나 바뀐 사진이 없으면 저장하지 않는다.
 - 앱: `AppModel.syncCategories: Set<SyncCategory>`(기본 전부, 세션 상태), `setSyncCategory(_:enabled:)`, `canApplyToAll = photos.count >= 2 && !syncCategories.isEmpty`. `EditorScene`의 전체 적용 버튼 옆 `SyncMenu`(톱니 아이콘 `Menu`, 항목마다 `Toggle`). 상태 문구는 고른 항목 수를 포함한다.
 
 #### 1.8 분할 전후 비교 (기존 전체 토글은 그대로)
@@ -232,7 +232,8 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
 - `displayImage`는 `.full`이면 원본, 아니면 `preview ?? original`(기존과 같음). `blocksCanvasTouch { compareMode != .off }`를 두고 `touch(from:to:)`·마커·브러시 층·자르기 틀은 이 값으로 막는다(지금 `isComparing`을 보던 자리).
 - `PhotoCanvasView`: `.split`이면 미리보기 위에 원본을 `mask(alignment: .leading)`로 왼쪽 `width × split`만 보이게 얹고, 그 경계에 `CompareDivider`(세로선 + 손잡이, `DragGesture`로 `setCompareSplit(x / width)`)를 둔다. 왼쪽 위 배지는 `.off` "보정본", `.full` "원본", `.split` "원본 | 보정본".
 - `CompareDivider.fraction(forX:width:)`는 순수 계산(클램프)이라 테스트한다. `ActionBar`: 기존 "원본 비교"/"보정본" 버튼은 그대로이고, 그 왼쪽에 `UserMessage.splitCompare`("분할") / `splitCompareDone`("분할 끝") 버튼을 더한다. 한쪽을 켜면 다른 쪽은 꺼진다(모드 하나).
-- `Theme.compareDividerWidth` 2, `compareHandleSize` 28.
+- 겹침 규칙: `AppModel.splitCompareOriginal`은 들고 있는 원본(`original`)을 그린 기하(`heldOriginalGeometry`)가 들고 있는 미리보기(`preview`)를 그린 기하(`previewGeometry`, 자르기 화면이면 자르기를 뺀 기하)와 같을 때만 원본을 돌려주고 아니면 nil이다. 두 값은 이미지를 받는 자리에서만 기록한다(원본 다시 그리기를 요청할 때 바뀌는 `originalGeometry`와 비교하면 그리는 중에도 통과한다). 그래서 좌우 반전·180° 회전처럼 비율이 같은 기하 변경 뒤에도 원본을 다시 그릴 때까지 겹치지 않고, 다시 그리기가 실패하면 다음 렌더가 다시 시도할 때까지 겹치지 않는다. 비율 비교(`compareAspectTolerance`)는 쓰지 않는다. `AppModel.renderOriginal`은 원본 다시 그리기 함수이고 테스트가 늦추거나 실패시키려고 바꿔 끼운다.
+- `Theme.compareDividerWidth` 2, `compareHandleSize` 28(그린 손잡이), `compareHandleHitWidth` 44(분할선을 잡는 띠의 폭).
 
 #### 1.9 앱 화면
 

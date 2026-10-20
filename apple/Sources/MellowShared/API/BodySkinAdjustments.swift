@@ -8,6 +8,7 @@ public enum BodySkinKey: String, CaseIterable, Codable, Sendable {
 }
 
 /// 보이는 피부 전체(얼굴 포함)에 거는 밝기 0…1, 톤 −1…1(따뜻 ↔ 차가움), 매끄럽게 0…1. 렌더는 bodySkin 단계(인물 마스크 × 피부색).
+/// 매끄럽게는 얼굴 피부 다각형을 빼고 건다(얼굴은 skin 단계의 피부 보정이 맡는다).
 public struct BodySkinAdjustments: Codable, Equatable, Sendable {
     public var brightness: Double
     public var tone: Double
