@@ -1102,4 +1102,24 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertNil(plain.recipe.portrait.oneTouch)
         XCTAssertEqual(EditingPolicy.oneTouchDefaultStrength, 0.6)
     }
+
+    func testOneTouchBundlesBodyBrightnessIntoTheAllMarkButLeavesBodyTone() {
+        var document = EditDocument()
+        XCTAssertNil(document.set(.bodySkin(.tone, -0.3)))
+        XCTAssertNil(document.applyOneTouch(strength: OneTouchBundle.defaultStrength))
+        XCTAssertEqual(document.recipe.bodySkin.tone, -0.3, "톤 표 값이 0이면 사용자 톤을 지우지 않는다")
+        XCTAssertEqual(
+            document.recipe.bodySkin.brightness, OneTouchBundle.Table.bodyBrightness * OneTouchBundle.defaultStrength,
+            accuracy: 1e-12)
+        XCTAssertNil(document.set(.bodySkin(.tone, 0.2)))
+        XCTAssertEqual(document.recipe.portrait.oneTouch, OneTouchBundle.defaultStrength, "묶이지 않은 톤은 표시를 남긴다")
+        XCTAssertNil(document.set(.bodySkin(.brightness, 0.5)))
+        XCTAssertNil(document.recipe.portrait.oneTouch, "몸 피부 밝기를 손으로 바꾸면 전체 층 표시가 지워진다")
+        XCTAssertEqual(
+            document.recipe.people.groups[.female]?.oneTouch, OneTouchBundle.defaultStrength, "그룹 표시는 그대로")
+        XCTAssertNil(document.applyOneTouch(strength: 0))
+        XCTAssertEqual(document.recipe.bodySkin.brightness, 0, "강도 0은 묶인 몸 피부 밝기도 기본값으로")
+        XCTAssertEqual(document.recipe.bodySkin.tone, 0.2, "톤은 그대로")
+        XCTAssertEqual(EditingPolicy.oneTouchDefaultStrength, OneTouchBundle.defaultStrength)
+    }
 }

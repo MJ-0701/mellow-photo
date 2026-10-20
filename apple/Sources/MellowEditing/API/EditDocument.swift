@@ -142,7 +142,8 @@ public struct EditDocument: Equatable, Sendable {
 
     /// 대상 층에 원터치 표 × 강도를 쓴다(스펙 G4 3.3).
     /// 체크포인트 하나이고 연속 변경 중이면 만들지 않는다.
-    /// .all은 전체 층에 공통 표, 남성·여성 그룹 층에 각 성별 표, 몸 피부에 몸 피부 표를 쓴다.
+    /// .all은 전체 층에 공통 표, 남성·여성 그룹 층에 각 성별 표, 몸 피부 밝기에 몸 피부 표를 쓴다.
+    /// 몸 피부 톤은 표 값이 0인 동안 쓰지 않는다.
     /// 그룹 층의 묶음 밖 키와 개인 층은 그대로 둔다.
     /// .gender는 그 그룹 층만, .person은 그 기록 층에 기록의 수동 성별 표(없으면 공통)를 쓴다.
     /// 강도 0은 묶인 키를 지우고(전체 층은 기본값, 그 외 상속) 표시도 지운다.
@@ -162,7 +163,9 @@ public struct EditDocument: Equatable, Sendable {
             }
             let body = OneTouchBundle.bodySkin(strength: clamped)
             updated.bodySkin.brightness = body.brightness
-            updated.bodySkin.tone = body.tone
+            if OneTouchBundle.writesBodyTone {
+                updated.bodySkin.tone = body.tone
+            }
         case .gender(let gender):
             var group = updated.people.groups[gender] ?? PortraitLayer()
             Self.writeOneTouch(gender: gender, strength: clamped, into: &group)
@@ -443,9 +446,11 @@ public struct EditDocument: Equatable, Sendable {
 
     /// 이전 레시피와 비교해 묶인 키가 실제로 바뀐 층의 원터치 표시를 지운다(메이크업 lookID와 같은 규칙).
     /// 같은 값이면 표시를 남긴다.
+    /// 전체 층 표시는 몸 피부 밝기도 본다.
     private static func clearStaleOneTouchMarks(previous: EditRecipe, in updated: inout EditRecipe) {
         if updated.portrait.oneTouch != nil,
             bundledValues(previous.portrait, previous.makeup) != bundledValues(updated.portrait, updated.makeup)
+                || bundledBody(previous.bodySkin) != bundledBody(updated.bodySkin)
         {
             updated.portrait.oneTouch = nil
         }
@@ -472,6 +477,12 @@ public struct EditDocument: Equatable, Sendable {
         copy.oneTouch = nil
         copy.makeupLookID = nil
         return copy
+    }
+
+    /// 전체 층 표시에 묶인 몸 피부 값.
+    /// 밝기는 늘 묶이고 톤은 원터치가 쓸 때만 묶인다.
+    private static func bundledBody(_ body: BodySkinAdjustments) -> [Double] {
+        OneTouchBundle.writesBodyTone ? [body.brightness, body.tone] : [body.brightness]
     }
 
     /// 전체 층의 묶인 값.

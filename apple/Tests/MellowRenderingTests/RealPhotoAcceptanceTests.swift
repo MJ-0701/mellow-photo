@@ -424,6 +424,9 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     /// 화면 배율 얼굴 상자 changedFraction.
     enum OneTouchVisibility {
         static let femaleDefaultChangedFraction = 0.05
+        /// 남성·공통 기본 0.6도 같은 하한(스펙 G4 1.2, G4-2 구현 중 추가).
+        static let maleDefaultChangedFraction = 0.05
+        static let commonDefaultChangedFraction = 0.05
         static let femaleMaximumChangedFraction = 0.10
         static let maleMaximumChangedFraction = 0.06
         static let femaleMaleDifferenceFraction = 0.02
@@ -443,10 +446,6 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let browChangedFraction = 0.05
         static let outsideFaceChangedFraction = 0.002
     }
-
-    /// MellowRendering 테스트 타깃은 MellowEditing을 import할 수 없어 기본 강도를 같은 값으로 둔다.
-    /// EditDocumentTests가 EditingPolicy.oneTouchDefaultStrength 0.6을 고정한다.
-    private static let oneTouchDefaultStrength = 0.6
 
     /// 전체 대상 원터치와 같은 층(전체 층 공통 표, 그룹 층 성별 표)에 faces[i]를 genders[i]로 지정한 레시피.
     /// 하한(보임)과 남녀 비교는 몸 피부 없이 얼굴만 잰다(보수적).
@@ -496,12 +495,24 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let portrait = try self.portrait()
         let before = try base().grid
         let rect = try faceRect
-        let femaleDefault = try oneTouchRender(strength: Self.oneTouchDefaultStrength, gender: .female).grid
+        let femaleDefault = try oneTouchRender(strength: OneTouchBundle.defaultStrength, gender: .female).grid
         XCTAssertGreaterThanOrEqual(
             record(
-                label(.female, Self.oneTouchDefaultStrength), "changed",
+                label(.female, OneTouchBundle.defaultStrength), "changed",
                 DisplayScale.changedFraction(before, femaleDefault, in: rect)),
             OneTouchVisibility.femaleDefaultChangedFraction)
+        let defaults: [(gender: Gender?, minimum: Double)] = [
+            (.male, OneTouchVisibility.maleDefaultChangedFraction),
+            (nil, OneTouchVisibility.commonDefaultChangedFraction),
+        ]
+        for item in defaults {
+            let result = try oneTouchRender(strength: OneTouchBundle.defaultStrength, gender: item.gender).grid
+            XCTAssertGreaterThanOrEqual(
+                record(
+                    label(item.gender, OneTouchBundle.defaultStrength), "changed",
+                    DisplayScale.changedFraction(before, result, in: rect)),
+                item.minimum, "\(label(item.gender, OneTouchBundle.defaultStrength)) 기본 강도도 보인다")
+        }
         let female = try oneTouchRender(strength: OneTouchBundle.maximumStrength, gender: .female).grid
         XCTAssertGreaterThanOrEqual(
             record(label(.female, 1), "changed", DisplayScale.changedFraction(before, female, in: rect)),
@@ -542,9 +553,9 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let bodySkinArea = try DisplayScale.grid(portrait.bodySkinArea())
         let skinBounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
         let cases: [(gender: Gender?, strength: Double, fineRatio: Double)] = [
-            (.female, Self.oneTouchDefaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
-            (.male, Self.oneTouchDefaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
-            (nil, Self.oneTouchDefaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (.female, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (.male, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (nil, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
             (.female, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
             (.male, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
             (nil, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
@@ -552,7 +563,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         for item in cases {
             let result = try oneTouchRender(strength: item.strength, gender: item.gender, withBodySkin: true)
             let name = label(item.gender, item.strength)
-            if item.strength == Self.oneTouchDefaultStrength {
+            if item.strength == OneTouchBundle.defaultStrength {
                 let lift = DisplayScale.lumaDelta(before, result.grid, weight: skin).mean
                 XCTAssertTrue(
                     OneTouchNaturalness.skinMeanLiftRange.contains(record(name, "skinMeanLuma", lift)),
@@ -581,7 +592,15 @@ final class RealPhotoAcceptanceTests: XCTestCase {
                     portrait.outsideFaceChangedFraction(
                         before: before, after: result.grid, dilationFraction: Naturalness.outsideFaceDilationFraction,
                         excluding: bodySkinArea)),
-                OneTouchNaturalness.outsideFaceChangedFraction, "\(name) 얼굴 밖")
+                OneTouchNaturalness.outsideFaceChangedFraction, "\(name) 얼굴·몸 피부 밖")
+            // 얼굴 항목(피부·눈입·메이크업)은 몸 피부 없이 렌더해 넓힌 얼굴 다각형 밖 전체를 뺌 없이 잰다.
+            let faceOnly = try oneTouchRender(strength: item.strength, gender: item.gender).grid
+            XCTAssertLessThanOrEqual(
+                record(
+                    name, "outsideFaceFaceOnly",
+                    portrait.outsideFaceChangedFraction(
+                        before: before, after: faceOnly, dilationFraction: Naturalness.outsideFaceDilationFraction)),
+                OneTouchNaturalness.outsideFaceChangedFraction, "\(name) 얼굴 항목은 얼굴 밖을 바꾸지 않는다")
             let lipChroma = DisplayScale.chromaDelta(before, result.grid, weight: lips)
             XCTAssertLessThanOrEqual(
                 record(name, "lipChroma", max(lipChroma.cb, lipChroma.cr)),

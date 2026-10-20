@@ -8,6 +8,13 @@ public enum OneTouchBundle {
     /// 강도 슬라이더의 끝.
     /// 표 값 그대로이고 그것이 상한이다.
     public static let maximumStrength = 1.0
+    /// 원터치 기본 강도.
+    /// Evoto 전후 측정 크기가 나는 강도다(스펙 G4 1.4).
+    /// 편집 규칙(EditingPolicy)과 렌더 테스트가 함께 쓴다.
+    public static let defaultStrength = 0.6
+    /// 몸 피부 톤을 쓰는지.
+    /// 표 값이 0인 동안은 쓰지 않아 사용자가 맞춘 톤을 지우지 않는다.
+    public static var writesBodyTone: Bool { Table.bodyTone != 0 }
 
     /// 표 한 줄.
     /// 블러셔 색이 nil이면 블러셔 없음(강도 0으로 덮어씀)이다.
@@ -89,6 +96,7 @@ public enum OneTouchBundle {
     /// 묶인 키.
     /// 이 키를 손으로 바꾸면 그 층의 oneTouch 표시가 지워진다.
     /// 얼굴형·체형은 들지 않는다.
+    /// 전체 층 표시에는 몸 피부 밝기도 묶인다(EditDocument가 따로 본다).
     public static let keys: Set<PortraitKey> = PortraitKey.skin.union(PortraitKey.features)
         .union([.makeupPart(.blush), .makeupPart(.lip)])
 

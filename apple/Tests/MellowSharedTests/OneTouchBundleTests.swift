@@ -38,6 +38,8 @@ final class OneTouchBundleTests: XCTestCase {
         XCTAssertEqual(OneTouchBundle.layer(for: .male, strength: 0), PortraitLayer(), "강도 0은 빈 층")
         XCTAssertEqual(OneTouchBundle.layer(for: .male, strength: 3), male, "강도는 상한으로 자른다")
         XCTAssertEqual(OneTouchBundle.clampedStrength(-1), 0)
+        XCTAssertEqual(OneTouchBundle.defaultStrength, 0.6, "Evoto 크기의 기본 강도")
+        XCTAssertFalse(OneTouchBundle.writesBodyTone, "톤 표 값이 0이면 톤을 쓰지 않는다")
         XCTAssertEqual(
             OneTouchBundle.bodySkin(strength: 0.5).brightness, OneTouchBundle.Table.bodyBrightness * 0.5,
             accuracy: 1e-12)
