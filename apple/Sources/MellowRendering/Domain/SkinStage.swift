@@ -1,7 +1,9 @@
 import CoreImage
 import MellowShared
 
-/// 자동 잡티를 지운 뒤 피부 마스크 안에서 주파수 분리로 얼룩만 줄인다. 모공 질감은 남긴다.
+/// 자동 잡티를 먼저 지우고 얼굴마다 주름 밝히기 4종(다크서클·팔자·마리오네트·미간)을 건다.
+/// 이어서 피부 마스크 안 대역 합성으로 얼룩(피부 보정)·넓은 톤 차이(얼룩 고르기)·번들거림을 줄이고 마지막에 붉은기를 조정한다.
+/// 모공 질감(가는 대역)은 남긴다.
 struct SkinStage: RenderStage {
     let name = "skin"
 
@@ -54,9 +56,11 @@ struct SkinStage: RenderStage {
         let blendMask = MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)
         if bandMix {
             // 볼 상자가 없으면 번들거림의 기준이 없어 번들거림만 건너뛴다.
+            // 그때 커널에 넘기는 검은 기준은 자리 채움이라 쓰이지 않는다.
             let reference = Self.cheekReference(of: result, face: face, extent: extent)
             let smooth = try FrequencySeparation.refined(
-                result, bounds: bounds, faceWidth: faceWidth, mask: unitMask, reference: reference ?? Self.noReference,
+                result, bounds: bounds, faceWidth: faceWidth, mask: unitMask,
+                reference: reference ?? CIImage(color: .black),
                 smoothing: skin.smoothing, toneEvening: skin.toneEvening, shine: reference == nil ? 0 : skin.shine,
                 tuning: tuning)
             result = MaskBuilder.blend(smooth, over: result, mask: blendMask).cropped(to: extent)
@@ -72,9 +76,6 @@ struct SkinStage: RenderStage {
         }
         return result
     }
-
-    /// 기준이 없을 때 커널에 넘기는 자리 채움(쓰이지 않는다).
-    private static let noReference = CIImage(color: .black)
 
     /// 볼 두 곳 평균을 반씩 섞은 기준색(무한 확장). 넘긴 이미지의 색공간을 따른다. 볼 상자가 없으면 nil.
     static func cheekReference(of image: CIImage, face: FaceGeometry, extent: CGRect) -> CIImage? {

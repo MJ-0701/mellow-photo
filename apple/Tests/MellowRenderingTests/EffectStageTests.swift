@@ -81,4 +81,28 @@ final class EffectStageTests: XCTestCase {
             XCTAssertEqual(grid.rgba(point)[3], 255, "가장자리가 투명해지지 않는다 \(point)")
         }
     }
+
+    /// 키운 잡음은 가장 가까운 화소로 뽑아 알갱이 안이 한 값이다. 선형 보간이면 알갱이 경계가 번진다.
+    func testGrainLayerKeepsHardSquareGrains() throws {
+        let side = 64
+        let grain = 4
+        let layer = try EffectStage.grainLayer(
+            extent: CGRect(x: 0, y: 0, width: side, height: side), amplitude: 1, grainSize: CGFloat(grain))
+        let grid = try Support.grid(layer)
+        var cellValues = Set<UInt8>()
+        var softPixels = 0
+        for cellY in stride(from: 0, to: side, by: grain) {
+            for cellX in stride(from: 0, to: side, by: grain) {
+                let corner = grid.red(CGPoint(x: cellX, y: cellY))
+                cellValues.insert(corner)
+                for y in cellY..<(cellY + grain) {
+                    for x in cellX..<(cellX + grain) where grid.red(CGPoint(x: x, y: y)) != corner {
+                        softPixels += 1
+                    }
+                }
+            }
+        }
+        XCTAssertEqual(softPixels, 0, "알갱이 안은 한 값")
+        XCTAssertGreaterThan(cellValues.count, 1, "알갱이마다 값이 다르다")
+    }
 }
