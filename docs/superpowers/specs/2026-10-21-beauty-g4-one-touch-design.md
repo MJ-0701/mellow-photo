@@ -343,7 +343,7 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 1. 얼굴 없음·분석 실패 안내(지금과 같음).
 2. `TargetChips`(H3) — 전체 · 남성 · 여성 · 사람 1…n.
 3. **원터치 줄** `OneTouchRow`(새 파일 `Features/Editor/OneTouchRow.swift`): 왼쪽 버튼 "원터치 보정"(`wand.and.sparkles`), 오른쪽 `AdjustmentSlider`와 같은 모양의 강도 슬라이더(0…1). 슬라이더 값은 현재 대상 층의 `oneTouch`(전체 대상이면 `portrait.oneTouch`)이고 nil이면 손잡이는 0에 두고 값 자리에 "—"를 보인다. 버튼은 nil이면 `oneTouchDefaultStrength`로 적용, 값이 있으면 그 값으로 다시 적용(사용자 조정을 표로 되돌림). 슬라이더 드래그는 `beginSliderEdit`/`applyOneTouch(strength:)`/`endSliderEdit`로 연속 변경 한 단계.
-4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요". (G4-3 구현 중 변경) 전체 문구는 원터치 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)이 성별을 지정한 사람에게는 그룹 값에 가린다는 것을, 그룹·사람 문구는 몸 피부 밝기를 바꾸지 않는다는 것(전체 대상에서만)을 함께 말한다. 문구는 `UserMessage.oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`에 G4-3 Task 1이 둔다.
+4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요". (G4-3 구현 중 변경) 전체 문구는 원터치 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)이 성별을 지정한 사람에게는 그룹 값에 가린다는 것을, 그룹·사람 문구는 몸 피부 밝기를 바꾸지 않는다는 것(전체 대상에서만)을 함께 말한다. 문구는 `UserMessage.oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`에 G4-3 Task 1이 둔다. (G4-3 리뷰 변경) iPhone 조절 영역(200pt)에서 칩·원터치 줄·"세부 조정" 머리가 스크롤 없이 보이도록 전체 문구는 두 줄, 그룹·사람 문구는 한 줄로 줄인다(뜻은 같음: 성별 표·공통 표, 그룹 값이 메이크업까지 전체보다 앞섬, 그룹·사람 원터치는 몸 피부를 바꾸지 않음). 뷰티 패널은 자체 세로 간격을 8로 좁힌다.
 5. `DisclosureGroup("세부 조정", isExpanded: $model.showsDetailAdjustments)` 안에 지금의 탭 피커와 네 탭 내용. `showsDetailAdjustments`는 세션 상태(기본 false, 파일에 저장 안 함). 세부 슬라이더가 묶인 키이고 그 층의 표시가 있으면 제목 옆에 작은 "원터치" 꼬리표(`Theme.oneTouchTagFont`)를 둔다 — 손으로 바꾸면 꼬리표와 표시가 사라진다.
 6. 피부톤 탭 맨 위 상태 줄(2.4절).
 
