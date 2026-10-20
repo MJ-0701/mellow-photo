@@ -46,6 +46,13 @@ public struct RenderTuning: Sendable {
     public var blemishHealRadiusScale: Double = 1.8
     /// 복제 원본을 복제 반지름의 이 배수만큼 얼굴 가운데 쪽 옆 피부에서 가져온다. 2 이상이면 원이 겹치지 않는다.
     public var blemishSourceOffset: Double = 2.5
+    /// 주름 밝히기가 보는 국소 저주파 반지름. 얼굴 폭 비율.
+    /// 가장 좁은 띠 반지름(마리오네트 3%)의 절반이라 주름 그늘을 잡고, 모공 대역(fineBandFraction 0.6%)보다 커서 모공은 뺀다.
+    public var foldLowBandFraction: Double = 0.015
+    /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3.5~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
+    public var foldSurroundFraction: Double = 0.12
+    /// 주름 밝히기 1에서 "주변 평균 − 국소 저주파"의 양수 차이를 더하는 비율. 100%면 평평해 보인다.
+    public var foldLiftMax: Double = 0.9
 
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25

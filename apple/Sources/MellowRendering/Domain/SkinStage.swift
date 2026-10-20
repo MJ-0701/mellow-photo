@@ -6,30 +6,76 @@ struct SkinStage: RenderStage {
     let name = "skin"
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let skin = context.recipe.portrait.skin
+        let skin = Self.clamped(context.recipe.portrait.skin)
         guard skin.hasEffect, !context.targetFaces.isEmpty else { return image }
         let extent = context.extent
-        let tuning = context.tuning
         var result = image
         if skin.autoBlemish {
             for heal in Self.healSpots(in: context) {
                 result = LocalEditStage.applySpot(heal, to: result, context: context)
             }
         }
-        guard skin.smoothing > 0 else { return result.cropped(to: extent) }
+        guard skin.smoothing > 0 || skin.hasRefinement else { return result.cropped(to: extent) }
         for face in context.targetFaces {
-            // 이미지 밖까지 계산하면 가장자리에 알파 0·RGB가 있는 픽셀이 남는다.
-            let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(result.extent)
-            guard !bounds.isEmpty else { continue }
-            let mask = try FaceRegions.skinMask(
-                face: face, image: result, extent: extent, tuning: tuning, strength: tuning.skinMaskMaxStrength,
-                cache: context.regionMasks)
-            let smooth = try FrequencySeparation.smoothed(
-                result, bounds: bounds, faceWidth: FaceRegions.faceWidth(face, extent: extent),
-                smoothing: skin.smoothing, tuning: tuning)
-            result = MaskBuilder.blend(smooth, over: result, mask: mask).cropped(to: extent)
+            result = try refine(result, face: face, skin: skin, context: context)
         }
-        return result
+        return result.cropped(to: extent)
+    }
+
+    /// 피부 보정 0…1, 정밀 값은 키별 범위로 자른다. 프리셋·일괄 값은 편집 규칙을 거치지 않는다. 유한하지 않은 값은 RenderPipeline이 먼저 거절한다.
+    static func clamped(_ skin: SkinAdjustments) -> SkinAdjustments {
+        var copy = skin
+        copy.smoothing = AdjustmentRange.clamped(skin.smoothing, to: AdjustmentRange.unit)
+        for key in SkinRefinementKey.allCases {
+            copy[key] = AdjustmentRange.clamped(skin[key], to: AdjustmentRange.skinRefinement(key))
+        }
+        return copy
+    }
+
+    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    private func refine(_ image: CIImage, face: FaceGeometry, skin: SkinAdjustments, context: RenderContext) throws
+        -> CIImage
+    {
+        let extent = context.extent
+        let tuning = context.tuning
+        // 이미지 밖까지 계산하면 가장자리에 알파 0·RGB가 있는 픽셀이 남는다.
+        let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(image.extent)
+        guard !bounds.isEmpty else { return image }
+        let faceWidth = FaceRegions.faceWidth(face, extent: extent)
+        var result = image
+        for fold in Self.folds(for: face, skin: skin, context: context) {
+            result = try SkinRefinement.liftFold(
+                result, region: fold.region, faceWidth: faceWidth, amount: fold.amount, tuning: tuning, extent: extent)
+        }
+        guard skin.smoothing > 0 else { return result }
+        let mask = try FaceRegions.skinMask(
+            face: face, image: result, extent: extent, tuning: tuning, strength: tuning.skinMaskMaxStrength,
+            cache: context.regionMasks)
+        let smooth = try FrequencySeparation.smoothed(
+            result, bounds: bounds, faceWidth: faceWidth, smoothing: skin.smoothing, tuning: tuning)
+        return MaskBuilder.blend(smooth, over: result, mask: mask).cropped(to: extent)
+    }
+
+    /// 값이 0이 아니고 마스크를 만들 수 있는 주름 띠. 순서는 다크서클 → 팔자 → 마리오네트 → 미간. 특징점이 없는 띠는 빠진다.
+    static func folds(for face: FaceGeometry, skin: SkinAdjustments, context: RenderContext)
+        -> [(amount: Double, region: FaceRegions.RegionMask)]
+    {
+        let extent = context.extent
+        let tuning = context.tuning
+        let cache = context.regionMasks
+        let candidates: [(Double, () -> FaceRegions.RegionMask?)] = [
+            (
+                skin.darkCircles,
+                { FaceRegions.darkCircleMask(face: face, extent: extent, tuning: tuning, cache: cache) }
+            ),
+            (skin.nasolabial, { FaceRegions.nasolabialMask(face: face, extent: extent, tuning: tuning, cache: cache) }),
+            (skin.marionette, { FaceRegions.marionetteMask(face: face, extent: extent, tuning: tuning, cache: cache) }),
+            (skin.glabella, { FaceRegions.glabellaMask(face: face, extent: extent, tuning: tuning, cache: cache) }),
+        ]
+        return candidates.compactMap { amount, make in
+            guard amount > 0, let region = make() else { return nil }
+            return (amount, region)
+        }
     }
 
     /// 대상 잡티의 복제 원. 쓸 만한 원본이 없는 잡티는 건너뛴다.

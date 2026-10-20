@@ -62,6 +62,26 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
+    /// center 둘레 타원 안 픽셀을 factor배 어둡게 한다(그늘·주름 흉내).
+    private func darkened(_ image: CIImage, at center: CGPoint, radii: CGSize, factor: Double) -> CIImage {
+        let dim = image.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: factor, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: factor, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: factor, w: 0),
+            ])
+        let mask = Support.hardEllipse(center: center, radii: radii, extent: SyntheticFace.extent)
+        return dim.applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: image, kCIInputMaskImageKey: mask]
+        ).cropped(to: SyntheticFace.extent)
+    }
+
+    /// 주름 띠 테스트의 그늘 밝기 배율(선형).
+    private static let shadowFactor = 0.6
+    /// 밝힌 뒤 기대하는 최소 빨강 증가(바이트).
+    private static let liftMinimum = 12
+
     func testNoSmoothingAndNoAutoBlemishIsIdentity() throws {
         let synthetic = SyntheticFace.make(withBlemishes: true)
         let output = try render(synthetic, skin: SkinAdjustments())
@@ -211,5 +231,103 @@ final class SkinStageTests: XCTestCase {
         let fresh = RenderContext(
             extent: synthetic.image.extent, recipe: recipe, faces: [synthetic.face], tuning: RenderTuning())
         XCTAssertEqual(first, try Support.bytes(SkinStage().apply(synthetic.image, in: fresh)), "캐시 여부와 결과가 같다")
+    }
+
+    func testDarkCirclesLiftOnlyTheShadowUnderTheEyes() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 30, height: 10)
+        var image = darkened(base.image, at: SyntheticFace.underLeftEye, radii: radii, factor: Self.shadowFactor)
+        image = darkened(image, at: SyntheticFace.underRightEye, radii: radii, factor: Self.shadowFactor)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(darkCircles: 1)))
+        for point in [SyntheticFace.underLeftEye, SyntheticFace.underRightEye] {
+            XCTAssertGreaterThanOrEqual(
+                Int(after.red(point)), Int(before.red(point)) + Self.liftMinimum, "\(point) 그늘이 밝아진다")
+        }
+        let outside = [
+            SyntheticFace.leftEye, SyntheticFace.scleraPoint, SyntheticFace.cheek, SyntheticFace.mouth,
+            SyntheticFace.forehead, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ]
+        for point in outside {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "다크서클 띠 밖 \(point)")
+        }
+        let half = try Support.grid(render(synthetic, skin: SkinAdjustments(darkCircles: 0.5)))
+        XCTAssertGreaterThan(half.red(SyntheticFace.underLeftEye), before.red(SyntheticFace.underLeftEye))
+        XCTAssertLessThan(half.red(SyntheticFace.underLeftEye), after.red(SyntheticFace.underLeftEye), "0.5는 사이")
+    }
+
+    func testNasolabialAndMarionetteLiftTheirOwnFoldOnly() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 7, height: 7)
+        var image = base.image
+        for center in [SyntheticFace.leftNasolabial, SyntheticFace.leftMarionette] {
+            image = darkened(image, at: center, radii: radii, factor: Self.shadowFactor)
+        }
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let nasolabial = try Support.grid(render(synthetic, skin: SkinAdjustments(nasolabial: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(nasolabial.red(SyntheticFace.leftNasolabial)),
+            Int(before.red(SyntheticFace.leftNasolabial)) + Self.liftMinimum, "팔자주름이 밝아진다")
+        XCTAssertEqual(
+            nasolabial.rgba(SyntheticFace.leftMarionette), before.rgba(SyntheticFace.leftMarionette),
+            "팔자 슬라이더는 마리오네트 띠를 건드리지 않는다")
+        let marionette = try Support.grid(render(synthetic, skin: SkinAdjustments(marionette: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(marionette.red(SyntheticFace.leftMarionette)),
+            Int(before.red(SyntheticFace.leftMarionette)) + Self.liftMinimum, "마리오네트 주름이 밝아진다")
+        XCTAssertEqual(
+            marionette.rgba(SyntheticFace.leftNasolabial), before.rgba(SyntheticFace.leftNasolabial),
+            "마리오네트 슬라이더는 팔자 띠를 건드리지 않는다")
+        let outside = [
+            SyntheticFace.mouth, SyntheticFace.lipPoint, SyntheticFace.philtrum, SyntheticFace.leftEye,
+            SyntheticFace.forehead, SyntheticFace.chinTip, SyntheticFace.outside,
+        ]
+        for point in outside {
+            XCTAssertEqual(nasolabial.rgba(point), before.rgba(point), "팔자 띠 밖 \(point)")
+            XCTAssertEqual(marionette.rgba(point), before.rgba(point), "마리오네트 띠 밖 \(point)")
+        }
+    }
+
+    func testGlabellaLiftsBetweenTheBrowsOnly() throws {
+        let base = SyntheticFace.make()
+        let image = darkened(
+            base.image, at: SyntheticFace.glabella, radii: CGSize(width: 8, height: 8), factor: Self.shadowFactor)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(glabella: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.glabella)), Int(before.red(SyntheticFace.glabella)) + Self.liftMinimum)
+        let outside = [
+            SyntheticFace.leftBrowCenter, SyntheticFace.leftEye, SyntheticFace.forehead, SyntheticFace.bridge,
+            SyntheticFace.cheek, SyntheticFace.mouth,
+        ]
+        for point in outside {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "미간 밖 \(point)")
+        }
+    }
+
+    func testMissingLandmarksSkipOnlyThatFold() throws {
+        let base = SyntheticFace.make()
+        let image = darkened(
+            base.image, at: SyntheticFace.glabella, radii: CGSize(width: 8, height: 8), factor: Self.shadowFactor)
+        let shaded = darkened(
+            image, at: SyntheticFace.leftMarionette, radii: CGSize(width: 7, height: 7), factor: Self.shadowFactor)
+        let noNose = SyntheticFace(image: shaded, face: base.face.removing([.nose]))
+        let three = SkinAdjustments(nasolabial: 1, marionette: 1, glabella: 1)
+        let before = try Support.grid(shaded)
+        let after = try Support.grid(render(noNose, skin: three))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.glabella)), Int(before.red(SyntheticFace.glabella)) + Self.liftMinimum,
+            "코가 없어도 미간은 밝힌다")
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.leftMarionette)),
+            Int(before.red(SyntheticFace.leftMarionette)) + Self.liftMinimum,
+            "코가 없어도 마리오네트는 밝힌다(방향 고정)")
+        XCTAssertEqual(after.rgba(SyntheticFace.leftNasolabial), before.rgba(SyntheticFace.leftNasolabial), "팔자만 건너뛴다")
+        let boxOnly = SyntheticFace.make(landmarks: false)
+        let folds = SkinAdjustments(darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1)
+        XCTAssertTrue(try Support.bytes(render(boxOnly, skin: folds)) == Support.bytes(boxOnly.image), "특징점 없으면 그대로")
     }
 }

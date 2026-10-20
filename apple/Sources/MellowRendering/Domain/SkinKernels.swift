@@ -7,6 +7,7 @@ final class SkinKernels: @unchecked Sendable {
 
     private let chroma: CIColorKernel?
     private let bands: CIColorKernel?
+    private let fold: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -30,6 +31,13 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(midBlur.rgb + mid * keep + fine, image.a);
                 }
                 """)
+        fold = CIColorKernel(
+            source: """
+                kernel vec4 foldLift(__sample image, __sample low, __sample surround, float amount) {
+                    vec3 gap = max(surround.rgb - low.rgb, vec3(0.0));
+                    return vec4(image.rgb + gap * amount, image.a);
+                }
+                """)
     }
 
     /// encoded는 sRGB 감마 값 이미지, left·right는 볼 평균을 무한 확장한 이미지. 결과는 회색 가중치.
@@ -48,5 +56,13 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [image, fineBlur, midBlur, keep]
         guard let mixed = bands.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return mixed
+    }
+
+    /// 주변 평균(surround)이 국소 저주파(low)보다 밝은 만큼만 amount 비율로 더한다. 모공 대역은 더하는 항에 없어 그대로다.
+    func foldLift(image: CIImage, low: CIImage, surround: CIImage, amount: Double, extent: CGRect) throws -> CIImage {
+        guard let fold else { throw MellowError.renderFailed }
+        let arguments: [Any] = [image, low, surround, amount]
+        guard let lifted = fold.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
+        return lifted
     }
 }
