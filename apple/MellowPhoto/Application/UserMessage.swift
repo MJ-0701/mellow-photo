@@ -49,6 +49,8 @@ enum UserMessage {
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
+    static let skinRefinementHint =
+        "다크서클·팔자주름·마리오네트 주름·미간 주름은 특징점으로 어림한 띠 안에서 어두운 만큼만 밝힙니다. 붉은기는 왼쪽이 맑게, 오른쪽이 혈색이에요."
     static let faceHint = "미소는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
     static let featureHint = "치아 미백은 치아가 보이는 사진에서만 바뀌어요. 눈·입 보정은 얼굴 특징점을 찾은 얼굴에 적용돼요."
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
@@ -139,6 +141,19 @@ enum UserMessage {
         case .eyeBrighten: return "눈 또렷하게"
         case .teethWhiten: return "치아 미백"
         case .lipVitality: return "입술 생기"
+        }
+    }
+
+    /// 뷰티 › 피부 탭의 정밀 슬라이더 이름. 화면 순서는 SkinRefinementKey.allCases.
+    static func skinRefinementTitle(_ key: SkinRefinementKey) -> String {
+        switch key {
+        case .darkCircles: return "다크서클"
+        case .nasolabial: return "팔자주름"
+        case .marionette: return "마리오네트 주름"
+        case .glabella: return "미간 주름"
+        case .toneEvening: return "피부 얼룩 고르기"
+        case .redness: return "붉은기"
+        case .shine: return "번들거림"
         }
     }
 

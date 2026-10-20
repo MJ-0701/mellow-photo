@@ -46,6 +46,7 @@ struct BeautyPanel: View {
         }
     }
 
+    /// 피부 보정·자동 잡티 아래에 정밀 7개. 붉은기만 가운데 0인 양방향이고 0 근처에서 0에 붙는다.
     @ViewBuilder
     private func skinControls(_ skin: SkinAdjustments) -> some View {
         AdjustmentSlider(title: UserMessage.skinSmoothing, value: skin.smoothing, range: EditingPolicy.unitRange) {
@@ -57,6 +58,15 @@ struct BeautyPanel: View {
         )
         .font(.caption)
         Text(UserMessage.skinHint).font(.caption).foregroundStyle(.secondary)
+        Divider().opacity(0.4)
+        ForEach(SkinRefinementKey.allCases, id: \.self) { key in
+            let range = EditingPolicy.skinRefinementRange(key)
+            AdjustmentSlider(
+                title: UserMessage.skinRefinementTitle(key), value: skin[key], range: range,
+                snapsToZero: range.lowerBound < 0
+            ) { .skinRefinement(key, $0) }
+        }
+        Text(UserMessage.skinRefinementHint).font(.caption).foregroundStyle(.secondary)
     }
 
     /// 얼굴형 슬라이더 10개. 미소만 0…1, 나머지는 가운데 0인 양방향이고 0 근처에서 0에 붙는다.
