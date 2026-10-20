@@ -217,6 +217,43 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.makeup, MakeupAdjustments(), "없음은 메이크업을 모두 지운다")
     }
 
+    func testSkinRefinementChangesClampAreNotLockedAndUndoOneStepEach() {
+        var document = EditDocument()
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.5, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        let steps = document.undoStack.count
+        XCTAssertFalse(EditChange.skinRefinement(.redness, 0.5).affectsGeometry)
+        XCTAssertNil(document.set(.skinRefinement(.darkCircles, 1.7)), "색만 바꾸므로 수동 편집이 있어도 잠기지 않는다")
+        XCTAssertEqual(document.recipe.portrait.skin.darkCircles, 1)
+        XCTAssertNil(document.set(.skinRefinement(.redness, -3)))
+        XCTAssertEqual(document.recipe.portrait.skin.redness, -1, "붉은기만 양방향")
+        document.set(.skinRefinement(.shine, -0.2))
+        XCTAssertEqual(document.recipe.portrait.skin.shine, 0, "한 방향 항목의 음수는 0")
+        XCTAssertEqual(document.undoStack.count, steps + 2, "값이 실제로 바뀐 변경마다 한 단계")
+        XCTAssertEqual(EditingPolicy.skinRefinementRange(.redness), EditingPolicy.bipolarRange)
+        XCTAssertEqual(EditingPolicy.skinRefinementRange(.toneEvening), EditingPolicy.unitRange)
+        document.undo()
+        XCTAssertEqual(document.recipe.portrait.skin.redness, 0)
+        XCTAssertEqual(document.recipe.portrait.skin.darkCircles, 1)
+    }
+
+    func testApplyAutoKeepsSkinRefinements() {
+        var document = EditDocument()
+        document.set(.skinRefinement(.darkCircles, 0.6))
+        document.set(.skinRefinement(.redness, -0.3))
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.2), detail: DetailAdjustments(),
+            portrait: PortraitAdjustments(skin: SkinAdjustments(smoothing: 0.3, autoBlemish: true)))
+        XCTAssertTrue(document.applyAuto(suggestion))
+        XCTAssertEqual(
+            document.recipe.portrait.skin,
+            SkinAdjustments(smoothing: 0.3, autoBlemish: true, darkCircles: 0.6, redness: -0.3),
+            "자동 보정은 피부 보정·자동 잡티만 쓰고 정밀 값은 지우지 않는다")
+        XCTAssertFalse(document.applyAuto(suggestion), "같은 값이면 아무것도 하지 않는다")
+        var other = EditDocument()
+        other.applyFromBatch(PresetValues(of: document.recipe))
+        XCTAssertEqual(other.recipe.portrait.skin.darkCircles, 0.6, "일괄 적용은 정밀 값을 나른다")
+    }
+
     func testPresetAndBatchCarryFeaturesAndBackground() {
         let values = PresetValues(
             portrait: PortraitAdjustments(features: FeatureAdjustments(eyeBrighten: 0.3, lipVitality: 0.2)),

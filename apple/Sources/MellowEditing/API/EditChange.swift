@@ -7,6 +7,7 @@ public enum EditChange: Equatable, Sendable {
     case warmth(Double)
     case skinSmoothing(Double)
     case autoBlemish(Bool)
+    case skinRefinement(SkinRefinementKey, Double)
     case faceShape(FaceShapeKey, Double)
     case targetFace(Int?)
     case feature(FeatureKey, Double)

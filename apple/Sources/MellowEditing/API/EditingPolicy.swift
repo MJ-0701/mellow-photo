@@ -21,6 +21,11 @@ public enum EditingPolicy {
         AdjustmentRange.bodyShape(key)
     }
 
+    /// 붉은기만 양방향이다.
+    public static func skinRefinementRange(_ key: SkinRefinementKey) -> ClosedRange<Double> {
+        AdjustmentRange.skinRefinement(key)
+    }
+
     /// NaN은 범위의 아래 끝이 된다.
     public static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
         AdjustmentRange.clamped(value, to: range)

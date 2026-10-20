@@ -51,6 +51,8 @@ public struct EditDocument: Equatable, Sendable {
         case .skinSmoothing(let value):
             updated.portrait.skin.smoothing = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .autoBlemish(let flag): updated.portrait.skin.autoBlemish = flag
+        case .skinRefinement(let key, let value):
+            updated.portrait.skin[key] = EditingPolicy.clamped(value, to: EditingPolicy.skinRefinementRange(key))
         case .faceShape(let key, let value):
             updated.portrait.face[key] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(key))
         case .targetFace(let index): updated.portrait.targetFace = index
@@ -113,15 +115,16 @@ public struct EditDocument: Equatable, Sendable {
         recipe = merged(values, targetFace: isGeometryLocked ? recipe.portrait.targetFace : nil)
     }
 
-    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부·눈 또렷하게만 바꾸고
-    /// 치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·메이크업·룩·기하·수동 편집은 건드리지 않는다.
+    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
+    /// 피부 정밀·치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·메이크업·룩·기하·수동 편집은 건드리지 않는다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         var updated = recipe
         updated.color = suggestion.color
         updated.detail = suggestion.detail
-        updated.portrait.skin = suggestion.portrait.skin
+        updated.portrait.skin.smoothing = suggestion.portrait.skin.smoothing
+        updated.portrait.skin.autoBlemish = suggestion.portrait.skin.autoBlemish
         updated.portrait.features.eyeBrighten = suggestion.portrait.features.eyeBrighten
         guard updated != recipe else { return false }
         checkpoint()
