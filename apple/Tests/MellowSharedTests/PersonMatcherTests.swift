@@ -62,4 +62,34 @@ final class PersonMatcherTests: XCTestCase {
         people.individuals.append(legacy)
         XCTAssertNil(people.personID(at: PersonAnchor(faceBox: box(0.1))), "anchor 없는 기록은 anchor로 찾지 못한다")
     }
+
+    func testPersonIDAtAnchorPicksTheNearestRecordForOverlappingFaces() {
+        // 앞사람(폭 0.10, 중심 0.45)과 뒷사람(폭 0.08, 중심 0.47)은 서로의 허용치 안에 있다.
+        let front = PersonAnchor(x: 0.45, y: 0.5, width: 0.10)
+        let back = PersonAnchor(x: 0.47, y: 0.5, width: 0.08)
+        XCTAssertTrue(PersonMatcher.isMatch(front, back))
+        let first = PersonRecord(anchor: front)
+        let second = PersonRecord(anchor: back)
+        let people = PeopleAdjustments(individuals: [first, second])
+        XCTAssertEqual(people.personID(at: back), second.id, "배열 앞 기록이 아니라 가장 가까운 기록")
+        XCTAssertEqual(people.personID(at: front), first.id)
+        let faces = [
+            NormalizedRect(x: 0.40, y: 0.45, width: 0.10, height: 0.10),
+            NormalizedRect(x: 0.43, y: 0.46, width: 0.08, height: 0.08),
+        ]
+        XCTAssertEqual(
+            PersonMatcher.match(people.individuals, faces: faces),
+            [.init(person: first.id, faceIndex: 0), .init(person: second.id, faceIndex: 1)], "렌더 짝짓기와 같은 사람")
+        let twin = PersonRecord(anchor: back)
+        XCTAssertEqual(
+            PeopleAdjustments(individuals: [twin, second]).personID(at: back), twin.id, "같은 거리는 배열 순서")
+    }
+
+    func testLegacyIDNeverCrashesOnOutOfRangeIndices() {
+        let last = PersonID.legacy(index: PersonID.legacyIndexRange.upperBound)
+        XCTAssertEqual(PersonID.legacy(index: Int.max), last)
+        XCTAssertEqual(PersonID.legacy(index: -1), last, "음수는 어느 얼굴과도 짝이 되지 않는 마지막 값으로 모은다")
+        XCTAssertNotEqual(PersonID.legacy(index: 0), last)
+        XCTAssertEqual(PersonID.legacy(index: 7).rawValue.uuidString, "B0000000-0000-0000-0000-000000000007")
+    }
 }

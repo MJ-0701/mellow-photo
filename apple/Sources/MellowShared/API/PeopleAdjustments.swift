@@ -16,6 +16,9 @@ public struct PersonID: Hashable, Codable, Sendable {
     private static let legacyPrefix = "B0000000-0000-0000-0000-"
     /// 접두사 뒤 인덱스 자리 수.
     private static let legacyDigits = 12
+    /// 12자리에 들어가는 인덱스 범위.
+    /// 밖의 인덱스(음수·손상 파일)는 upperBound로 모은다.
+    public static let legacyIndexRange = 0...999_999_999_999
 
     public let rawValue: UUID
 
@@ -29,9 +32,11 @@ public struct PersonID: Hashable, Codable, Sendable {
 
     /// 옛 targetFace 이행용 결정적 id.
     /// 같은 파일을 두 번 읽어도 같다.
+    /// 범위 밖 인덱스는 어느 얼굴과도 짝이 되지 않는 마지막 값으로 모은다(크래시하지 않는다).
     public static func legacy(index: Int) -> PersonID {
-        let digits = String(max(0, index))
-        let suffix = String(repeating: "0", count: max(0, legacyDigits - digits.count)) + digits
+        let safe = legacyIndexRange.contains(index) ? index : legacyIndexRange.upperBound
+        let digits = String(safe)
+        let suffix = String(repeating: "0", count: legacyDigits - digits.count) + digits
         guard let uuid = UUID(uuidString: legacyPrefix + suffix) else {
             preconditionFailure("legacy person index out of range: \(index)")
         }
@@ -370,6 +375,26 @@ public struct PersonRecord: Codable, Equatable, Identifiable, Sendable {
     /// 성별도 층도 없는 기록.
     /// 편집 규칙이 변경 뒤 지운다.
     public var isEmpty: Bool { gender == nil && layer.isEmpty }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case anchor
+        case legacyIndex
+        case gender
+        case layer
+    }
+
+    /// 관대하게 읽는다.
+    /// layer가 없으면 빈 층이고 모르는 gender 문자열은 미지정이다.
+    /// id·anchor·legacyIndex가 잘못되면 실패하고 PeopleAdjustments가 이 기록만 버린다.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(PersonID.self, forKey: .id)
+        anchor = try container.decodeIfPresent(PersonAnchor.self, forKey: .anchor)
+        legacyIndex = try container.decodeIfPresent(Int.self, forKey: .legacyIndex)
+        gender = try? container.decodeIfPresent(Gender.self, forKey: .gender)
+        layer = try container.decodeIfPresent(PortraitLayer.self, forKey: .layer) ?? PortraitLayer()
+    }
 }
 
 /// 성별 그룹 층 둘과 개인 기록.
@@ -398,15 +423,26 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
         individuals.first { $0.id == id }
     }
 
-    /// anchor와 같은 사람의 기록(PersonMatcher.isMatch).
+    /// anchor와 같은 사람의 기록.
+    /// 허용치(PersonMatcher.isMatch) 안에서 거리가 가장 가까운 기록이고 동률은 배열 순서다.
+    /// 겹친 얼굴에서도 렌더 짝짓기(PersonMatcher.match)와 같은 사람을 고른다.
     /// anchor 없는 기록은 찾지 못한다.
     public func personID(at anchor: PersonAnchor) -> PersonID? {
-        individuals.first { record in record.anchor.map { PersonMatcher.isMatch($0, anchor) } ?? false }?.id
+        var best: (distance: Double, id: PersonID)?
+        for record in individuals {
+            guard let stored = record.anchor, let distance = PersonMatcher.distance(stored, anchor) else { continue }
+            if best.map({ distance < $0.distance }) ?? true {
+                best = (distance, record.id)
+            }
+        }
+        return best?.id
     }
 
-    /// 빈 기록을 지운다.
+    /// 빈 기록과 빈 그룹 층을 지운다.
+    /// 빈 그룹 층은 인코드에서 빠지므로 남겨 두면 저장 전후 ==와 isDefault가 어긋난다.
     public mutating func prune() {
         individuals.removeAll(where: \.isEmpty)
+        groups = groups.filter { !$0.value.isEmpty }
     }
 
     // MARK: Codable
@@ -442,7 +478,17 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
                     PortraitLayer.self, forKey: GenderKey(stringValue: gender.rawValue))
             }
         }
-        individuals = try container.decodeIfPresent([PersonRecord].self, forKey: .individuals) ?? []
+        let lossy = try container.decodeIfPresent([LossyRecord].self, forKey: .individuals) ?? []
+        individuals = lossy.compactMap(\.record)
+    }
+
+    /// 잘못된 기록 하나 때문에 세션 전체를 못 여는 일이 없게 그 기록만 버린다.
+    private struct LossyRecord: Decodable {
+        let record: PersonRecord?
+
+        init(from decoder: Decoder) throws {
+            record = try? PersonRecord(from: decoder)
+        }
     }
 
     public func encode(to encoder: Encoder) throws {

@@ -183,6 +183,7 @@
           "items": {
             "type": "object", "additionalProperties": false,
             "required": ["id", "layer"],
+            "anyOf": [{ "required": ["anchor"] }, { "required": ["legacyIndex"] }],
             "properties": {
               "id": { "type": "string", "format": "uuid" },
               "anchor": {

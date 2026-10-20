@@ -428,4 +428,43 @@ final class EditRecipeCodingTests: XCTestCase {
         let decoded = try JSONDecoder().decode(PresetValues.self, from: Data(smuggled.utf8))
         XCTAssertTrue(decoded.people.individuals.isEmpty, "파일에 든 개인 층은 무시한다")
     }
+
+    func testPruneDropsEmptyGroupLayersSoTheRecipeStaysDefault() throws {
+        var recipe = EditRecipe()
+        recipe.people.groups[.male] = PortraitLayer(skinSmoothing: 0.3)
+        recipe.people.groups[.female] = PortraitLayer(face: [.jaw: 0.1])
+        recipe.people.groups[.male]?.remove([.skinSmoothing])
+        recipe.people.groups[.female]?.remove([.faceShape(.jaw)])
+        XCTAssertFalse(recipe.isDefault, "빈 층이 남아 있으면 기본과 다르다")
+        recipe.people.prune()
+        XCTAssertTrue(recipe.people.groups.isEmpty)
+        XCTAssertTrue(recipe.isDefault)
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: JSONEncoder().encode(recipe)), recipe)
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.2)
+        recipe.people.groups[.male] = PortraitLayer()
+        recipe.people.prune()
+        XCTAssertEqual(recipe.people.groups, [.female: PortraitLayer(skinSmoothing: 0.2)], "값이 있는 그룹은 남긴다")
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: JSONEncoder().encode(recipe)), recipe)
+    }
+
+    func testPersonRecordsDecodeLenientlyAndOnlyBrokenRecordsAreDropped() throws {
+        let json = """
+            {"schemaVersion":2,"people":{"individuals":[\
+            {"id":"11111111-1111-1111-1111-111111111111","anchor":{"x":0.3,"y":0.5,"width":0.1},"gender":"other"},\
+            {"id":"not-a-uuid","anchor":{"x":0.5,"y":0.5,"width":0.1},"layer":{"skin":{"smoothing":0.4}}},\
+            {"anchor":{"x":0.7,"y":0.5,"width":0.1},"layer":{}},\
+            {"id":"22222222-2222-2222-2222-222222222222","legacyIndex":1,"gender":"female",\
+            "layer":{"face":{"width":-0.2}}}]}}
+            """
+        let recipe = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8))
+        XCTAssertEqual(recipe.people.individuals.count, 2, "id가 없거나 잘못된 기록만 버린다")
+        let first = recipe.people.individuals[0]
+        XCTAssertEqual(first.layer, PortraitLayer(), "layer가 없으면 빈 층")
+        XCTAssertNil(first.gender, "모르는 성별 문자열은 미지정")
+        XCTAssertEqual(first.anchor, PersonAnchor(x: 0.3, y: 0.5, width: 0.1))
+        let second = recipe.people.individuals[1]
+        XCTAssertEqual(second.gender, .female)
+        XCTAssertEqual(second.legacyIndex, 1)
+        XCTAssertEqual(second.layer, PortraitLayer(face: [.width: -0.2]))
+    }
 }
