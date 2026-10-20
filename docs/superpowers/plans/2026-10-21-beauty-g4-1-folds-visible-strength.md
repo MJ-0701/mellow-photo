@@ -40,7 +40,7 @@
 - 시작 조건: `git log --oneline -1`이 `74fb2df` 또는 그 뒤 main. 작업 트리에 미추적 `apple/Tests/MellowRenderingTests/ZZMeasureGTests.swift`(임시 측정 파일)가 있으면 지운다(커밋하지 않는다).
 - 모듈 의존성 표(`docs/architecture/modules.md`)와 `scripts/verify-modules.sh`는 바뀌지 않는다. MellowRendering은 `CoreImage`·`Foundation`·`MellowShared`·`Vision`·`ImageIO`·`UniformTypeIdentifiers`만 import한다. 레시피 키·스키마는 바뀌지 않는다.
 - 파이프라인 단계 이름 순서 불변. 새 단계 없음. 마스크는 `FaceRegions`(확장 파일 포함) 한 곳, 피부 CIKL 커널은 `SkinKernels` 한 곳.
-- `RenderTuning` 변경(스펙 1.3): `grainMaxAmplitude` 0.30, `grainSizeFraction` 0.0025, `rednessFlushMax` 0.06, `rednessClearMax` 1.0, `rednessReferenceOffset` 0.01(신설), `shineLumaOffset` 0.08, `shineLumaRamp` 0.08, `bodySkinToneMax` 0.05, `foldSurroundFraction` 0.18, `foldFeatureFeather` 0.012(신설), `bodySkinFallbackWidthScale` 3·`bodySkinFallbackHeightScale` 4·`bodySkinFallbackFeather` 0.05(신설). `FoldShape` 변경은 Task 2. 캐시 `entriesPerFacePerResolution` 9 → 10.
+- `RenderTuning` 변경(스펙 1.3): `grainMaxAmplitude` 0.30, `grainSizeFraction` 0.0025, `rednessFlushMax` 0.06, `rednessClearMax` 1.0, `rednessReferenceOffset` 0.01(신설), `shineLumaOffset` 0.08, `shineLumaRamp` 0.08, `bodySkinToneMax` 0.05(최종 리뷰 뒤 0.035로 내림, 스펙 1.3·1.4), `foldSurroundFraction` 0.18, `foldFeatureFeather` 0.012(신설), `bodySkinFallbackWidthScale` 3·`bodySkinFallbackHeightScale` 4·`bodySkinFallbackFeather` 0.05(신설). `FoldShape` 변경은 Task 2. 캐시 `entriesPerFacePerResolution` 9 → 10.
 - 한 줄 한 문장, 세미콜론 금지, 매직 넘버는 명명 상수(`RenderTuning`·`Theme`·`AppModel.Policy`·`EditingPolicy`, 기하 비율은 `FoldShape`, 테스트 문턱은 `Visibility`·`Naturalness`). CIKL 안 표준 계수(BT.601·BT.709)는 주석으로 이름을 단다.
 - 한국어 사용자 문구는 앱 타깃(`UserMessage`·뷰)에만. 모듈은 `MellowError`만 던진다(새 case 없음).
 - CI는 Xcode 26.3이다(로컬 27). `CGFloat`와 `Double`을 섞는 삼각함수·`hypot`·`atan2`는 인자 타입을 명시 변환한다.
