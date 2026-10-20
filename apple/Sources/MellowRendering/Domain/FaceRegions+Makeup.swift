@@ -45,10 +45,11 @@ private enum MakeupShape {
 }
 
 extension FaceRegions {
-    /// 얼굴 x축 방향으로 돌려 그리는 타원 하나(픽셀).
+    /// 얼굴 x축 방향으로 돌려 그리는 타원 하나(픽셀). tilt는 얼굴 x축 기준 추가 회전(라디안, 반시계)이다.
     struct Oval {
         let center: CGPoint
         let radii: CGSize
+        var tilt: CGFloat = 0
     }
 
     /// 볼 블러셔 영역. 두 눈 아래·코 옆의 기운 타원 × 피부 다각형. 윤곽점이나 두 눈이 없으면 nil.
@@ -118,7 +119,7 @@ extension FaceRegions {
     }
 
     /// 두 눈 가운데의 얼굴 좌표 u. 두 눈 위치를 모르면 얼굴 상자 중심(0)이다.
-    private static func eyeMidline(_ frame: FaceFrame) -> CGFloat {
+    static func eyeMidline(_ frame: FaceFrame) -> CGFloat {
         guard let first = frame.eyes.first, let last = frame.eyes.last, frame.eyes.count > 1 else { return 0 }
         return (frame.local(first.center).x + frame.local(last.center).x) / 2
     }
@@ -233,7 +234,8 @@ extension FaceRegions {
         let black = CIImage(color: .black).cropped(to: extent)
         var shapes = black
         for oval in ovals {
-            shapes = MaskBuilder.ellipse(center: oval.center, radii: oval.radii, angle: angle, extent: extent)
+            let turn = angle + oval.tilt
+            shapes = MaskBuilder.ellipse(center: oval.center, radii: oval.radii, angle: turn, extent: extent)
                 .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: shapes])
         }
         let skin = skinPolygonRaster(face: face, extent: extent, tuning: tuning, cache: cache)

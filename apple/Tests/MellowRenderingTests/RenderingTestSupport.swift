@@ -515,6 +515,24 @@ extension SyntheticFace {
     static let chinTip = CGPoint(x: 256, y: 67)
 }
 
+/// 주름 띠 표본 점. 얼굴 좌표(원점 (256, 200), 얼굴 폭 280)에서 계산한 위치다. 계산은 G1 계획 Task 3 참고.
+extension SyntheticFace {
+    /// 다크서클 타원 안(중심 y 269.2, 세로 반지름 22.4). 눈 보호 영역(아래끝 286 − 14)보다 10px 아래.
+    static let underLeftEye = CGPoint(x: 200, y: 262)
+    static let underRightEye = CGPoint(x: 312, y: 262)
+    /// 얼굴을 중심 둘레로 30° 돌렸을 때의 under*Eye 자리.
+    static let rolledUnderLeftEye = CGPoint(x: 176.5, y: 225.7)
+    static let rolledUnderRightEye = CGPoint(x: 273.5, y: 281.7)
+    /// 코 날개 → 입꼬리 띠 위(코 쪽 40% 지점을 바깥으로 민 자리).
+    static let leftNasolabial = CGPoint(x: 220, y: 173)
+    static let rightNasolabial = CGPoint(x: 292, y: 173)
+    /// 입꼬리에서 턱 쪽으로 내려간 마리오네트 타원 안.
+    static let leftMarionette = CGPoint(x: 196, y: 124)
+    static let rightMarionette = CGPoint(x: 316, y: 124)
+    /// 두 눈썹 안쪽 끝 사이.
+    static let glabella = CGPoint(x: 256, y: 338)
+}
+
 extension FaceGeometry {
     /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
     func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {
