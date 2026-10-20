@@ -27,7 +27,14 @@
           "type": "object", "additionalProperties": false,
           "properties": {
             "smoothing": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
-            "autoBlemish": { "type": "boolean", "default": false }
+            "autoBlemish": { "type": "boolean", "default": false },
+            "darkCircles": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+            "nasolabial": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "팔자주름(코 날개 → 입꼬리)." },
+            "marionette": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "마리오네트 주름(입꼬리 → 턱 쪽)." },
+            "glabella": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "미간 주름." },
+            "toneEvening": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "피부 얼룩 고르기(저주파를 피부 평균 쪽으로)." },
+            "redness": { "type": "number", "default": 0, "minimum": -1, "maximum": 1, "description": "음수는 맑게(붉은 반점 줄임), 양수는 혈색." },
+            "shine": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "번들거림(밝은 반사 영역을 피부 평균 쪽으로)." }
           }
         },
         "face": {

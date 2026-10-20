@@ -237,4 +237,52 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(features.numericValues, [0.2, 0.2, 0.2])
         XCTAssertEqual(MakeupPart.allCases.filter(\.hasColor), [.lip, .blush, .eyeshadow])
     }
+
+    func testSkinRefinementKeysRoundTripAndDefaultToIdentity() throws {
+        let legacy = #"{"schemaVersion":2,"portrait":{"skin":{"smoothing":0.4,"autoBlemish":true}}}"#
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.portrait.skin, SkinAdjustments(smoothing: 0.4, autoBlemish: true), "G 이전 파일은 정밀 값이 0")
+        XCTAssertEqual(decoded.portrait.skin.refinementValues, Array(repeating: 0, count: 7))
+        XCTAssertFalse(decoded.portrait.skin.hasRefinement)
+        var recipe = EditRecipe()
+        for (offset, key) in SkinRefinementKey.allCases.enumerated() {
+            recipe.portrait.skin[key] = Double(offset + 1) / 10
+        }
+        XCTAssertEqual(recipe.portrait.skin.refinementValues, (1...7).map { Double($0) / 10 })
+        XCTAssertEqual(recipe.portrait.skin.darkCircles, 0.1)
+        XCTAssertEqual(recipe.portrait.skin.marionette, 0.3)
+        XCTAssertEqual(recipe.portrait.skin.shine, 0.7)
+        XCTAssertEqual(recipe.portrait.skin.numericValues, [0] + (1...7).map { Double($0) / 10 })
+        XCTAssertTrue(recipe.portrait.skin.hasEffect)
+        XCTAssertTrue(recipe.dependsOnFaces, "정밀 값만 있어도 얼굴이 필요하다")
+        XCTAssertFalse(recipe.dependsOnPerson)
+        XCTAssertFalse(recipe.isDefault)
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let skin = try XCTUnwrap((json["portrait"] as? [String: Any])?["skin"] as? [String: Any])
+        XCTAssertEqual(
+            Set(skin.keys), Set(["smoothing", "autoBlemish"] + SkinRefinementKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
+        XCTAssertEqual(AdjustmentRange.skinRefinement(.redness), AdjustmentRange.bipolar)
+        for key in SkinRefinementKey.allCases where key != .redness {
+            XCTAssertEqual(AdjustmentRange.skinRefinement(key), AdjustmentRange.unit, "\(key)")
+        }
+    }
+
+    func testSkinRefinementScalarsAreCheckedForFinitenessAndCarriedByPresets() throws {
+        let paths: [WritableKeyPath<EditRecipe, Double>] = [
+            \.portrait.skin.darkCircles, \.portrait.skin.nasolabial, \.portrait.skin.marionette,
+            \.portrait.skin.glabella, \.portrait.skin.toneEvening, \.portrait.skin.redness, \.portrait.skin.shine,
+        ]
+        for path in paths {
+            var recipe = EditRecipe()
+            recipe[keyPath: path] = .nan
+            XCTAssertFalse(recipe.allValuesFinite, "\(path)")
+        }
+        var recipe = EditRecipe()
+        recipe.portrait.skin.redness = -0.4
+        let values = PresetValues(of: recipe)
+        XCTAssertEqual(values.portrait.skin.redness, -0.4)
+        XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values)), values)
+    }
 }

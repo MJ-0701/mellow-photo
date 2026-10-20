@@ -20,7 +20,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
 - 좌표(`x`, `y`, `sourceX`, `sourceY`, `dx`, `dy`, `radius`)는 방향 보정된 이미지 기준 0~1 정규화 값이고, 원점은 왼쪽 아래입니다.
 - `portrait.targetFace`는 왼쪽부터 센 얼굴 인덱스입니다. 값이 없으면 모든 얼굴에 적용합니다.
-- `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`), `face`(얼굴형 10개, 가운데 0인 양방향, `smile`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
+- `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`, G의 피부 정밀 `darkCircles`·`nasolabial`·`marionette`·`glabella`·`toneEvening`·`shine` 0~1과 `redness` −1~1), `face`(얼굴형 10개, 가운데 0인 양방향, `smile`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
 - 최상위 `background`(배경 흐림), `body`(체형 7개, `legLength`만 0~1), `makeup`(룩 id와 부위별 색 id·강도)이 있습니다. 렌더는 단계별로 들어오며 값이 기본이면 결과가 바뀌지 않습니다.
 - B0까지 쓰던 `portrait.skinSmoothing`·`portrait.faceSlim`은 읽기만 합니다. `skin`이 없으면 `skin.smoothing = skinSmoothing`, `face`가 없으면 `face.width = −faceSlim`(0은 0)으로 읽고, 쓸 때는 새 키만 씁니다. 스키마에는 `deprecated: true`로 남아 있어 이전 파일도 검증을 통과합니다.
 - `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
@@ -48,6 +48,8 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 | `color.saturation` | 0 … 2 | 0 … 1.5 |
 | `color.warmth` | −1 … 1 | −1 … 1 |
 | `portrait.skin.smoothing` | 0 … 1 | 0 … 1 |
+| `portrait.skin.{darkCircles,nasolabial,marionette,glabella,toneEvening,shine}` | 0 … 1 | 0 … 1 |
+| `portrait.skin.redness` | −1 … 1 | −1 … 1 |
 | `portrait.face.*` | −1 … 1 (`smile` 0 … 1) | 같음 |
 | `portrait.features.*` | 0 … 1 | 0 … 1 |
 | `background.blur` | 0 … 1 | 0 … 1 |
@@ -105,9 +107,9 @@ v1 → v2 변환 규칙(`apple/Sources/MellowLibrary/Infrastructure/SessionFileV
 
 v1은 읽기만 합니다. 저장은 항상 v2로 합니다.
 
-## 키를 추가할 때의 규칙 (B~F)
+## 키를 추가할 때의 규칙 (B~G)
 
-B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다.
+B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다. G 단계는 `portrait.skin`에 피부 정밀 7개, 최상위 `bodySkin`·`effects`를 같은 규칙으로 더했습니다(기본값 0, schemaVersion 2 유지).
 
 1. **새 키는 반드시 기본값을 가집니다.** 키가 없는 기존 파일은 기본값으로 읽혀 지금과 같은 결과를 내야 합니다. 스키마에도 `default`를 적고 `required`에 넣지 않습니다.
 2. **키를 지우거나 이름을 바꾸지 않습니다.** 더 쓰지 않는 값도 읽기는 계속합니다. 의미를 바꿔야 하면 새 키를 만듭니다.

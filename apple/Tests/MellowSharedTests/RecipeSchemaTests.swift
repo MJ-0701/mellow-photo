@@ -34,7 +34,7 @@ final class RecipeSchemaTests: XCTestCase {
     private func encodedSampleRecipe() throws -> [String: Any] {
         var recipe = EditRecipe()
         recipe.portrait.targetFace = 1
-        recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true)
+        recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true, darkCircles: 0.2, redness: -0.1)
         recipe.portrait.face.width = -0.2
         recipe.portrait.features.eyeBrighten = 0.1
         recipe.background.blur = 0.2
