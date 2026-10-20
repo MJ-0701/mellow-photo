@@ -1652,6 +1652,154 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(UserMessage.scopeHint(for: .gender(.male)), UserMessage.scopeHintGroup)
         XCTAssertNil(UserMessage.scopeHint(for: .all))
     }
+
+    /// 리뷰 Important 1·Minor 5: 뷰티·메이크업 캔버스는 탭만 대상 고르기이고, 이동(드래그)은 무시하며, 렌더 중에도 받는다.
+    func testTargetTapIgnoresDragsAndIsNotBlockedByRendering() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        try await waitUntil { !model.isRendering }
+        XCTAssertTrue(EditorTool.beauty.selectsTargetByTap)
+        XCTAssertTrue(EditorTool.makeup.selectsTargetByTap)
+        XCTAssertFalse(EditorTool.retouch.selectsTargetByTap)
+        XCTAssertFalse(EditorTool.warp.selectsTargetByTap)
+        model.selectTool(.beauty)
+        let left = NormalizedPoint(x: 0.2, y: 0.5)
+        let right = NormalizedPoint(x: 0.7, y: 0.5)
+        model.touch(from: left, to: left)
+        XCTAssertEqual(model.beautyTarget, .face(0))
+        model.touch(from: left, to: right)
+        XCTAssertEqual(model.beautyTarget, .face(0), "오른쪽 얼굴까지 끈 이동은 탭이 아니다")
+        model.touch(from: left, to: NormalizedPoint(x: 0.95, y: 0.95))
+        XCTAssertEqual(model.beautyTarget, .face(0), "얼굴 밖에서 끝난 이동도 대상을 전체로 바꾸지 않는다")
+        let jitter = AppModel.Policy.targetTapTolerance / 2
+        model.touch(from: right, to: NormalizedPoint(x: right.x + jitter, y: right.y))
+        XCTAssertEqual(model.beautyTarget, .face(1), "허용 오차 안의 흔들림은 탭이다")
+        model.isRendering = true
+        model.touch(from: left, to: left)
+        XCTAssertEqual(model.beautyTarget, .face(0), "대상 고르기는 편집이 아니라 렌더 중에도 받는다")
+        model.selectTool(.retouch)
+        model.touch(from: left, to: left)
+        XCTAssertNil(model.cloneSource, "잡티 탭은 렌더 중에 여전히 막는다")
+        model.isRendering = false
+        XCTAssertFalse(model.canUndo)
+    }
+
+    /// 리뷰 Minor 3: 기억한 대상이 없어진 사람이나 범위 밖 얼굴이면 전체로 읽는다.
+    func testStaleTargetFallsBackToAll() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.setBeautyTarget(.face(5))
+        XCTAssertEqual(model.beautyTarget, .all, "범위 밖 얼굴")
+        model.setBeautyTarget(.person(PersonID()))
+        XCTAssertEqual(model.beautyTarget, .all, "없는 사람")
+        model.session.edit(model.session.photos[0].id) { document in
+            let stray = NormalizedRect(x: 0.485, y: 0.955, width: 0.03, height: 0.03)
+            return document.set(.skinSmoothing(0.8), forFace: 0, of: [stray])
+        }
+        let stray = try XCTUnwrap(model.currentRecipe.people.individuals.first)
+        model.setBeautyTarget(.person(stray.id))
+        XCTAssertEqual(model.beautyTarget, .person(stray.id))
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty)
+        XCTAssertEqual(model.beautyTarget, .all, "실행 취소로 사라진 사람이 대상이면 전체")
+        model.edit(.skinSmoothing(0.3))
+        XCTAssertEqual(model.currentRecipe.portrait.skin.smoothing, 0.3, "편집이 조용히 버려지지 않고 전체 층에 간다")
+    }
+
+    /// 리뷰 Minor 4: 성별 지우기·바꾸기, 사진을 오가도 대상 기억, 기록 없는 얼굴의 원터치 드래그 한 단계,
+    /// 자동·원터치 실행 취소, 기록이 있는 얼굴로의 연결 무시.
+    func testGenderChangesTargetMemoryOneTouchDragUndoAndRebindGuard() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "first")
+        let second = try TestSupport.solidPNG(in: root, name: "second")
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [
+                .success(StagedPhoto(url: first, displayName: nil)),
+                .success(StagedPhoto(url: second, displayName: nil)),
+            ]))
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady && model.preview != nil && model.session.photos.count == 2 }
+        let firstID = model.session.photos[0].id
+        let secondID = model.session.photos[1].id
+        if model.session.selectedPhotoID != firstID {
+            model.select(firstID)
+            try await waitUntil { model.isReady && model.session.selectedPhotoID == firstID }
+        }
+        let pristine = model.currentRecipe
+        XCTAssertEqual(pristine, EditRecipe())
+
+        // 성별: 남성 → 여성 → 미지정.
+        model.setBeautyTarget(.face(0))
+        model.setGender(.male)
+        XCTAssertEqual(model.personChips[0].gender, .male)
+        model.setGender(.female)
+        XCTAssertEqual(model.personChips[0].gender, .female)
+        XCTAssertEqual(model.personChips[0].source, .manual)
+        model.setGender(nil)
+        XCTAssertNil(model.personChips[0].gender)
+        XCTAssertEqual(model.personChips[0].source, .none)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3)
+        model.undo()
+        model.undo()
+        model.undo()
+        XCTAssertEqual(model.currentRecipe, pristine)
+
+        // 대상 기억: 다른 사진은 전체, 돌아오면 그대로.
+        model.setBeautyTarget(.face(1))
+        model.select(secondID)
+        try await waitUntil { model.isReady && model.session.selectedPhotoID == secondID && !model.faces.isEmpty }
+        XCTAssertEqual(model.beautyTarget, .all)
+        model.select(firstID)
+        try await waitUntil { model.isReady && model.session.selectedPhotoID == firstID && !model.faces.isEmpty }
+        XCTAssertEqual(model.beautyTarget, .face(1), "사진마다 대상을 기억한다")
+
+        // 기록 없는 얼굴의 원터치 드래그는 기록을 만들며 한 단계다.
+        XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty)
+        model.beginSliderEdit()
+        model.applyOneTouch(strength: 0.3)
+        model.applyOneTouch(strength: 0.5)
+        model.endSliderEdit()
+        XCTAssertEqual(model.currentRecipe.people.individuals.count, 1)
+        XCTAssertEqual(model.oneTouchStrength, 0.5)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1, "연속 변경 한 단계")
+        model.undo()
+        XCTAssertEqual(model.currentRecipe, pristine, "실행 취소 한 번에 기록까지 사라진다")
+
+        // 원터치 버튼(전체)과 자동은 실행 취소 한 번에 기본 레시피로.
+        model.setBeautyTarget(.all)
+        model.applyOneTouch()
+        XCTAssertNotEqual(model.currentRecipe, pristine)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe, pristine)
+        try await waitUntil { !model.isRendering }
+        await model.autoEnhance()
+        XCTAssertNotNil(model.currentRecipe.people.groups[.male]?.oneTouch)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe, pristine)
+
+        // 기록이 있는 얼굴로는 연결하지 않는다.
+        model.setBeautyTarget(.face(0))
+        model.setGender(.female)
+        model.session.edit(firstID) { document in
+            let stray = NormalizedRect(x: 0.485, y: 0.955, width: 0.03, height: 0.03)
+            return document.set(.skinSmoothing(0.8), forFace: 0, of: [stray])
+        }
+        let stray = try XCTUnwrap(model.personChips.first(where: \.isUnmatched)?.personID)
+        let before = model.currentRecipe
+        let steps = model.session.selected?.document.undoStack.count
+        model.rebindPerson(stray, toFace: 0)
+        XCTAssertEqual(model.currentRecipe, before, "이미 기록과 짝인 얼굴")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, steps)
+        XCTAssertEqual(model.beautyTarget, .face(0))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+    }
 }
 
 /// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.

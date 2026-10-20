@@ -273,8 +273,10 @@ extension AppModel {
     }
 
     /// 캔버스 탭·드래그. 좌표는 캔버스(출력) 정규화, 원점 왼쪽 아래. 저장은 원본 좌표로 한다.
+    /// 뷰티·메이크업의 대상 고르기는 편집이 아니라 렌더 중에도 받는다.
     func touch(from: NormalizedPoint, to: NormalizedPoint) {
-        guard isReady, !isBusy, !blocksCanvasTouch, !isRendering, !canvasShowsUncropped else { return }
+        guard isReady, !isBusy, !blocksCanvasTouch, !canvasShowsUncropped else { return }
+        guard tool.selectsTargetByTap || !isRendering else { return }
         let transform = outputTransform
         // 변환을 모르는데 기하가 있으면 캔버스 좌표를 원본 좌표로 오인하게 되므로 거절한다.
         guard transform != nil || currentRecipe.geometry.isIdentity else { return }
@@ -307,6 +309,8 @@ extension AppModel {
                 return nil
             }
         case .beauty, .makeup:
+            // 누른 점에서 멀리 뗀 것은 사진 이동이라 대상을 바꾸지 않는다.
+            guard hypot(to.x - from.x, to.y - from.y) <= Policy.targetTapTolerance else { return }
             // 탭한 점이 든 얼굴 상자 중 가장 작은 것(겹치면 앞사람)이 대상이고 얼굴 밖이면 전체다.
             // 대상 선택은 화면 상태라 레시피를 바꾸지 않는다.
             let point = CGPoint(x: toOriginal.x, y: toOriginal.y)

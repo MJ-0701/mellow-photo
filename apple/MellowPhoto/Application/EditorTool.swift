@@ -48,4 +48,10 @@ enum EditorTool: CaseIterable, Identifiable {
         case .look, .crop, .adjust, .body, .background: return false
         }
     }
+
+    /// 캔버스에서 탭만 받는 도구(대상 고르기).
+    /// 드래그는 확대한 사진 이동에 남긴다.
+    var selectsTargetByTap: Bool {
+        self == .beauty || self == .makeup
+    }
 }

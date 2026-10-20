@@ -130,6 +130,9 @@ final class AppModel {
         /// true면 자동 버튼이 색감·디테일 자동과 함께, 얼굴이 있으면 전체 대상 원터치 기본 강도를 한 단계로 적용한다.
         /// false면 자동은 지금처럼 피부 보정·자동 잡티·눈 또렷하게만 쓴다.
         static let autoIncludesOneTouch = true
+        /// 뷰티·메이크업 캔버스 탭의 허용 이동 거리(캔버스 정규화).
+        /// 누른 점과 뗀 점이 이보다 멀면 탭이 아니라 이동이라 대상을 바꾸지 않는다.
+        static let targetTapTolerance = 0.02
     }
 
     /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
@@ -264,8 +267,18 @@ final class AppModel {
         return selectedInfo?.hasBody == true ? .ready : .noBody
     }
     /// 선택 사진의 뷰티 대상.
+    /// 기억한 대상이 지금 없는 사람(실행 취소·초기화로 사라짐)이나 범위 밖 얼굴이면 전체로 읽는다.
+    /// 기억은 그대로 두어 얼굴을 다시 찾으면 돌아온다.
     var beautyTarget: BeautyTarget {
-        session.selectedPhotoID.flatMap { beautyTargets[$0] } ?? .all
+        guard let stored = session.selectedPhotoID.flatMap({ beautyTargets[$0] }) else { return .all }
+        switch stored {
+        case .all, .gender:
+            return stored
+        case .face(let index):
+            return faces.indices.contains(index) ? stored : .all
+        case .person(let id):
+            return currentRecipe.people.person(id) == nil ? .all : stored
+        }
     }
 
     /// 찾은 얼굴의 anchor.
