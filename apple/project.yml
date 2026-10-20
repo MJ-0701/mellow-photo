@@ -7,6 +7,8 @@ options:
   xcodeVersion: "16.0"
   createIntermediateGroups: true
   generateEmptyDirectories: true
+  # 테스트 액션의 스레드 성능 검사기를 끈다(XcodeGen이 만들지 못하는 스킴 속성). 이유는 스크립트 주석에 있다.
+  postGenCommand: ../scripts/tools/disable-test-performance-checker.sh
 configFiles:
   Debug: Config/Version.xcconfig
   Release: Config/Version.xcconfig

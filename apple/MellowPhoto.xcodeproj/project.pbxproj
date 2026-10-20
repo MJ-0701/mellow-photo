@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		00F4C33BE606D515F9ED95B7 /* TestEnvironmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4447CFE328C5B08BDB9982E /* TestEnvironmentTests.swift */; };
 		0A057E2AF9D0378C785F1D3F /* BrushPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */; };
 		0A92F1EF8F2E281B8793D3CE /* PhotoStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */; };
 		0CD761468E304A218D226C61 /* ExportPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505F21DC7A15D7DBC745704E /* ExportPhotos.swift */; };
@@ -155,6 +156,7 @@
 		DD25AA90F8D05216BCD544F0 /* container-migration.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "container-migration.plist"; sourceTree = "<group>"; };
 		DF065A9DFEF0B076E76F17FD /* LibrarySidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibrarySidebar.swift; sourceTree = "<group>"; };
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		E4447CFE328C5B08BDB9982E /* TestEnvironmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestEnvironmentTests.swift; sourceTree = "<group>"; };
 		E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
 		E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledLooksTests.swift; sourceTree = "<group>"; };
 		E87CE2394E0C5D2CCF9B5FEA /* CompareDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareDivider.swift; sourceTree = "<group>"; };
@@ -310,6 +312,7 @@
 				FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */,
 				6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */,
 				BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */,
+				E4447CFE328C5B08BDB9982E /* TestEnvironmentTests.swift */,
 				0CC7503240254DB929DE6204 /* TestSupport.swift */,
 			);
 			path = MellowPhotoTests;
@@ -545,6 +548,7 @@
 				5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */,
 				102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */,
 				865DD46860E65C891D8D186C /* SystemPhotoImporterTests.swift in Sources */,
+				00F4C33BE606D515F9ED95B7 /* TestEnvironmentTests.swift in Sources */,
 				8D84CF1378E138B0D0E29826 /* TestSupport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
