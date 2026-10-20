@@ -643,4 +643,173 @@ final class EditDocumentTests: XCTestCase {
         document.applyFromBatch(values, categories: SyncCategory.all)
         XCTAssertEqual(PresetValues(of: document.recipe), values, "전부를 고르면 프리셋의 모든 그룹을 복사한다")
     }
+
+    private var faceAnchor: PersonAnchor { PersonAnchor(x: 0.3, y: 0.5, width: 0.2) }
+
+    func testScopedSetWritesOnlyThatLayerAndClamps() {
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.2))
+        XCTAssertNil(document.set(.skinSmoothing(1.7), in: .gender(.female)))
+        XCTAssertEqual(document.recipe.people.groups[.female], PortraitLayer(skinSmoothing: 1), "층 값도 같은 범위로 자른다")
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.2, "전체 층은 그대로")
+        XCTAssertNil(document.set(.skinRefinement(.redness, -3), in: .gender(.female)))
+        XCTAssertEqual(document.recipe.people.groups[.female]?.skinRefinement[.redness], -1)
+        XCTAssertNil(document.set(.faceShape(.width, -0.4), in: .gender(.male)))
+        XCTAssertNil(document.set(.feature(.eyeBrighten, 0.5), in: .gender(.male)))
+        XCTAssertNil(document.set(.autoBlemish(true), in: .gender(.male)))
+        XCTAssertEqual(
+            document.recipe.people.groups[.male],
+            PortraitLayer(autoBlemish: true, face: [.width: -0.4], features: [.eyeBrighten: 0.5]))
+        XCTAssertNil(document.set(.exposure(0.3), in: .gender(.male)), "얼굴 의존이 아닌 변경은 scope를 무시한다")
+        XCTAssertEqual(document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(document.set(.skinSmoothing(0.5), in: .person(PersonID())), .unknownPerson)
+        XCTAssertNil(document.set(.makeupColor(.lip, "lip-rose"), in: .gender(.female)))
+        XCTAssertEqual(
+            document.recipe.people.groups[.female]?.makeup[.lip],
+            MakeupTint(colorID: "lip-rose", intensity: EditingPolicy.makeupDefaultIntensity),
+            "층에서 색을 처음 고르면 기본 강도")
+        document.set(.makeupIntensity(.lip, 0.8), in: .gender(.female))
+        XCTAssertEqual(document.recipe.people.groups[.female]?.makeup[.lip]?.intensity, 0.8)
+        XCTAssertNil(document.set(.makeupIntensity(.brow, 2), in: .gender(.female)))
+        XCTAssertEqual(document.recipe.people.groups[.female]?.makeup[.brow], MakeupTint(colorID: nil, intensity: 1))
+        XCTAssertEqual(document.recipe.makeup, MakeupAdjustments(), "전체 층 메이크업은 그대로")
+        let steps = document.undoStack.count
+        document.set(.skinSmoothing(1), in: .gender(.female))
+        XCTAssertEqual(document.undoStack.count, steps, "같은 값은 체크포인트를 만들지 않는다")
+        document.beginContinuousChange()
+        document.set(.skinSmoothing(0.3), in: .gender(.female))
+        document.set(.skinSmoothing(0.4), in: .gender(.female))
+        document.endContinuousChange()
+        XCTAssertEqual(document.undoStack.count, steps + 1, "드래그는 한 단계")
+        document.undo()
+        XCTAssertEqual(document.recipe.people.groups[.female]?.skinSmoothing, 1)
+    }
+
+    func testFirstTouchOfAFaceCreatesTheRecordAndEmptyRecordsArePruned() {
+        var document = EditDocument()
+        XCTAssertNil(document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor))
+        XCTAssertEqual(document.recipe.people.individuals.count, 1)
+        let id = document.recipe.people.individuals[0].id
+        XCTAssertEqual(document.recipe.people.individuals[0].anchor, faceAnchor)
+        XCTAssertEqual(document.recipe.people.individuals[0].layer, PortraitLayer(skinSmoothing: 0.6))
+        XCTAssertEqual(document.undoStack.count, 1, "기록 생성과 값 쓰기는 한 단계")
+        XCTAssertNil(document.set(.faceShape(.jaw, 0.2), forPersonAt: PersonAnchor(x: 0.31, y: 0.5, width: 0.19)))
+        XCTAssertEqual(document.recipe.people.individuals.count, 1, "가까운 anchor는 같은 사람")
+        XCTAssertEqual(document.recipe.people.individuals[0].id, id)
+        XCTAssertEqual(document.recipe.people.person(id)?.layer.face[.jaw], 0.2)
+        XCTAssertNil(document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor))
+        XCTAssertEqual(document.undoStack.count, 2, "같은 값은 단계를 만들지 않는다")
+        XCTAssertNil(document.resetOverrides(in: .person(id)))
+        XCTAssertTrue(document.recipe.people.individuals.isEmpty, "층이 비고 성별도 없는 기록은 지운다")
+        document.undo()
+        XCTAssertEqual(document.recipe.people.person(id)?.layer.face[.jaw], 0.2)
+        XCTAssertNil(document.set(.gender(.female), forPersonAt: PersonAnchor(x: 0.7, y: 0.5, width: 0.2)))
+        XCTAssertEqual(document.recipe.people.individuals.count, 2)
+        let second = document.recipe.people.individuals[1]
+        XCTAssertEqual(second.gender, .female)
+        XCTAssertTrue(second.layer.isEmpty)
+        XCTAssertNil(document.set(.gender(nil), in: .person(second.id)))
+        XCTAssertEqual(document.recipe.people.individuals.count, 1, "성별을 풀어 비면 기록도 사라진다")
+        XCTAssertTrue(document.hasEdits)
+    }
+
+    func testGenderAssignmentIsLockedByLocalEditsAndNeedsAPerson() {
+        var document = EditDocument()
+        document.set(.gender(.male), forPersonAt: faceAnchor)
+        let id = document.recipe.people.individuals[0].id
+        XCTAssertEqual(document.set(.gender(.female), in: .all), .unknownPerson, "성별은 개인에게만")
+        XCTAssertEqual(document.set(.gender(.female), in: .gender(.female)), .unknownPerson)
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        XCTAssertTrue(document.isGeometryLocked)
+        XCTAssertEqual(document.set(.gender(.female), in: .person(id)), .geometryLocked)
+        XCTAssertEqual(document.recipe.people.person(id)?.gender, .male)
+        XCTAssertEqual(document.set(.faceShape(.width, -0.3), in: .person(id)), .geometryLocked)
+        XCTAssertEqual(document.set(.faceShape(.width, -0.3), in: .gender(.male)), .geometryLocked)
+        XCTAssertNil(document.set(.skinSmoothing(0.4), in: .person(id)), "피부는 잠금과 무관")
+        XCTAssertNil(document.set(.feature(.teethWhiten, 0.4), in: .gender(.male)))
+        document.undo()
+        document.undo()
+        document.undo()
+        XCTAssertFalse(document.isGeometryLocked)
+        XCTAssertNil(document.set(.gender(.female), in: .person(id)))
+        XCTAssertEqual(document.recipe.people.person(id)?.gender, .female)
+        XCTAssertTrue(EditChange.gender(nil).affectsGeometry)
+        XCTAssertEqual(EditChange.makeupColor(.lip, nil).portraitKey, .makeupPart(.lip))
+        XCTAssertNil(EditChange.exposure(0).portraitKey)
+    }
+
+    func testResetOverridesRestoresInheritanceAndRespectsLock() {
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.2))
+        document.set(.faceShape(.width, -0.5))
+        document.set(.skinSmoothing(0.9), in: .gender(.female))
+        document.set(.faceShape(.width, 0.3), in: .gender(.female))
+        document.set(.makeupColor(.lip, "lip-rose"), in: .gender(.female))
+        XCTAssertNil(document.resetOverrides([.skinSmoothing], in: .gender(.female)))
+        XCTAssertEqual(
+            document.recipe.people.groups[.female]?.overriddenKeys, [.faceShape(.width), .makeupPart(.lip)],
+            "지운 키는 상속으로 돌아간다")
+        XCTAssertNil(document.resetOverrides(in: .gender(.female)))
+        XCTAssertNil(document.recipe.people.groups[.female], "빈 그룹 층은 키를 지운다")
+        XCTAssertEqual(document.recipe.portrait.face.width, -0.5, "전체 층은 그대로")
+        XCTAssertNil(document.resetOverrides([.faceShape(.width)], in: .all))
+        XCTAssertEqual(document.recipe.portrait.face.width, 0, "전체 층의 재설정은 기본값")
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.2)
+        document.set(.faceShape(.jaw, 0.4), in: .gender(.male))
+        document.set(.skinSmoothing(0.7), in: .gender(.male))
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        XCTAssertEqual(document.resetOverrides(in: .gender(.male)), .geometryLocked, "얼굴형 키가 든 층 전체 초기화는 거절")
+        XCTAssertNil(document.resetOverrides([.skinSmoothing], in: .gender(.male)), "얼굴형이 아닌 키만이면 허용")
+        XCTAssertEqual(document.recipe.people.groups[.male], PortraitLayer(face: [.jaw: 0.4]))
+        XCTAssertEqual(document.resetOverrides(in: .person(PersonID())), .unknownPerson)
+    }
+
+    func testRebindRemoveBindLegacyAndScopedLookAreOneUndoStep() throws {
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor)
+        let id = document.recipe.people.individuals[0].id
+        let elsewhere = PersonAnchor(x: 0.8, y: 0.5, width: 0.2)
+        XCTAssertNil(document.rebindPerson(id, to: elsewhere))
+        XCTAssertEqual(document.recipe.people.person(id)?.anchor, elsewhere)
+        XCTAssertEqual(document.undoStack.count, 2)
+        XCTAssertEqual(document.rebindPerson(PersonID(), to: elsewhere), .unknownPerson)
+        XCTAssertNil(document.removePerson(id))
+        XCTAssertTrue(document.recipe.people.individuals.isEmpty)
+        document.undo()
+        XCTAssertEqual(document.recipe.people.person(id)?.anchor, elsewhere)
+        var legacy = EditDocument(
+            recipe: EditRecipe(
+                people: PeopleAdjustments(individuals: [
+                    PersonRecord(id: .legacy(index: 1), legacyIndex: 1, layer: PortraitLayer(skinSmoothing: 0.3)),
+                    PersonRecord(id: .legacy(index: 5), legacyIndex: 5, layer: PortraitLayer(skinSmoothing: 0.4)),
+                ])))
+        let faces = [
+            NormalizedRect(x: 0.1, y: 0.3, width: 0.2, height: 0.3),
+            NormalizedRect(x: 0.6, y: 0.3, width: 0.2, height: 0.3),
+        ]
+        XCTAssertTrue(legacy.bindLegacyPeople(faces: faces))
+        XCTAssertEqual(legacy.recipe.people.individuals[0].anchor, PersonAnchor(faceBox: faces[1]))
+        XCTAssertNil(legacy.recipe.people.individuals[0].legacyIndex)
+        XCTAssertEqual(legacy.recipe.people.individuals[1].legacyIndex, 5, "범위 밖 인덱스는 그대로 남는다")
+        XCTAssertFalse(legacy.canUndo, "연결은 체크포인트가 아니다")
+        XCTAssertFalse(legacy.bindLegacyPeople(faces: faces), "두 번째는 바뀐 것이 없다")
+        let look = MakeupLook(
+            id: "daily", name: "데일리", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
+            blush: MakeupTint(colorID: "blush-peach", intensity: 0.3),
+            eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.2), brow: MakeupStrength(intensity: 0.4),
+            contour: MakeupStrength(intensity: 0.1))
+        var looked = EditDocument()
+        looked.applyMakeupLook(look, in: .gender(.female))
+        XCTAssertEqual(looked.undoStack.count, 1)
+        XCTAssertEqual(looked.recipe.people.groups[.female]?.makeupLookID, "daily")
+        XCTAssertEqual(
+            looked.recipe.people.groups[.female]?.makeup[.lip], MakeupTint(colorID: "lip-coral", intensity: 0.5))
+        XCTAssertEqual(looked.recipe.people.groups[.female]?.makeup[.contour], MakeupTint(colorID: nil, intensity: 0.1))
+        XCTAssertEqual(looked.recipe.makeup, MakeupAdjustments(), "전체 층은 그대로")
+        looked.set(.makeupIntensity(.lip, 0.9), in: .gender(.female))
+        XCTAssertNil(looked.recipe.people.groups[.female]?.makeupLookID, "부위를 바꾸면 룩 이름을 지운다")
+        looked.applyMakeupLook(nil, in: .gender(.female))
+        XCTAssertEqual(looked.recipe.people.groups[.female]?.makeup.count, 5, "층의 룩 없음은 다섯 부위를 0으로 덮어쓴다")
+        XCTAssertTrue(looked.recipe.people.groups[.female]!.makeup.values.allSatisfy { $0.intensity == 0 })
+    }
 }
