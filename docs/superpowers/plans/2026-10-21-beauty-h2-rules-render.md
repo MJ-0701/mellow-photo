@@ -1143,6 +1143,16 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
+먼저 G3 테스트 `testBatchWithAllCategoriesCopiesEveryPresetGroup`(`EditDocumentTests.swift`)을 되돌린다(H1 구현 중 추가). H1은 이 테스트의 Mirror 반복문에 `where filled.label != "people"` 제외와 "H2 Task 4가 … 지운다" 주석을 넣었다. 그 제외와 주석을 지우고 원래 모양(`for (filled, empty) in zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children)`)으로 돌린다. `filledPresetValues()`의 `return values` 앞에 그룹 층을 채운다:
+
+```swift
+        values.people.groups[.male] = PortraitLayer(skinSmoothing: 0.4, face: [.jaw: -0.2])
+        values.people.groups[.female] = PortraitLayer(
+            features: [.eyeBrighten: 0.3], makeup: [.lip: MakeupTint(colorID: "lip-test", intensity: 0.5)])
+```
+
+이 테스트의 마지막 단언(`PresetValues(of: document.recipe) == values`)은 동기화가 `people.groups`를 복사해야 통과한다(Step 3 전에는 실패).
+
 `EditDocumentTests.swift` 끝에 추가:
 
 ```swift
@@ -1576,9 +1586,13 @@ Run: `cd apple && swift test --filter EditRecipeCodingTests` → 컴파일 실�
         portrait = PortraitAdjustments()
         makeup = MakeupAdjustments()
         guard !layer.isEmpty else { return }
-        people.individuals = [PersonRecord(id: .legacy(index: index), legacyIndex: index, layer: layer)]
+        // 음수·거대한 인덱스(손상 파일)는 범위의 마지막 값으로 모은다. 어느 얼굴과도 짝이 되지 않아 옛 결과(빈 대상)와 같다.
+        let safe = PersonID.legacyIndexRange.contains(index) ? index : PersonID.legacyIndexRange.upperBound
+        people.individuals = [PersonRecord(id: .legacy(index: safe), legacyIndex: safe, layer: layer)]
     }
 ```
+
+인덱스 검증은 H1 구현 중 추가했다. `legacyIndex`는 스키마 `minimum: 0`이므로 음수를 그대로 쓰지 않는다. Step 1에 `targetFace: -1`과 `targetFace: 9999999999999`(13자리) 레시피가 크래시 없이 디코드되고 기록의 `legacyIndex`가 `PersonID.legacyIndexRange.upperBound`, `PersonMatcher.match`가 빈 결과인 단언을 더한다.
 
 `SessionFileV1.swift`의 `recipe(_:)`: `converted.portrait.targetFace = recipe.selectedFace` 줄을 지우고, 마지막에 `var result = EditRecipe(color: …, portrait: …, operations: operations)` 뒤 `if let selected = recipe.selectedFace { result.migrateLegacyTargetFace(selected) }`, `return result`.
 

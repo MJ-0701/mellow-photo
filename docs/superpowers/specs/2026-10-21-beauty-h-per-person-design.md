@@ -101,12 +101,12 @@
 
 - `portrait`·`makeup`은 그대로 **전체 층**이다(빽빽한 값, 기본값 = 항등). `portrait.targetFace`는 더 쓰지 않는다(스키마 `deprecated: true`, 읽기 전용).
 - **층(`PortraitLayer`)은 성긴 값**이다. 있는 키만 덮어쓰고 없는 키는 아래 층을 상속한다. 모양은 전체 층의 `portrait`·`makeup`과 같은 중첩이되 모든 잎이 선택이다. 메이크업은 **부위 단위**로 덮어쓴다(`lip` 객체가 있으면 색과 강도를 함께 덮어씀, `colorID`가 없거나 null이면 "색 없음"으로 덮어씀). `lookID`는 그 층에서 마지막으로 적용한 룩 이름이고 부위를 바꾸면 지운다(기존 규칙).
-- `individuals[]`: `id`(UUID 문자열, 편집이 사람을 가리키는 키), `anchor`(정규화 얼굴 상자 중심 `x`·`y`와 폭 `width`, 원점 왼쪽 아래, 원본 기준), `legacyIndex`(옛 `targetFace`에서 온 기록만, anchor가 채워지면 지움), `gender`(**수동 지정만**, 없으면 미지정), `layer`. anchor와 legacyIndex 중 하나는 있어야 한다.
+- `individuals[]`: `id`(UUID 문자열, 편집이 사람을 가리키는 키), `anchor`(정규화 얼굴 상자 중심 `x`·`y`와 폭 `width`, 원점 왼쪽 아래, 원본 기준), `legacyIndex`(옛 `targetFace`에서 온 기록만, anchor가 채워지면 지움), `gender`(**수동 지정만**, 없으면 미지정), `layer`. anchor와 legacyIndex 중 하나는 있어야 한다(스키마 `anyOf`). 읽기는 관대하다(H1 구현 중 변경): `layer`가 없으면 빈 층, 모르는 `gender` 문자열은 미지정으로 읽고, `id`·`anchor`가 잘못된 기록은 그 기록만 버린다(세션 전체를 못 여는 일이 없게).
 - 자동 추정 성별은 레시피에 쓰지 않는다. 얼굴과 같이 분석 결과(`PhotoAnalysis`)이고 영속화하지 않는다. 그래서 다시 분석해도 수동 지정이 덮이지 않는다.
-- **읽기 이행**: `EditRecipe.init(from:)`가 `portrait` 컨테이너의 `targetFace`를 따로 읽어(`PortraitAdjustments`는 더 이상 이 키를 갖지 않음) 값이 있고 `people.individuals`가 비어 있으면 (1) `portrait.skin/face/features`와 `makeup` 중 기본값과 다른 키 전부를 성긴 층으로 만들고 (2) `individuals = [PersonRecord(id: 새 UUID, legacyIndex: i, layer: 그 층)]`, (3) `portrait`·`makeup`을 기본값으로 둔다. `targetFace`가 범위 밖이었다면(렌더가 빈 대상이던 상태) 그대로 옮긴다(짝이 없는 사람 = 렌더 안 함, 옛 결과와 같음). 옮길 값이 하나도 없으면(모두 기본값) 기록을 만들지 않는다. 실행 취소 기록의 레시피도 같은 디코더를 거치므로 함께 이행된다. 이행으로 만든 기록의 id는 인덱스에서 결정적으로 만든다(`PersonID.legacy(index:)` = `B0000000-0000-0000-0000-` 뒤 12자리 인덱스). 그래서 같은 파일을 두 번 읽어도 같고, 실행 취소 기록의 레시피와 현재 레시피가 내용이 같으면 `==`도 같다(체크포인트 중복이 생기지 않는다).
+- **읽기 이행**: `EditRecipe.init(from:)`가 `portrait` 컨테이너의 `targetFace`를 따로 읽어(`PortraitAdjustments`는 더 이상 이 키를 갖지 않음) 값이 있고 `people.individuals`가 비어 있으면 (1) `portrait.skin/face/features`와 `makeup` 중 기본값과 다른 키 전부를 성긴 층으로 만들고 (2) `individuals = [PersonRecord(id: 새 UUID, legacyIndex: i, layer: 그 층)]`, (3) `portrait`·`makeup`을 기본값으로 둔다. `targetFace`가 범위 밖이었다면(렌더가 빈 대상이던 상태) 그대로 옮긴다(짝이 없는 사람 = 렌더 안 함, 옛 결과와 같음). 옮길 값이 하나도 없으면(모두 기본값) 기록을 만들지 않는다. 실행 취소 기록의 레시피도 같은 디코더를 거치므로 함께 이행된다. 이행으로 만든 기록의 id는 인덱스에서 결정적으로 만든다(`PersonID.legacy(index:)` = `B0000000-0000-0000-0000-` 뒤 12자리 인덱스). 인덱스가 `PersonID.legacyIndexRange`(0…999 999 999 999) 밖이면(음수·손상 파일) 크래시하지 않고 범위의 마지막 값으로 모은다. 이행은 `legacyIndex`에도 같은 값을 써서 어느 얼굴과도 짝이 되지 않게 한다(옛 범위 밖 `targetFace`와 같은 결과, H1 구현 중 변경). 그래서 같은 파일을 두 번 읽어도 같고, 실행 취소 기록의 레시피와 현재 레시피가 내용이 같으면 `==`도 같다(체크포인트 중복이 생기지 않는다).
 - **적용 순서**: H1은 `people`을 더하기만 하고(렌더·편집 동작 불변, `targetFace`는 그대로), H2가 렌더·편집이 `people`을 읽게 한 뒤 마지막 Task 하나에서 `targetFace` 읽기 이행·속성 제거·앱 최소 변경을 한 번에 한다(그 사이 어느 커밋에서도 옛 세션의 렌더 결과가 바뀌지 않는다).
 - `EditRecipe.dependsOnFaces = portrait.dependsOnFaces || makeup.hasEffect || people.hasEffect`. `people.hasEffect`는 어느 층이든 기본값과 다른 값이 하나라도 있으면 true(성별 지정만 있는 기록은 false).
-- `isDefault`는 그대로(`people`이 비면 기본). 빈 기록(성별 없음·층 비움)은 편집 규칙이 변경 뒤 지운다(1.4).
+- `isDefault`는 그대로(`people`이 비면 기본). 빈 기록(성별 없음·층 비움)과 빈 그룹 층은 편집 규칙이 변경 뒤 `prune()`으로 지운다(1.4). 빈 그룹 층은 인코드에서 빠지므로 지우지 않으면 저장 전후 `==`와 `isDefault`가 어긋난다(H1 구현 중 변경).
 - `allValuesFinite`에 모든 층의 숫자 포함.
 - `PresetValues.people`: `groups`만 담는다. `init(of:)`가 `individuals`를 버리고 인코드도 `groups`만 쓴다. 디코드에서 `individuals`가 와도 무시한다.
 - `shared/recipe-schema/edit-recipe.v2.schema.json`: `people` 추가(`groups`는 `male`·`female` 키의 층, `individuals`는 위 필드, 층 스키마는 `$defs/portraitLayer` 하나로 두고 `additionalProperties: false`), `portrait.targetFace`에 `deprecated: true`와 이행 설명. `session-file.v2.schema.json`의 프리셋 `values`에 `people`(`groups`만) 추가. README의 v2 요점·v1 변환 표(`selectedFace` → `people.individuals[0].legacyIndex`)·"키를 추가할 때의 규칙"에 H 항목 추가.
@@ -165,8 +165,8 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
     public var hasEffect: Bool
     public var numericValues: [Double]
     public func person(_ id: PersonID) -> PersonRecord?
-    public func personID(at anchor: PersonAnchor) -> PersonID?      // PersonMatcher.isMatch로 찾음
-    public mutating func prune()                                     // isEmpty인 기록 제거
+    public func personID(at anchor: PersonAnchor) -> PersonID?      // 허용치 안에서 PersonMatcher 거리가 가장 가까운 기록, 동률은 배열 순서 (H1 구현 중 변경)
+    public mutating func prune()                                     // isEmpty인 기록과 빈 그룹 층 제거 (H1 구현 중 변경)
 }
 ```
 
@@ -179,8 +179,10 @@ public enum PortraitResolver {
     public static func resolve(_ recipe: EditRecipe, person: PersonRecord?, gender: Gender?) -> Resolved
     /// 수동 지정이 있으면 그것, 없으면 추정값.
     public static func effectiveGender(person: PersonRecord?, estimate: Gender?) -> Gender?
-    /// 화면용. scope 층까지 겹친 값. person은 recipe.people에서 찾고 gender는 호출자가 유효 성별을 넘긴다.
-    public static func resolve(_ recipe: EditRecipe, scope: PortraitScope, gender: Gender?) -> Resolved
+    /// 화면용. scope 층까지 겹친 값. person은 recipe.people에서 찾는다. estimate는 그 얼굴의 자동 추정이고 .person의 유효 성별은 effectiveGender(기록의 수동 성별 ?? estimate)로 함수 안에서 정한다. 모르는 사람은 전체 값 (H1 구현 중 변경: 인자 gender → estimate)
+    public static func resolve(_ recipe: EditRecipe, scope: PortraitScope, estimate: Gender?) -> Resolved
+    /// 그 scope의 층. .all은 nil, 없는 그룹은 빈 층, 모르는 사람은 nil.
+    public static func layer(_ recipe: EditRecipe, scope: PortraitScope) -> PortraitLayer?
     /// 화면용. 그 층에서 덮어쓴 키. .all은 빈 집합.
     public static func overriddenKeys(_ recipe: EditRecipe, scope: PortraitScope) -> Set<PortraitKey>
 }
@@ -232,7 +234,7 @@ extension EditDocument {
 
 - `Rejection`에 `unknownPerson` 추가.
 - `affectsGeometry`: `.faceShape`, `.bodyShape`, `.gender`(그리고 제거 전까지 `.targetFace`).
-- 모든 변경은 적용 뒤 `people.prune()`으로 빈 기록(성별 없음·층 비움)을 지운 다음 "값이 그대로면 체크포인트 없음" 비교를 한다. `anchor`를 받은 기록은 `legacyIndex`를 지운다.
+- 모든 변경은 적용 뒤 `people.prune()`으로 빈 기록(성별 없음·층 비움)과 빈 그룹 층을 지운 다음 "값이 그대로면 체크포인트 없음" 비교를 한다. `anchor`를 받은 기록은 `legacyIndex`를 지운다.
 - 층에 메이크업 색을 처음 고를 때의 기본 강도 규칙은 그 층 아래(전체 ⊕ 그룹, 그룹은 기록의 수동 성별 기준)를 겹친 값을 기준으로 한다.
 - 그룹·개인 층의 값 변경도 "값이 그대로면 체크포인트 없음" 규칙을 따른다. 연속 변경(`beginContinuousChange`)은 scope와 무관하게 지금과 같다.
 - `applyAuto`: 전체 층만(지금과 같음).
