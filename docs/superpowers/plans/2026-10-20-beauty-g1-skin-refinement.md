@@ -42,7 +42,7 @@
 - 레시피 `schemaVersion`은 2 유지, 키 추가만. 새 키는 기본값 0이고 없으면 0으로 읽는다. v1 세션은 계속 읽힌다.
 - 값 범위: `skin.redness`만 `AdjustmentRange.bipolar`, 나머지 정밀 6종은 `AdjustmentRange.unit`. `AdjustmentRange.skinRefinement(_:)` 한 곳.
 - 마스크는 `FaceRegions`(확장 파일 포함)에서만 만든다. 피부 CIKL 색 커널은 `SkinKernels` 한 곳.
-- `RenderTuning` 새 상수 시작값: foldLowBandFraction 0.04, foldSurroundFraction 0.12, foldLiftMax 0.9 (Task 4) · toneBandFraction 0.12, toneEveningMax 0.8, shineLumaOffset 0.12, shineLumaRamp 0.1, shineReductionMax 0.85 (Task 5) · rednessClearMax 0.7, rednessFlushMax 0.03 (Task 6). 위치 비율은 `FaceRegions+Folds.swift`의 `private enum FoldShape`.
+- `RenderTuning` 새 상수 시작값: foldLowBandFraction 0.015(구현 중 0.04에서 변경), foldSurroundFraction 0.12, foldLiftMax 0.9 (Task 4) · toneBandFraction 0.12, toneEveningMax 0.8, shineLumaOffset 0.12, shineLumaRamp 0.1, shineReductionMax 0.85 (Task 5) · rednessClearMax 0.7, rednessFlushMax 0.03 (Task 6). 위치 비율은 `FaceRegions+Folds.swift`의 `private enum FoldShape`.
 - CI는 Xcode 26.3이다(로컬 27). `CGFloat`와 `Double`을 섞는 삼각함수·`hypot`·`atan2` 호출은 인자 타입을 맞춘다(`CGFloat(cos(Double(angle)))`처럼 명시 변환). 같은 타입 둘(`atan2(cgFloat, cgFloat)`)은 그대로 된다.
 - 한 줄 한 문장, 세미콜론 금지, 매직 넘버는 명명 상수(`RenderTuning`·`Theme`·`AppModel.Policy`·`EditingPolicy`, 기하 비율은 `FoldShape` 또는 타입 안 `private static let`). CIKL 소스 안 표준 계수(BT.601·BT.709)는 주석으로 이름을 단다.
 - 한국어 사용자 문구는 앱 타깃(`UserMessage`·뷰)에만. 모듈은 `MellowError`만 던진다(새 case 없음).
@@ -944,7 +944,7 @@ Run: `cd apple && swift test --filter SkinStageTests` → 컴파일 실패(`Skin
 
 ```swift
     /// 주름 밝히기가 보는 국소 저주파 반지름. 얼굴 폭 비율(midBandFraction과 같은 대역).
-    public var foldLowBandFraction: Double = 0.04
+    public var foldLowBandFraction: Double = 0.015
     /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3.5~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
     public var foldSurroundFraction: Double = 0.12
     /// 주름 밝히기 1에서 "주변 평균 − 국소 저주파"의 양수 차이를 더하는 비율. 100%면 평평해 보인다.

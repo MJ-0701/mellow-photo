@@ -142,7 +142,7 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
-| `foldLowBandFraction` | 0.04 | 주름 국소 저주파 반지름(얼굴 폭 비율, `midBandFraction`과 같은 대역) |
+| `foldLowBandFraction` | 0.015 | 주름 국소 저주파 반지름(얼굴 폭 비율). 가장 좁은 띠(마리오네트, 얼굴 폭 3%)의 절반이고 모공 대역(0.6%)의 2.5배. (G1 구현 중 변경: 0.04는 좁은 주름 그림자를 거의 지워 밝힘이 생기지 않음) |
 | `foldSurroundFraction` | 0.12 | 주변 피부 평균 반지름 |
 | `foldLiftMax` | 0.9 | 값 1에서 어두운 차이의 90%를 올림 |
 
