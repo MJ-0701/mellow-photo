@@ -51,6 +51,7 @@ struct AdjustmentSlider: View {
                 }
             }
             .accessibilityLabel(title)
+            .overrideAccessibility(isOverridden: isOverridden, onReset: onReset)
         }
     }
 
@@ -90,5 +91,16 @@ extension View {
                 Button(UserMessage.overrideReset, action: onReset)
             }
         }
+    }
+
+    /// 보조 기술에 덮어씀을 힌트로 알리고 "재설정" 동작을 준다.
+    /// 동작 목록만 조건부라 덮어쓰기 상태가 바뀌어도 뷰 정체성이 그대로다.
+    func overrideAccessibility(isOverridden: Bool, onReset: (() -> Void)?) -> some View {
+        accessibilityHint(isOverridden ? UserMessage.overriddenAccessibilityHint : "")
+            .accessibilityActions {
+                if isOverridden, let onReset {
+                    Button(UserMessage.overrideReset, action: onReset)
+                }
+            }
     }
 }

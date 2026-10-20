@@ -3,13 +3,14 @@ import SwiftUI
 
 /// 뷰티·메이크업 패널 맨 위의 대상 칩: 전체 · 남성 그룹 · 여성 그룹 · 사람 1…n · 찾지 못한 사람.
 /// 칩 줄만 가로로 스크롤한다.
-/// 사람 칩에는 성별 메뉴(길게 누르기·오른쪽 클릭)가 있고, 선택된 사람 칩은 아래 상태 줄에 메뉴 단추를 따로 둔다.
+/// 사람 칩에는 성별 메뉴(길게 누르기·오른쪽 클릭)가 있다.
+/// 선택된 사람 칩은 아래 상태 줄에 현재 성별이 보이는 "성별: … ⌄" 단추를 두어 같은 메뉴를 연다.
 /// 대상 전환은 화면 상태라 잠긴 사진에서도 막지 않는다.
 struct TargetChips: View {
     @Environment(AppModel.self) private var model
-    /// 선택된 사람의 성별이 미지정일 때 성별 지정 안내를 보일지.
-    /// 뷰티 패널은 원터치 줄이 같은 안내를 하므로 끈다.
-    var showsGenderHint = true
+    /// 성별 지정 안내와 대상 안내(scopeHint)를 칩 아래에 보일지.
+    /// 뷰티 패널은 원터치 줄이 성별 안내를, 세부 조정이 대상 안내를 하므로 끈다.
+    var showsHints = true
 
     var body: some View {
         let target = model.beautyTarget
@@ -39,29 +40,40 @@ struct TargetChips: View {
             .accessibilityLabel(UserMessage.targetLabel)
             if let selected = chips.first(where: { $0.target == target }) {
                 HStack {
-                    Text(Self.statusLine(for: selected)).font(.caption).foregroundStyle(.secondary)
+                    Text(Self.statusLine(for: selected)).lineLimit(1).foregroundStyle(.secondary)
                     Spacer()
-                    Menu {
-                        PersonGenderMenu(chip: selected)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .frame(minWidth: Theme.iconButtonHitSize, minHeight: Theme.iconButtonHitSize)
-                            .contentShape(Rectangle())
-                    }
-                    .menuStyle(.button)
-                    .buttonStyle(.borderless)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
-                    .accessibilityLabel(UserMessage.personMenu)
+                    genderButton(for: selected)
                 }
-                if showsGenderHint, selected.gender == nil {
+                .font(.caption)
+                if showsHints, selected.gender == nil {
                     Text(UserMessage.assignGenderHint).font(.caption2).foregroundStyle(.secondary)
                 }
             }
-            if let hint = UserMessage.scopeHint(for: target) {
+            if showsHints, let hint = UserMessage.scopeHint(for: target) {
                 Text(hint).font(.caption2).foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// 현재 성별이 보이는 글자 단추.
+    /// 누름 영역은 위아래로 넓히되 같은 만큼 바깥 여백을 빼 상태 줄 높이는 글자 한 줄 그대로다.
+    private func genderButton(for chip: AppModel.PersonChip) -> some View {
+        Menu {
+            PersonGenderMenu(chip: chip)
+        } label: {
+            HStack(spacing: 2) {
+                Text(UserMessage.genderButton(chip.gender))
+                Image(systemName: "chevron.down").imageScale(.small)
+            }
+            .padding(.vertical, Theme.statusButtonHitPadding)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.borderless)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .padding(.vertical, -Theme.statusButtonHitPadding)
+        .accessibilityLabel(UserMessage.genderButton(chip.gender))
     }
 
     private func chip(
@@ -82,10 +94,11 @@ struct TargetChips: View {
             .padding(.horizontal, Theme.targetChipPadding)
             .frame(minHeight: Theme.targetChipHeight)
             .background(
-                selected ? Theme.accent.opacity(Theme.accentFillOpacity) : Color.secondary.opacity(0.15),
+                selected
+                    ? Theme.accent.opacity(Theme.accentFillOpacity) : Color.secondary.opacity(Theme.chipFillOpacity),
                 in: Capsule()
             )
-            .overlay(Capsule().stroke(selected ? Theme.accent : .clear, lineWidth: 2))
+            .overlay(Capsule().stroke(selected ? Theme.accent : .clear, lineWidth: Theme.chipStrokeWidth))
             .foregroundStyle(selected ? Theme.accent : .primary)
             .contentShape(Capsule())
         }
@@ -111,7 +124,8 @@ struct TargetChips: View {
         }
     }
 
-    /// "사람 n, 성별, 출처, 바꾼 항목 k개". 미지정은 출처가 없고 바꾼 항목이 없으면 그 부분을 뺀다.
+    /// "사람 n, 성별, 출처, 바꾼 항목 k개".
+    /// 미지정은 출처가 없고 바꾼 항목이 없으면 그 부분을 뺀다.
     static func accessibilityLabel(for chip: AppModel.PersonChip) -> String {
         let person: String = chip.faceIndex.map { UserMessage.personOrdinal($0 + 1) } ?? UserMessage.personUnmatched
         var parts: [String] = [person]
@@ -127,11 +141,23 @@ struct TargetChips: View {
         return parts.joined(separator: ", ")
     }
 
-    /// 선택된 사람 칩 아래 상태 줄.
-    /// 접근성 문구와 같다.
+    /// 선택된 사람 칩 아래 상태 줄: "사람 n · 출처 · 바꾼 항목 k개".
+    /// 성별은 옆 단추가 보이므로 뺀다.
     static func statusLine(for chip: AppModel.PersonChip) -> String {
-        accessibilityLabel(for: chip)
+        let person: String = chip.faceIndex.map { UserMessage.personOrdinal($0 + 1) } ?? UserMessage.personUnmatched
+        var parts: [String] = [person]
+        switch chip.source {
+        case .manual: parts.append(UserMessage.genderManual)
+        case .estimated: parts.append(UserMessage.genderEstimated)
+        case .none: break
+        }
+        if chip.overriddenCount > 0 {
+            parts.append(UserMessage.overriddenCount(chip.overriddenCount))
+        }
+        return parts.joined(separator: statusSeparator)
     }
+
+    private static let statusSeparator = " · "
 
     /// 치마 모양 기호는 iOS 18·macOS 15부터라 그 전에는 남녀가 같은 기호이고 글자로 구분한다.
     private static func groupSymbol(_ gender: Gender) -> String {

@@ -86,8 +86,13 @@ struct MakeupPanel: View {
             Text(name).font(.caption)
                 .padding(.horizontal, Theme.makeupChipPadding)
                 .frame(minWidth: Theme.makeupChipSize.width, minHeight: Theme.makeupChipSize.height)
-                .background(selected ? Theme.accent.opacity(0.2) : Color.secondary.opacity(0.15), in: Capsule())
-                .overlay(Capsule().stroke(selected ? Theme.accent : .clear, lineWidth: 2))
+                .background(
+                    selected
+                        ? Theme.accent.opacity(Theme.accentFillOpacity)
+                        : Color.secondary.opacity(Theme.chipFillOpacity),
+                    in: Capsule()
+                )
+                .overlay(Capsule().stroke(selected ? Theme.accent : .clear, lineWidth: Theme.chipStrokeWidth))
                 .foregroundStyle(selected ? Theme.accent : .primary)
         }
         .buttonStyle(.plain)
@@ -103,7 +108,7 @@ struct MakeupPanel: View {
             VStack(spacing: 4) {
                 Circle().fill(Color(red: color.red, green: color.green, blue: color.blue))
                     .frame(width: Theme.makeupSwatchSize, height: Theme.makeupSwatchSize)
-                    .overlay(Circle().stroke(selected ? Theme.accent : .clear, lineWidth: 2))
+                    .overlay(Circle().stroke(selected ? Theme.accent : .clear, lineWidth: Theme.chipStrokeWidth))
                 Text(color.name).font(.caption2).foregroundStyle(selected ? Theme.accent : .secondary)
             }
         }

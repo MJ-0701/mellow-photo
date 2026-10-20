@@ -3,7 +3,8 @@ import XCTest
 
 @testable import Mellow_Photo
 
-/// 원터치 줄의 값 글자와 대상별 안내만 확인한다. 버튼·슬라이더 배치는 사람이 본다.
+/// 원터치 줄의 값 글자와 대상별 안내만 확인한다.
+/// 버튼·슬라이더 배치는 사람이 본다.
 @MainActor
 final class OneTouchRowTests: XCTestCase {
     func testStrengthTextAndHintsFollowTheTarget() {

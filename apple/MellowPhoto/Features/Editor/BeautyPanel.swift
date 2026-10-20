@@ -3,7 +3,7 @@ import MellowShared
 import SwiftUI
 
 /// 뷰티 도구(G4 스펙 4절).
-/// 위에서 아래로 대상 칩 → 원터치 버튼 + 강도 → 안내 → 세부 조정(접기, 기본 접힘).
+/// 위에서 아래로 대상 칩 → 원터치 버튼 + 강도 → 안내 → 세부 조정(접기, 기본 접힘) → 특징점 없음 안내.
 /// 세부 조정은 탭마다 대상 층까지 겹친 값을 슬라이더로 보여준다.
 /// 현재 대상 층이 덮어쓴 항목은 점과 재설정 메뉴를 단다(전체 대상에는 없다).
 /// 원터치가 쓴 항목은 제목 옆에 "원터치" 꼬리표를 단다.
@@ -23,26 +23,34 @@ struct BeautyPanel: View {
             Label(UserMessage.noFaceDetected, systemImage: "person.crop.rectangle.badge.questionmark")
             Text(UserMessage.noFaceHint).font(.caption).foregroundStyle(.secondary)
         case .ready, .noLandmarks:
-            // 성별 지정 안내는 원터치 줄이 한다.
-            TargetChips(showsGenderHint: false)
-            OneTouchRow()
-            if availability == .noLandmarks {
-                Text(UserMessage.noLandmarksHint).font(.caption).foregroundStyle(.secondary)
-            }
-            DisclosureGroup(UserMessage.detailAdjustments, isExpanded: $model.showsDetailAdjustments) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Picker(UserMessage.beautyTabsLabel, selection: $model.beautyTab) {
-                        ForEach(BeautyTab.allCases) { Text($0.title).tag($0) }
+            // iPhone 조절 영역(200pt)에 칩·원터치 줄·"세부 조정" 머리가 스크롤 없이 보이게 간격을 좁힌다.
+            VStack(alignment: .leading, spacing: Theme.beautyPanelSpacing) {
+                // 성별 안내는 원터치 줄이, 대상 안내는 세부 조정이 한다.
+                TargetChips(showsHints: false)
+                OneTouchRow()
+                DisclosureGroup(UserMessage.detailAdjustments, isExpanded: $model.showsDetailAdjustments) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        // 점 표시를 설명하는 안내라 세부 슬라이더 위에 둔다.
+                        if let hint = UserMessage.scopeHint(for: model.beautyTarget) {
+                            Text(hint).font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Picker(UserMessage.beautyTabsLabel, selection: $model.beautyTab) {
+                            ForEach(BeautyTab.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        switch model.beautyTab {
+                        case .skin: skinControls(portrait.skin)
+                        case .face: faceControls(portrait.face)
+                        case .features: featureControls(portrait.features)
+                        case .skinTone: skinToneControls(recipe.bodySkin)
+                        }
                     }
-                    .pickerStyle(.segmented)
-                    switch model.beautyTab {
-                    case .skin: skinControls(portrait.skin)
-                    case .face: faceControls(portrait.face)
-                    case .features: featureControls(portrait.features)
-                    case .skinTone: skinToneControls(recipe.bodySkin)
-                    }
+                    .padding(.top, 8)
                 }
-                .padding(.top, 8)
+                // 세부 조정 머리가 첫 화면에 남도록 그 아래에 둔다.
+                if availability == .noLandmarks {
+                    Text(UserMessage.noLandmarksHint).font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -69,6 +77,7 @@ struct BeautyPanel: View {
         }
         .font(.caption)
         .overrideResetMenu(isOverridden: overridden.contains(.autoBlemish), onReset: reset(.autoBlemish))
+        .overrideAccessibility(isOverridden: overridden.contains(.autoBlemish), onReset: reset(.autoBlemish))
         Text(UserMessage.skinHint).font(.caption).foregroundStyle(.secondary)
         Divider().opacity(0.4)
         ForEach(SkinRefinementKey.allCases, id: \.self) { key in
