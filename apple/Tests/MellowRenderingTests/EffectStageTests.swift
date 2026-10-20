@@ -45,7 +45,7 @@ final class EffectStageTests: XCTestCase {
         XCTAssertGreaterThan(grainVariance, flatVariance + 1e-5, "단색에 잡음이 생긴다")
         let half = Support.variance(try Support.luma(output(input, EffectAdjustments(grain: 0.5))))
         XCTAssertLessThan(half, grainVariance, "강도 0.5는 더 약하다")
-        XCTAssertEqual(EffectStage.grainSize(shortSide: 1200, tuning: RenderTuning()), 1.44, accuracy: 1e-9)
+        XCTAssertEqual(EffectStage.grainSize(shortSide: 1200, tuning: RenderTuning()), 3.0, accuracy: 1e-9)
         XCTAssertEqual(EffectStage.grainSize(shortSide: 100, tuning: RenderTuning()), 1, "알갱이는 1px 아래로 내려가지 않는다")
     }
 

@@ -465,6 +465,11 @@ final class SkinStageTests: XCTestCase {
     /// 오른볼 위 반점 자리. 잡티·특징·분산 측정 패치에서 떨어져 있다.
     private static let blotchPoint = CGPoint(x: 320, y: 210)
 
+    /// BT.601 역변환에서 Cr 1이 바꾸는 R·G·B(감마 값).
+    private static let crToRGB = [1.402, -0.714136, 0]
+    /// 감마 값 1을 8비트 바이트로.
+    private static let byteRange = 255.0
+
     func testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly() throws {
         let base = SyntheticFace.make()
         let blotch = Support.hardEllipse(
@@ -478,10 +483,16 @@ final class SkinStageTests: XCTestCase {
         let clear = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: -1)))
         XCTAssertLessThanOrEqual(
             gap(clear.rgba(Self.blotchPoint)), gap(before.rgba(Self.blotchPoint)) - 10, "반점의 붉은기가 준다")
+        // 기준이 볼 평균보다 rednessReferenceOffset 낮아 볼과 같은 붉기의 피부도 그만큼만 맑아진다(G4).
+        let tuning = RenderTuning()
+        let referenceShift = -tuning.rednessReferenceOffset * tuning.skinMaskMaxStrength
         for channel in 0..<3 {
+            let expected =
+                Double(before.rgba(SyntheticFace.cheek)[channel]) + referenceShift * Self.crToRGB[channel]
+                * Self.byteRange
             XCTAssertEqual(
-                Int(clear.rgba(SyntheticFace.cheek)[channel]), Int(before.rgba(SyntheticFace.cheek)[channel]),
-                accuracy: 2, "기준보다 붉지 않은 피부는 거의 그대로")
+                Double(clear.rgba(SyntheticFace.cheek)[channel]), expected, accuracy: 2,
+                "볼과 같은 붉기의 피부는 기준 여유만큼만 맑아진다")
         }
         let flush = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: 1)))
         for point in [SyntheticFace.cheek, Self.blotchPoint, SyntheticFace.forehead] {

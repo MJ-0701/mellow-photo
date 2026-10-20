@@ -96,19 +96,11 @@ struct BeautyPanel: View {
         Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
     }
 
-    /// 보이는 피부 전체의 밝기·톤·매끄럽게. 사람이 없으면 안내를 보이고 슬라이더는 배경 흐림과 같은 규칙으로 끈다.
+    /// 보이는 피부 전체의 밝기·톤·매끄럽게. 맨 위에 사람 영역·기준 얼굴 상태 줄을 보인다.
+    /// 슬라이더는 사람 영역이 있거나 얼굴 둘레 대체 영역을 쓸 때 켠다.
     @ViewBuilder
     private func skinToneControls(_ bodySkin: BodySkinAdjustments) -> some View {
-        switch model.backgroundAvailability {
-        case .ready:
-            EmptyView()
-        case .noPerson:
-            Label(UserMessage.noPersonDetected, systemImage: "person.crop.rectangle.badge.questionmark")
-            Text(UserMessage.bodySkinNoPersonHint).font(.caption).foregroundStyle(.secondary)
-        case .unavailable(let failure):
-            Label(UserMessage.personAnalysisUnavailableTitle, systemImage: "exclamationmark.triangle")
-            Text(UserMessage.text(for: failure)).font(.caption).foregroundStyle(.secondary)
-        }
+        Text(UserMessage.bodySkinStatus(model.bodySkinStatus)).font(.caption).foregroundStyle(.secondary)
         ForEach(BodySkinKey.allCases, id: \.self) { key in
             let range = EditingPolicy.bodySkinRange(key)
             AdjustmentSlider(

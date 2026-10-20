@@ -53,7 +53,6 @@ enum UserMessage {
     static let beautyTabSkinTone = "피부톤"
     static let bodySkinHint =
         "얼굴·목·팔처럼 보이는 피부 전체에 적용돼요. 기준 피부색은 가장 큰 얼굴의 볼에서 읽고, 옷과 배경은 그대로 둬요. 피부 톤은 가운데가 원래 색이에요."
-    static let bodySkinNoPersonHint = "피부 밝기·톤·바디 매끄럽게는 사람 영역을 찾은 사진에서 동작해요."
     static let beautyTabsLabel = "뷰티 항목"
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
@@ -152,6 +151,17 @@ enum UserMessage {
         case .eyeBrighten: return "눈 또렷하게"
         case .teethWhiten: return "치아 미백"
         case .lipVitality: return "입술 생기"
+        }
+    }
+
+    /// 뷰티 › 피부톤 탭 맨 위 상태 줄. 사람 영역과 기준 얼굴 조건을 한 줄로 보인다.
+    static func bodySkinStatus(_ status: AppModel.BodySkinStatus) -> String {
+        switch status {
+        case .ready: return "사람 영역 ✓ · 기준 얼굴 ✓"
+        case .fallback: return "사람 영역 없음 → 얼굴 둘레로 대신 적용해요"
+        case .noFace: return "기준 얼굴이 없어 피부 밝기·톤·매끄럽게가 적용되지 않아요"
+        case .faceAnalysisUnavailable: return faceAnalysisUnavailableTitle
+        case .personAnalysisUnavailable: return "인물 영역 분석 실패 → 얼굴 둘레로 대신 적용해요"
         }
     }
 

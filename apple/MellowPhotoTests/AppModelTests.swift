@@ -696,7 +696,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.beautyTab, .skinTone, "탭은 도구를 바꿔도 유지")
     }
 
-    func testSkinToneSlidersFollowPersonAvailabilityAndPresetValues() async throws {
+    func testSkinToneStatusLineReflectsPersonAndFaceConditions() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
         let model = TestSupport.makeModel(
@@ -704,17 +704,28 @@ final class AppModelTests: XCTestCase {
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
         XCTAssertEqual(model.backgroundAvailability, .noPerson)
-        XCTAssertFalse(model.canAdjustBodySkin(.brightness), "사람이 없으면 끈다")
-        model.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
-        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
-        XCTAssertFalse(model.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
-        try await waitUntil { !model.isRendering }
-        XCTAssertNil(model.presentedError, "사람이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        XCTAssertEqual(model.bodySkinStatus, .fallback, "사람 영역이 없어도 얼굴이 있으면 대체 영역")
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "대체 영역에서도 켠다")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.fallback), "사람 영역 없음 → 얼굴 둘레로 대신 적용해요")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.ready), "사람 영역 ✓ · 기준 얼굴 ✓")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.noFace), "기준 얼굴이 없어 피부 밝기·톤·매끄럽게가 적용되지 않아요")
         model.beginSliderEdit()
-        model.edit(.bodySkin(.brightness, 0))
-        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        model.edit(.bodySkin(.brightness, 0.4))
         model.endSliderEdit()
-        XCTAssertFalse(model.canAdjustBodySkin(.brightness))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        let facelessRoot = root.appendingPathComponent("faceless")
+        try FileManager.default.createDirectory(at: facelessRoot, withIntermediateDirectories: true)
+        let facelessStaged = try TestSupport.solidPNG(in: facelessRoot)
+        let faceless = TestSupport.makeModel(
+            root: facelessRoot,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: facelessStaged, displayName: nil))]))
+        try await importOne(faceless, facelessStaged)
+        XCTAssertEqual(faceless.bodySkinStatus, .noFace)
+        XCTAssertFalse(faceless.canAdjustBodySkin(.brightness), "얼굴이 없으면 끈다")
+        faceless.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
+        XCTAssertTrue(faceless.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(faceless.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
     }
 
     func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {

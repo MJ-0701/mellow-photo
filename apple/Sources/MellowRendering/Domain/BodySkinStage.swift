@@ -4,23 +4,28 @@ import MellowShared
 /// 보이는 피부 전체(얼굴 포함)의 밝기·톤과 얼굴 밖 피부의 매끄럽게.
 /// 마스크 = 인물 마스크 × 가장 큰 얼굴의 볼 기준 피부색 가중치 × (1 − 모든 얼굴의 눈·눈썹·입).
 /// 매끄럽게는 거기서 얼굴 피부 다각형 전체(눈가·입가 포함, 잘라내지 않음)를 뺀다.
-/// 인물 마스크나 얼굴이 없으면 입력 그대로다(오류 아님). 값은 AdjustmentRange로 직접 자른다. 대상 얼굴 선택과 무관하다.
+/// 얼굴이 없으면 입력 그대로, 인물 마스크가 없으면 얼굴 둘레 대체 영역을 쓴다(오류 아님).
+/// 값은 AdjustmentRange로 직접 자른다.
+/// 대상 얼굴 선택과 무관하다.
 struct BodySkinStage: RenderStage {
     let name = "bodySkin"
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
         let values = Self.clamped(context.recipe.bodySkin)
-        guard values.hasEffect, let person = context.personMask, !person.extent.isEmpty, !person.extent.isInfinite,
-            let reference = Self.referenceFace(context.faces)
-        else { return image }
+        guard values.hasEffect, let reference = Self.referenceFace(context.faces) else { return image }
         let extent = context.extent
         let tuning = context.tuning
         let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
         // 기준색은 skin 단계 뒤 입력에서 잰다. 마스크를 거는 얼굴 픽셀과 같은 이미지라야 얼굴 피부 가중치가 1에 머문다.
         guard let cheeks = FaceRegions.cheekAverages(of: encoded, face: reference, extent: extent) else { return image }
-        let feather = max(
-            CGFloat(tuning.skinBlurMinimumRadius), context.shortSide * CGFloat(tuning.bodySkinMaskFeather))
-        let area = BackgroundStage.personMask(person, extent: extent, feather: feather)
+        let area: CIImage
+        if let person = context.personMask, !person.extent.isEmpty, !person.extent.isInfinite {
+            let feather = max(
+                CGFloat(tuning.skinBlurMinimumRadius), context.shortSide * CGFloat(tuning.bodySkinMaskFeather))
+            area = BackgroundStage.personMask(person, extent: extent, feather: feather)
+        } else {
+            area = Self.fallbackPersonRegion(face: reference, extent: extent, tuning: tuning)
+        }
         let chroma = try SkinKernels.shared.chromaWeight(
             of: encoded, left: cheeks.left, right: cheeks.right, sigma: tuning.bodySkinChromaSigma, extent: extent)
         var toneMask = Self.product(area, chroma, extent: extent)
@@ -60,6 +65,23 @@ struct BodySkinStage: RenderStage {
             copy[key] = AdjustmentRange.clamped(values[key], to: AdjustmentRange.bodySkin(key))
         }
         return copy
+    }
+
+    /// 인물 마스크가 없을 때의 사람 영역.
+    /// 얼굴 상자를 가로 bodySkinFallbackWidthScale배, 상자 위끝에서 아래로 높이 × bodySkinFallbackHeightScale만큼 늘린 직사각형이다.
+    /// 짧은 변 × bodySkinFallbackFeather로 흐린 부드러운 사각형이고 옷·배경은 피부색 가중치가 뺀다.
+    static func fallbackPersonRegion(face: FaceGeometry, extent: CGRect, tuning: RenderTuning) -> CIImage {
+        let box = FaceRegions.pixelRect(face.boundingBox, in: extent)
+        let width = box.width * CGFloat(tuning.bodySkinFallbackWidthScale)
+        let height = box.height * CGFloat(tuning.bodySkinFallbackHeightScale)
+        let region = CGRect(x: box.midX - width / 2, y: box.maxY - height, width: width, height: height)
+            .intersection(extent)
+        let feather = max(
+            CGFloat(tuning.skinBlurMinimumRadius),
+            min(extent.width, extent.height) * CGFloat(tuning.bodySkinFallbackFeather))
+        let black = CIImage(color: .black).cropped(to: extent)
+        return CIImage(color: .white).cropped(to: region).composited(over: black).clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: feather]).cropped(to: extent)
     }
 
     /// 기준색을 재는 얼굴. 상자 폭이 가장 큰 얼굴이고 없으면 nil.

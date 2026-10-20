@@ -37,7 +37,8 @@ enum SkinRefinement {
         let clear = value < 0 ? -value * tuning.rednessClearMax : 0
         let flush = value > 0 ? value * tuning.rednessFlushMax : 0
         let shifted = try SkinKernels.shared.redness(
-            encoded: encoded, reference: reference, clear: clear, flush: flush, extent: bounds
+            encoded: encoded, reference: reference, clear: clear, flush: flush,
+            referenceOffset: tuning.rednessReferenceOffset, extent: bounds
         ).applyingFilter("CISRGBToneCurveToLinear")
         return MaskBuilder.blend(shifted, over: image, mask: mask).cropped(to: extent)
     }

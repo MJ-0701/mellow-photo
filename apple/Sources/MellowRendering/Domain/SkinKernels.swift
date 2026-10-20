@@ -71,14 +71,15 @@ final class SkinKernels: @unchecked Sendable {
         // Y·Cb·Cr 계수와 역변환 계수는 BT.601(sRGB 감마 값 기준)이다.
         blush = CIColorKernel(
             source: """
-                kernel vec4 skinRedness(__sample pixel, __sample reference, float clear, float flush) {
+                kernel vec4 skinRedness(__sample pixel, __sample reference, float clear, float flush,
+                                        float referenceOffset) {
                     vec3 yv = vec3(0.299, 0.587, 0.114);
                     vec3 cbv = vec3(-0.168736, -0.331264, 0.5);
                     vec3 crv = vec3(0.5, -0.418688, -0.081312);
                     float y = dot(pixel.rgb, yv);
                     float cb = dot(pixel.rgb, cbv);
                     float cr = dot(pixel.rgb, crv);
-                    float excess = max(cr - dot(reference.rgb, crv), 0.0);
+                    float excess = max(cr - (dot(reference.rgb, crv) - referenceOffset), 0.0);
                     cr = cr - excess * clear + flush;
                     vec3 rgb = vec3(y + 1.402 * cr, y - 0.344136 * cb - 0.714136 * cr, y + 1.772 * cb);
                     return vec4(clamp(rgb, 0.0, 1.0), pixel.a);
@@ -140,10 +141,13 @@ final class SkinKernels: @unchecked Sendable {
         return mixed
     }
 
-    /// encoded는 sRGB 감마 이미지, reference는 볼 기준 평균(감마, 무한 확장). 기준 Cr을 넘는 만큼 × clear를 빼고 flush를 더한다.
-    func redness(encoded: CIImage, reference: CIImage, clear: Double, flush: Double, extent: CGRect) throws -> CIImage {
+    /// encoded는 sRGB 감마 이미지, reference는 볼 기준 평균(감마, 무한 확장).
+    /// 기준 Cr(볼 평균 − referenceOffset)을 넘는 만큼 × clear를 빼고 flush를 더한다.
+    func redness(
+        encoded: CIImage, reference: CIImage, clear: Double, flush: Double, referenceOffset: Double, extent: CGRect
+    ) throws -> CIImage {
         guard let blush else { throw MellowError.renderFailed }
-        let arguments: [Any] = [encoded, reference, clear, flush]
+        let arguments: [Any] = [encoded, reference, clear, flush, referenceOffset]
         guard let shifted = blush.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return shifted
     }
