@@ -54,15 +54,21 @@ public struct EditDocument: Equatable, Sendable {
         return commit(updated)
     }
 
-    /// anchor에 해당하는 기록이 있으면 그 기록에, 없으면 새 기록을 만들어 같은 변경을 쓴다(한 체크포인트).
+    /// faces[index]와 짝이 된 기록이 있으면 그 기록에, 없으면 그 얼굴의 anchor로 새 기록을 만들어 같은 변경을 쓴다(한 체크포인트).
     /// 찾은 얼굴을 처음 만질 때의 경로다.
+    /// 짝은 렌더와 같은 전역 짝짓기(PeopleAdjustments.personID(forFace:of:))로 정한다.
+    /// 그래서 겹친 얼굴에서도 화면에서 고른 얼굴과 값이 바뀌는 얼굴이 같다.
+    /// index가 범위 밖이면 .unknownPerson이다.
     @discardableResult
-    public mutating func set(_ change: EditChange, forPersonAt anchor: PersonAnchor) -> Rejection? {
+    public mutating func set(_ change: EditChange, forFace index: Int, of faces: [NormalizedRect]) -> Rejection? {
         if change.affectsGeometry, isGeometryLocked {
             return .geometryLocked
         }
+        guard faces.indices.contains(index) else { return .unknownPerson }
         var updated = recipe
-        let id = updated.people.personID(at: anchor) ?? Self.appendPerson(at: anchor, to: &updated)
+        let id =
+            updated.people.personID(forFace: index, of: faces)
+            ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[index]), to: &updated)
         if let rejection = Self.apply(change, scope: .person(id), to: &updated) {
             return rejection
         }
@@ -294,6 +300,8 @@ public struct EditDocument: Equatable, Sendable {
         return nil
     }
 
+    /// 짝이 없는 얼굴의 새 기록.
+    /// 그 얼굴과 거리 0이라 다음 짝짓기에서 그 얼굴과 짝이 된다.
     private static func appendPerson(at anchor: PersonAnchor, to recipe: inout EditRecipe) -> PersonID {
         let record = PersonRecord(anchor: anchor)
         recipe.people.individuals.append(record)

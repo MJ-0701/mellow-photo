@@ -385,8 +385,10 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(record["gender"] as? String, "female")
         XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
         XCTAssertEqual(recipe.people.person(id)?.anchor, anchor)
-        XCTAssertEqual(recipe.people.personID(at: PersonAnchor(x: 0.32, y: 0.61, width: 0.11)), id)
-        XCTAssertNil(recipe.people.personID(at: PersonAnchor(x: 0.8, y: 0.6, width: 0.12)))
+        let nearby = NormalizedRect(x: 0.32 - 0.055, y: 0.61 - 0.07, width: 0.11, height: 0.14)
+        let far = NormalizedRect(x: 0.8 - 0.06, y: 0.6 - 0.07, width: 0.12, height: 0.14)
+        XCTAssertEqual(recipe.people.personID(forFace: 0, of: [nearby]), id)
+        XCTAssertNil(recipe.people.personID(forFace: 0, of: [far]))
         let empty = try JSONDecoder().decode(EditRecipe.self, from: Data(#"{"schemaVersion":2,"people":{}}"#.utf8))
         XCTAssertTrue(empty.isDefault)
         XCTAssertTrue(

@@ -214,4 +214,23 @@ final class RenderPipelineTests: XCTestCase {
         let restricted = RenderContext(extent: extent, recipe: legacy, faces: [left, right], tuning: RenderTuning())
         XCTAssertEqual(restricted.faceTargets.map(\.index), [0], "Task 5 전까지 옛 targetFace는 그 얼굴만 남긴다")
     }
+
+    func testOverlappingFacesUseTheSameGlobalPairingAsEditing() {
+        // A(중심 0.50)·B(0.60)와 얼굴 0.48·0.54(폭 모두 0.2).
+        // 얼굴 1에 가장 가까운 기록은 A지만 짝짓기는 B를 얼굴 1에 둔다.
+        let faces = [
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.38, y: 0.35, width: 0.2, height: 0.3)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.44, y: 0.35, width: 0.2, height: 0.3)),
+        ]
+        let recordA = PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male)
+        let recordB = PersonRecord(
+            anchor: PersonAnchor(x: 0.6, y: 0.5, width: 0.2), layer: PortraitLayer(skinSmoothing: 0.8))
+        let recipe = EditRecipe(people: PeopleAdjustments(individuals: [recordA, recordB]))
+        let context = RenderContext(
+            extent: CGRect(x: 0, y: 0, width: 64, height: 64), recipe: recipe, faces: faces, tuning: RenderTuning())
+        XCTAssertEqual(context.faceTargets.map(\.personID), [recordA.id, recordB.id])
+        XCTAssertEqual(
+            recipe.people.personID(forFace: 1, of: faces.map(\.boundingBox)), recordB.id, "편집이 고르는 사람과 같다")
+        XCTAssertEqual(context.faceTargets.map(\.portrait.skin.smoothing), [0, 0.8], "B의 값은 얼굴 1에만")
+    }
 }

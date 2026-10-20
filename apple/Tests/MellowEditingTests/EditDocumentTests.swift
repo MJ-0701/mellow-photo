@@ -645,7 +645,12 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(PresetValues(of: document.recipe), values, "전부를 고르면 프리셋의 모든 그룹을 복사한다")
     }
 
-    private var faceAnchor: PersonAnchor { PersonAnchor(x: 0.3, y: 0.5, width: 0.2) }
+    /// 두 사람 사진의 얼굴 상자(왼쪽 중심 x 0.3, 오른쪽 0.7).
+    private let twoFaces = [
+        NormalizedRect(x: 0.2, y: 0.35, width: 0.2, height: 0.3),
+        NormalizedRect(x: 0.6, y: 0.35, width: 0.2, height: 0.3),
+    ]
+    private var faceAnchor: PersonAnchor { PersonAnchor(faceBox: twoFaces[0]) }
 
     func testScopedSetWritesOnlyThatLayerAndClamps() {
         var document = EditDocument()
@@ -688,23 +693,24 @@ final class EditDocumentTests: XCTestCase {
 
     func testFirstTouchOfAFaceCreatesTheRecordAndEmptyRecordsArePruned() {
         var document = EditDocument()
-        XCTAssertNil(document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor))
+        XCTAssertNil(document.set(.skinSmoothing(0.6), forFace: 0, of: twoFaces))
         XCTAssertEqual(document.recipe.people.individuals.count, 1)
         let id = document.recipe.people.individuals[0].id
         XCTAssertEqual(document.recipe.people.individuals[0].anchor, faceAnchor)
         XCTAssertEqual(document.recipe.people.individuals[0].layer, PortraitLayer(skinSmoothing: 0.6))
         XCTAssertEqual(document.undoStack.count, 1, "기록 생성과 값 쓰기는 한 단계")
-        XCTAssertNil(document.set(.faceShape(.jaw, 0.2), forPersonAt: PersonAnchor(x: 0.31, y: 0.5, width: 0.19)))
-        XCTAssertEqual(document.recipe.people.individuals.count, 1, "가까운 anchor는 같은 사람")
+        let reanalyzed = [NormalizedRect(x: 0.215, y: 0.35, width: 0.19, height: 0.3), twoFaces[1]]
+        XCTAssertNil(document.set(.faceShape(.jaw, 0.2), forFace: 0, of: reanalyzed))
+        XCTAssertEqual(document.recipe.people.individuals.count, 1, "조금 움직인 얼굴 상자도 같은 사람")
         XCTAssertEqual(document.recipe.people.individuals[0].id, id)
         XCTAssertEqual(document.recipe.people.person(id)?.layer.face[.jaw], 0.2)
-        XCTAssertNil(document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor))
+        XCTAssertNil(document.set(.skinSmoothing(0.6), forFace: 0, of: twoFaces))
         XCTAssertEqual(document.undoStack.count, 2, "같은 값은 단계를 만들지 않는다")
         XCTAssertNil(document.resetOverrides(in: .person(id)))
         XCTAssertTrue(document.recipe.people.individuals.isEmpty, "층이 비고 성별도 없는 기록은 지운다")
         document.undo()
         XCTAssertEqual(document.recipe.people.person(id)?.layer.face[.jaw], 0.2)
-        XCTAssertNil(document.set(.gender(.female), forPersonAt: PersonAnchor(x: 0.7, y: 0.5, width: 0.2)))
+        XCTAssertNil(document.set(.gender(.female), forFace: 1, of: twoFaces))
         XCTAssertEqual(document.recipe.people.individuals.count, 2)
         let second = document.recipe.people.individuals[1]
         XCTAssertEqual(second.gender, .female)
@@ -716,7 +722,7 @@ final class EditDocumentTests: XCTestCase {
 
     func testGenderAssignmentIsLockedByLocalEditsAndNeedsAPerson() {
         var document = EditDocument()
-        document.set(.gender(.male), forPersonAt: faceAnchor)
+        document.set(.gender(.male), forFace: 0, of: twoFaces)
         let id = document.recipe.people.individuals[0].id
         XCTAssertEqual(document.set(.gender(.female), in: .all), .unknownPerson, "성별은 개인에게만")
         XCTAssertEqual(document.set(.gender(.female), in: .gender(.female)), .unknownPerson)
@@ -767,7 +773,7 @@ final class EditDocumentTests: XCTestCase {
 
     func testRebindRemoveBindLegacyAndScopedLookAreOneUndoStep() throws {
         var document = EditDocument()
-        document.set(.skinSmoothing(0.6), forPersonAt: faceAnchor)
+        document.set(.skinSmoothing(0.6), forFace: 0, of: twoFaces)
         let id = document.recipe.people.individuals[0].id
         let elsewhere = PersonAnchor(x: 0.8, y: 0.5, width: 0.2)
         XCTAssertNil(document.rebindPerson(id, to: elsewhere))
@@ -817,8 +823,8 @@ final class EditDocumentTests: XCTestCase {
     func testPresetKeepsIndividualsAndGenderButReplacesGroups() {
         var document = EditDocument()
         document.set(.skinSmoothing(0.8), in: .gender(.female))
-        document.set(.gender(.female), forPersonAt: faceAnchor)
-        document.set(.faceShape(.width, -0.3), forPersonAt: faceAnchor)
+        document.set(.gender(.female), forFace: 0, of: twoFaces)
+        document.set(.faceShape(.width, -0.3), forFace: 0, of: twoFaces)
         let id = document.recipe.people.individuals[0].id
         var values = PresetValues(color: ColorAdjustments(exposure: 0.2))
         values.people.groups[.male] = PortraitLayer(skinSmoothing: 0.1)
@@ -843,10 +849,10 @@ final class EditDocumentTests: XCTestCase {
     func testBatchSyncCopiesGroupsAndClearsIndividualKeysOfSyncedCategories() {
         var document = EditDocument()
         document.set(.skinSmoothing(0.9), in: .gender(.male))
-        document.set(.gender(.female), forPersonAt: faceAnchor)
-        document.set(.skinSmoothing(0.7), forPersonAt: faceAnchor)
-        document.set(.faceShape(.width, -0.3), forPersonAt: faceAnchor)
-        document.set(.makeupColor(.lip, "lip-rose"), forPersonAt: faceAnchor)
+        document.set(.gender(.female), forFace: 0, of: twoFaces)
+        document.set(.skinSmoothing(0.7), forFace: 0, of: twoFaces)
+        document.set(.faceShape(.width, -0.3), forFace: 0, of: twoFaces)
+        document.set(.makeupColor(.lip, "lip-rose"), forFace: 0, of: twoFaces)
         let id = document.recipe.people.individuals[0].id
         var values = PresetValues(color: ColorAdjustments(exposure: 0.3))
         values.portrait.skin.smoothing = 0.4
@@ -880,5 +886,30 @@ final class EditDocumentTests: XCTestCase {
         let steps = document.undoStack.count
         document.applyFromBatch(values, categories: [.faceShape, .makeup])
         XCTAssertEqual(document.undoStack.count, steps, "바뀐 것이 없는 동기화는 단계를 만들지 않는다")
+    }
+
+    func testFaceEditsFollowTheRenderPairingForOverlappingFaces() {
+        // A(중심 0.50)·B(0.60)와 얼굴 0.48·0.54(폭 모두 0.2).
+        // 얼굴 1에 가장 가까운 기록은 A지만 렌더 짝짓기는 B를 얼굴 1에 둔다.
+        let recordA = PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male)
+        let recordB = PersonRecord(
+            anchor: PersonAnchor(x: 0.6, y: 0.5, width: 0.2), layer: PortraitLayer(skinSmoothing: 0.2))
+        var document = EditDocument(
+            recipe: EditRecipe(people: PeopleAdjustments(individuals: [recordA, recordB])))
+        let overlapping = [
+            NormalizedRect(x: 0.38, y: 0.35, width: 0.2, height: 0.3),
+            NormalizedRect(x: 0.44, y: 0.35, width: 0.2, height: 0.3),
+        ]
+        XCTAssertNil(document.set(.skinSmoothing(0.8), forFace: 1, of: overlapping))
+        XCTAssertEqual(document.recipe.people.person(recordB.id)?.layer.skinSmoothing, 0.8, "얼굴 1의 사람은 B")
+        XCTAssertTrue(document.recipe.people.person(recordA.id)?.layer.isEmpty == true, "A는 그대로")
+        XCTAssertEqual(document.recipe.people.individuals.count, 2)
+        XCTAssertNil(document.set(.gender(.female), forFace: 0, of: overlapping))
+        XCTAssertEqual(document.recipe.people.person(recordA.id)?.gender, .female)
+        let third = overlapping + [NormalizedRect(x: 0.8, y: 0.35, width: 0.1, height: 0.15)]
+        XCTAssertNil(document.set(.skinSmoothing(0.4), forFace: 2, of: third))
+        XCTAssertEqual(document.recipe.people.individuals.count, 3, "짝이 없는 얼굴은 새 기록")
+        XCTAssertEqual(document.recipe.people.personID(forFace: 2, of: third), document.recipe.people.individuals[2].id)
+        XCTAssertEqual(document.set(.skinSmoothing(0.4), forFace: 3, of: third), .unknownPerson, "범위 밖 얼굴")
     }
 }

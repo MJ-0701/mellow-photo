@@ -423,26 +423,36 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
         individuals.first { $0.id == id }
     }
 
-    /// anchor와 같은 사람의 기록.
-    /// 허용치(PersonMatcher.isMatch) 안에서 거리가 가장 가까운 기록이고 동률은 배열 순서다.
-    /// 겹친 얼굴에서도 렌더 짝짓기(PersonMatcher.match)와 같은 사람을 고른다.
-    /// anchor 없는 기록은 찾지 못한다.
-    public func personID(at anchor: PersonAnchor) -> PersonID? {
-        var best: (distance: Double, id: PersonID)?
-        for record in individuals {
-            guard let stored = record.anchor, let distance = PersonMatcher.distance(stored, anchor) else { continue }
-            if best.map({ distance < $0.distance }) ?? true {
-                best = (distance, record.id)
-            }
+    /// 찾은 얼굴 인덱스 → 그 얼굴과 짝이 된 기록.
+    /// PersonMatcher.match의 전역 1:1 결과다.
+    /// 렌더(RenderContext.makeTargets)·편집·앱이 모두 이 함수로 얼굴의 사람을 정한다.
+    /// 짝이 없는 얼굴은 키가 없다.
+    public func peopleByFace(_ faces: [NormalizedRect]) -> [Int: PersonRecord] {
+        var result: [Int: PersonRecord] = [:]
+        for match in PersonMatcher.match(individuals, faces: faces) {
+            result[match.faceIndex] = person(match.person)
         }
-        return best?.id
+        return result
+    }
+
+    /// faces[index]와 짝이 된 기록의 id.
+    /// anchor 하나에 가장 가까운 기록을 따로 찾으면 겹친 얼굴에서 렌더와 다른 사람을 고를 수 있어 늘 전역 짝짓기를 쓴다.
+    public func personID(forFace index: Int, of faces: [NormalizedRect]) -> PersonID? {
+        peopleByFace(faces)[index]?.id
     }
 
     /// 빈 기록과 빈 그룹 층을 지운다.
     /// 빈 그룹 층은 인코드에서 빠지므로 남겨 두면 저장 전후 ==와 isDefault가 어긋난다.
+    /// 같은 id의 기록은 앞의 것만 남긴다(손상 파일에서 두 얼굴이 한 층을 나누지 않게).
     public mutating func prune() {
-        individuals.removeAll(where: \.isEmpty)
+        individuals = Self.uniqued(individuals.filter { !$0.isEmpty })
         groups = groups.filter { !$0.value.isEmpty }
+    }
+
+    /// 같은 id가 다시 나오면 버린다.
+    private static func uniqued(_ records: [PersonRecord]) -> [PersonRecord] {
+        var seen = Set<PersonID>()
+        return records.filter { seen.insert($0.id).inserted }
     }
 
     // MARK: Codable
@@ -479,7 +489,8 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
             }
         }
         let lossy = try container.decodeIfPresent([LossyRecord].self, forKey: .individuals) ?? []
-        individuals = lossy.compactMap(\.record)
+        // 같은 id가 둘 이상이면 앞의 것만 남긴다.
+        individuals = Self.uniqued(lossy.compactMap(\.record))
     }
 
     /// 잘못된 기록 하나 때문에 세션 전체를 못 여는 일이 없게 그 기록만 버린다.

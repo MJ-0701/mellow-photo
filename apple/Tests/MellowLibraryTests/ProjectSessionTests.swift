@@ -246,11 +246,11 @@ final class ProjectSessionTests: XCTestCase {
         let other = entry("B")
         try session.add(source)
         try session.add(other)
-        let anchor = PersonAnchor(x: 0.3, y: 0.5, width: 0.2)
+        let faces = [NormalizedRect(x: 0.2, y: 0.35, width: 0.2, height: 0.3)]
         session.edit(source.id) { $0.set(.skinSmoothing(0.6), in: .gender(.female)) }
-        session.edit(source.id) { $0.set(.skinSmoothing(0.9), forPersonAt: anchor) }
-        session.edit(other.id) { $0.set(.gender(.male), forPersonAt: anchor) }
-        session.edit(other.id) { $0.set(.skinSmoothing(0.2), forPersonAt: anchor) }
+        session.edit(source.id) { $0.set(.skinSmoothing(0.9), forFace: 0, of: faces) }
+        session.edit(other.id) { $0.set(.gender(.male), forFace: 0, of: faces) }
+        session.edit(other.id) { $0.set(.skinSmoothing(0.2), forFace: 0, of: faces) }
         session.applyToAll(from: source.id, categories: [.skin])
         let received = session.photos[1].document.recipe
         XCTAssertEqual(received.people.groups[.female], PortraitLayer(skinSmoothing: 0.6), "그룹 층은 복사")
