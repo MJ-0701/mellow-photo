@@ -4,9 +4,9 @@
 
 **Goal:** 조정 패널에 그레인·글로우를, "전체 사진에 적용"에 무엇을 복사할지 고르는 동기화 항목 메뉴를, 동작 줄에 기존 "원본 비교" 토글 옆 분할 비교(드래그 분할선)를 더하고, G 전체의 문서·검증 기록을 마친다.
 
-**Architecture:** MellowShared에 최상위 레시피 그룹 `effects`(그레인·글로우)를 더하고 MellowRendering은 `look` 뒤 마지막 단계 `effect`(`CIBloom` → 회색 잡음 오버레이)를 둔다. 선택 동기화는 MellowEditing의 `SyncCategory`와 `EditDocument.applyFromBatch(_:categories:)`가 규칙을 갖고, MellowLibrary `ProjectSession.applyToAll(from:categories:)`가 넘기며, 앱은 세션 상태 `syncCategories`와 톱니 메뉴를 둔다. 비교는 `AppModel.CompareMode { off, full, split }`로 묶되 기존 `isComparing`(전체 토글)은 계산 속성으로 남겨 호출부·테스트가 바뀌지 않고, 분할은 캔버스 위에 원본을 왼쪽만 보이게 얹고 분할선을 드래그한다.
+**Architecture:** MellowShared에 최상위 레시피 그룹 `effects`(그레인·글로우)를 더하고 MellowRendering은 `look` 뒤 마지막 단계 `effect`(흐림 제곱 스크린 글로우 → 회색 잡음 오버레이)를 둔다. 선택 동기화는 MellowEditing의 `SyncCategory`와 `EditDocument.applyFromBatch(_:categories:)`가 규칙을 갖고, MellowLibrary `ProjectSession.applyToAll(from:categories:)`가 넘기며, 앱은 세션 상태 `syncCategories`와 톱니 메뉴를 둔다. 비교는 `AppModel.CompareMode { off, full, split }`로 묶되 기존 `isComparing`(전체 토글)은 계산 속성으로 남겨 호출부·테스트가 바뀌지 않고, 분할은 캔버스 위에 원본을 왼쪽만 보이게 얹고 분할선을 드래그한다.
 
-**Tech Stack:** Swift 5.9 tools / Swift 5 언어 모드, SwiftUI + Observation, Core Image(CIBloom·CIRandomGenerator·CIColorMatrix·CIOverlayBlendMode·CILinearToSRGBToneCurve), XCTest, XcodeGen 2.46.0.
+**Tech Stack:** Swift 5.9 tools / Swift 5 언어 모드, SwiftUI + Observation, Core Image(CIGaussianBlur·CIMultiplyCompositing·CIScreenBlendMode·CIRandomGenerator·CIColorMatrix·CIOverlayBlendMode·CILinearToSRGBToneCurve), XCTest, XcodeGen 2.46.0.
 
 **Spec:** `docs/superpowers/specs/2026-10-20-beauty-g-evoto-design.md` (G3에 해당하는 절: 1.1, 1.2, 1.3, 1.6의 효과, 1.7, 1.8, 1.9, 1.10, 2, 3, 4). 선행: G1·G2 계획 전부 머지.
 
@@ -19,7 +19,7 @@
 | 결정 | 이유 | 바꾸면 비용 |
 |---|---|---|
 | 그레인 층은 `0.5 ± 진폭/2`의 회색 잡음이고 sRGB 감마 공간에서 오버레이 | 회색 0.5 오버레이는 항등이라 강도 0이 정확히 항등이고, 감마에서 얹어야 어두운 곳과 밝은 곳의 알갱이가 비슷하게 보임 | 작음 |
-| 글로우는 `CIBloom` 하나, 반지름은 짧은 변 비례 | 기본 필터만으로 되고 미리보기·저장본이 같아 보임 | 작음 |
+| 글로우는 흐린 사본을 제곱해 스크린 합성(구현 중 `CIBloom`에서 변경: 고르게 밝은 영역에 빛이 번지지 않음), 반지름은 짧은 변 비례 | 기본 필터만으로 되고 미리보기·저장본이 같아 보임 | 작음 |
 | 동기화 선택이 비면 "전체 사진에 적용" 버튼을 끄고 적용도 하지 않음 | 아무것도 복사하지 않는 적용은 실행 취소 단계만 남김 | 작음 |
 | 동기화 메뉴 항목 이름: 색감·디테일, 효과, 피부, 얼굴형, 눈·입, 메이크업, 배경, 체형, 피부톤 | 도구·탭 이름과 같은 말을 씀 | 작음 |
 | 분할선은 캔버스 좌표계(`coordinateSpace`)로 드래그 위치를 받아 0…1로 자르고, 분할을 끄고 켜도 마지막 위치를 기억(사진을 바꾸면 모드만 꺼짐) | 손잡이 자체 좌표로 받으면 손을 뗐다 다시 잡을 때 튐 | 작음 |

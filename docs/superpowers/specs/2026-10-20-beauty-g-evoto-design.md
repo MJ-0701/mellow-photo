@@ -20,7 +20,7 @@
 | 몸 피부는 `dependsOnPerson`에만 넣고 `dependsOnFaces`에는 넣지 않음. 얼굴 분석이 실패한 사진에 몸 피부 값이 있어도 저장은 되고(몸 피부만 빠짐) 미리보기와 같음 | `dependsOnFaces`에 넣으면 얼굴 분석 실패 사진의 저장이 `faceAnalysisUnavailable`로 막힘. 배경 흐림과 같은 "해당 단계만 건너뜀" 규칙이 맞고, 패널이 얼굴 없음을 먼저 안내하므로 조용히 빠져도 놀라지 않음 | 작음 |
 | 피부 밝기는 0…1 한 방향(흰색 쪽으로 섞음), 피부 톤은 −1…1(따뜻 ↔ 차가움), 바디 매끄럽게 0…1 | Evoto "피부색 변경"은 밝히는 방향만 측정됨. 어둡게는 조정 도구의 노출로 충분 | 작음 |
 | 레시피: `portrait.skin`에 키 7개 추가, 최상위 `bodySkin`·`effects` 추가, `schemaVersion` 2 유지, 기본값은 모두 항등 | B~F "키 추가만" 규칙. 옛 세션은 기본값으로 읽혀 결과가 같음 | 중간 (플랫폼 공통 계약) |
-| 효과는 룩 뒤 새 단계 `effect`: 글로우(`CIBloom`) → 그레인(짧은 변에 비례한 회색 잡음을 오버레이). 두 슬라이더 0…1 | Core Image 기본 필터만으로 됨. 그레인 크기를 짧은 변에 비례시켜 미리보기와 저장본이 같아 보임 | 작음 |
+| 효과는 룩 뒤 새 단계 `effect`: 글로우(흐린 사본을 제곱해 밝은 곳에 모은 빛을 스크린 합성) → 그레인(짧은 변에 비례한 회색 잡음을 오버레이). 두 슬라이더 0…1 (G3 구현 중 변경: `CIBloom`은 고르게 밝은 영역을 밝히지 않아 하이라이트에 빛이 번지지 않았음) | Core Image 기본 필터만으로 됨. 그레인 크기를 짧은 변에 비례시켜 미리보기와 저장본이 같아 보임 | 작음 |
 | 선택 동기화: 동기화 항목 9종(`SyncCategory`)은 MellowEditing에 두고 `applyFromBatch(_:categories:)`가 고른 그룹만 복사. 선택은 앱 세션 상태(파일에 저장하지 않음), 기본은 전부 | "무엇을 복사하나"는 편집 규칙이고 Library가 Editing을 의존하므로 모듈 표 그대로. 저장하지 않으면 세션 스키마가 바뀌지 않음 | 작음 |
 | 잠긴 사진 보존 규칙은 그대로이고, 얼굴 의존 항목(피부·얼굴형·눈입·메이크업) 중 하나라도 동기화할 때만 잠기지 않은 사진의 대상 얼굴을 전체로 되돌림 | 색감만 동기화하는데 대상 얼굴이 풀리면 놀람 | 작음 |
 | 기존 "원본 비교" 전체 토글은 그대로 두고, 분할 비교(드래그하는 분할선)를 비교 모드 하나로 더함(`없음 · 전체 · 분할`). 분할선은 0…1로 드래그 | 피부 질감·잡티·턱선 같은 작은 변화는 같은 자리에서 번갈아 보는 토글이 더 잘 보이고, 분할은 화면 전체의 색·톤 변화를 나란히 볼 때 맞음(사용자 결정). 비교 중 캔버스 탭 금지 규칙은 두 모드 모두 그대로 | 작음 |
@@ -190,14 +190,14 @@ out  = low + mid × keep + (image − fineBlur)
 | `bodySkinFineBandFraction` | 0.002 | 몸 모공 대역 반지름(짧은 변 비율) |
 | `bodySkinMidBandFraction` | 0.012 | 몸 얼룩 대역 반지름 |
 
-**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 `CIBloom(inputRadius: shortSide × glowRadiusFraction, inputIntensity: glow × glowMaxIntensity)` 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤 sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
+**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤 sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
 | `grainMaxAmplitude` | 0.12 | 그레인 1에서 오버레이 층의 ±진폭(감마) |
 | `grainSizeFraction` | 0.0012 | 알갱이 한 변(짧은 변 비율, 1200px에서 1.4px) |
 | `glowRadiusFraction` | 0.02 | 글로우 반지름(짧은 변 비율) |
-| `glowMaxIntensity` | 0.6 | 글로우 1에서 CIBloom 세기 |
+| `glowMaxIntensity` | 0.6 | 글로우 1에서 스크린 합성하는 빛의 배율 |
 
 #### 1.7 선택 동기화
 
