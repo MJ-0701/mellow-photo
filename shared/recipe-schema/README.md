@@ -41,7 +41,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
   | `features.lipVitality` | 0 | 0.2 | 0 |
   | `makeup.blush` | 없음(강도 0) | `blush-peach` 0.15 | 없음(강도 0) |
   | `makeup.lip` | 없음(강도 0) | 없음(강도 0) | 없음(강도 0) |
-  | `bodySkin.brightness`(전체 대상만) | 0.2 | — | — |
+  | `bodySkin.brightness`(전체 대상만) | 0.15 | — | — |
   | `bodySkin.tone`(전체 대상만) | 0 | — | — |
 
   기준 구현은 `apple/Sources/MellowShared/API/OneTouchBundle.swift`이고 다른 플랫폼도 같은 표를 씁니다.
