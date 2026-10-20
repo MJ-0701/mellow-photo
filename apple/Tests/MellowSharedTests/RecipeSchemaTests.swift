@@ -34,10 +34,11 @@ final class RecipeSchemaTests: XCTestCase {
     private func encodedSampleRecipe() throws -> [String: Any] {
         var recipe = EditRecipe()
         recipe.portrait.targetFace = 1
-        recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true)
+        recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true, darkCircles: 0.2, redness: -0.1)
         recipe.portrait.face.width = -0.2
         recipe.portrait.features.eyeBrighten = 0.1
         recipe.background.blur = 0.2
+        recipe.bodySkin.tone = -0.2
         recipe.body.legLength = 0.3
         recipe.makeup = MakeupAdjustments(
             lookID: "daily", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
@@ -51,6 +52,7 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.look = LookSelection(id: "film", intensity: 0.5)
         recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
         recipe.detail.sharpness = 0.2
+        recipe.effects.grain = 0.1
         return try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any])
     }
 
@@ -59,7 +61,9 @@ final class RecipeSchemaTests: XCTestCase {
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let encoded = try encodedSampleRecipe()
         XCTAssertEqual(Set(properties.keys), Set(encoded.keys))
-        for key in ["color", "portrait", "detail", "look", "geometry", "background", "body", "makeup"] {
+        for key in [
+            "color", "portrait", "detail", "look", "geometry", "background", "bodySkin", "body", "makeup", "effects",
+        ] {
             let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
             XCTAssertEqual(try activeKeys(properties[key]), Set(encodedSection.keys), key)
         }

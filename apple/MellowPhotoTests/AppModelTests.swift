@@ -299,6 +299,58 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.session.isPersistenceDeferred)
     }
 
+    func testAdjustToolEditsEffectsOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.adjust)
+        for (offset, key) in EffectKey.allCases.enumerated() {
+            model.beginSliderEdit()
+            model.edit(.effect(key, 0.2))
+            model.edit(.effect(key, 0.6))
+            model.endSliderEdit()
+            XCTAssertEqual(model.session.selected?.document.undoStack.count, offset + 1, "\(key)")
+        }
+        XCTAssertEqual(model.currentRecipe.effects, EffectAdjustments(grain: 0.6, glow: 0.6))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(EffectKey.allCases.map(UserMessage.effectTitle), ["그레인", "글로우"])
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.effects, EffectAdjustments(grain: 0.6))
+    }
+
+    func testApplyToAllCopiesOnlyChosenCategories() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A")
+        let second = try TestSupport.solidPNG(in: root, name: "B")
+        let model = TestSupport.makeModel(root: root, importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady && model.preview != nil }
+        XCTAssertEqual(model.session.photos.count, 2)
+        XCTAssertEqual(model.syncCategories, SyncCategory.all, "기본은 전부")
+        XCTAssertTrue(model.canApplyToAll)
+        model.edit(.exposure(0.3))
+        model.edit(.skinSmoothing(0.4))
+        model.setSyncCategory(.skin, enabled: false)
+        model.applyToAll()
+        let other = model.session.photos[1].document.recipe
+        XCTAssertEqual(other.color.exposure, 0.3)
+        XCTAssertEqual(other.portrait.skin.smoothing, 0, "끈 항목은 복사하지 않는다")
+        XCTAssertEqual(model.statusMessage, UserMessage.appliedToAll(categoryCount: 8, total: 9))
+        for category in SyncCategory.allCases {
+            model.setSyncCategory(category, enabled: false)
+        }
+        XCTAssertFalse(model.canApplyToAll, "아무것도 고르지 않으면 끈다")
+        model.edit(.exposure(0.5))
+        model.applyToAll()
+        XCTAssertEqual(model.session.photos[1].document.recipe.color.exposure, 0.3, "빈 선택은 적용하지 않는다")
+        model.setSyncCategory(.color, enabled: true)
+        XCTAssertEqual(model.syncCategories, [.color])
+        XCTAssertEqual(
+            SyncCategory.allCases.map(UserMessage.syncCategoryTitle),
+            ["색감·디테일", "효과", "피부", "얼굴형", "눈·입", "메이크업", "배경", "체형", "피부톤"])
+    }
+
     private func importOne(_ model: AppModel, _ url: URL) async throws {
         await model.importFromFiles([url])
         try await waitUntil { model.isReady && model.preview != nil }
@@ -483,6 +535,36 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.currentRecipe.isDefault)
     }
 
+    func testSkinTabEditsEveryRefinementKeyOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        model.beautyTab = .skin
+        for (offset, key) in SkinRefinementKey.allCases.enumerated() {
+            model.beginSliderEdit()
+            model.edit(.skinRefinement(key, 0.3))
+            model.edit(.skinRefinement(key, key == .redness ? -0.5 : 0.6))
+            model.endSliderEdit()
+            XCTAssertEqual(model.session.selected?.document.undoStack.count, offset + 1, "\(key) 드래그 한 번이 한 단계")
+        }
+        XCTAssertEqual(
+            model.currentRecipe.portrait.skin,
+            SkinAdjustments(
+                darkCircles: 0.6, nasolabial: 0.6, marionette: 0.6, glabella: 0.6, toneEvening: 0.6, redness: -0.5,
+                shine: 0.6))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.portrait.skin.shine, 0)
+        XCTAssertEqual(
+            SkinRefinementKey.allCases.map(UserMessage.skinRefinementTitle),
+            ["다크서클", "팔자주름", "마리오네트 주름", "미간 주름", "피부 얼룩 고르기", "붉은기", "번들거림"])
+    }
+
     func testAutoEnhanceWithFaceTurnsOnAutoBlemishAndKeepsFaceWidth() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
@@ -557,7 +639,7 @@ final class AppModelTests: XCTestCase {
         let model = TestSupport.makeModel(
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
-        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features])
+        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features, .skinTone])
         XCTAssertEqual(BeautyTab.features.title, "눈·입")
         model.tool = .retouch
         model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
@@ -579,6 +661,60 @@ final class AppModelTests: XCTestCase {
         model.undo()
         XCTAssertEqual(model.currentRecipe.portrait.features.lipVitality, 0, "실행 취소 한 번에 마지막 슬라이더만")
         XCTAssertEqual(model.currentRecipe.portrait.features.teethWhiten, 0.6, accuracy: 1e-9)
+    }
+
+    func testSkinToneTabEditsEveryKeyOneUndoStepEachWhenPersonFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6))
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 0.95))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(mask)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        model.beautyTab = .skinTone
+        XCTAssertEqual(BeautyTab.allCases.count, 4)
+        XCTAssertEqual(BeautyTab.skinTone.title, "피부톤")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        for key in BodySkinKey.allCases {
+            XCTAssertTrue(model.canAdjustBodySkin(key), "\(key)")
+        }
+        for (offset, key) in BodySkinKey.allCases.enumerated() {
+            model.beginSliderEdit()
+            model.edit(.bodySkin(key, 0.2))
+            model.edit(.bodySkin(key, key == .tone ? -0.4 : 0.7))
+            model.endSliderEdit()
+            XCTAssertEqual(model.session.selected?.document.undoStack.count, offset + 1, "\(key) 드래그 한 번이 한 단계")
+        }
+        XCTAssertEqual(model.currentRecipe.bodySkin, BodySkinAdjustments(brightness: 0.7, tone: -0.4, smoothing: 0.7))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(BodySkinKey.allCases.map(UserMessage.bodySkinTitle), ["피부 밝기", "피부 톤", "바디 피부 매끄럽게"])
+        model.selectTool(.adjust)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .skinTone, "탭은 도구를 바꿔도 유지")
+    }
+
+    func testSkinToneSlidersFollowPersonAvailabilityAndPresetValues() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.backgroundAvailability, .noPerson)
+        XCTAssertFalse(model.canAdjustBodySkin(.brightness), "사람이 없으면 끈다")
+        model.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(model.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError, "사람이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        model.beginSliderEdit()
+        model.edit(.bodySkin(.brightness, 0))
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.canAdjustBodySkin(.brightness))
     }
 
     func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
@@ -737,6 +873,10 @@ final class AppModelTests: XCTestCase {
         model.edit(.targetFace(1))
         XCTAssertEqual(model.faceAvailability, .noLandmarks)
         XCTAssertTrue(UserMessage.noLandmarksHint.contains("메이크업"))
+        for tool in ["피부 보정", "얼룩 고르기", "붉은기", "번들거림", "잡티·변형"] {
+            XCTAssertTrue(UserMessage.noLandmarksHint.contains(tool), "특징점 없이 쓸 수 있는 도구를 알린다: \(tool)")
+        }
+        XCTAssertTrue(UserMessage.noLandmarksHint.contains("주름 밝히기"), "특징점이 있어야 하는 주름 슬라이더를 알린다")
         model.edit(.targetFace(0))
         XCTAssertEqual(model.faceAvailability, .ready)
 
@@ -955,5 +1095,109 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.body.waist, 0, "허리 드래그는 그 앞 단계")
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
+    }
+
+    func testSplitCompareIsAModeBesideTheFullToggleAndResetsOnSelect() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.compareMode, .off)
+        XCTAssertFalse(model.blocksCanvasTouch)
+        model.isComparing = true
+        XCTAssertEqual(model.compareMode, .full, "기존 토글은 전체 모드")
+        XCTAssertTrue(model.displayImage === model.original)
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .split, "분할을 켜면 전체는 꺼진다")
+        XCTAssertFalse(model.isComparing)
+        XCTAssertTrue(model.displayImage === model.preview, "분할 모드의 바탕은 보정본")
+        XCTAssertTrue(model.blocksCanvasTouch)
+        XCTAssertTrue(model.splitCompareOriginal === model.original, "같은 기하로 그린 원본을 겹친다")
+        XCTAssertEqual(model.compareSplit, AppModel.Policy.compareSplitDefault)
+        model.setCompareSplit(1.4)
+        XCTAssertEqual(model.compareSplit, 1)
+        model.setCompareSplit(-0.2)
+        XCTAssertEqual(model.compareSplit, 0)
+        model.setCompareSplit(0.3)
+        model.selectTool(.retouch)
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertNil(model.cloneSource, "비교 중에는 캔버스 탭을 무시한다")
+        model.isComparing.toggle()
+        XCTAssertEqual(model.compareMode, .full, "분할 중에 전체 토글을 켜면 전체로")
+        model.toggleSplitCompare()
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .off, "분할을 두 번 누르면 꺼진다")
+        XCTAssertEqual(model.compareSplit, 0.3, accuracy: 1e-9, "분할선 위치는 기억한다")
+        model.toggleSplitCompare()
+        let id = try XCTUnwrap(model.session.selectedPhotoID)
+        model.select(id)
+        XCTAssertEqual(model.compareMode, .off, "사진을 고르면 비교가 꺼진다")
+        XCTAssertEqual(UserMessage.compareBadge(.split), "원본 | 보정본")
+        XCTAssertEqual(UserMessage.compareBadge(.full), "원본")
+        XCTAssertEqual(UserMessage.compareBadge(.off), "보정본")
+    }
+
+    func testSplitCompareShowsTheOriginalOnlyWhenItsGeometryMatchesThePreview() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        try await waitUntil { !model.isRendering }
+        let gate = OriginalRenderGate()
+        let pipeline = model.pipeline
+        model.renderOriginal = { id, recipe in
+            try await gate.pass()
+            return try await pipeline.preview(id, recipe: recipe)
+        }
+        model.toggleSplitCompare()
+        XCTAssertNotNil(model.splitCompareOriginal, "같은 기하로 그린 원본을 겹친다")
+        let unflipped = model.preview
+        model.edit(.flipHorizontal(true))
+        try await waitUntil { model.preview !== unflipped && gate.calls == 1 }
+        let stale = try XCTUnwrap(model.original)
+        let preview = try XCTUnwrap(model.preview)
+        XCTAssertEqual(stale.width * preview.height, preview.width * stale.height, "뒤집기는 비율이 같다")
+        XCTAssertNil(model.splitCompareOriginal, "뒤집기 전 원본은 다시 그려질 때까지 겹치지 않는다")
+        gate.open()
+        try await waitUntil { model.splitCompareOriginal != nil }
+        XCTAssertTrue(model.original !== stale, "다시 그린 원본을 겹친다")
+        gate.fails = true
+        let flipped = model.preview
+        model.edit(.quarterTurns(1))
+        try await waitUntil { model.preview !== flipped && gate.calls == 2 }
+        XCTAssertNil(model.splitCompareOriginal, "원본을 다시 그리지 못하면 겹치지 않는다")
+        model.edit(.exposure(0.2))
+        try await waitUntil { gate.calls == 3 && !model.isRendering }
+        XCTAssertNil(model.splitCompareOriginal, "다시 시도도 실패하면 계속 숨긴다")
+        gate.fails = false
+        model.edit(.exposure(0.3))
+        try await waitUntil { model.splitCompareOriginal != nil }
+        XCTAssertNil(model.presentedError, "원본 실패는 알림을 띄우지 않는다")
+    }
+}
+
+/// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.
+@MainActor
+private final class OriginalRenderGate {
+    var fails = false
+    private(set) var calls = 0
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func pass() async throws {
+        calls += 1
+        if fails {
+            throw MellowError.renderFailed
+        }
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for waiter in waiters {
+            waiter.resume()
+        }
+        waiters.removeAll()
     }
 }

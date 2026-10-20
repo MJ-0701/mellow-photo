@@ -1,4 +1,5 @@
 import Foundation
+import MellowEditing
 import MellowRendering
 import MellowShared
 
@@ -9,6 +10,10 @@ enum UserMessage {
     static let chooseCloneSource = "① 깨끗한 피부를 톡 눌러 샘플을 골라주세요."
     static let chooseCloneTarget = "② 지우고 싶은 작은 잡티를 톡 눌러주세요."
     static let appliedToAll = "전체 사진에 슬라이더 설정을 적용했어요."
+    static let syncMenuLabel = "동기화 항목"
+    static let splitCompare = "분할"
+    static let splitCompareDone = "분할 끝"
+    static let compareDividerLabel = "원본과 보정본의 경계"
     static let sessionUnreadable = "작업 기록을 읽지 못해 복구용 사본을 보관했습니다. 기존 작업 사진도 보존됩니다. 사진을 다시 골라 편집할 수 있어요."
     static let somePhotosUnreadable = "일부 작업 사진을 열지 못했습니다. 해당 사진을 다시 가져오세요."
     static let selectionUnreadable = "이 작업 사진을 열 수 없습니다. 다시 시도하거나 편집에서 뺀 뒤 사진을 다시 골라주세요."
@@ -45,16 +50,24 @@ enum UserMessage {
     static let beautyTabSkin = "피부"
     static let beautyTabFace = "얼굴"
     static let beautyTabFeatures = "눈·입"
+    static let beautyTabSkinTone = "피부톤"
+    static let bodySkinHint =
+        "얼굴·목·팔처럼 보이는 피부 전체에 적용돼요. 기준 피부색은 가장 큰 얼굴의 볼에서 읽고, 옷과 배경은 그대로 둬요. 피부 톤은 가운데가 원래 색이에요."
+    static let bodySkinNoPersonHint = "피부 밝기·톤·바디 매끄럽게는 사람 영역을 찾은 사진에서 동작해요."
     static let beautyTabsLabel = "뷰티 항목"
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
+    static let skinRefinementHint =
+        "다크서클·팔자주름·마리오네트 주름·미간 주름은 특징점으로 어림한 띠 안에서 어두운 만큼만 밝힙니다. 붉은기는 왼쪽이 맑게, 오른쪽이 혈색이에요."
+    static let effectsHint = "그레인과 글로우는 필터와 선명도 뒤에 사진 전체에 얹어요."
     static let faceHint = "미소는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
     static let featureHint = "치아 미백은 치아가 보이는 사진에서만 바뀌어요. 눈·입 보정은 얼굴 특징점을 찾은 얼굴에 적용돼요."
     static let faceAnalysisUnavailableTitle = "자동 얼굴 분석을 사용할 수 없어요"
     static let noFaceDetected = "감지된 얼굴이 없어요"
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
-    static let noLandmarksHint = "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정과 잡티·변형 도구는 쓸 수 있어요."
+    static let noLandmarksHint =
+        "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정·얼룩 고르기·붉은기·번들거림과 잡티·변형 도구는 쓸 수 있고, 주름 밝히기 4종은 특징점이 있어야 바뀌어요."
     static let allFaces = "모든 얼굴"
     static let autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."
     static let lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."
@@ -139,6 +152,65 @@ enum UserMessage {
         case .eyeBrighten: return "눈 또렷하게"
         case .teethWhiten: return "치아 미백"
         case .lipVitality: return "입술 생기"
+        }
+    }
+
+    /// 뷰티 › 피부톤 탭 슬라이더 이름. 화면 순서는 BodySkinKey.allCases.
+    static func bodySkinTitle(_ key: BodySkinKey) -> String {
+        switch key {
+        case .brightness: return "피부 밝기"
+        case .tone: return "피부 톤"
+        case .smoothing: return "바디 피부 매끄럽게"
+        }
+    }
+
+    /// 뷰티 › 피부 탭의 정밀 슬라이더 이름. 화면 순서는 SkinRefinementKey.allCases.
+    static func skinRefinementTitle(_ key: SkinRefinementKey) -> String {
+        switch key {
+        case .darkCircles: return "다크서클"
+        case .nasolabial: return "팔자주름"
+        case .marionette: return "마리오네트 주름"
+        case .glabella: return "미간 주름"
+        case .toneEvening: return "피부 얼룩 고르기"
+        case .redness: return "붉은기"
+        case .shine: return "번들거림"
+        }
+    }
+
+    /// 조정 패널 효과 슬라이더 이름. 화면 순서는 EffectKey.allCases.
+    static func effectTitle(_ key: EffectKey) -> String {
+        switch key {
+        case .grain: return "그레인"
+        case .glow: return "글로우"
+        }
+    }
+
+    /// 캔버스 왼쪽 위 배지.
+    static func compareBadge(_ mode: AppModel.CompareMode) -> String {
+        switch mode {
+        case .off: return "보정본"
+        case .full: return "원본"
+        case .split: return "원본 | 보정본"
+        }
+    }
+
+    /// 전부 골랐으면 기존 문구, 아니면 고른 개수를 알린다.
+    static func appliedToAll(categoryCount: Int, total: Int) -> String {
+        categoryCount == total ? appliedToAll : "전체 사진에 고른 \(categoryCount)개 항목을 적용했어요."
+    }
+
+    /// 동기화 메뉴 항목 이름. 화면 순서는 SyncCategory.allCases.
+    static func syncCategoryTitle(_ category: SyncCategory) -> String {
+        switch category {
+        case .color: return "색감·디테일"
+        case .effects: return "효과"
+        case .skin: return "피부"
+        case .faceShape: return "얼굴형"
+        case .features: return "눈·입"
+        case .makeup: return "메이크업"
+        case .background: return "배경"
+        case .body: return "체형"
+        case .bodySkin: return "피부톤"
         }
     }
 

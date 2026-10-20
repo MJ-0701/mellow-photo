@@ -165,6 +165,24 @@ final class ProjectSessionTests: XCTestCase {
         XCTAssertEqual(session.photos[2].document.recipe.background.blur, 0.4)
     }
 
+    func testApplyToAllWithCategoriesCopiesOnlyThose() throws {
+        let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        session.edit(source.id) { $0.set(.exposure(0.3)) }
+        session.edit(source.id) { $0.set(.skinSmoothing(0.5)) }
+        session.edit(other.id) { $0.set(.targetFace(0)) }
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0, "피부는 고르지 않았다")
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 0, "얼굴 항목이 없으면 대상 얼굴 유지")
+        session.applyToAll(from: source.id)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0.5, "기본은 전부")
+        XCTAssertNil(session.photos[1].document.recipe.portrait.targetFace)
+    }
+
     func testAddPresetTrimsAndLimitsName() throws {
         let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
         session.addPreset(named: "  " + String(repeating: "가", count: 40) + "  ", values: PresetValues())
@@ -199,5 +217,26 @@ final class ProjectSessionTests: XCTestCase {
         session.edit(source.id) { $0.set(.vignette(0.4)) }
         session.applyToAll(from: source.id)
         XCTAssertEqual(session.photos[1].document.recipe.detail.vignette, 0.4)
+    }
+
+    func testApplyToAllSkipsSavingWhenNothingChanged() throws {
+        let store = MemorySessionStore()
+        let session = ProjectSession(store: store, maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        session.edit(source.id) { $0.set(.exposure(0.3)) }
+        session.applyToAll(from: source.id, categories: [.color])
+        let saves = store.saveCount
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(store.saveCount, saves, "다시 복사해도 바뀐 사진이 없으면 저장하지 않는다")
+        session.applyToAll(from: source.id, categories: [])
+        XCTAssertEqual(store.saveCount, saves, "빈 선택은 저장하지 않는다")
+        XCTAssertEqual(session.photos[1].document.undoStack.count, 1, "바뀐 것이 없는 복사는 단계를 만들지 않는다")
+        session.edit(source.id) { $0.set(.exposure(0.5)) }
+        let edited = store.saveCount
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(store.saveCount, edited + 1, "바뀐 사진이 있으면 한 번 저장한다")
     }
 }

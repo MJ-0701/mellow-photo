@@ -47,7 +47,7 @@ final class AppModel {
     /// 뷰티·메이크업 도구가 보여줄 얼굴 상태. 분석 실패가 얼굴 없음보다 먼저다.
     enum FaceAvailability: Equatable {
         case ready
-        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정만 동작한다.
+        /// 대상 얼굴에 특징점이 하나도 없다. 피부 보정·얼룩 고르기·붉은기·번들거림만 동작하고 주름 밝히기 4종은 빠진다.
         case noLandmarks
         case noFace
         case unavailable(MellowError)
@@ -68,6 +68,16 @@ final class AppModel {
         /// 앱 번들에 든 메이크업 카탈로그 파일. shared/makeup/makeup.v1.json과 같은 내용이다.
         static let bundledMakeupCatalogName = "makeup.v1"
         static let bundledMakeupCatalogExtension = "json"
+        /// 분할 비교의 처음 분할선 위치와 범위(원본이 보이는 왼쪽 폭 비율).
+        static let compareSplitDefault = 0.5
+        static let compareSplitRange = 0.0...1.0
+        /// 보조 기술로 분할선을 한 번 옮기는 폭.
+        static let compareSplitAccessibilityStep = 0.1
+    }
+
+    /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
+    enum CompareMode: Equatable {
+        case off, full, split
     }
 
     let session: ProjectSession
@@ -109,7 +119,24 @@ final class AppModel {
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
-    var isComparing = false
+    var compareMode: CompareMode = .off
+    /// 원본이 보이는 왼쪽 폭 비율. 분할을 끄고 켜도 유지한다.
+    var compareSplit = Policy.compareSplitDefault
+    /// 기존 전체 토글. 분할 중에 true로 두면 전체로 바뀐다.
+    var isComparing: Bool {
+        get { compareMode == .full }
+        set { compareMode = newValue ? .full : .off }
+    }
+    /// 비교 중에는 캔버스 탭·브러시·자르기 틀을 막는다(두 모드 모두).
+    var blocksCanvasTouch: Bool { compareMode != .off }
+    /// 분할 모드에서 보정본 위에 겹칠 원본. 들고 있는 원본의 기하가 보이는 미리보기의 기하와 같을 때만 겹친다.
+    /// 기하를 바꾼 뒤 원본을 다시 그리는 중이거나 다시 그리지 못했으면 nil이다(뒤집기처럼 비율이 같아도).
+    var splitCompareOriginal: CGImage? {
+        guard compareMode == .split, let original, let heldOriginalGeometry else { return nil }
+        return heldOriginalGeometry == previewGeometry ? original : nil
+    }
+    /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
+    var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
     /// 이름 입력 시트가 떠 있는 동안 true. 메뉴의 ⌘Z/⇧⌘Z가 입력란의 실행 취소를 가로채지 않게 한다.
     var isTextEntryActive = false
@@ -122,8 +149,14 @@ final class AppModel {
     let renderScheduler: RenderScheduler
     private var selectionTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
-    /// 비교 화면의 원본에 마지막으로 입힌 기하. 같으면 원본을 다시 그리지 않는다.
+    /// 비교 화면의 원본에 마지막으로 입힌 기하. 같으면 원본을 다시 그리지 않는다. 요청할 때 기록하므로 그리는 중에도 바뀌어 있다.
     private var originalGeometry: GeometryAdjustments?
+    /// 지금 들고 있는 원본(original)을 그린 기하. 원본을 받을 때만 바뀐다.
+    private var heldOriginalGeometry: GeometryAdjustments?
+    /// 지금 들고 있는 미리보기(preview)를 그린 기하. 자르기 화면이면 자르기를 뺀 기하다.
+    private var previewGeometry: GeometryAdjustments?
+    /// 기하를 바꾼 뒤 비교 화면의 원본을 다시 그린다. 테스트가 늦추거나 실패시키려고 바꿔 끼운다.
+    var renderOriginal: @MainActor (PhotoID, EditRecipe) async throws -> CGImage
 
     init(
         session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
@@ -138,6 +171,7 @@ final class AppModel {
         self.lookCatalog = lookCatalog
         self.makeupCatalog = makeupCatalog
         renderScheduler = RenderScheduler(debounce: renderDebounce)
+        renderOriginal = { id, recipe in try await pipeline.preview(id, recipe: recipe) }
     }
 
     var isBusy: Bool { isImporting || isExporting || isRestoring }
@@ -180,6 +214,10 @@ final class AppModel {
     /// 드래그 중에는 0에 닿아도 끄지 않는다.
     var canAdjustBackgroundBlur: Bool {
         isSliderEditActive || backgroundAvailability == .ready || currentRecipe.background.blur != 0
+    }
+    /// 피부톤 슬라이더를 움직일 수 있는지. 배경 흐림과 같은 인물 마스크 규칙이다(드래그 중·사람 있음·0이 아닌 값).
+    func canAdjustBodySkin(_ key: BodySkinKey) -> Bool {
+        isSliderEditActive || backgroundAvailability == .ready || currentRecipe.bodySkin[key] != 0
     }
     /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
     /// 드래그 중에는 0을 지나도 끄지 않는다.
@@ -277,6 +315,14 @@ final class AppModel {
         remember(id, prepared)
     }
 
+    func toggleSplitCompare() {
+        compareMode = compareMode == .split ? .off : .split
+    }
+
+    func setCompareSplit(_ fraction: Double) {
+        compareSplit = min(Policy.compareSplitRange.upperBound, max(Policy.compareSplitRange.lowerBound, fraction))
+    }
+
     func select(_ id: PhotoID) {
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
@@ -292,10 +338,12 @@ final class AppModel {
         isReady = false
         isRendering = false
         selectionFailure = nil
-        isComparing = false
+        compareMode = .off
         cloneSource = nil
         isChoosingCloneSource = true
         originalGeometry = nil
+        heldOriginalGeometry = nil
+        previewGeometry = nil
         guard let entry = session.selected else { return }
         selectionTask = Task {
             do {
@@ -305,6 +353,7 @@ final class AppModel {
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
                 original = base
                 originalGeometry = baseRecipe.geometry
+                heldOriginalGeometry = baseRecipe.geometry
                 isReady = true
                 scheduleRender()
                 if tool == .look {
@@ -358,6 +407,7 @@ final class AppModel {
             switch result {
             case .success(let image):
                 preview = image
+                previewGeometry = shownGeometry
                 refreshOriginalIfNeeded(id: id, geometry: shownGeometry)
             case .failure(let error): present(error)
             }
@@ -369,16 +419,17 @@ final class AppModel {
         guard originalGeometry != geometry else { return }
         originalGeometry = geometry
         let recipe = EditRecipe(geometry: geometry)
-        let pipeline = self.pipeline
+        let render = renderOriginal
         Task { [weak self] in
-            let image = try? await pipeline.preview(id, recipe: recipe)
+            let image = try? await render(id, recipe)
             guard let self, session.selectedPhotoID == id, originalGeometry == geometry else { return }
-            // 실패하면 다음 렌더가 다시 시도하도록 기록을 지운다. 그동안은 이전 원본을 보여준다.
+            // 실패하면 다음 렌더가 다시 시도하도록 기록을 지운다. 이전 원본은 기하가 달라 분할 비교에 겹치지 않는다.
             guard let image else {
                 originalGeometry = nil
                 return
             }
             original = image
+            heldOriginalGeometry = geometry
         }
     }
 

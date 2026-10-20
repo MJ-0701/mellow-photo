@@ -39,8 +39,10 @@
               "portrait": { "$ref": "edit-recipe.v2.schema.json#/properties/portrait" },
               "detail": { "$ref": "edit-recipe.v2.schema.json#/properties/detail" },
               "background": { "$ref": "edit-recipe.v2.schema.json#/properties/background" },
+              "bodySkin": { "$ref": "edit-recipe.v2.schema.json#/properties/bodySkin" },
               "body": { "$ref": "edit-recipe.v2.schema.json#/properties/body" },
-              "makeup": { "$ref": "edit-recipe.v2.schema.json#/properties/makeup" }
+              "makeup": { "$ref": "edit-recipe.v2.schema.json#/properties/makeup" },
+              "effects": { "$ref": "edit-recipe.v2.schema.json#/properties/effects" }
             }
           }
         }

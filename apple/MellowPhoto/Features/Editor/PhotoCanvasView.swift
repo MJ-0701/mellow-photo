@@ -27,12 +27,14 @@ struct PhotoCanvasView: View {
                             .frame(width: size.width, height: size.height)
                             .overlay { cloneSourceMarker(in: size) }
                             .overlay { touchLayer(in: size) }
+                            .overlay { splitOverlay(in: size) }
                             .overlay { cropOverlay(in: size) }
+                            .coordinateSpace(.named(Theme.canvasCoordinateSpace))
                             .frame(minWidth: geometry.size.width, minHeight: geometry.size.height)
                     }
                     .scrollDisabled(zoom == Theme.zoomRange.lowerBound)
                     .simultaneousGesture(magnify)
-                    .accessibilityLabel(model.isComparing ? "원본 사진" : "보정 미리보기")
+                    .accessibilityLabel(model.compareMode == .full ? "원본 사진" : "보정 미리보기")
                 }
                 if let message = model.selectionFailure {
                     recoveryActions(message)
@@ -42,7 +44,7 @@ struct PhotoCanvasView: View {
             }
             .overlay(alignment: .topLeading) {
                 if model.isReady {
-                    Text(model.isComparing ? "원본" : "보정본")
+                    Text(UserMessage.compareBadge(model.compareMode))
                         .font(.caption2)
                         .padding(7)
                         .background(.ultraThinMaterial, in: Capsule())
@@ -72,7 +74,7 @@ struct PhotoCanvasView: View {
 
     @ViewBuilder
     private func cloneSourceMarker(in size: CGSize) -> some View {
-        if let source = model.cloneSourceOnCanvas, model.tool == .retouch, !model.isComparing {
+        if let source = model.cloneSourceOnCanvas, model.tool == .retouch, !model.blocksCanvasTouch {
             let diameter = max(
                 Theme.brushMarkerMinimumDiameter,
                 model.brushRadius * min(size.width, size.height) * 2 * outputToOriginalScale)
@@ -92,14 +94,29 @@ struct PhotoCanvasView: View {
     /// 자르기 손잡이 드래그가 확대 제스처보다 우선하도록 가장 위에 둔다.
     @ViewBuilder
     private func cropOverlay(in size: CGSize) -> some View {
-        if model.tool == .crop, !model.isComparing {
+        if model.tool == .crop, !model.blocksCanvasTouch {
             CropOverlay(size: size)
+        }
+    }
+
+    /// 분할 모드: 보정본 위에 원본을 왼쪽 compareSplit 비율만 보이게 얹고 경계에 분할선을 둔다.
+    /// 원본은 미리보기와 같은 기하로 그린 것만 받으므로(AppModel.splitCompareOriginal) 같은 크기(size)에 겹치면 화소 위치가 맞는다.
+    @ViewBuilder
+    private func splitOverlay(in size: CGSize) -> some View {
+        if model.compareMode == .split {
+            if let original = model.splitCompareOriginal {
+                Image(cgImage: original).resizable().interpolation(.high)
+                    .frame(width: size.width, height: size.height)
+                    .mask(alignment: .leading) { Rectangle().frame(width: size.width * model.compareSplit) }
+                    .allowsHitTesting(false)
+            }
+            CompareDivider(size: size)
         }
     }
 
     @ViewBuilder
     private func touchLayer(in size: CGSize) -> some View {
-        if model.tool.usesCanvasTouch, !model.isComparing {
+        if model.tool.usesCanvasTouch, !model.blocksCanvasTouch {
             Color.clear.contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0).onChanged { _ in

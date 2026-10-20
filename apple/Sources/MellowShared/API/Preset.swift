@@ -5,27 +5,32 @@ public struct PresetValues: Codable, Equatable, Sendable {
     public var portrait: PortraitAdjustments
     public var detail: DetailAdjustments
     public var background: BackgroundAdjustments
+    public var bodySkin: BodySkinAdjustments
     public var body: BodyShapeAdjustments
     public var makeup: MakeupAdjustments
+    public var effects: EffectAdjustments
 
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
-        background: BackgroundAdjustments = .init(), body: BodyShapeAdjustments = .init(),
-        makeup: MakeupAdjustments = .init()
+        background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
+        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(),
+        effects: EffectAdjustments = .init()
     ) {
         self.color = color
         self.portrait = portrait
         self.detail = detail
         self.background = background
+        self.bodySkin = bodySkin
         self.body = body
         self.makeup = makeup
+        self.effects = effects
     }
 
     /// 레시피의 슬라이더 그룹. 룩·기하·수동 편집은 담지 않는다. 대상 얼굴은 호출자가 정한다.
     public init(of recipe: EditRecipe) {
         self.init(
             color: recipe.color, portrait: recipe.portrait, detail: recipe.detail, background: recipe.background,
-            body: recipe.body, makeup: recipe.makeup)
+            bodySkin: recipe.bodySkin, body: recipe.body, makeup: recipe.makeup, effects: recipe.effects)
     }
 
     public init(from decoder: Decoder) throws {
@@ -34,8 +39,10 @@ public struct PresetValues: Codable, Equatable, Sendable {
         portrait = try container.decodeIfPresent(PortraitAdjustments.self, forKey: .portrait) ?? .init()
         detail = try container.decodeIfPresent(DetailAdjustments.self, forKey: .detail) ?? .init()
         background = try container.decodeIfPresent(BackgroundAdjustments.self, forKey: .background) ?? .init()
+        bodySkin = try container.decodeIfPresent(BodySkinAdjustments.self, forKey: .bodySkin) ?? .init()
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
+        effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
     }
 }
 

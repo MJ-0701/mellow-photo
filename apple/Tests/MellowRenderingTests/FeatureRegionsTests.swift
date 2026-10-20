@@ -122,6 +122,54 @@ final class FeatureRegionsTests: XCTestCase {
         XCTAssertNil(FaceRegions.innerMouthAreaFraction(face: boxOnly.face, extent: extent))
     }
 
+    /// 상자만 있는 얼굴의 대체 왼눈 타원 중심. 상자 (116, 50, 280, 300)에서 비율 (0.15, 0.56, 0.28, 0.14).
+    private static let fallbackLeftEye = CGPoint(x: 197, y: 239)
+
+    func testFeatureMaskCoversEyesBrowsAndLipsOfEveryFaceInOneRaster() throws {
+        let synthetic = SyntheticFace.makeFeatures()
+        let second = synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.5))
+        let cache = RegionMaskCache()
+        let mask = try XCTUnwrap(
+            FaceRegions.featureMask(faces: [synthetic.face, second], extent: extent, tuning: tuning, cache: cache))
+        let pixels = try Support.grid(mask.image)
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.scleraPoint), 200)
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.lipPoint), 200)
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.mouth), 200, "안쪽 입술(치아)도 덮는다")
+        XCTAssertGreaterThan(pixels.red(SyntheticFace.leftBrowCenter), 200, "눈썹도 덮는다")
+        XCTAssertGreaterThan(pixels.red(CGPoint(x: 256 + 200 / 2, y: 256 + 300 / 2)), 200, "두 번째 얼굴의 왼눈")
+        XCTAssertEqual(pixels.red(SyntheticFace.cheek), 0)
+        XCTAssertEqual(pixels.red(SyntheticFace.forehead), 0)
+        XCTAssertEqual(cache.count, 1, "얼굴 수와 관계없이 비트맵 하나")
+        XCTAssertNil(FaceRegions.featureMask(faces: [], extent: extent, tuning: tuning, cache: cache))
+        let boxOnly = try XCTUnwrap(
+            FaceRegions.featureMask(
+                faces: [SyntheticFace.make(landmarks: false).face], extent: extent, tuning: tuning, cache: cache),
+            "특징점이 없어도 대체 타원으로 뺀다")
+        let fallback = try Support.grid(boxOnly.image)
+        XCTAssertGreaterThan(fallback.red(Self.fallbackLeftEye), 200)
+        XCTAssertEqual(fallback.red(SyntheticFace.forehead), 0)
+    }
+
+    func testWholeFaceMaskCoversEveryFaceWithFeatureRingsInOneRaster() throws {
+        let synthetic = SyntheticFace.make()
+        let second = synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.5))
+        let cache = RegionMaskCache()
+        let mask = try XCTUnwrap(
+            FaceRegions.wholeFaceMask(faces: [synthetic.face, second], extent: extent, tuning: tuning, cache: cache))
+        let pixels = try Support.grid(mask.image)
+        let inside = [
+            SyntheticFace.cheek, SyntheticFace.leftEye, SyntheticFace.mouth, CGPoint(x: 200, y: 272),
+            CGPoint(x: 256, y: 167), CGPoint(x: 256 + 180 / 2, y: 256 + 200 / 2),
+        ]
+        for point in inside {
+            XCTAssertEqual(pixels.red(point), 255, "자르지 않은 얼굴 다각형 \(point)")
+        }
+        XCTAssertEqual(pixels.red(SyntheticFace.outside), 0)
+        XCTAssertEqual(pixels.red(CGPoint(x: 256, y: 24)), 0, "턱 아래 몸은 얼굴 피부가 아니다")
+        XCTAssertEqual(cache.count, 1, "얼굴 수와 관계없이 비트맵 하나")
+        XCTAssertNil(FaceRegions.wholeFaceMask(faces: [], extent: extent, tuning: tuning, cache: cache))
+    }
+
     func testDemoPortraitFeatureMasksFollowRealLandmarks() throws {
         let url = try XCTUnwrap(
             Bundle.module.url(forResource: "demo-portrait", withExtension: "png", subdirectory: "Fixtures"))

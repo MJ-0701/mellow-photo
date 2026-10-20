@@ -24,15 +24,20 @@ struct BackgroundStage: RenderStage {
         return MaskBuilder.blend(blurred, over: image, mask: background).cropped(to: extent)
     }
 
-    /// 배경 1·사람 0인 extent 크기 마스크. 인물 마스크(사람 1)를 extent에 맞게 가로·세로 따로 키운다(마스크 비율은 사진과 다를 수 있다).
-    static func backgroundMask(_ person: CIImage, extent: CGRect, feather: CGFloat) -> CIImage {
+    /// 사람 1·배경 0인 extent 크기 마스크. 인물 마스크를 extent에 맞게 가로·세로 따로 키우고(마스크 비율은 사진과 다를 수 있다)
+    /// feather로 흐린다.
+    static func personMask(_ person: CIImage, extent: CGRect, feather: CGFloat) -> CIImage {
         let source = person.extent
         let placement = CGAffineTransform(translationX: extent.minX, y: extent.minY)
             .scaledBy(x: extent.width / source.width, y: extent.height / source.height)
             .translatedBy(x: -source.minX, y: -source.minY)
         return person.transformed(by: placement).clampedToExtent()
             .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: feather])
-            .applyingFilter("CIColorInvert")
             .cropped(to: extent)
+    }
+
+    /// 배경 1·사람 0. personMask의 반전.
+    static func backgroundMask(_ person: CIImage, extent: CGRect, feather: CGFloat) -> CIImage {
+        personMask(person, extent: extent, feather: feather).applyingFilter("CIColorInvert").cropped(to: extent)
     }
 }

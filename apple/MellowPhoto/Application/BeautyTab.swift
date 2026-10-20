@@ -3,6 +3,7 @@ enum BeautyTab: CaseIterable, Identifiable {
     case skin
     case face
     case features
+    case skinTone
 
     var id: Self { self }
 
@@ -11,6 +12,7 @@ enum BeautyTab: CaseIterable, Identifiable {
         case .skin: return UserMessage.beautyTabSkin
         case .face: return UserMessage.beautyTabFace
         case .features: return UserMessage.beautyTabFeatures
+        case .skinTone: return UserMessage.beautyTabSkinTone
         }
     }
 }

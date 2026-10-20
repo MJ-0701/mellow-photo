@@ -62,6 +62,26 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
+    /// center 둘레 타원 안 픽셀을 factor배 어둡게 한다(그늘·주름 흉내).
+    private func darkened(_ image: CIImage, at center: CGPoint, radii: CGSize, factor: Double) -> CIImage {
+        let dim = image.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: factor, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: factor, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: factor, w: 0),
+            ])
+        let mask = Support.hardEllipse(center: center, radii: radii, extent: SyntheticFace.extent)
+        return dim.applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: image, kCIInputMaskImageKey: mask]
+        ).cropped(to: SyntheticFace.extent)
+    }
+
+    /// 주름 띠 테스트의 그늘 밝기 배율(선형).
+    private static let shadowFactor = 0.6
+    /// 밝힌 뒤 기대하는 최소 빨강 증가(바이트).
+    private static let liftMinimum = 12
+
     func testNoSmoothingAndNoAutoBlemishIsIdentity() throws {
         let synthetic = SyntheticFace.make(withBlemishes: true)
         let output = try render(synthetic, skin: SkinAdjustments())
@@ -211,5 +231,347 @@ final class SkinStageTests: XCTestCase {
         let fresh = RenderContext(
             extent: synthetic.image.extent, recipe: recipe, faces: [synthetic.face], tuning: RenderTuning())
         XCTAssertEqual(first, try Support.bytes(SkinStage().apply(synthetic.image, in: fresh)), "캐시 여부와 결과가 같다")
+    }
+
+    func testDarkCirclesLiftOnlyTheShadowUnderTheEyes() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 30, height: 10)
+        var image = darkened(base.image, at: SyntheticFace.underLeftEye, radii: radii, factor: Self.shadowFactor)
+        image = darkened(image, at: SyntheticFace.underRightEye, radii: radii, factor: Self.shadowFactor)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(darkCircles: 1)))
+        for point in [SyntheticFace.underLeftEye, SyntheticFace.underRightEye] {
+            XCTAssertGreaterThanOrEqual(
+                Int(after.red(point)), Int(before.red(point)) + Self.liftMinimum, "\(point) 그늘이 밝아진다")
+        }
+        let outside = [
+            SyntheticFace.leftEye, SyntheticFace.scleraPoint, SyntheticFace.cheek, SyntheticFace.mouth,
+            SyntheticFace.forehead, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ]
+        for point in outside {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "다크서클 띠 밖 \(point)")
+        }
+        let half = try Support.grid(render(synthetic, skin: SkinAdjustments(darkCircles: 0.5)))
+        XCTAssertGreaterThan(half.red(SyntheticFace.underLeftEye), before.red(SyntheticFace.underLeftEye))
+        XCTAssertLessThan(half.red(SyntheticFace.underLeftEye), after.red(SyntheticFace.underLeftEye), "0.5는 사이")
+    }
+
+    func testNasolabialAndMarionetteLiftTheirOwnFoldOnly() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 7, height: 7)
+        var image = base.image
+        for center in [SyntheticFace.leftNasolabial, SyntheticFace.leftMarionette] {
+            image = darkened(image, at: center, radii: radii, factor: Self.shadowFactor)
+        }
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let nasolabial = try Support.grid(render(synthetic, skin: SkinAdjustments(nasolabial: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(nasolabial.red(SyntheticFace.leftNasolabial)),
+            Int(before.red(SyntheticFace.leftNasolabial)) + Self.liftMinimum, "팔자주름이 밝아진다")
+        XCTAssertEqual(
+            nasolabial.rgba(SyntheticFace.leftMarionette), before.rgba(SyntheticFace.leftMarionette),
+            "팔자 슬라이더는 마리오네트 띠를 건드리지 않는다")
+        let marionette = try Support.grid(render(synthetic, skin: SkinAdjustments(marionette: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(marionette.red(SyntheticFace.leftMarionette)),
+            Int(before.red(SyntheticFace.leftMarionette)) + Self.liftMinimum, "마리오네트 주름이 밝아진다")
+        XCTAssertEqual(
+            marionette.rgba(SyntheticFace.leftNasolabial), before.rgba(SyntheticFace.leftNasolabial),
+            "마리오네트 슬라이더는 팔자 띠를 건드리지 않는다")
+        let outside = [
+            SyntheticFace.mouth, SyntheticFace.lipPoint, SyntheticFace.philtrum, SyntheticFace.leftEye,
+            SyntheticFace.forehead, SyntheticFace.chinTip, SyntheticFace.outside,
+        ]
+        for point in outside {
+            XCTAssertEqual(nasolabial.rgba(point), before.rgba(point), "팔자 띠 밖 \(point)")
+            XCTAssertEqual(marionette.rgba(point), before.rgba(point), "마리오네트 띠 밖 \(point)")
+        }
+    }
+
+    func testGlabellaLiftsBetweenTheBrowsOnly() throws {
+        let base = SyntheticFace.make()
+        let image = darkened(
+            base.image, at: SyntheticFace.glabella, radii: CGSize(width: 8, height: 8), factor: Self.shadowFactor)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(glabella: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.glabella)), Int(before.red(SyntheticFace.glabella)) + Self.liftMinimum)
+        let outside = [
+            SyntheticFace.leftBrowCenter, SyntheticFace.leftEye, SyntheticFace.forehead, SyntheticFace.bridge,
+            SyntheticFace.cheek, SyntheticFace.mouth,
+        ]
+        for point in outside {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "미간 밖 \(point)")
+        }
+    }
+
+    /// 그늘 없는 피부에서 주름 밝히기가 띠 표본 점의 채널마다 바꿔도 되는 최대 바이트. 피부 질감 얼룩의 작은 밝힘만 허용한다.
+    private static let unshadowedFoldTolerance = 3
+
+    func testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast() throws {
+        let synthetic = SyntheticFace.make()
+        let before = try Support.grid(synthetic.image)
+        let cases: [(SkinAdjustments, [CGPoint])] = [
+            (SkinAdjustments(darkCircles: 1), [SyntheticFace.underLeftEye, SyntheticFace.underRightEye]),
+            (SkinAdjustments(nasolabial: 1), [SyntheticFace.leftNasolabial, SyntheticFace.rightNasolabial]),
+            (SkinAdjustments(marionette: 1), [SyntheticFace.leftMarionette, SyntheticFace.rightMarionette]),
+            (SkinAdjustments(glabella: 1), [SyntheticFace.glabella]),
+        ]
+        for (skin, points) in cases {
+            let after = try Support.grid(render(synthetic, skin: skin))
+            for point in points {
+                for channel in 0..<3 {
+                    XCTAssertEqual(
+                        Int(after.rgba(point)[channel]), Int(before.rgba(point)[channel]),
+                        accuracy: Self.unshadowedFoldTolerance, "그늘 없는 \(point) 채널 \(channel)은 밝은 얼룩·색 번짐이 없다")
+                }
+            }
+        }
+    }
+
+    /// 밝힌 그늘의 (R − G) / (R + G)가 바뀌어도 되는 최대값. 세 채널에 같은 값을 더하면 0.05쯤 줄어 회색 쪽으로 간다.
+    private static let liftedChromaTolerance = 0.01
+
+    func testFoldLiftKeepsShadowChroma() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 30, height: 10)
+        var image = darkened(base.image, at: SyntheticFace.underLeftEye, radii: radii, factor: Self.shadowFactor)
+        image = darkened(image, at: SyntheticFace.underRightEye, radii: radii, factor: Self.shadowFactor)
+        let before = try Support.grid(image)
+        let after = try Support.grid(
+            render(SyntheticFace(image: image, face: base.face), skin: SkinAdjustments(darkCircles: 1)))
+        func chroma(_ pixel: [UInt8]) -> Double {
+            (Double(pixel[0]) - Double(pixel[1])) / (Double(pixel[0]) + Double(pixel[1]))
+        }
+        for point in [SyntheticFace.underLeftEye, SyntheticFace.underRightEye] {
+            XCTAssertGreaterThan(after.red(point), before.red(point), "\(point) 그늘이 밝아진다")
+            XCTAssertEqual(
+                chroma(after.rgba(point)), chroma(before.rgba(point)), accuracy: Self.liftedChromaTolerance,
+                "\(point) 밝힌 그늘의 색조·채도가 그대로다")
+        }
+        XCTAssertThrowsError(
+            try SkinKernels.shared.foldLift(
+                image: image, low: image, surround: image, amount: 1, maxGain: Self.darkeningGain,
+                lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
+            "배율 상한이 1보다 작으면 그늘을 어둡게 하므로 렌더 실패")
+    }
+
+    /// 1보다 작은(어둡게 만드는) 배율 상한.
+    private static let darkeningGain = 0.9
+
+    func testMissingLandmarksSkipOnlyThatFold() throws {
+        let base = SyntheticFace.make()
+        let image = darkened(
+            base.image, at: SyntheticFace.glabella, radii: CGSize(width: 8, height: 8), factor: Self.shadowFactor)
+        let shaded = darkened(
+            image, at: SyntheticFace.leftMarionette, radii: CGSize(width: 7, height: 7), factor: Self.shadowFactor)
+        let noNose = SyntheticFace(image: shaded, face: base.face.removing([.nose]))
+        let three = SkinAdjustments(nasolabial: 1, marionette: 1, glabella: 1)
+        let before = try Support.grid(shaded)
+        let after = try Support.grid(render(noNose, skin: three))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.glabella)), Int(before.red(SyntheticFace.glabella)) + Self.liftMinimum,
+            "코가 없어도 미간은 밝힌다")
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(SyntheticFace.leftMarionette)),
+            Int(before.red(SyntheticFace.leftMarionette)) + Self.liftMinimum,
+            "코가 없어도 마리오네트는 밝힌다(방향 고정)")
+        XCTAssertEqual(after.rgba(SyntheticFace.leftNasolabial), before.rgba(SyntheticFace.leftNasolabial), "팔자만 건너뛴다")
+        let boxOnly = SyntheticFace.make(landmarks: false)
+        let folds = SkinAdjustments(darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1)
+        XCTAssertTrue(try Support.bytes(render(boxOnly, skin: folds)) == Support.bytes(boxOnly.image), "특징점 없으면 그대로")
+    }
+
+    /// 번들거림 테스트의 반사광 색. 피부색 가중치(σ 0.04) 안에 들면서 선형 휘도가 피부(0.44)보다 0.28 밝다.
+    private static let glossColor = CIColor(red: 0.98, green: 0.84, blue: 0.74)
+    /// 번들거림을 눌렀을 때 기대하는 최소 빨강 감소(바이트).
+    private static let mattifyMinimum = 15
+
+    func testToneEveningFlattensBlotchesAndKeepsPores() throws {
+        let synthetic = SyntheticFace.make()
+        let output = try render(synthetic, skin: SkinAdjustments(toneEvening: 1))
+        let radii = FrequencySeparation.radii(
+            faceWidth: FaceRegions.faceWidth(synthetic.face, extent: synthetic.image.extent), tuning: RenderTuning())
+        let patch = SyntheticFace.skinPatch
+        let before = try Support.bandVariances(synthetic.image, in: patch, fineRadius: radii.fine, midRadius: radii.mid)
+        let after = try Support.bandVariances(output, in: patch, fineRadius: radii.fine, midRadius: radii.mid)
+        XCTAssertEqual(after.fine / before.fine, 1, accuracy: 0.1, "모공 대역은 ±10% 안")
+        XCTAssertEqual(after.mid / before.mid, 1, accuracy: 0.25, "중간 대역은 피부 보정 0이라 거의 그대로")
+        let lowBefore = Support.variance(
+            try Support.luma(FrequencySeparation.blurred(synthetic.image, radius: radii.mid).cropped(to: patch)))
+        let lowAfter = Support.variance(
+            try Support.luma(FrequencySeparation.blurred(output, radius: radii.mid).cropped(to: patch)))
+        XCTAssertLessThan(lowAfter, lowBefore * 0.5, "저주파 얼룩이 준다")
+        let beforeGrid = try Support.grid(synthetic.image)
+        let afterGrid = try Support.grid(output)
+        for point in [
+            SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ] {
+            XCTAssertEqual(afterGrid.rgba(point), beforeGrid.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
+
+    func testShineMattifiesOnlyBrightSkinSpots() throws {
+        let base = SyntheticFace.make()
+        let gloss = Support.hardEllipse(
+            center: SyntheticFace.forehead, radii: CGSize(width: 12, height: 12), extent: SyntheticFace.extent)
+        let image = CIImage(color: Self.glossColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: gloss]
+        ).cropped(to: SyntheticFace.extent)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(shine: 1)))
+        XCTAssertLessThanOrEqual(
+            Int(after.red(SyntheticFace.forehead)), Int(before.red(SyntheticFace.forehead)) - Self.mattifyMinimum,
+            "반사광이 눌린다")
+        for point in [SyntheticFace.cheek, CGPoint(x: 180, y: 220)] {
+            let expected = before.rgba(point)
+            let actual = after.rgba(point)
+            for channel in 0..<3 {
+                XCTAssertEqual(Int(actual[channel]), Int(expected[channel]), accuracy: 1, "보통 피부 \(point)는 거의 그대로")
+            }
+        }
+        for point in [SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.outside] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
+
+    func testSmoothingOnlyUsesTheLegacyBandMixPath() throws {
+        let synthetic = SyntheticFace.make()
+        let extent = synthetic.image.extent
+        let tuning = RenderTuning()
+        let faceWidth = FaceRegions.faceWidth(synthetic.face, extent: extent)
+        let bounds = FaceRegions.maskBounds(face: synthetic.face, extent: extent, tuning: tuning)
+        let mask = try FaceRegions.skinMask(
+            face: synthetic.face, image: synthetic.image, extent: extent, tuning: tuning)
+        let reference = try XCTUnwrap(
+            SkinStage.cheekReference(of: synthetic.image, face: synthetic.face, extent: extent))
+        let legacy = try FrequencySeparation.smoothed(
+            synthetic.image, bounds: bounds, faceWidth: faceWidth, smoothing: 0.7, tuning: tuning)
+        let refined = try FrequencySeparation.refined(
+            synthetic.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference, smoothing: 0.7,
+            toneEvening: 0, shine: 0, tuning: tuning)
+        XCTAssertTrue(try Support.bytes(refined) == Support.bytes(legacy), "얼룩·번들거림 0이면 기존 경로와 같은 바이트")
+        let combined = try render(synthetic, skin: SkinAdjustments(smoothing: 0.7, toneEvening: 0.5))
+        XCTAssertFalse(
+            try Support.bytes(combined) == Support.bytes(render(synthetic, skin: SkinAdjustments(smoothing: 0.7))))
+    }
+
+    /// 붉은기 테스트의 반점 색. 피부보다 감마 Cr이 0.037 높고 피부색 가중치 안이다.
+    private static let blotchColor = CIColor(red: 0.84, green: 0.58, blue: 0.52)
+    /// 오른볼 위 반점 자리. 잡티·특징·분산 측정 패치에서 떨어져 있다.
+    private static let blotchPoint = CGPoint(x: 320, y: 210)
+
+    func testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly() throws {
+        let base = SyntheticFace.make()
+        let blotch = Support.hardEllipse(
+            center: Self.blotchPoint, radii: CGSize(width: 10, height: 10), extent: SyntheticFace.extent)
+        let image = CIImage(color: Self.blotchColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: blotch]
+        ).cropped(to: SyntheticFace.extent)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        func gap(_ pixel: [UInt8]) -> Int { Int(pixel[0]) - Int(pixel[1]) }
+        let before = try Support.grid(image)
+        let clear = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: -1)))
+        XCTAssertLessThanOrEqual(
+            gap(clear.rgba(Self.blotchPoint)), gap(before.rgba(Self.blotchPoint)) - 10, "반점의 붉은기가 준다")
+        for channel in 0..<3 {
+            XCTAssertEqual(
+                Int(clear.rgba(SyntheticFace.cheek)[channel]), Int(before.rgba(SyntheticFace.cheek)[channel]),
+                accuracy: 2, "기준보다 붉지 않은 피부는 거의 그대로")
+        }
+        let flush = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: 1)))
+        for point in [SyntheticFace.cheek, Self.blotchPoint, SyntheticFace.forehead] {
+            XCTAssertGreaterThanOrEqual(gap(flush.rgba(point)), gap(before.rgba(point)) + 5, "혈색은 피부 전체에 고르게 \(point)")
+        }
+        for point in [
+            SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ] {
+            XCTAssertEqual(clear.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+            XCTAssertEqual(flush.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
+
+    func testZeroRefinementsAreIdentityAndOutOfRangeValuesRenderClamped() throws {
+        let synthetic = SyntheticFace.make()
+        let input = try Support.bytes(synthetic.image)
+        XCTAssertTrue(try Support.bytes(render(synthetic, skin: SkinAdjustments())) == input)
+        XCTAssertTrue(try Support.bytes(render(synthetic, skin: SkinAdjustments(shine: -1))) == input, "음수는 0")
+        let outOfRange = SkinAdjustments(darkCircles: 3, marionette: 2, toneEvening: 2, redness: -5)
+        let inRange = SkinAdjustments(darkCircles: 1, marionette: 1, toneEvening: 1, redness: -1)
+        XCTAssertTrue(
+            try Support.bytes(render(synthetic, skin: outOfRange)) == Support.bytes(render(synthetic, skin: inRange)),
+            "범위 밖 값은 자른 값과 같은 바이트")
+        XCTAssertEqual(
+            SkinStage.clamped(SkinAdjustments(smoothing: 4, marionette: -2, glabella: -1, redness: 2)),
+            SkinAdjustments(smoothing: 1, redness: 1))
+    }
+
+    func testBoxOnlyFaceSkipsFoldsButStillEvensTone() throws {
+        let boxOnly = SyntheticFace.make(landmarks: false)
+        let input = try Support.bytes(boxOnly.image)
+        let folds = SkinAdjustments(darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1)
+        XCTAssertTrue(try Support.bytes(render(boxOnly, skin: folds)) == input, "주름 띠는 특징점이 없으면 빠진다")
+        let before = try Support.grid(boxOnly.image)
+        let evened = try Support.grid(render(boxOnly, skin: SkinAdjustments(toneEvening: 1, redness: 1)))
+        XCTAssertNotEqual(evened.rgba(SyntheticFace.cheek), before.rgba(SyntheticFace.cheek), "대체 타원 마스크로 동작")
+        XCTAssertEqual(evened.rgba(SyntheticFace.outside), before.rgba(SyntheticFace.outside))
+    }
+
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. 비트맵으로 굳혀 마스크 밖 바이트를 그대로 비교한다.
+    func testTargetFaceRefinesOnlyThatFace() throws {
+        let synthetic = SyntheticFace.make()
+        let side = CGFloat(SyntheticFace.size)
+        let half = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        let left = synthetic.image.transformed(by: half.concatenating(CGAffineTransform(translationX: 0, y: side / 4)))
+        let right = synthetic.image.transformed(
+            by: half.concatenating(CGAffineTransform(translationX: side / 2, y: side / 4)))
+        let composed = left.composited(over: right).composited(over: CIImage(color: .gray))
+            .cropped(to: SyntheticFace.extent)
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(composed))
+        let faces = [
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25)),
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25)),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.skin = SkinAdjustments(
+            darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: 1, shine: 1)
+        recipe.portrait.targetFace = 0
+        let context = RenderContext(extent: image.extent, recipe: recipe, faces: faces, tuning: RenderTuning())
+        let before = try Support.grid(image)
+        let after = try Support.grid(SkinStage().apply(image, in: context))
+        var leftChanged = 0
+        var rightChanged = 0
+        for y in 0..<SyntheticFace.size {
+            for x in 0..<SyntheticFace.size {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if x < SyntheticFace.size / 2 {
+                    leftChanged += 1
+                } else {
+                    rightChanged += 1
+                }
+            }
+        }
+        XCTAssertGreaterThan(leftChanged, 0, "고른 얼굴은 보정된다")
+        XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
+    }
+
+    func testRefinementsReuseTheSkinRasterAndAddNoCacheEntries() throws {
+        let synthetic = SyntheticFace.make()
+        var recipe = EditRecipe()
+        recipe.portrait.skin = SkinAdjustments(
+            smoothing: 0.5, darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: -1,
+            shine: 1)
+        let analysis = PhotoAnalysis(faces: [synthetic.face])
+        let context = RenderContext(
+            extent: synthetic.image.extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
+        let first = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        XCTAssertEqual(analysis.regionMasks.count, 1, "주름 띠·대역 합성·붉은기 모두 피부 다각형 비트맵 하나를 쓴다")
+        XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
     }
 }

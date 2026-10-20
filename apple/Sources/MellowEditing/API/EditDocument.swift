@@ -51,6 +51,8 @@ public struct EditDocument: Equatable, Sendable {
         case .skinSmoothing(let value):
             updated.portrait.skin.smoothing = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .autoBlemish(let flag): updated.portrait.skin.autoBlemish = flag
+        case .skinRefinement(let key, let value):
+            updated.portrait.skin[key] = EditingPolicy.clamped(value, to: EditingPolicy.skinRefinementRange(key))
         case .faceShape(let key, let value):
             updated.portrait.face[key] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(key))
         case .targetFace(let index): updated.portrait.targetFace = index
@@ -58,6 +60,8 @@ public struct EditDocument: Equatable, Sendable {
             updated.portrait.features[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .backgroundBlur(let value):
             updated.background.blur = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .bodySkin(let key, let value):
+            updated.bodySkin[key] = EditingPolicy.clamped(value, to: EditingPolicy.bodySkinRange(key))
         case .bodyShape(let key, let value):
             updated.body[key] = EditingPolicy.clamped(value, to: EditingPolicy.bodyShapeRange(key))
         case .makeupColor(let part, let id):
@@ -76,6 +80,8 @@ public struct EditDocument: Equatable, Sendable {
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value
         case .vignette(let value): updated.detail.vignette = value
+        case .effect(let key, let value):
+            updated.effects[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .lookID(let id): updated.look.id = id
         case .lookIntensity(let value): updated.look.intensity = value
         // 회전·반전은 자르기 영역을 이미지와 함께 옮긴다.
@@ -101,27 +107,37 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
-    /// 잠긴 사진은 얼굴형·체형도 유지한다.
+    /// 잠긴 사진은 얼굴형·체형도 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
     public mutating func apply(_ values: PresetValues) {
+        let updated = merged(values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all)
+        guard updated != recipe else { return }
         checkpoint()
-        recipe = merged(values, targetFace: recipe.portrait.targetFace)
+        recipe = updated
     }
 
-    /// 다른 사진의 설정을 일괄 복사. 잠기지 않은 사진은 대상 얼굴을 전체로 되돌린다.
-    public mutating func applyFromBatch(_ values: PresetValues) {
+    /// 다른 사진의 설정을 일괄 복사. 고른 항목만 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
+    /// 잠기지 않은 사진은 얼굴 의존 항목을 복사할 때만 대상 얼굴을 전체로 되돌린다.
+    /// 바뀌는 값이 없으면(잠긴 사진에 얼굴형만 복사하는 경우 등) 실행 취소 단계를 만들지 않는다.
+    public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
+        guard !categories.isEmpty else { return }
+        let resetsTarget = !isGeometryLocked && categories.contains { $0.dependsOnFaces }
+        let updated = merged(
+            values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories)
+        guard updated != recipe else { return }
         checkpoint()
-        recipe = merged(values, targetFace: isGeometryLocked ? recipe.portrait.targetFace : nil)
+        recipe = updated
     }
 
-    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부·눈 또렷하게만 바꾸고
-    /// 치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·메이크업·룩·기하·수동 편집은 건드리지 않는다.
+    /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
+    /// 피부 정밀·치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         var updated = recipe
         updated.color = suggestion.color
         updated.detail = suggestion.detail
-        updated.portrait.skin = suggestion.portrait.skin
+        updated.portrait.skin.smoothing = suggestion.portrait.skin.smoothing
+        updated.portrait.skin.autoBlemish = suggestion.portrait.skin.autoBlemish
         updated.portrait.features.eyeBrighten = suggestion.portrait.features.eyeBrighten
         guard updated != recipe else { return false }
         checkpoint()
@@ -138,20 +154,38 @@ public struct EditDocument: Equatable, Sendable {
         recipe.makeup = makeup
     }
 
-    /// 슬라이더 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 둔다.
-    private func merged(_ values: PresetValues, targetFace: Int?) -> EditRecipe {
+    /// 고른 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
+    private func merged(_ values: PresetValues, targetFace: Int?, categories: Set<SyncCategory>) -> EditRecipe {
         var updated = recipe
-        updated.color = values.color
-        updated.detail = values.detail
-        updated.portrait = values.portrait
-        updated.portrait.targetFace = targetFace
-        updated.background = values.background
-        updated.body = values.body
-        updated.makeup = values.makeup
-        if isGeometryLocked {
-            updated.portrait.face = recipe.portrait.face
-            updated.body = recipe.body
+        if categories.contains(.color) {
+            updated.color = values.color
+            updated.detail = values.detail
         }
+        if categories.contains(.effects) {
+            updated.effects = values.effects
+        }
+        if categories.contains(.skin) {
+            updated.portrait.skin = values.portrait.skin
+        }
+        if categories.contains(.faceShape), !isGeometryLocked {
+            updated.portrait.face = values.portrait.face
+        }
+        if categories.contains(.features) {
+            updated.portrait.features = values.portrait.features
+        }
+        if categories.contains(.makeup) {
+            updated.makeup = values.makeup
+        }
+        if categories.contains(.background) {
+            updated.background = values.background
+        }
+        if categories.contains(.body), !isGeometryLocked {
+            updated.body = values.body
+        }
+        if categories.contains(.bodySkin) {
+            updated.bodySkin = values.bodySkin
+        }
+        updated.portrait.targetFace = targetFace
         return updated
     }
 

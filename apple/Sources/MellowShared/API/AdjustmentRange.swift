@@ -19,6 +19,16 @@ public enum AdjustmentRange {
         key == .legLength ? unit : bipolar
     }
 
+    /// 붉은기(맑게 ↔ 혈색)만 양방향이다.
+    public static func skinRefinement(_ key: SkinRefinementKey) -> ClosedRange<Double> {
+        key == .redness ? bipolar : unit
+    }
+
+    /// 피부 톤(따뜻 ↔ 차가움)만 양방향이다.
+    public static func bodySkin(_ key: BodySkinKey) -> ClosedRange<Double> {
+        key == .tone ? bipolar : unit
+    }
+
     /// NaN은 범위의 아래 끝이 된다.
     public static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
         min(range.upperBound, max(range.lowerBound, value))

@@ -37,6 +37,8 @@ struct ToneShift: Equatable {
     var saturation: Double = 1
     /// Cr에 더하는 값.
     var redness: Double = 0
+    /// Cb에 더하는 값(양수면 차갑게).
+    var blueness: Double = 0
 }
 
 /// 눈·입 보정의 CIKL 색 커널을 감싸는 유일한 자리. SkinKernels처럼 Metal로 바꿀 때 이 타입만 바꾼다.
@@ -65,12 +67,12 @@ final class FeatureKernels: @unchecked Sendable {
         toneShift = CIColorKernel(
             source: """
                 kernel vec4 toneShift(__sample pixel, float lift, float yellowRemoval, float saturation,
-                                      float redness) {
+                                      float redness, float blueness) {
                     vec3 rgb = pixel.rgb;
                     float y = dot(rgb, vec3(0.299, 0.587, 0.114));
                     float cb = dot(rgb, vec3(-0.168736, -0.331264, 0.5));
                     float cr = dot(rgb, vec3(0.5, -0.418688, -0.081312));
-                    cb = (cb - min(cb, 0.0) * yellowRemoval) * saturation;
+                    cb = (cb - min(cb, 0.0) * yellowRemoval) * saturation + blueness;
                     cr = cr * saturation + redness;
                     vec3 shifted = vec3(y + 1.402 * cr, y - 0.344136 * cb - 0.714136 * cr, y + 1.772 * cb);
                     return vec4(clamp(mix(shifted, vec3(1.0), lift), 0.0, 1.0), pixel.a);
@@ -95,7 +97,9 @@ final class FeatureKernels: @unchecked Sendable {
     func shifted(_ image: CIImage, by shift: ToneShift, extent: CGRect) throws -> CIImage {
         guard let toneShift else { throw MellowError.renderFailed }
         let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
-        let arguments: [Any] = [encoded, shift.lift, shift.yellowRemoval, shift.saturation, shift.redness]
+        let arguments: [Any] = [
+            encoded, shift.lift, shift.yellowRemoval, shift.saturation, shift.redness, shift.blueness,
+        ]
         guard let output = toneShift.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return output.applyingFilter("CISRGBToneCurveToLinear")
     }
