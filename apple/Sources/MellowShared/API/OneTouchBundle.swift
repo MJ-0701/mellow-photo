@@ -80,7 +80,7 @@ public enum OneTouchBundle {
             blushColorID: nil)
         /// 사진 단위 몸 피부 밝기.
         /// 전체 대상에서만 쓴다.
-        public static let bodyBrightness = 0.2
+        public static let bodyBrightness = 0.15
         /// 사진 단위 몸 피부 톤.
         /// 전체 대상에서만 쓴다.
         public static let bodyTone = 0.0

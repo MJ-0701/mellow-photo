@@ -736,6 +736,29 @@ enum DisplayScale {
         return Double(changed.count) / Double(all.count)
     }
 
+    /// weight(회색 마스크)가 절반을 넘는 픽셀 중 바뀐 비율.
+    /// 그런 픽셀이 없으면 0이다(호출자가 maskedPixelCount로 빈 마스크를 먼저 막는다).
+    static func changedFraction(
+        _ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid, minimumDelta: Int = defaultMinimumDelta
+    ) -> Double {
+        let inside = points(before, in: nil).filter { weight.red($0) > maskHalf }
+        guard !inside.isEmpty else { return 0 }
+        let changed = inside.filter { point in
+            let a = before.rgba(point)
+            let b = after.rgba(point)
+            return (0..<3).contains { abs(Int(a[$0]) - Int(b[$0])) >= minimumDelta }
+        }
+        return Double(changed.count) / Double(inside.count)
+    }
+
+    /// weight가 절반을 넘는 픽셀 수.
+    static func maskedPixelCount(_ weight: PixelGrid) -> Int {
+        points(weight, in: nil).filter { weight.red($0) > maskHalf }.count
+    }
+
+    /// 8비트 마스크의 절반.
+    private static let maskHalf: UInt8 = 127
+
     /// 가중 평균 ΔY와 평균 |ΔY|(8비트).
     /// weight가 nil이면 전체 평균.
     static func lumaDelta(_ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid?) -> (
@@ -930,6 +953,48 @@ final class RealPortrait: @unchecked Sendable {
         return try DisplayScale.grid(region.image.cropped(to: extent))
     }
 
+    /// 얼굴 다각형(이마 호 포함)을 얼굴 폭 dilationFraction만큼 넓힌 영역 밖에서 바뀐 비율(화면 배율).
+    /// 머리카락·배경 불변 검사다(스펙 G4 1.4).
+    /// excluding(회색 마스크, 화면 배율)가 0이 아닌 픽셀도 뺀다.
+    /// 몸 피부가 켜진 원터치는 몸 피부 영역을 빼고 잰다(스펙 G4 1.4 "사람 영역 밖").
+    func outsideFaceChangedFraction(
+        before: PixelGrid, after: PixelGrid, dilationFraction: CGFloat, excluding: PixelGrid? = nil
+    ) -> Double {
+        let polygon = FaceRegions.skinPolygon(face: face, extent: extent, tuning: tuning)
+        let inside = FaceRegions.containment(polygons: [polygon], dilation: faceWidth * dilationFraction)
+        let scale = extent.width / DisplayScale.phoneWidth
+        var changed = 0
+        var total = 0
+        for y in 0..<before.height {
+            for x in 0..<before.width {
+                guard !inside(CGPoint(x: CGFloat(x) * scale, y: CGFloat(y) * scale)) else { continue }
+                let point = CGPoint(x: x, y: y)
+                if let excluding, excluding.red(point) > 0 {
+                    continue
+                }
+                total += 1
+                let a = before.rgba(point)
+                let b = after.rgba(point)
+                if (0..<3).contains(where: { abs(Int(a[$0]) - Int(b[$0])) >= DisplayScale.defaultMinimumDelta }) {
+                    changed += 1
+                }
+            }
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// 두 눈썹 다각형 마스크(화면 배율).
+    /// 눈썹 특징점이 없으면 실패한다.
+    func browMask() throws -> PixelGrid {
+        let brows = [FaceLandmark.leftEyebrow, .rightEyebrow].compactMap {
+            FaceRegions.landmarkPolygon(face, $0, extent)
+        }
+        guard !brows.isEmpty else { throw MellowError.renderFailed }
+        return try mask(
+            FaceRegions.featheredPolygonMask(
+                fill: brows, cut: [], face: face, extent: extent, tuning: tuning, cache: nil))
+    }
+
     func skinMask(strength: Double = 1) throws -> CIImage {
         try FaceRegions.skinMask(face: face, image: image, extent: extent, tuning: tuning, strength: strength)
     }
@@ -1024,6 +1089,28 @@ enum PeopleFixtures {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("shared/fixtures/people")
+    }
+}
+
+/// 생성 커플 사진(couple-01.jpg)과 실제 Vision 얼굴, 라벨 성별(왼쪽부터).
+/// 한 번만 준비해 나눠 쓴다.
+final class RealPeople: @unchecked Sendable {
+    /// 준비 결과.
+    /// 실패는 테스트마다 get()에서 오류로 나온다(RealPortrait와 같은 이유).
+    static let couple = Result { try RealPeople(file: "couple-01.jpg") }
+
+    let image: CIImage
+    let extent: CGRect
+    let faces: [FaceGeometry]
+    let labels: [Gender]
+    let tuning = RenderTuning()
+
+    private init(file: String) throws {
+        image = try ImageLoader().load(url: try PeopleFixtures.url(file), maxDimension: tuning.previewMaxDimension)
+        extent = image.extent
+        faces = try VisionFaceAnalyzer().analyze(image)
+        let photo = try PeopleFixtures.labels().photos.first { $0.file == file }
+        labels = (photo?.people ?? []).compactMap { Gender(rawValue: $0.gender) }
     }
 }
 
