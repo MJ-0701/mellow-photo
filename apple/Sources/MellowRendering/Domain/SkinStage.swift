@@ -32,7 +32,7 @@ struct SkinStage: RenderStage {
         return copy
     }
 
-    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림). 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림) → 붉은기. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
     private func refine(_ image: CIImage, face: FaceGeometry, skin: SkinAdjustments, context: RenderContext) throws
         -> CIImage
     {
@@ -47,17 +47,30 @@ struct SkinStage: RenderStage {
             result = try SkinRefinement.liftFold(
                 result, region: fold.region, faceWidth: faceWidth, amount: fold.amount, tuning: tuning, extent: extent)
         }
-        guard skin.smoothing > 0 || skin.toneEvening > 0 || skin.shine > 0 else { return result }
+        let bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.shine > 0
+        guard bandMix || skin.redness != 0 else { return result }
         let unitMask = try FaceRegions.skinMask(
             face: face, image: result, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)
         let blendMask = MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)
-        // 볼 상자가 없으면 번들거림의 기준이 없어 번들거림만 건너뛴다.
-        let reference = Self.cheekReference(of: result, face: face, extent: extent)
-        let smooth = try FrequencySeparation.refined(
-            result, bounds: bounds, faceWidth: faceWidth, mask: unitMask, reference: reference ?? Self.noReference,
-            smoothing: skin.smoothing, toneEvening: skin.toneEvening, shine: reference == nil ? 0 : skin.shine,
-            tuning: tuning)
-        return MaskBuilder.blend(smooth, over: result, mask: blendMask).cropped(to: extent)
+        if bandMix {
+            // 볼 상자가 없으면 번들거림의 기준이 없어 번들거림만 건너뛴다.
+            let reference = Self.cheekReference(of: result, face: face, extent: extent)
+            let smooth = try FrequencySeparation.refined(
+                result, bounds: bounds, faceWidth: faceWidth, mask: unitMask, reference: reference ?? Self.noReference,
+                smoothing: skin.smoothing, toneEvening: skin.toneEvening, shine: reference == nil ? 0 : skin.shine,
+                tuning: tuning)
+            result = MaskBuilder.blend(smooth, over: result, mask: blendMask).cropped(to: extent)
+        }
+        // 볼 상자가 없으면 붉은기의 기준이 없어 붉은기는 건너뛴다.
+        if skin.redness != 0,
+            let encodedReference = Self.cheekReference(
+                of: result.applyingFilter("CILinearToSRGBToneCurve"), face: face, extent: extent)
+        {
+            result = try SkinRefinement.adjustRedness(
+                result, mask: blendMask, bounds: bounds, reference: encodedReference, value: skin.redness,
+                tuning: tuning, extent: extent)
+        }
+        return result
     }
 
     /// 기준이 없을 때 커널에 넘기는 자리 채움(쓰이지 않는다).

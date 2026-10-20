@@ -405,4 +405,39 @@ final class SkinStageTests: XCTestCase {
         XCTAssertFalse(
             try Support.bytes(combined) == Support.bytes(render(synthetic, skin: SkinAdjustments(smoothing: 0.7))))
     }
+
+    /// 붉은기 테스트의 반점 색. 피부보다 감마 Cr이 0.037 높고 피부색 가중치 안이다.
+    private static let blotchColor = CIColor(red: 0.84, green: 0.58, blue: 0.52)
+    /// 오른볼 위 반점 자리. 잡티·특징·분산 측정 패치에서 떨어져 있다.
+    private static let blotchPoint = CGPoint(x: 320, y: 210)
+
+    func testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly() throws {
+        let base = SyntheticFace.make()
+        let blotch = Support.hardEllipse(
+            center: Self.blotchPoint, radii: CGSize(width: 10, height: 10), extent: SyntheticFace.extent)
+        let image = CIImage(color: Self.blotchColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: blotch]
+        ).cropped(to: SyntheticFace.extent)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        func gap(_ pixel: [UInt8]) -> Int { Int(pixel[0]) - Int(pixel[1]) }
+        let before = try Support.grid(image)
+        let clear = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: -1)))
+        XCTAssertLessThanOrEqual(
+            gap(clear.rgba(Self.blotchPoint)), gap(before.rgba(Self.blotchPoint)) - 10, "반점의 붉은기가 준다")
+        for channel in 0..<3 {
+            XCTAssertEqual(
+                Int(clear.rgba(SyntheticFace.cheek)[channel]), Int(before.rgba(SyntheticFace.cheek)[channel]),
+                accuracy: 2, "기준보다 붉지 않은 피부는 거의 그대로")
+        }
+        let flush = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: 1)))
+        for point in [SyntheticFace.cheek, Self.blotchPoint, SyntheticFace.forehead] {
+            XCTAssertGreaterThanOrEqual(gap(flush.rgba(point)), gap(before.rgba(point)) + 5, "혈색은 피부 전체에 고르게 \(point)")
+        }
+        for point in [
+            SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ] {
+            XCTAssertEqual(clear.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+            XCTAssertEqual(flush.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
 }

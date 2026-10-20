@@ -63,6 +63,10 @@ public struct RenderTuning: Sendable {
     public var shineLumaRamp: Double = 0.1
     /// 번들거림 1에서 반사광의 저주파를 넓은 평균 쪽으로 당기고 중간 대역을 줄이는 비율. 모공 대역은 그대로다.
     public var shineReductionMax: Double = 0.85
+    /// 붉은기 −1에서 볼 기준 Cr을 넘는 붉은 양을 줄이는 비율.
+    public var rednessClearMax: Double = 0.7
+    /// 붉은기 +1에서 감마 Cr에 고르게 더하는 값. 입술 생기(0.02)보다 조금 크다.
+    public var rednessFlushMax: Double = 0.03
 
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25
