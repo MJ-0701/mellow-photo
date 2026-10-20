@@ -398,10 +398,10 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
         individuals.first { $0.id == id }
     }
 
-    /// anchor와 같은 사람의 기록.
-    /// Task 4가 PersonMatcher.isMatch로 바꾼다.
+    /// anchor와 같은 사람의 기록(PersonMatcher.isMatch).
+    /// anchor 없는 기록은 찾지 못한다.
     public func personID(at anchor: PersonAnchor) -> PersonID? {
-        individuals.first { $0.anchor.map { $0.isNear(anchor) } ?? false }?.id
+        individuals.first { record in record.anchor.map { PersonMatcher.isMatch($0, anchor) } ?? false }?.id
     }
 
     /// 빈 기록을 지운다.
@@ -457,16 +457,5 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
         if !individuals.isEmpty {
             try container.encode(individuals, forKey: .individuals)
         }
-    }
-}
-
-extension PersonAnchor {
-    /// Task 4의 PersonMatcher.isMatch와 같은 조건.
-    /// Task 4가 이 확장을 지우고 그 함수를 부른다.
-    fileprivate func isNear(_ other: PersonAnchor) -> Bool {
-        let larger = max(width, other.width)
-        let smaller = min(width, other.width)
-        guard smaller > 0, larger / smaller <= 2 else { return false }
-        return hypot(x - other.x, y - other.y) / larger <= 0.5
     }
 }
