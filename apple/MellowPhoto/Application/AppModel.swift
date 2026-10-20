@@ -181,6 +181,10 @@ final class AppModel {
     var canAdjustBackgroundBlur: Bool {
         isSliderEditActive || backgroundAvailability == .ready || currentRecipe.background.blur != 0
     }
+    /// 피부톤 슬라이더를 움직일 수 있는지. 배경 흐림과 같은 인물 마스크 규칙이다(드래그 중·사람 있음·0이 아닌 값).
+    func canAdjustBodySkin(_ key: BodySkinKey) -> Bool {
+        isSliderEditActive || backgroundAvailability == .ready || currentRecipe.bodySkin[key] != 0
+    }
     /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
     /// 드래그 중에는 0을 지나도 끄지 않는다.
     func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {

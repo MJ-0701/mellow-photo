@@ -202,6 +202,15 @@ final class EditorScenarioTests: XCTestCase {
         try await waitUntil { !model.isRendering && self.previewBytes(model) != skinned }
         let refined = previewBytes(model)
 
+        model.beautyTab = .skinTone
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness))
+        model.beginSliderEdit()
+        model.edit(.bodySkin(.brightness, 0.6))
+        model.endSliderEdit()
+        // 몸 피부 밝기만 바꿔도 미리보기가 바뀌어야 한다(스텁 인물 마스크가 얼굴을 덮는다).
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != refined }
+        let toned = previewBytes(model)
+
         model.beautyTab = .face
         let faceEdits: [(FaceShapeKey, Double)] = [(.width, -0.5), (.eyeSize, 0.3), (.smile, 0.4)]
         for (key, value) in faceEdits {
@@ -210,7 +219,7 @@ final class EditorScenarioTests: XCTestCase {
             model.endSliderEdit()
         }
         // 얼굴형만 바꿔도 미리보기가 바뀌어야 한다(바뀌지 않으면 시간 초과로 실패).
-        try await waitUntil { !model.isRendering && self.previewBytes(model) != refined }
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != toned }
 
         model.beautyTab = .features
         model.beginSliderEdit()
@@ -248,6 +257,7 @@ final class EditorScenarioTests: XCTestCase {
             SkinAdjustments(smoothing: 0.5, autoBlemish: true, darkCircles: 0.6, toneEvening: 0.5))
         XCTAssertEqual(recipe.portrait.face, FaceShapeAdjustments(width: -0.5, eyeSize: 0.3, smile: 0.4))
         XCTAssertEqual(recipe.portrait.features, FeatureAdjustments(eyeBrighten: 0.5))
+        XCTAssertEqual(recipe.bodySkin, BodySkinAdjustments(brightness: 0.6))
         XCTAssertEqual(recipe.background.blur, 0.5, accuracy: 1e-9)
         XCTAssertEqual(recipe.body, BodyShapeAdjustments(legLength: 0.5))
         XCTAssertEqual(recipe.makeup, try XCTUnwrap(model.makeupCatalog.look(id: "daily")).adjustments)

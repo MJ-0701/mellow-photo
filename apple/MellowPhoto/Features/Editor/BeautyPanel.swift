@@ -42,6 +42,7 @@ struct BeautyPanel: View {
             case .skin: skinControls(recipe.portrait.skin)
             case .face: faceControls(recipe.portrait.face)
             case .features: featureControls(recipe.portrait.features)
+            case .skinTone: skinToneControls(recipe.bodySkin)
             }
         }
     }
@@ -93,5 +94,29 @@ struct BeautyPanel: View {
             ) { .feature(key, $0) }
         }
         Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
+    }
+
+    /// 보이는 피부 전체의 밝기·톤·매끄럽게. 사람이 없으면 안내를 보이고 슬라이더는 배경 흐림과 같은 규칙으로 끈다.
+    @ViewBuilder
+    private func skinToneControls(_ bodySkin: BodySkinAdjustments) -> some View {
+        switch model.backgroundAvailability {
+        case .ready:
+            EmptyView()
+        case .noPerson:
+            Label(UserMessage.noPersonDetected, systemImage: "person.crop.rectangle.badge.questionmark")
+            Text(UserMessage.bodySkinNoPersonHint).font(.caption).foregroundStyle(.secondary)
+        case .unavailable(let failure):
+            Label(UserMessage.personAnalysisUnavailableTitle, systemImage: "exclamationmark.triangle")
+            Text(UserMessage.text(for: failure)).font(.caption).foregroundStyle(.secondary)
+        }
+        ForEach(BodySkinKey.allCases, id: \.self) { key in
+            let range = EditingPolicy.bodySkinRange(key)
+            AdjustmentSlider(
+                title: UserMessage.bodySkinTitle(key), value: bodySkin[key], range: range,
+                snapsToZero: range.lowerBound < 0
+            ) { .bodySkin(key, $0) }
+            .disabled(!model.canAdjustBodySkin(key))
+        }
+        Text(UserMessage.bodySkinHint).font(.caption).foregroundStyle(.secondary)
     }
 }

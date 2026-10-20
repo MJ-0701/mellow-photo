@@ -45,6 +45,10 @@ enum UserMessage {
     static let beautyTabSkin = "피부"
     static let beautyTabFace = "얼굴"
     static let beautyTabFeatures = "눈·입"
+    static let beautyTabSkinTone = "피부톤"
+    static let bodySkinHint =
+        "얼굴·목·팔처럼 보이는 피부 전체에 적용돼요. 기준 피부색은 가장 큰 얼굴의 볼에서 읽고, 옷과 배경은 그대로 둬요. 피부 톤은 가운데가 원래 색이에요."
+    static let bodySkinNoPersonHint = "피부 밝기·톤·바디 매끄럽게는 사람 영역을 찾은 사진에서 동작해요."
     static let beautyTabsLabel = "뷰티 항목"
     static let skinSmoothing = "피부 보정"
     static let autoBlemish = "자동 잡티"
@@ -141,6 +145,15 @@ enum UserMessage {
         case .eyeBrighten: return "눈 또렷하게"
         case .teethWhiten: return "치아 미백"
         case .lipVitality: return "입술 생기"
+        }
+    }
+
+    /// 뷰티 › 피부톤 탭 슬라이더 이름. 화면 순서는 BodySkinKey.allCases.
+    static func bodySkinTitle(_ key: BodySkinKey) -> String {
+        switch key {
+        case .brightness: return "피부 밝기"
+        case .tone: return "피부 톤"
+        case .smoothing: return "바디 피부 매끄럽게"
         }
     }
 

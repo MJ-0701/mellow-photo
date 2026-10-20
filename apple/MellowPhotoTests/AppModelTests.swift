@@ -587,7 +587,7 @@ final class AppModelTests: XCTestCase {
         let model = TestSupport.makeModel(
             root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
-        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features])
+        XCTAssertEqual(BeautyTab.allCases, [.skin, .face, .features, .skinTone])
         XCTAssertEqual(BeautyTab.features.title, "눈·입")
         model.tool = .retouch
         model.touch(from: NormalizedPoint(x: 0.3, y: 0.3), to: NormalizedPoint(x: 0.3, y: 0.3))
@@ -609,6 +609,60 @@ final class AppModelTests: XCTestCase {
         model.undo()
         XCTAssertEqual(model.currentRecipe.portrait.features.lipVitality, 0, "실행 취소 한 번에 마지막 슬라이더만")
         XCTAssertEqual(model.currentRecipe.portrait.features.teethWhiten, 0.6, accuracy: 1e-9)
+    }
+
+    func testSkinToneTabEditsEveryKeyOneUndoStepEachWhenPersonFound() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.3, width: 0.6, height: 0.6))
+        let mask = TestSupport.personMask(NormalizedRect(x: 0.1, y: 0, width: 0.8, height: 0.95))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .success(mask)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.beauty)
+        model.beautyTab = .skinTone
+        XCTAssertEqual(BeautyTab.allCases.count, 4)
+        XCTAssertEqual(BeautyTab.skinTone.title, "피부톤")
+        XCTAssertEqual(model.backgroundAvailability, .ready)
+        for key in BodySkinKey.allCases {
+            XCTAssertTrue(model.canAdjustBodySkin(key), "\(key)")
+        }
+        for (offset, key) in BodySkinKey.allCases.enumerated() {
+            model.beginSliderEdit()
+            model.edit(.bodySkin(key, 0.2))
+            model.edit(.bodySkin(key, key == .tone ? -0.4 : 0.7))
+            model.endSliderEdit()
+            XCTAssertEqual(model.session.selected?.document.undoStack.count, offset + 1, "\(key) 드래그 한 번이 한 단계")
+        }
+        XCTAssertEqual(model.currentRecipe.bodySkin, BodySkinAdjustments(brightness: 0.7, tone: -0.4, smoothing: 0.7))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(BodySkinKey.allCases.map(UserMessage.bodySkinTitle), ["피부 밝기", "피부 톤", "바디 피부 매끄럽게"])
+        model.selectTool(.adjust)
+        model.selectTool(.beauty)
+        XCTAssertEqual(model.beautyTab, .skinTone, "탭은 도구를 바꿔도 유지")
+    }
+
+    func testSkinToneSlidersFollowPersonAvailabilityAndPresetValues() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.backgroundAvailability, .noPerson)
+        XCTAssertFalse(model.canAdjustBodySkin(.brightness), "사람이 없으면 끈다")
+        model.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(model.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError, "사람이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        model.beginSliderEdit()
+        model.edit(.bodySkin(.brightness, 0))
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        model.endSliderEdit()
+        XCTAssertFalse(model.canAdjustBodySkin(.brightness))
     }
 
     func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
