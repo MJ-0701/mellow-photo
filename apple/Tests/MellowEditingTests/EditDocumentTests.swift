@@ -995,6 +995,23 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.people.groups[.female]?.face[.jaw], 0.3)
     }
 
+    /// 전체 원터치가 메이크업 값을 실제로 바꾸지 않으면 룩 이름을 지키고, 바꾸면 지운다.
+    func testAllLayerOneTouchKeepsTheLookWhenMakeupIsUnchanged() {
+        var portrait = PortraitAdjustments()
+        var makeup = MakeupAdjustments()
+        OneTouchBundle.layer(for: nil, strength: 0.6).applied(to: &portrait, makeup: &makeup)
+        makeup.lookID = "daily"
+        var recipe = EditRecipe()
+        recipe.makeup = makeup
+        var document = EditDocument(recipe: recipe)
+        XCTAssertNil(document.applyOneTouch(strength: 0.6))
+        XCTAssertEqual(document.recipe.makeup.lookID, "daily", "표 값이 지금 색·강도와 같으면 룩이 남는다")
+        recipe.makeup.lip = MakeupTint(colorID: "lip-rose", intensity: 0.5)
+        var tinted = EditDocument(recipe: recipe)
+        XCTAssertNil(tinted.applyOneTouch(strength: 0.6))
+        XCTAssertNil(tinted.recipe.makeup.lookID, "표가 립을 바꾸면 룩 이름을 지운다")
+    }
+
     // twoFaces는 H2가 EditDocumentTests에 둔 두 얼굴 상자(중심 x 0.3·0.7)다.
     func testOneTouchOnGroupAndPersonUsesThatGenderTableOnly() {
         var document = EditDocument()

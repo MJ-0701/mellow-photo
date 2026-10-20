@@ -220,8 +220,10 @@ public struct EditDocument: Equatable, Sendable {
 
     /// 전체 층에 공통 표 × 강도를 쓴다.
     /// 강도 0은 묶인 키를 기본값으로 두고 표시를 지운다.
+    /// 메이크업 색·강도가 그대로면 룩 이름을 지키고 바뀌면 지운다.
+    /// 표 층은 늘 메이크업 부위를 담아 applied가 룩 이름을 지우므로 앞의 이름을 따로 들고 있다.
     private static func writeOneTouch(strength: Double, intoAllLayerOf recipe: inout EditRecipe) {
-        var makeup = recipe.makeup
+        let previous = recipe.makeup
         resetAllLayer(OneTouchBundle.keys, in: &recipe)
         if strength > 0 {
             OneTouchBundle.layer(for: nil, strength: strength).applied(to: &recipe.portrait, makeup: &recipe.makeup)
@@ -229,10 +231,9 @@ public struct EditDocument: Equatable, Sendable {
         } else {
             recipe.portrait.oneTouch = nil
         }
-        makeup.lookID = recipe.makeup.lookID
-        if recipe.makeup != makeup {
-            recipe.makeup.lookID = nil
-        }
+        var tints = recipe.makeup
+        tints.lookID = previous.lookID
+        recipe.makeup.lookID = tints == previous ? previous.lookID : nil
     }
 
     /// legacyIndex만 있는 기록 중 지금 짝짓기에서 faces[legacyIndex]와 짝이 된 기록에 그 anchor를 채운다.
