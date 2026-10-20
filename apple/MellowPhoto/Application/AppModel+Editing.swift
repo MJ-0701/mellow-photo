@@ -137,7 +137,7 @@ extension AppModel {
 
     /// 캔버스 탭·드래그. 좌표는 캔버스(출력) 정규화, 원점 왼쪽 아래. 저장은 원본 좌표로 한다.
     func touch(from: NormalizedPoint, to: NormalizedPoint) {
-        guard isReady, !isBusy, !isComparing, !isRendering, !canvasShowsUncropped else { return }
+        guard isReady, !isBusy, !blocksCanvasTouch, !isRendering, !canvasShowsUncropped else { return }
         let transform = outputTransform
         // 변환을 모르는데 기하가 있으면 캔버스 좌표를 원본 좌표로 오인하게 되므로 거절한다.
         guard transform != nil || currentRecipe.geometry.isIdentity else { return }

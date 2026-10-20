@@ -32,6 +32,13 @@ struct ActionBar: View {
                 Button("+") { zoom = Theme.clampedZoom(zoom + Theme.zoomStep) }
             }
             Button {
+                model.toggleSplitCompare()
+            } label: {
+                Text(model.compareMode == .split ? UserMessage.splitCompareDone : UserMessage.splitCompare)
+                    .font(.caption.weight(.medium))
+                    .frame(minWidth: 44, minHeight: 40)
+            }
+            Button {
                 model.isComparing.toggle()
             } label: {
                 Text(model.isComparing ? "보정본" : "원본 비교")

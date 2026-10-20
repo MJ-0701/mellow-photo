@@ -28,6 +28,12 @@ enum Theme {
     static let brushMarkerMinimumDiameter: CGFloat = 12
     /// 가운데 0인 양방향 슬라이더가 0으로 붙는 폭.
     static let bipolarSnapWidth = 0.05
+    /// 분할 비교 세로선 두께.
+    static let compareDividerWidth: CGFloat = 2
+    /// 분할선 손잡이 지름.
+    static let compareHandleSize: CGFloat = 28
+    /// 캔버스 이미지 좌표계 이름. 분할선 드래그 위치를 이 좌표로 받는다.
+    static let canvasCoordinateSpace = "canvas"
 
     static func clampedZoom(_ value: Double) -> Double {
         min(zoomRange.upperBound, max(zoomRange.lowerBound, value))

@@ -18,8 +18,10 @@
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
 		281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */; };
 		2986031DF20FD411A4677470 /* EditorScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C781535D14BC45ED308E3C /* EditorScene.swift */; };
+		2A655FCF4910A8E8A22BEA34 /* CompareDividerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */; };
 		2BF138DBA2985AF7A3B3A78E /* MellowLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E104DB4C3683E0F5CABAB0BD /* MellowLibrary */; };
 		2D128DF7E8DAC981A4578867 /* Ports.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */; };
+		30FB4CA4BAE4A2E7A47F9F77 /* CompareDivider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E87CE2394E0C5D2CCF9B5FEA /* CompareDivider.swift */; };
 		3767C6140008302C2C497B32 /* CropOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */; };
 		3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */; };
 		3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFA6571D26629D5ED075E50 /* ToolStrip.swift */; };
@@ -155,7 +157,9 @@
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
 		E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledLooksTests.swift; sourceTree = "<group>"; };
+		E87CE2394E0C5D2CCF9B5FEA /* CompareDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareDivider.swift; sourceTree = "<group>"; };
 		EA1FE7AA1267A55B90D3A984 /* MellowPhotoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareDividerTests.swift; sourceTree = "<group>"; };
 		F465BA3A1339352022E907AA /* AppModel+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Live.swift"; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportMenuUITests.swift; sourceTree = "<group>"; };
@@ -257,6 +261,7 @@
 				66A2803D9F9CE4AAAE77D780 /* BeautyPanel.swift */,
 				83CBCF07C95A8CA66A73434E /* BodyPanel.swift */,
 				67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */,
+				E87CE2394E0C5D2CCF9B5FEA /* CompareDivider.swift */,
 				8610E11E70A395E3B9504730 /* CropOverlay.swift */,
 				0D9139D4C642B3B57F110390 /* CropPanel.swift */,
 				C0C781535D14BC45ED308E3C /* EditorScene.swift */,
@@ -296,6 +301,7 @@
 			children = (
 				898E1FD227433ABB414F380E /* AppModelTests.swift */,
 				E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */,
+				EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */,
 				CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */,
 				39A51E7E5ED431D27897013E /* EditorScenarioTests.swift */,
 				D882DADCF0E8575966450368 /* ExportPhotosTests.swift */,
@@ -530,6 +536,7 @@
 			files = (
 				0FA73B0DF5725C84F333FF05 /* AppModelTests.swift in Sources */,
 				9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */,
+				2A655FCF4910A8E8A22BEA34 /* CompareDividerTests.swift in Sources */,
 				3767C6140008302C2C497B32 /* CropOverlayTests.swift in Sources */,
 				569EA3E6CC5B033787708596 /* EditorScenarioTests.swift in Sources */,
 				8BBE3FCB108100426FA44D97 /* ExportPhotosTests.swift in Sources */,
@@ -561,6 +568,7 @@
 				EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */,
 				C51CAABDED6649C066D63C91 /* BodyPanel.swift in Sources */,
 				0A057E2AF9D0378C785F1D3F /* BrushPanel.swift in Sources */,
+				30FB4CA4BAE4A2E7A47F9F77 /* CompareDivider.swift in Sources */,
 				60596D9E8104A6F04F5CBC9D /* CropOverlay.swift in Sources */,
 				89D66B4D324B8DBA6E28BC23 /* CropPanel.swift in Sources */,
 				2986031DF20FD411A4677470 /* EditorScene.swift in Sources */,

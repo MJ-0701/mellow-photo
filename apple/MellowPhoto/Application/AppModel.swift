@@ -68,6 +68,19 @@ final class AppModel {
         /// 앱 번들에 든 메이크업 카탈로그 파일. shared/makeup/makeup.v1.json과 같은 내용이다.
         static let bundledMakeupCatalogName = "makeup.v1"
         static let bundledMakeupCatalogExtension = "json"
+        /// 분할 비교의 처음 분할선 위치와 범위(원본이 보이는 왼쪽 폭 비율).
+        static let compareSplitDefault = 0.5
+        static let compareSplitRange = 0.0...1.0
+        /// 보조 기술로 분할선을 한 번 옮기는 폭.
+        static let compareSplitAccessibilityStep = 0.1
+        /// 분할 비교에서 원본을 겹치려면 미리보기와 가로세로 비율이 이만큼 안으로 같아야 한다.
+        /// 기하를 바꾼 직후 원본을 다시 그리는 동안 늘어난 원본이 겹치지 않게 한다.
+        static let compareAspectTolerance = 0.01
+    }
+
+    /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
+    enum CompareMode: Equatable {
+        case off, full, split
     }
 
     let session: ProjectSession
@@ -109,7 +122,24 @@ final class AppModel {
     var brushRadius = Policy.defaultBrushRadius
     var cloneSource: NormalizedPoint?
     var isChoosingCloneSource = true
-    var isComparing = false
+    var compareMode: CompareMode = .off
+    /// 원본이 보이는 왼쪽 폭 비율. 분할을 끄고 켜도 유지한다.
+    var compareSplit = Policy.compareSplitDefault
+    /// 기존 전체 토글. 분할 중에 true로 두면 전체로 바뀐다.
+    var isComparing: Bool {
+        get { compareMode == .full }
+        set { compareMode = newValue ? .full : .off }
+    }
+    /// 비교 중에는 캔버스 탭·브러시·자르기 틀을 막는다(두 모드 모두).
+    var blocksCanvasTouch: Bool { compareMode != .off }
+    /// 분할 모드에서 보정본 위에 겹칠 원본. 기하가 바뀌어 원본을 다시 그리는 중이면 비율이 달라 nil이다.
+    var splitCompareOriginal: CGImage? {
+        guard compareMode == .split, let original else { return nil }
+        guard let preview else { return original }
+        let originalAspect = Double(original.width) / Double(max(original.height, 1))
+        let previewAspect = Double(preview.width) / Double(max(preview.height, 1))
+        return abs(originalAspect - previewAspect) <= Policy.compareAspectTolerance ? original : nil
+    }
     /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
     var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
@@ -283,6 +313,14 @@ final class AppModel {
         remember(id, prepared)
     }
 
+    func toggleSplitCompare() {
+        compareMode = compareMode == .split ? .off : .split
+    }
+
+    func setCompareSplit(_ fraction: Double) {
+        compareSplit = min(Policy.compareSplitRange.upperBound, max(Policy.compareSplitRange.lowerBound, fraction))
+    }
+
     func select(_ id: PhotoID) {
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
@@ -298,7 +336,7 @@ final class AppModel {
         isReady = false
         isRendering = false
         selectionFailure = nil
-        isComparing = false
+        compareMode = .off
         cloneSource = nil
         isChoosingCloneSource = true
         originalGeometry = nil

@@ -1092,4 +1092,44 @@ final class AppModelTests: XCTestCase {
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
     }
+
+    func testSplitCompareIsAModeBesideTheFullToggleAndResetsOnSelect() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.compareMode, .off)
+        XCTAssertFalse(model.blocksCanvasTouch)
+        model.isComparing = true
+        XCTAssertEqual(model.compareMode, .full, "기존 토글은 전체 모드")
+        XCTAssertTrue(model.displayImage === model.original)
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .split, "분할을 켜면 전체는 꺼진다")
+        XCTAssertFalse(model.isComparing)
+        XCTAssertTrue(model.displayImage === model.preview, "분할 모드의 바탕은 보정본")
+        XCTAssertTrue(model.blocksCanvasTouch)
+        XCTAssertTrue(model.splitCompareOriginal === model.original, "같은 기하로 그린 원본을 겹친다")
+        XCTAssertEqual(model.compareSplit, AppModel.Policy.compareSplitDefault)
+        model.setCompareSplit(1.4)
+        XCTAssertEqual(model.compareSplit, 1)
+        model.setCompareSplit(-0.2)
+        XCTAssertEqual(model.compareSplit, 0)
+        model.setCompareSplit(0.3)
+        model.selectTool(.retouch)
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.5, y: 0.5))
+        XCTAssertNil(model.cloneSource, "비교 중에는 캔버스 탭을 무시한다")
+        model.isComparing.toggle()
+        XCTAssertEqual(model.compareMode, .full, "분할 중에 전체 토글을 켜면 전체로")
+        model.toggleSplitCompare()
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .off, "분할을 두 번 누르면 꺼진다")
+        XCTAssertEqual(model.compareSplit, 0.3, accuracy: 1e-9, "분할선 위치는 기억한다")
+        model.toggleSplitCompare()
+        let id = try XCTUnwrap(model.session.selectedPhotoID)
+        model.select(id)
+        XCTAssertEqual(model.compareMode, .off, "사진을 고르면 비교가 꺼진다")
+        XCTAssertEqual(UserMessage.compareBadge(.split), "원본 | 보정본")
+        XCTAssertEqual(UserMessage.compareBadge(.full), "원본")
+        XCTAssertEqual(UserMessage.compareBadge(.off), "보정본")
+    }
 }
