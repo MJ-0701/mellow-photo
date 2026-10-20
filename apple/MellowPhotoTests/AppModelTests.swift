@@ -726,6 +726,11 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(failing.bodySkinStatus, .personAnalysisUnavailable(personFailure))
         XCTAssertTrue(failing.canAdjustBodySkin(.brightness), "인물 분석이 실패해도 얼굴 둘레 대체 영역으로 렌더하므로 켠다")
         XCTAssertEqual(UserMessage.bodySkinStatus(failing.bodySkinStatus), "인물 영역 분석 실패 → 얼굴 둘레로 대신 적용해요")
+        failing.beginSliderEdit()
+        failing.edit(.bodySkin(.brightness, 0.4))
+        failing.endSliderEdit()
+        try await waitUntil { !failing.isRendering }
+        XCTAssertNil(failing.presentedError, "인물 분석이 실패한 사진도 대체 영역으로 몸 피부를 렌더한다")
         let facelessRoot = root.appendingPathComponent("faceless")
         try FileManager.default.createDirectory(at: facelessRoot, withIntermediateDirectories: true)
         let facelessStaged = try TestSupport.solidPNG(in: facelessRoot)
@@ -738,6 +743,13 @@ final class AppModelTests: XCTestCase {
         faceless.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
         XCTAssertTrue(faceless.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
         XCTAssertFalse(faceless.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
+        try await waitUntil { !faceless.isRendering }
+        XCTAssertNil(faceless.presentedError, "얼굴이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        faceless.beginSliderEdit()
+        faceless.edit(.bodySkin(.brightness, 0))
+        XCTAssertTrue(faceless.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        faceless.endSliderEdit()
+        XCTAssertFalse(faceless.canAdjustBodySkin(.brightness), "드래그가 끝나고 0이면 끈다")
     }
 
     func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
@@ -1198,6 +1210,23 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.presentedError, "원본 실패는 알림을 띄우지 않는다")
     }
 
+    func testLastRenderFailureClearsWhenTheSelectedPhotoChanges() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A")
+        let second = try TestSupport.solidPNG(in: root, name: "B")
+        let importer = FakeImporter(staged: [
+            .success(StagedPhoto(url: first, displayName: "A")), .success(StagedPhoto(url: second, displayName: "B")),
+        ])
+        let model = TestSupport.makeModel(root: root, importer: importer)
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady }
+        model.lastRenderFailure = UserMessage.text(for: MellowError.renderFailed)
+        XCTAssertTrue(model.diagnosticLines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.failure)) })
+        let other = try XCTUnwrap(model.session.photos.first { $0.id != model.session.selectedPhotoID }).id
+        model.select(other)
+        XCTAssertNil(model.lastRenderFailure, "다른 사진을 고르면 이전 사진의 렌더 오류를 지운다")
+        XCTAssertFalse(model.diagnosticLines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.failure)) })
+    }
+
     func testDiagnosticLinesListBuildPhotoAnalysisAndNonDefaultRecipeKeys() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
@@ -1210,6 +1239,12 @@ final class AppModelTests: XCTestCase {
         try await waitUntil { !model.isRendering }
         let lines = model.diagnosticLines
         XCTAssertTrue(lines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.build)) })
+        XCTAssertNotEqual(DeviceModel.identifier, DeviceModel.unknown, "기기 모델을 읽는다")
+        XCTAssertTrue(
+            lines.contains {
+                $0.hasPrefix(UserMessage.diagnosticLabel(.device)) && $0.contains(DeviceModel.identifier)
+            },
+            "기기 줄에 모델 식별자가 있다")
         XCTAssertTrue(lines.contains { $0.contains("faces=1") })
         XCTAssertTrue(lines.contains { $0.contains("preview=") })
         XCTAssertTrue(lines.contains("effects.grain=1.00"))

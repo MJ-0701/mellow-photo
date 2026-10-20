@@ -154,7 +154,8 @@ enum UserMessage {
         }
     }
 
-    /// 뷰티 › 피부톤 탭 맨 위 상태 줄. 사람 영역과 기준 얼굴 조건을 한 줄로 보인다.
+    /// 뷰티 › 피부톤 탭 맨 위 상태 줄.
+    /// 사람 영역과 기준 얼굴 조건을 한 줄로 보인다.
     static func bodySkinStatus(_ status: AppModel.BodySkinStatus) -> String {
         switch status {
         case .ready: return "사람 영역 ✓ · 기준 얼굴 ✓"
@@ -169,7 +170,8 @@ enum UserMessage {
     static let diagnosticsTitle = "진단"
     static let copyDiagnostics = "복사"
 
-    /// 진단 줄 앞에 붙는 라벨. 값과 키 경로는 영어 식별자로 둔다.
+    /// 진단 줄 앞에 붙는 라벨.
+    /// 값과 키 경로는 영어 식별자로 둔다.
     static func diagnosticLabel(_ item: AppModel.DiagnosticItem) -> String {
         switch item {
         case .build: return "앱"

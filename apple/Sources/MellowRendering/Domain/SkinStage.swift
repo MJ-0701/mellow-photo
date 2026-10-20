@@ -44,7 +44,8 @@ struct SkinStage: RenderStage {
         let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(image.extent)
         guard !bounds.isEmpty else { return image }
         let faceWidth = FaceRegions.faceWidth(face, extent: extent)
-        // 피부 마스크는 주름 전 이미지에서 한 번 만든다. 주름 밝히기의 둘레 기준 가중치와 대역 합성·붉은기가 함께 쓴다.
+        // 피부 마스크는 주름 전 이미지에서 한 번 만든다.
+        // 주름 밝히기의 둘레 기준 가중치와 대역 합성·붉은기가 함께 쓴다.
         // 캐시된 비트맵과 볼 평균만 쓰므로 주름만 켜도 비용이 거의 없다.
         let unitMask = try FaceRegions.skinMask(
             face: face, image: image, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)

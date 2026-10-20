@@ -44,7 +44,8 @@ final class AppModel {
         case unavailable(MellowError)
     }
 
-    /// 피부톤 탭이 보여줄 몸 피부 조건. 얼굴 분석 실패 → 얼굴 없음 → 인물 분석 실패 → 대체 → 준비 순서로 판정한다.
+    /// 피부톤 탭이 보여줄 몸 피부 조건.
+    /// 얼굴 분석 실패 → 얼굴 없음 → 인물 분석 실패 → 대체 → 준비 순서로 판정한다.
     enum BodySkinStatus: Equatable {
         case ready
         /// 사람 영역이 없어 얼굴 둘레 대체 영역을 쓴다.
@@ -120,7 +121,9 @@ final class AppModel {
     var statusMessage = UserMessage.welcomeStatus
     var presentedError: PresentedError?
     var selectionFailure: String?
-    /// 마지막 미리보기 렌더 실패 문구. 알림(presentedError)과 달리 닫아도 남아 진단 절에 보인다. 성공하면 지운다.
+    /// 마지막 미리보기 렌더 실패 문구.
+    /// 알림(presentedError)과 달리 닫아도 남아 진단 절에 보인다.
+    /// 렌더가 성공하거나 선택 사진이 바뀌면 지운다(다른 사진의 오류를 보이지 않는다).
     var lastRenderFailure: String?
 
     var tool: EditorTool = .look
@@ -227,7 +230,8 @@ final class AppModel {
     var canAdjustBackgroundBlur: Bool {
         isSliderEditActive || backgroundAvailability == .ready || currentRecipe.background.blur != 0
     }
-    /// 선택 사진의 몸 피부 조건. 피부톤 탭 맨 위 상태 줄이 보인다.
+    /// 선택 사진의 몸 피부 조건.
+    /// 피부톤 탭 맨 위 상태 줄이 보인다.
     var bodySkinStatus: BodySkinStatus {
         if let failure = selectedInfo?.faceAnalysisFailure {
             return .faceAnalysisUnavailable(failure)
@@ -238,7 +242,8 @@ final class AppModel {
         }
         return selectedInfo?.hasPerson == true ? .ready : .fallback
     }
-    /// 피부톤 슬라이더를 움직일 수 있는지. 사람 영역이 있거나 얼굴 둘레 대체 영역을 쓸 때 켠다.
+    /// 피부톤 슬라이더를 움직일 수 있는지.
+    /// 사람 영역이 있거나 얼굴 둘레 대체 영역을 쓸 때 켠다.
     /// 인물 분석이 실패해도 얼굴이 있으면 렌더가 대체 영역을 쓰므로 켠다.
     /// 드래그 중이거나 0이 아닌 값(프리셋)도 되돌릴 수 있게 켠다.
     func canAdjustBodySkin(_ key: BodySkinKey) -> Bool {
@@ -363,6 +368,7 @@ final class AppModel {
             cropAspect = nil
         }
         session.selectedPhotoID = id
+        lastRenderFailure = nil
         preview = nil
         original = nil
         isReady = false

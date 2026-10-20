@@ -5,11 +5,13 @@ import XCTest
 @testable import MellowRendering
 
 /// 실사진(실제 Vision) + 폰 화면 배율에서 "보이는 강도" 하한과 "자연스러움" 상한(스펙 G4 1.2·1.4).
-/// 문턱을 못 넘으면 렌더 상수를 고친다. 문턱을 바꾸는 것은 사용자 승인 뒤 VALIDATION에 적는다.
+/// 문턱을 못 넘으면 렌더 상수를 고친다.
+/// 문턱을 바꾸는 것은 사용자 승인 뒤 VALIDATION에 적는다.
 final class RealPhotoAcceptanceTests: XCTestCase {
     typealias Support = RenderingTestSupport
 
-    /// 하한(보여야 함). 화면 배율 8비트.
+    /// 하한(보여야 함).
+    /// 화면 배율 8비트.
     enum Visibility {
         static let smoothingChangedFraction = 0.04
         static let darkCirclesChangedFraction = 0.010
@@ -33,6 +35,11 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let blushMeanAbsolute = 3.0
         /// 합성 그늘 깊이·반점·반사광 크기.
         static let shadowDepth = 0.25
+        /// 심은 반점이 실제로 붉어졌는지 보는 반점 안 |ΔCr| 하한(0…1).
+        /// 심는 양은 약 0.05다.
+        static let minimumPlantedBlotchCr = 0.02
+        /// 심은 반사광이 실제로 밝아졌는지 보는 반사광 안 평균 ΔY 하한(8비트).
+        static let minimumPlantedHighlightLift = 10.0
         static let blotchRadiusFraction: CGFloat = 0.04
         static let highlightRadiusFraction: CGFloat = 0.06
         static let highlightLift = 0.3
@@ -47,17 +54,23 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let toneEveningMaximumMeanLift = 0.03 * 255
         static let bodyBrightnessMaximumMeanLift = 0.10 * 255
         static let outsideFaceChangedFraction = 0.002
+        /// "얼굴 밖"을 재기 전에 얼굴 다각형을 넓히는 폭.
+        /// 얼굴 폭 비율(스펙 G4 1.4).
+        static let outsideFaceDilationFraction: CGFloat = 0.05
         static let browChangedFraction = 0.05
     }
 
-    private var portrait: RealPortrait { .shared }
+    /// 준비가 실패하면 이 테스트만 오류로 실패한다(묶음 전체가 멈추지 않는다).
+    private func portrait() throws -> RealPortrait {
+        try RealPortrait.shared.get()
+    }
     private static var baseline: (image: CGImage, grid: PixelGrid)?
 
     private func base() throws -> (image: CGImage, grid: PixelGrid) {
         if let baseline = Self.baseline {
             return baseline
         }
-        let image = try portrait.render(EditRecipe())
+        let image = try self.portrait().render(EditRecipe())
         let baseline = (image, try DisplayScale.grid(image))
         Self.baseline = baseline
         return baseline
@@ -69,23 +82,31 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     {
         var recipe = EditRecipe()
         change(&recipe)
-        return try DisplayScale.grid(portrait.render(recipe, stage: stage, input: input))
+        return try DisplayScale.grid(self.portrait().render(recipe, stage: stage, input: input))
     }
 
     private var faceRect: CGRect {
-        get throws { DisplayScale.rect(portrait.face.boundingBox, in: try base().grid) }
+        get throws { DisplayScale.rect(try self.portrait().face.boundingBox, in: try base().grid) }
     }
 
     private func skinWeight() throws -> PixelGrid {
-        try DisplayScale.grid(portrait.skinMask().cropped(to: portrait.extent))
+        let portrait = try self.portrait()
+        return try DisplayScale.grid(portrait.skinMask().cropped(to: portrait.extent))
     }
 
-    private var bandRadii: (fine: Double, mid: Double) {
-        FrequencySeparation.radii(faceWidth: portrait.faceWidth, tuning: portrait.tuning)
+    private func fineRadius() throws -> Double {
+        let portrait = try self.portrait()
+        return FrequencySeparation.radii(faceWidth: portrait.faceWidth, tuning: portrait.tuning).fine
     }
 
-    private func nativeFaceRect() -> CGRect {
-        FaceRegions.pixelRect(portrait.face.boundingBox, in: portrait.extent).integral
+    /// 피부 마스크 가중 fine 분산 비(스펙 G4 1.4 "피부 마스크 안").
+    /// 피부 마스크가 0이 아닐 수 있는 영역에서 잰다.
+    private func skinFineVarianceRatio(_ recipe: EditRecipe) throws -> Double {
+        let portrait = try self.portrait()
+        let output = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
+        let rect = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        return try Support.fineVarianceRatio(
+            before: portrait.image, after: output, weight: portrait.skinMask(), in: rect, fineRadius: fineRadius())
     }
 
     // MARK: 피부
@@ -97,11 +118,8 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             DisplayScale.changedFraction(before.grid, after, in: try faceRect), Visibility.smoothingChangedFraction)
         var recipe = EditRecipe()
         recipe.portrait.skin.smoothing = 1
-        let output = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
-        let ratio = try Support.fineVarianceRatio(
-            before: portrait.image, after: output, in: nativeFaceRect(), fineRadius: bandRadii.fine,
-            midRadius: bandRadii.mid)
-        XCTAssertGreaterThanOrEqual(ratio, Naturalness.fineVarianceRatioMinimum, "모공 대역은 남는다")
+        XCTAssertGreaterThanOrEqual(
+            try skinFineVarianceRatio(recipe), Naturalness.fineVarianceRatioMinimum, "모공 대역은 남는다")
     }
 
     func testToneEveningEvensSkinButKeepsPores() throws {
@@ -115,17 +133,14 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         XCTAssertLessThanOrEqual(delta.mean, Naturalness.toneEveningMaximumMeanLift, "고르게 할 뿐 밝히지 않는다")
         var recipe = EditRecipe()
         recipe.portrait.skin.toneEvening = 1
-        let output = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
         XCTAssertGreaterThanOrEqual(
-            try Support.fineVarianceRatio(
-                before: portrait.image, after: output, in: nativeFaceRect(), fineRadius: bandRadii.fine,
-                midRadius: bandRadii.mid),
-            Naturalness.fineVarianceRatioMinimum)
+            try skinFineVarianceRatio(recipe), Naturalness.fineVarianceRatioMinimum, "모공 대역은 남는다")
     }
 
     // MARK: 주름
 
-    private func foldMask(_ key: SkinRefinementKey) -> FaceRegions.RegionMask? {
+    private func foldMask(_ key: SkinRefinementKey) throws -> FaceRegions.RegionMask? {
+        let portrait = try self.portrait()
         let extent = portrait.extent
         let tuning = portrait.tuning
         let face = portrait.face
@@ -138,12 +153,14 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         }
     }
 
-    /// 자연 사진에서의 상한 + 합성 그늘 회복률. 하한은 호출자가 더한다.
+    /// 자연 사진에서의 상한 + 합성 그늘 회복률.
+    /// 하한은 호출자가 더한다.
     private func assertFoldIsNaturalAndRecoversShadow(
         _ key: SkinRefinementKey, file: StaticString = #filePath, line: UInt = #line
     )
         throws
     {
+        let portrait = try self.portrait()
         let region = try XCTUnwrap(foldMask(key), "\(key) 띠", file: file, line: line)
         let weight = try portrait.mask(region)
         let before = try base().grid
@@ -156,10 +173,11 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         var recipe = EditRecipe()
         recipe.portrait.skin[key] = 1
         let naturalOutput = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
+        // 띠 마스크 가중이라 사각형 안에 걸친 눈·속눈썹은 비에 들어가지 않는다(스펙 G4 1.4 "띠 영역").
         XCTAssertGreaterThanOrEqual(
             try Support.fineVarianceRatio(
-                before: portrait.image, after: naturalOutput, in: region.bounds.integral, fineRadius: bandRadii.fine,
-                midRadius: bandRadii.mid),
+                before: portrait.image, after: naturalOutput, weight: region.image, in: region.bounds.integral,
+                fineRadius: fineRadius()),
             Naturalness.fineVarianceRatioMinimum, "\(key) 질감 유지", file: file, line: line)
         let shadowed = try portrait.baked(
             SyntheticDefect.shadowed(portrait.image, mask: region.image, depth: Visibility.shadowDepth))
@@ -177,7 +195,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let after = try grid({ $0.portrait.skin.darkCircles = 1 }, stage: SkinStage())
         XCTAssertGreaterThanOrEqual(
             DisplayScale.changedFraction(before, after, in: try faceRect), Visibility.darkCirclesChangedFraction)
-        let weight = try portrait.mask(foldMask(.darkCircles))
+        let weight = try self.portrait().mask(foldMask(.darkCircles))
         XCTAssertGreaterThanOrEqual(
             DisplayScale.lumaDelta(before, after, weight: weight).mean, Visibility.darkCirclesMeanLift, "눈 아래가 밝아진다")
         try assertFoldIsNaturalAndRecoversShadow(.darkCircles)
@@ -202,6 +220,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     // MARK: 붉은기·번들거림
 
     func testRednessClearsASyntheticBlotchAndFlushIsVisible() throws {
+        let portrait = try self.portrait()
         let cheek = try XCTUnwrap(FaceRegions.cheekRects(face: portrait.face, extent: portrait.extent).first)
         let center = CGPoint(x: cheek.midX, y: cheek.midY)
         let radius = portrait.faceWidth * Visibility.blotchRadiusFraction
@@ -214,7 +233,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let repaired = try grid({ $0.portrait.skin.redness = -1 }, stage: SkinStage(), input: blotchy)
         let excess = DisplayScale.chromaDelta(original, defective, weight: disc).cr
         let remaining = DisplayScale.chromaDelta(original, repaired, weight: disc).cr
-        XCTAssertGreaterThan(excess, 0.02, "반점이 심어졌다")
+        XCTAssertGreaterThan(excess, Visibility.minimumPlantedBlotchCr, "반점이 심어졌다")
         XCTAssertGreaterThanOrEqual(1 - remaining / excess, Visibility.rednessClearRemoval, "붉은 반점을 맑게")
         let flushed = try grid({ $0.portrait.skin.redness = 1 }, stage: SkinStage())
         XCTAssertGreaterThanOrEqual(
@@ -224,6 +243,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     }
 
     func testShineFlattensASyntheticHighlight() throws {
+        let portrait = try self.portrait()
         let frame = try XCTUnwrap(FaceFrame(face: portrait.face, extent: portrait.extent))
         let center = frame.imagePoint(u: 0, v: frame.eyeLevel + portrait.faceWidth * Visibility.highlightHeightFraction)
         let radius = portrait.faceWidth * Visibility.highlightRadiusFraction
@@ -237,7 +257,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let defective = DisplayScale.luma(try DisplayScale.grid(shiny), weight: disc)
         let repaired = DisplayScale.luma(
             try grid({ $0.portrait.skin.shine = 1 }, stage: SkinStage(), input: shiny), weight: disc)
-        XCTAssertGreaterThan(defective - original, 10, "반사광이 심어졌다")
+        XCTAssertGreaterThan(defective - original, Visibility.minimumPlantedHighlightLift, "반사광이 심어졌다")
         XCTAssertGreaterThanOrEqual(
             DisplayScale.recovery(original: original, defective: defective, repaired: repaired),
             Visibility.shineReduction,
@@ -247,15 +267,18 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     // MARK: 몸 피부
 
     func testBodySkinBrightnessToneAndSmoothingAreVisible() throws {
+        let portrait = try self.portrait()
         try XCTSkipIf(portrait.analysis.personMask == nil, "데모 사진에서 인물 마스크를 찾지 못함")
         let before = try base().grid
         let bright = try grid { $0.bodySkin.brightness = 1 }
         XCTAssertGreaterThanOrEqual(
             DisplayScale.changedFraction(before, bright, in: nil), Visibility.bodyBrightnessChangedFraction)
-        let skin = try skinWeight()
+        // 상한은 몸 피부 영역(인물 마스크 또는 대체 영역 × 몸 피부색 가중치)의 평균 ΔY다(스펙 G4 1.4 "피부 영역").
+        let bodySkin = try DisplayScale.grid(portrait.bodySkinArea())
         XCTAssertLessThanOrEqual(
-            DisplayScale.lumaDelta(before, bright, weight: skin).mean, Naturalness.bodyBrightnessMaximumMeanLift,
+            DisplayScale.lumaDelta(before, bright, weight: bodySkin).mean, Naturalness.bodyBrightnessMaximumMeanLift,
             "과하게 밝히지 않음")
+        let skin = try skinWeight()
         let warm = try grid { $0.bodySkin.tone = 1 }
         let redMinusBlue =
             DisplayScale.channelDelta(before, warm, channel: 0, weight: skin)
@@ -269,6 +292,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     // MARK: 효과
 
     func testGrainIsVisibleAtPhoneScale() throws {
+        let portrait = try self.portrait()
         let before = try base().grid
         let after = try grid { $0.effects.grain = 1 }
         XCTAssertGreaterThanOrEqual(
@@ -289,6 +313,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     // MARK: 눈·입·블러셔 (원터치가 쓰는 항목)
 
     func testEyeAndLipFeaturesAreVisible() throws {
+        let portrait = try self.portrait()
         let before = try base().grid
         let eyes = try portrait.mask(
             FaceRegions.eyeMask(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning))
@@ -306,6 +331,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     }
 
     func testBlushIsVisible() throws {
+        let portrait = try self.portrait()
         let catalog = try Support.sharedMakeupCatalog()
         var recipe = EditRecipe()
         recipe.makeup.blush = MakeupTint(colorID: "blush-peach", intensity: 1)
@@ -323,6 +349,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
     // MARK: 밖은 그대로
 
     func testFaceItemsLeaveHairAndBackgroundUntouched() throws {
+        let portrait = try self.portrait()
         let before = try base().grid
         var recipe = EditRecipe()
         recipe.portrait.skin = SkinAdjustments(
@@ -330,7 +357,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             shine: 1)
         let after = try DisplayScale.grid(portrait.render(recipe, stage: SkinStage()))
         let polygon = FaceRegions.skinPolygon(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
-        let dilation = portrait.faceWidth * 0.05
+        let dilation = portrait.faceWidth * Naturalness.outsideFaceDilationFraction
         let inside = FaceRegions.containment(polygons: [polygon], dilation: dilation)
         let scale = portrait.extent.width / DisplayScale.phoneWidth
         var outsideChanged = 0

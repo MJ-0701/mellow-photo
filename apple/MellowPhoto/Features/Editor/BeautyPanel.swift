@@ -96,7 +96,8 @@ struct BeautyPanel: View {
         Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
     }
 
-    /// 보이는 피부 전체의 밝기·톤·매끄럽게. 맨 위에 사람 영역·기준 얼굴 상태 줄을 보인다.
+    /// 보이는 피부 전체의 밝기·톤·매끄럽게.
+    /// 맨 위에 사람 영역·기준 얼굴 상태 줄을 보인다.
     /// 슬라이더는 사람 영역이 있거나 얼굴 둘레 대체 영역을 쓸 때 켠다.
     @ViewBuilder
     private func skinToneControls(_ bodySkin: BodySkinAdjustments) -> some View {

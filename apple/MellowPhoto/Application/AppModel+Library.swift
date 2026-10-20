@@ -82,6 +82,7 @@ extension AppModel {
         original = nil
         isReady = false
         selectionFailure = nil
+        lastRenderFailure = nil
         let pipeline = self.pipeline
         Task { await pipeline.evict(entry.id) }
         do {

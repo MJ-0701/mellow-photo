@@ -4,26 +4,33 @@ import MellowShared
 /// 주름 띠 위치 비율. 특징점에 주름선이 없어 코 날개·입꼬리·눈썹 안쪽 끝으로 어림한 값이다.
 /// 길이는 얼굴 폭·눈 폭 기준, 각도는 얼굴 x축 기준이다(G4: 눈 높이는 뜬 정도에 따라 달라 쓰지 않는다).
 private enum FoldShape {
-    /// 다크서클 중심을 눈 다각형 아래끝에서 내리는 양. 얼굴 폭 비율.
+    /// 다크서클 중심을 눈 다각형 아래끝에서 내리는 양.
+    /// 얼굴 폭 비율.
     static let darkCircleDropFraction: CGFloat = 0.055
-    /// 다크서클 타원 가로 반지름. 눈 폭 배수.
+    /// 다크서클 타원 가로 반지름.
+    /// 눈 폭 배수.
     static let darkCircleRadiusU: CGFloat = 0.65
-    /// 다크서클 타원 세로 반지름. 얼굴 폭 비율.
+    /// 다크서클 타원 세로 반지름.
+    /// 얼굴 폭 비율.
     static let darkCircleRadiusVFraction: CGFloat = 0.045
     /// 눈 다각형을 그 눈의 것으로 보는 중심 거리 상한. 눈 폭 배수.
     static let eyeMatchDistance: CGFloat = 1
-    /// 팔자 선분을 입꼬리 너머로 연장하는 비율(입꼬리 − 코 날개 길이 기준). 주름은 입꼬리 아래까지 이어진다.
+    /// 팔자 선분을 입꼬리 너머로 연장하는 비율(입꼬리 − 코 날개 길이 기준).
+    /// 주름은 입꼬리 아래까지 이어진다.
     static let nasolabialOverrun: CGFloat = 0.25
     /// 팔자 띠의 반 길이(연장한 선분 길이 배수)와 반 폭(얼굴 폭 비율).
     static let nasolabialHalfLength: CGFloat = 0.55
     static let nasolabialHalfWidth: CGFloat = 0.03
-    /// 팔자 띠를 선분에서 얼굴 바깥쪽으로 미는 양. 얼굴 폭 비율. 주름은 선분보다 바깥에 있다.
+    /// 팔자 띠를 선분에서 얼굴 바깥쪽으로 미는 양.
+    /// 얼굴 폭 비율.
+    /// 주름은 선분보다 바깥에 있다.
     static let nasolabialOutset: CGFloat = 0.045
     /// 마리오네트 띠 길이(입꼬리에서 턱 쪽으로)와 타원 반지름. 얼굴 폭 비율.
     static let marionetteLength: CGFloat = 0.14
     static let marionetteRadiusU: CGFloat = 0.08
     static let marionetteRadiusV: CGFloat = 0.03
-    /// 마리오네트 띠를 얼굴 바깥쪽으로 미는 양. 얼굴 폭 비율.
+    /// 마리오네트 띠를 얼굴 바깥쪽으로 미는 양.
+    /// 얼굴 폭 비율.
     static let marionetteOutset: CGFloat = 0.03
     /// 마리오네트 띠 방향. 얼굴 −v(턱 쪽)에서 바깥쪽으로 기운 각도(라디안, 약 15°). 입꼬리 아래에는 특징점이 없어 고정한다.
     static let marionetteTiltFromVertical: CGFloat = 0.26
@@ -121,7 +128,8 @@ extension FaceRegions {
         return foldMask(ovals, face: face, frame: frame, extent: extent, tuning: tuning, cache: cache)
     }
 
-    /// 얼굴 좌표의 중심·방향으로 놓는 띠 타원. 중심을 방향에 수직인 바깥쪽(side)으로 얼굴 폭 × outset 민다.
+    /// 얼굴 좌표의 중심·방향으로 놓는 띠 타원.
+    /// 중심을 방향에 수직인 바깥쪽(side)으로 얼굴 폭 × outset 민다.
     private static func bandOval(
         frame: FaceFrame, center: CGPoint, direction: CGPoint, side: CGFloat, outset: CGFloat, radii: CGSize
     ) -> Oval {
@@ -155,7 +163,8 @@ extension FaceRegions {
         return foldMask([oval], face: face, frame: frame, extent: extent, tuning: tuning, cache: cache)
     }
 
-    /// 주름 띠 타원들의 softMask. 피부 비트맵은 보호 영역 넓힘이 좁은 foldSkinRaster다.
+    /// 주름 띠 타원들의 softMask.
+    /// 피부 비트맵은 보호 영역 넓힘이 좁은 foldSkinRaster다.
     private static func foldMask(
         _ ovals: [Oval], face: FaceGeometry, frame: FaceFrame, extent: CGRect, tuning: RenderTuning,
         cache: RegionMaskCache?

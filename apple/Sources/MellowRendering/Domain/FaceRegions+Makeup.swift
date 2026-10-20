@@ -217,7 +217,8 @@ extension FaceRegions {
 
     /// 얼굴 x축으로 돌린 타원들의 최대 × 피부 다각형 비트맵을 피부 마스크와 같은 반지름으로 흐린다.
     /// 타원 경계 상자 + 흐림 4배 여백 밖은 정확히 0이다. 타원이 없으면 nil.
-    /// raster가 nil이면 skinPolygonRaster를 쓴다. 주름 띠는 foldSkinRaster를 넘긴다.
+    /// raster가 nil이면 skinPolygonRaster를 쓴다.
+    /// 주름 띠는 foldSkinRaster를 넘긴다.
     static func softMask(
         _ ovals: [Oval], face: FaceGeometry, frame: FaceFrame, extent: CGRect, tuning: RenderTuning,
         cache: RegionMaskCache?, raster: CIImage? = nil

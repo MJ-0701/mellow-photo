@@ -203,7 +203,13 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 
 `FoldShape` 새 이름: `darkCircleDropFraction` 0.055, `darkCircleRadiusU` 0.65(눈 폭 배수, 이름 유지), `darkCircleRadiusVFraction` 0.045, `nasolabialOverrun` 0.25, `nasolabialHalfWidth` 0.03, `nasolabialOutset` 0.045, `marionetteLength` 0.14, `marionetteRadiusU` 0.08, `marionetteOutset` 0.03. `darkCircleDrop`·`darkCircleRadiusV`(눈 높이 배수)는 지운다. `bandOval`에 `outset` 인자를 더해 팔자·마리오네트가 다른 값을 쓴다.
 
-합성 얼굴 표본 점(`SyntheticFace`, 얼굴 폭 280, 계산은 G4-1 계획 Task 2): `underLeftEye`·`underRightEye`(200·312, 262)는 새 띠(중심 v 270.6, 반지름 12.6) 안이라 유지. `leftNasolabial`·`rightNasolabial`은 (206, 162)·(306, 162)로 옮긴다(새 띠 중심). `leftMarionette`·`rightMarionette`(196·316, 120)는 유지. 팔자 "밖" 목록에서 `leftMarionette`를 빼고 `CGPoint(x: 186, y: 100)`를 넣는다(연장된 띠 끝에서 3 흐림 이상 떨어진 곳). 표본이 어긋나면 G1 규칙대로 격자를 찍어 옮기고 문턱(128·0)은 낮추지 않는다.
+합성 얼굴 표본 점(`SyntheticFace`, 얼굴 폭 280, 계산은 G4-1 계획 Task 2, G4-1 구현 중 격자를 찍어 확정한 값):
+- `underLeftEye`·`underRightEye`(200·312, 262)는 새 띠(중심 v 270.6, 반지름 12.6) 안이라 유지한다.
+- `leftNasolabial`·`rightNasolabial`은 (202, 156)·(309, 156)이다. 계획의 (206, 162)·(306, 162)는 그늘 없는 피부 상승이 4바이트였고 오른쪽이 픽셀 거울상이 아니어서 대칭(127 vs 118)이 깨졌다. 확정 점은 띠 값 239, 마리오네트 띠 0이다.
+- `leftMarionette`·`rightMarionette`는 (196, 120)·(315, 120)이다. 512px 이미지의 픽셀 거울상은 x → 511 − x라 196의 거울은 315다(316에서는 대칭 차이가 4였다).
+- 팔자 "밖" 목록에서 `leftMarionette`를 빼고 `CGPoint(x: 186, y: 100)`를 넣는다(연장된 띠 끝에서 3 흐림 이상 떨어진 곳).
+- 팔자 띠가 입꼬리 옆까지 이어지는지 보는 점은 (202, 136)이다(값 86, 문턱 64). 계획의 (204, 136)은 값이 정확히 64였다.
+- 표본이 어긋나면 G1 규칙대로 격자를 찍어 옮기고 문턱(128·64·0)은 낮추지 않는다.
 
 #### 2.2 밝히기 (`SkinRefinement.liftFold`, `SkinKernels.foldLift`)
 

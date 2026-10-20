@@ -33,7 +33,8 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(midBlur.rgb + mid * keep + fine, image.a);
                 }
                 """)
-        // 휘도 계수는 BT.601이다. 주변은 피부 마스크 가중 평균(분자 ÷ 분모)이라 눈·눈썹·입술·머리카락이 섞이지 않는다.
+        // 휘도 계수는 BT.601이다.
+        // 주변은 피부 마스크 가중 평균(분자 ÷ 분모)이라 눈·눈썹·입술·머리카락이 섞이지 않는다.
         // 분모 하한 0.001은 둘레가 전부 보호 영역일 때 0으로 나누지 않게 한다.
         // 피부 가중치 합이 minimumCoverage보다 작으면 주변 휘도를 0으로 두어 gap이 0, 배율이 1이 된다.
         // 세 채널에 같은 배율을 곱해 그늘의 색조·채도를 지킨다(같은 값을 더하면 회색 쪽으로 간다).
@@ -105,7 +106,8 @@ final class SkinKernels: @unchecked Sendable {
         return mixed
     }
 
-    /// 주름 밝히기의 주변 피부 가중치 합 하한. 띠 둘레 피부 가중치 합(넓은 흐림의 분모)이 2%보다 작으면 기준이 없다고 보고 밝히지 않는다.
+    /// 주름 밝히기의 주변 피부 가중치 합 하한.
+    /// 띠 둘레 피부 가중치 합(넓은 흐림의 분모)이 2%보다 작으면 기준이 없다고 보고 밝히지 않는다.
     static let foldMinimumCoverage = 0.02
 
     /// 주변 피부 평균(wideNumerator ÷ wideDenominator)이 국소 저주파(low)보다 밝은 휘도(BT.601) 비율만큼 세 채널에 같은 배율을 곱한다.

@@ -107,7 +107,9 @@ enum FaceRegions {
             cache: cache)
     }
 
-    /// 주름 띠용 피부 비트맵. skinPolygonRaster와 같되 보호 영역 넓힘이 foldFeatureFeather다. 캐시 항목이 따로 든다.
+    /// 주름 띠용 피부 비트맵.
+    /// skinPolygonRaster와 같되 보호 영역 넓힘이 foldFeatureFeather다.
+    /// 캐시 항목이 따로 든다.
     static func foldSkinRaster(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache?)
         -> CIImage
     {
