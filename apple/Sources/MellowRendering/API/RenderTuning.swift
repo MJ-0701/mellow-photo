@@ -53,6 +53,12 @@ public struct RenderTuning: Sendable {
     public var foldSurroundFraction: Double = 0.12
     /// 주름 밝히기 1에서 "주변 평균 − 국소 저주파"의 양수 차이를 더하는 비율. 100%면 평평해 보인다.
     public var foldLiftMax: Double = 0.9
+    /// 주름 밝히기 배율(1 + 휘도 차이 ÷ 국소 휘도)의 상한.
+    /// 선형 휘도를 40% 잃은 그늘을 foldLiftMax 0.9로 올리는 배율(1 + 0.9 × 0.4 / 0.6)이 1.6이다.
+    /// 이보다 깊은 그늘은 덜 올리고, 국소 휘도가 아주 낮은 눈가·속눈썹 옆에서 배율이 튀지 않는다.
+    public var foldLiftMaxGain: Double = 1.6
+    /// 주름 밝히기 배율의 분모(국소 휘도) 하한. 선형 0.01(감마 약 0.1)보다 어두운 곳에서 0으로 나누지 않는다.
+    public var foldLumaFloor: Double = 0.01
     /// 얼룩 고르기·번들거림이 당기는 넓은 피부 평균의 반지름. 얼굴 폭 비율. 볼 그림자 같은 큰 명암은 남는다.
     public var toneBandFraction: Double = 0.12
     /// 얼룩 고르기 1에서 저주파를 넓은 평균 쪽으로 당기는 비율.

@@ -332,6 +332,28 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
+    /// 밝힌 그늘의 (R − G) / (R + G)가 바뀌어도 되는 최대값. 세 채널에 같은 값을 더하면 0.05쯤 줄어 회색 쪽으로 간다.
+    private static let liftedChromaTolerance = 0.01
+
+    func testFoldLiftKeepsShadowChroma() throws {
+        let base = SyntheticFace.make()
+        let radii = CGSize(width: 30, height: 10)
+        var image = darkened(base.image, at: SyntheticFace.underLeftEye, radii: radii, factor: Self.shadowFactor)
+        image = darkened(image, at: SyntheticFace.underRightEye, radii: radii, factor: Self.shadowFactor)
+        let before = try Support.grid(image)
+        let after = try Support.grid(
+            render(SyntheticFace(image: image, face: base.face), skin: SkinAdjustments(darkCircles: 1)))
+        func chroma(_ pixel: [UInt8]) -> Double {
+            (Double(pixel[0]) - Double(pixel[1])) / (Double(pixel[0]) + Double(pixel[1]))
+        }
+        for point in [SyntheticFace.underLeftEye, SyntheticFace.underRightEye] {
+            XCTAssertGreaterThan(after.red(point), before.red(point), "\(point) 그늘이 밝아진다")
+            XCTAssertEqual(
+                chroma(after.rgba(point)), chroma(before.rgba(point)), accuracy: Self.liftedChromaTolerance,
+                "\(point) 밝힌 그늘의 색조·채도가 그대로다")
+        }
+    }
+
     func testMissingLandmarksSkipOnlyThatFold() throws {
         let base = SyntheticFace.make()
         let image = darkened(

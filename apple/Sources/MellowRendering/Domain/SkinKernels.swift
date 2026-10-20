@@ -33,13 +33,17 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(midBlur.rgb + mid * keep + fine, image.a);
                 }
                 """)
-        // 휘도 계수는 BT.601이다. 차이를 휘도로 재 세 채널에 같게 더해 둘레의 배경·입술 색이 번지지 않는다.
+        // 휘도 계수는 BT.601이다. 차이를 휘도로 재 둘레의 배경·입술 색이 번지지 않는다.
+        // 세 채널에 같은 배율을 곱해 그늘의 색조·채도를 지킨다(같은 값을 더하면 회색 쪽으로 간다).
         fold = CIColorKernel(
             source: """
-                kernel vec4 foldLift(__sample image, __sample low, __sample surround, float amount) {
+                kernel vec4 foldLift(__sample image, __sample low, __sample surround, float amount, float maxGain,
+                                     float lumaFloor) {
                     vec3 luma = vec3(0.299, 0.587, 0.114);
-                    float gap = max(dot(surround.rgb, luma) - dot(low.rgb, luma), 0.0);
-                    return vec4(image.rgb + gap * amount, image.a);
+                    float lowLuma = dot(low.rgb, luma);
+                    float gap = max(dot(surround.rgb, luma) - lowLuma, 0.0);
+                    float gain = min(1.0 + amount * gap / max(lowLuma, lumaFloor), maxGain);
+                    return vec4(image.rgb * gain, image.a);
                 }
                 """)
         // luma는 BT.709 선형 휘도 계수다. 분모 하한 0.001은 마스크 밖(가중치 0)에서 0으로 나누지 않게 한다.
@@ -96,11 +100,14 @@ final class SkinKernels: @unchecked Sendable {
         return mixed
     }
 
-    /// 주변 평균(surround)이 국소 저주파(low)보다 밝은 휘도(BT.601)만큼만 amount 비율로 세 채널에 같게 더한다.
-    /// 모공 대역은 더하는 항에 없어 그대로다.
-    func foldLift(image: CIImage, low: CIImage, surround: CIImage, amount: Double, extent: CGRect) throws -> CIImage {
-        guard let fold else { throw MellowError.renderFailed }
-        let arguments: [Any] = [image, low, surround, amount]
+    /// 주변 평균(surround)이 국소 저주파(low)보다 밝은 휘도(BT.601) 비율만큼 세 채널에 같은 배율을 곱한다.
+    /// 배율 = min(1 + amount × 휘도 차이 ÷ max(국소 휘도, lumaFloor), maxGain). 둘레가 어두우면 배율 1이다.
+    func foldLift(
+        image: CIImage, low: CIImage, surround: CIImage, amount: Double, maxGain: Double, lumaFloor: Double,
+        extent: CGRect
+    ) throws -> CIImage {
+        guard let fold, lumaFloor > 0 else { throw MellowError.renderFailed }
+        let arguments: [Any] = [image, low, surround, amount, maxGain, lumaFloor]
         guard let lifted = fold.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return lifted
     }

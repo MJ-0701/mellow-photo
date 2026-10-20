@@ -14,7 +14,7 @@ enum SkinRefinement {
         let lifted = try SkinKernels.shared.foldLift(
             image: image, low: FrequencySeparation.blurred(image, radius: lowRadius),
             surround: FrequencySeparation.blurred(image, radius: surroundRadius), amount: amount * tuning.foldLiftMax,
-            extent: region.bounds)
+            maxGain: tuning.foldLiftMaxGain, lumaFloor: tuning.foldLumaFloor, extent: region.bounds)
         return MaskBuilder.blend(lifted, over: image, mask: region.image).cropped(to: extent)
     }
 

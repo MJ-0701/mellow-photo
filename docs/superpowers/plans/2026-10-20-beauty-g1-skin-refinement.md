@@ -43,7 +43,7 @@
 - 레시피 `schemaVersion`은 2 유지, 키 추가만. 새 키는 기본값 0이고 없으면 0으로 읽는다. v1 세션은 계속 읽힌다.
 - 값 범위: `skin.redness`만 `AdjustmentRange.bipolar`, 나머지 정밀 6종은 `AdjustmentRange.unit`. `AdjustmentRange.skinRefinement(_:)` 한 곳.
 - 마스크는 `FaceRegions`(확장 파일 포함)에서만 만든다. 피부 CIKL 색 커널은 `SkinKernels` 한 곳.
-- `RenderTuning` 새 상수 시작값: foldLowBandFraction 0.015(구현 중 0.04에서 변경), foldSurroundFraction 0.12, foldLiftMax 0.9 (Task 4) · toneBandFraction 0.12, toneEveningMax 0.8, shineLumaOffset 0.12, shineLumaRamp 0.1, shineReductionMax 0.85 (Task 5) · rednessClearMax 0.7, rednessFlushMax 0.03 (Task 6). 위치 비율은 `FaceRegions+Folds.swift`의 `private enum FoldShape`.
+- `RenderTuning` 새 상수 시작값: foldLowBandFraction 0.015(구현 중 0.04에서 변경), foldSurroundFraction 0.12, foldLiftMax 0.9, foldLiftMaxGain 1.6, foldLumaFloor 0.01 (Task 4, 배율 상한·분모 하한은 구현 중 추가) · toneBandFraction 0.12, toneEveningMax 0.8, shineLumaOffset 0.12, shineLumaRamp 0.1, shineReductionMax 0.85 (Task 5) · rednessClearMax 0.7, rednessFlushMax 0.03 (Task 6). 위치 비율은 `FaceRegions+Folds.swift`의 `private enum FoldShape`.
 - CI는 Xcode 26.3이다(로컬 27). `CGFloat`와 `Double`을 섞는 삼각함수·`hypot`·`atan2` 호출은 인자 타입을 맞춘다(`CGFloat(cos(Double(angle)))`처럼 명시 변환). 같은 타입 둘(`atan2(cgFloat, cgFloat)`)은 그대로 된다.
 - 한 줄 한 문장, 세미콜론 금지, 매직 넘버는 명명 상수(`RenderTuning`·`Theme`·`AppModel.Policy`·`EditingPolicy`, 기하 비율은 `FoldShape` 또는 타입 안 `private static let`). CIKL 소스 안 표준 계수(BT.601·BT.709)는 주석으로 이름을 단다.
 - 한국어 사용자 문구는 앱 타깃(`UserMessage`·뷰)에만. 모듈은 `MellowError`만 던진다(새 case 없음).
@@ -85,13 +85,13 @@ EditingPolicy.skinRefinementRange(_:)
 EditDocument.applyAuto: skin.smoothing·autoBlemish만 덮어씀
 
 // MellowRendering (Task 3~7)
-RenderTuning: + Global Constraints의 상수 10개
+RenderTuning: + Global Constraints의 상수 12개
 FaceRegions.Oval.tilt: CGFloat = 0                            // softMask가 angle + tilt로 그림
 FaceRegions.eyeMidline(_:) (private → internal)
 FaceRegions.darkCircleMask / nasolabialMask / marionetteMask / glabellaMask(face:extent:tuning:cache:) -> RegionMask?
 FaceRegions.cheekAverages(of:face:extent:) -> (left: CIImage, right: CIImage)?
 MaskBuilder.scaled(_:by:)
-SkinKernels.foldLift(image:low:surround:amount:extent:), toneMix(image:fineBlur:midBlur:wideNumerator:wideDenominator:reference:keep:even:shine:shineOffset:shineRamp:extent:), redness(encoded:reference:clear:flush:extent:)
+SkinKernels.foldLift(image:low:surround:amount:maxGain:lumaFloor:extent:), toneMix(image:fineBlur:midBlur:wideNumerator:wideDenominator:reference:keep:even:shine:shineOffset:shineRamp:extent:), redness(encoded:reference:clear:flush:extent:)
 FrequencySeparation.refined(_:bounds:faceWidth:mask:reference:smoothing:toneEvening:shine:tuning:), maskedMean(_:mask:radius:)
 enum SkinRefinement { liftFold(_:region:faceWidth:amount:tuning:extent:), adjustRedness(_:mask:bounds:reference:value:tuning:extent:) }
 SkinStage.clamped(_:), folds(for:skin:context:), cheekReference(of:face:extent:)

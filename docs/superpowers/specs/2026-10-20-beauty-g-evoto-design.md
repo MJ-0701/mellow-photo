@@ -82,7 +82,7 @@
 | `BodySkinStage` | MellowRendering/Domain | 새 단계 `bodySkin` |
 | `EffectStage` | MellowRendering/Domain | 새 단계 `effect` |
 | `ToneShift.blueness` | MellowRendering/Domain (`FeatureKernels`) | Cb 가산(피부 톤) |
-| `RenderTuning` 상수 20개 | MellowRendering/API | 1.6 표 |
+| `RenderTuning` 상수 22개 | MellowRendering/API | 1.6 표 |
 | `BeautyTab.skinTone`, `SyncMenu`, `CompareDivider`, `AppModel` 상태 | 앱 타깃 | 화면 |
 
 새 프레임워크 import 없음. `verify-modules.sh` 변경 없음. MellowRendering은 MellowEditing을 import하지 않으므로 렌더는 `AdjustmentRange`로 직접 자른다.
@@ -138,13 +138,15 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 
 모든 피부 정밀은 `SkinStage.apply` 안에서 대상 얼굴마다 다음 순서로 돈다: 자동 잡티(기존) → 주름 밝히기 4종(다크서클 → 팔자 → 마리오네트 → 미간) → 대역 합성(피부 보정·얼룩 고르기·번들거림 한 번) → 붉은기. 값은 `AdjustmentRange`로 먼저 자른다. 피부 마스크는 `FaceRegions.skinMask(strength: 1)`을 한 번 만들고(`unitMask`), 합성용은 `MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)`다.
 
-**주름 밝히기** (`SkinRefinement.liftFold`): 영역 마스크 `m`, `low = blur(image, faceWidth × foldLowBandFraction)`, `surround = blur(image, faceWidth × foldSurroundFraction)`. 커널 `foldLift`: `rgb' = rgb + max(surround − low, 0) × amount`, amount = 값 × `foldLiftMax`. `MaskBuilder.blend(lifted, over: image, mask: m)`을 `m.bounds` 안에서만 계산. 모공 대역(`image − blur(r_fine)`)은 더하는 항에 없어 그대로다.
+**주름 밝히기** (`SkinRefinement.liftFold`): 영역 마스크 `m`, `low = blur(image, faceWidth × foldLowBandFraction)`, `surround = blur(image, faceWidth × foldSurroundFraction)`. 커널 `foldLift`: `gap = max(Y(surround) − Y(low), 0)`(BT.601 휘도), `gain = min(1 + amount × gap / max(Y(low), foldLumaFloor), foldLiftMaxGain)`, `rgb' = rgb × gain`, amount = 값 × `foldLiftMax`. 휘도 차이라 둘레의 배경·입술 색이 번지지 않고, 세 채널에 같은 배율을 곱해 그늘의 색조·채도를 지킨다(같은 값을 더하면 밝힌 다크서클이 회색으로 뜸). 둘레가 더 어두우면 배율 1이다. `MaskBuilder.blend(lifted, over: image, mask: m)`을 `m.bounds` 안에서만 계산. (G1 구현 중 변경: 처음 식 `rgb + max(surround − low, 0) × amount`는 채널마다 차이를 재 배경 옆 띠에 파란 기를 더했다.)
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
 | `foldLowBandFraction` | 0.015 | 주름 국소 저주파 반지름(얼굴 폭 비율). 가장 좁은 띠(마리오네트, 얼굴 폭 3%)의 절반이고 모공 대역(0.6%)의 2.5배. (G1 구현 중 변경: 0.04는 좁은 주름 그림자를 거의 지워 밝힘이 생기지 않음) |
 | `foldSurroundFraction` | 0.12 | 주변 피부 평균 반지름 |
-| `foldLiftMax` | 0.9 | 값 1에서 어두운 차이의 90%를 올림 |
+| `foldLiftMax` | 0.9 | 값 1에서 어두운 휘도 차이의 90%를 올림 |
+| `foldLiftMaxGain` | 1.6 | 밝히기 배율 상한. 선형 휘도를 40% 잃은 그늘을 0.9로 올리는 배율(1 + 0.9 × 0.4 / 0.6). 눈가처럼 국소 휘도가 아주 낮은 곳에서 배율이 튀지 않음 |
+| `foldLumaFloor` | 0.01 | 배율 분모(국소 선형 휘도)의 하한 |
 
 **대역 합성** (`FrequencySeparation.refined`): 기존 `low + mid × keep + fine`에서 `low`를 바꾼다. `wideNum = blur(image × unitMask, r_tone)`, `wideDen = blur(unitMask, r_tone)`, `wide = wideNum / max(wideDen, ε)`(마스크 가중 평균이라 경계에서 머리카락·배경이 섞이지 않음), `r_tone = faceWidth × toneBandFraction`. 커널 `toneMix`:
 
@@ -152,10 +154,11 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 even' = max(even, shine × w)            // w = 번들거림 가중치
 w = clamp((Y(image) − (Y(reference) + shineOffset)) / shineRamp, 0, 1)   // 선형 휘도 BT.709
 low  = mix(midBlur, wide, even')
-out  = low + (fineBlur − midBlur) × keep + (image − fineBlur)
+mid  = (fineBlur − midBlur) × (1 − shine × w)
+out  = low + mid × keep + (image − fineBlur)
 ```
 
-`reference`는 볼 두 곳의 선형 평균(`CIAreaAverage` 두 개를 `CIMix` 0.5로 섞은 무한 이미지), `even = toneEvening × toneEveningMax`, `shine = shineValue × shineReductionMax`, `keep = 1 − smoothing × midReductionMax`. 세 값이 모두 0이면 기존 `bandMix` 경로(넓은 흐림을 만들지 않음). `smoothing`만 0이 아니면 결과는 지금과 바이트 단위로 같아야 한다(회귀 테스트).
+`reference`는 볼 두 곳의 선형 평균(`CIAreaAverage` 두 개를 `CIMix` 0.5로 섞은 무한 이미지), `even = toneEvening × toneEveningMax`, `shine = shineValue × shineReductionMax`, `keep = 1 − smoothing × midReductionMax`. 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다(G1 구현 중 변경: 저주파만 당기면 반지름 12px 반사광이 11바이트만 줄었다). 모공 대역은 그대로다. 세 값이 모두 0이면 기존 `bandMix` 경로(넓은 흐림을 만들지 않음). `smoothing`만 0이 아니면 결과는 지금과 바이트 단위로 같아야 한다(회귀 테스트).
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
@@ -163,7 +166,7 @@ out  = low + (fineBlur − midBlur) × keep + (image − fineBlur)
 | `toneEveningMax` | 0.8 | 값 1에서 저주파를 평균 쪽으로 80% |
 | `shineLumaOffset` | 0.12 | 기준 휘도보다 이만큼 밝으면 번들거림 시작(선형 휘도) |
 | `shineLumaRamp` | 0.1 | 시작점에서 이만큼 더 밝으면 가중치 1 |
-| `shineReductionMax` | 0.85 | 값 1에서 번들거림 저주파를 평균 쪽으로 85% |
+| `shineReductionMax` | 0.85 | 값 1에서 번들거림 저주파를 평균 쪽으로 85% 당기고 중간 대역을 85% 줄임 |
 
 **붉은기** (`SkinRefinement.adjustRedness`): sRGB 감마 값으로 바꿔 커널 `redness`를 적용하고 되돌린다(`FeatureKernels.shifted`와 같은 틀). `cr_ref`는 볼 기준 평균(감마)의 Cr. 값 v < 0: `cr' = cr − max(cr − cr_ref, 0) × |v| × rednessClearMax`. v > 0: `cr' = cr + v × rednessFlushMax`. Y·Cb는 그대로, RGB로 되돌려 0…1로 자른다. 피부 마스크(합성용)로 원본 위에 합성.
 
