@@ -80,6 +80,8 @@ public struct EditDocument: Equatable, Sendable {
         case .shadows(let value): updated.detail.shadows = value
         case .sharpness(let value): updated.detail.sharpness = value
         case .vignette(let value): updated.detail.vignette = value
+        case .effect(let key, let value):
+            updated.effects[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .lookID(let id): updated.look.id = id
         case .lookIntensity(let value): updated.look.intensity = value
         // 회전·반전은 자르기 영역을 이미지와 함께 옮긴다.
@@ -118,7 +120,7 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
-    /// 피부 정밀·치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·몸 피부·메이크업·룩·기하·수동 편집은 건드리지 않는다.
+    /// 피부 정밀·치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
@@ -154,6 +156,7 @@ public struct EditDocument: Equatable, Sendable {
         updated.bodySkin = values.bodySkin
         updated.body = values.body
         updated.makeup = values.makeup
+        updated.effects = values.effects
         if isGeometryLocked {
             updated.portrait.face = recipe.portrait.face
             updated.body = recipe.body

@@ -20,6 +20,7 @@ public enum EditChange: Equatable, Sendable {
     case shadows(Double)
     case sharpness(Double)
     case vignette(Double)
+    case effect(EffectKey, Double)
     case lookID(String?)
     case lookIntensity(Double)
     case flipHorizontal(Bool)

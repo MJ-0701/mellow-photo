@@ -511,4 +511,24 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertTrue(document.applyAuto(suggestion))
         XCTAssertEqual(document.recipe.bodySkin.brightness, 0.5, "자동 보정은 몸 피부를 건드리지 않는다")
     }
+
+    func testEffectChangesClampAreNotLockedAndAreCopiedButNotByAuto() {
+        var document = EditDocument()
+        document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.5, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        XCTAssertFalse(EditChange.effect(.grain, 0.5).affectsGeometry)
+        XCTAssertNil(document.set(.effect(.grain, 2)))
+        XCTAssertEqual(document.recipe.effects.grain, 1)
+        document.set(.effect(.glow, -1))
+        XCTAssertEqual(document.recipe.effects.glow, 0)
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.1), detail: DetailAdjustments(), portrait: PortraitAdjustments())
+        document.applyAuto(suggestion)
+        XCTAssertEqual(document.recipe.effects.grain, 1, "자동 보정은 효과를 건드리지 않는다")
+        var other = EditDocument()
+        other.apply(PresetValues(of: document.recipe))
+        XCTAssertEqual(other.recipe.effects.grain, 1, "프리셋이 효과를 나른다")
+        var third = EditDocument()
+        third.applyFromBatch(PresetValues(effects: EffectAdjustments(glow: 0.4)))
+        XCTAssertEqual(third.recipe.effects.glow, 0.4, "일괄 적용도 나른다")
+    }
 }
