@@ -315,6 +315,7 @@ extension EditDocument {
 
 - `.all`에서 그룹 층에 쓸 때 그룹 층의 묶음 밖 키(얼굴형 등)는 보존한다. 개인 층은 건드리지 않는다(사람이 따로 조정한 값은 남고, 그 사람에게는 개인 값이 이긴다 — H 규칙).
 - 표시 해제: `set(_:in:)`·`set(_:forFace:of:)`·`applyMakeupLook(_:in:)`·`applyAuto`·`resetOverrides`·`merged`(프리셋·동기화)가 어떤 층의 묶인 키(`OneTouchBundle.keys`)를 실제로 바꾸면 **그 층의** `oneTouch`를 nil로 둔다. 같은 값이면 유지. 구현은 `commit` 전에 `clearOneTouchMarks(where:)`가 이전 레시피와 비교한다.
+- (G4-2 구현 중 추가) 표시의 뜻에서 나오는 세 규칙: 개인 기록의 수동 성별을 바꾸면 그 사람 층의 표시를 지운다(표가 달라져 거짓이 됨, 값은 그대로). `resetOverrides(nil, in:)`(층 전체 재설정)는 표시도 지운다. 원터치가 쓰는 층의 룩 이름(`lookID`·`makeupLookID`)은 블러셔·립 값이 실제로 바뀔 때만 지운다(같은 값이면 룩 유지, 기존 룩 규칙과 같음).
 - `applyOneTouch`는 `face`·`body` 키를 절대 쓰지 않는다(변형은 묶음 밖, 1.4절 상한 테스트가 고정).
 - `applyAuto`: 질문 2가 "포함"이면 `applyAuto(_:oneTouch:)`가 색·디테일을 쓰고 얼굴이 있으면 `applyOneTouch(strength: oneTouchDefaultStrength, in: .all)`을 같은 체크포인트에서 한다(기존 피부 0.3·자동 잡티·눈 0.2 대입은 지움). "분리"면 지금 그대로이고 자동은 전체 층의 표시를 지운다(피부 보정이 바뀌므로).
 - 프리셋: `PresetValues`는 `portrait.oneTouch`와 `people.groups[*].oneTouch`를 그대로 나른다(값과 함께). `apply(_:)`는 통째로 바꾸므로 표시도 프리셋 것이 된다.
