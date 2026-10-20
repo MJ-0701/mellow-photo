@@ -52,6 +52,12 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.look = LookSelection(id: "film", intensity: 0.5)
         recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
         recipe.detail.sharpness = 0.2
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5)
+        recipe.people.individuals = [
+            PersonRecord(
+                id: PersonID(), anchor: PersonAnchor(x: 0.3, y: 0.6, width: 0.12), legacyIndex: 0, gender: .female,
+                layer: PortraitLayer(face: [.width: -0.3]))
+        ]
         recipe.effects.grain = 0.1
         return try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any])
     }
@@ -63,6 +69,7 @@ final class RecipeSchemaTests: XCTestCase {
         XCTAssertEqual(Set(properties.keys), Set(encoded.keys))
         for key in [
             "color", "portrait", "detail", "look", "geometry", "background", "bodySkin", "body", "makeup", "effects",
+            "people",
         ] {
             let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
             XCTAssertEqual(try activeKeys(properties[key]), Set(encodedSection.keys), key)
@@ -84,6 +91,30 @@ final class RecipeSchemaTests: XCTestCase {
         XCTAssertEqual(try propertyKeys(geometryProperties["crop"]), Set(encodedCrop.keys))
         try assertOperationsMatchBranches(properties: properties, encoded: encoded)
         XCTAssertEqual(schema["$id"] as? String, "https://mellow.photo/schema/edit-recipe.v2.schema.json")
+    }
+
+    func testPeopleSchemaDescribesLayersGroupsAndRecords() throws {
+        let schema = try schema(named: "edit-recipe.v2.schema")
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        let people = try sectionProperties(properties["people"])
+        XCTAssertEqual(Set(people.keys), ["groups", "individuals"])
+        XCTAssertEqual(try propertyKeys(people["groups"]), Set(Gender.allCases.map(\.rawValue)))
+        let item = try XCTUnwrap((people["individuals"] as? [String: Any])?["items"])
+        XCTAssertEqual(try propertyKeys(item), ["id", "anchor", "legacyIndex", "gender", "layer"])
+        let layer = try XCTUnwrap((schema["$defs"] as? [String: Any])?["portraitLayer"])
+        let layerProperties = try sectionProperties(layer)
+        XCTAssertEqual(Set(layerProperties.keys), ["skin", "face", "features", "makeup"])
+        XCTAssertEqual(
+            try propertyKeys(layerProperties["skin"]),
+            Set(["smoothing", "autoBlemish"] + SkinRefinementKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try propertyKeys(layerProperties["face"]), Set(FaceShapeKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try propertyKeys(layerProperties["features"]), Set(FeatureKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(
+            try propertyKeys(layerProperties["makeup"]), Set(["lookID"] + MakeupPart.allCases.map(\.rawValue)))
+        let encodedPeople = try XCTUnwrap(try encodedSampleRecipe()["people"] as? [String: Any])
+        let encodedRecord = try XCTUnwrap((encodedPeople["individuals"] as? [[String: Any]])?.first)
+        let encodedLayer = try XCTUnwrap(encodedRecord["layer"] as? [String: Any])
+        XCTAssertTrue(Set(encodedLayer.keys).isSubset(of: Set(layerProperties.keys)))
     }
 
     func testLegacyPortraitKeysStayInSchemaAsDeprecated() throws {

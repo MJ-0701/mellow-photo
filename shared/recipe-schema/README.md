@@ -4,7 +4,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
 | 파일 | 기술하는 것 | Apple 기준 구현 |
 |---|---|---|
-| `edit-recipe.v2.schema.json` | 사진 한 장의 보정 레시피 `EditRecipe` | `apple/Sources/MellowShared/API/EditRecipe.swift`, `Adjustments.swift`, `SkinAdjustments.swift`, `FaceShapeAdjustments.swift`, `FeatureAdjustments.swift`, `BackgroundAdjustments.swift`, `BodySkinAdjustments.swift`, `BodyShapeAdjustments.swift`, `MakeupAdjustments.swift`, `EffectAdjustments.swift`, `DetailAdjustments.swift`, `LookSelection.swift`, `GeometryAdjustments.swift`, `LocalEdit.swift` |
+| `edit-recipe.v2.schema.json` | 사진 한 장의 보정 레시피 `EditRecipe` | `apple/Sources/MellowShared/API/EditRecipe.swift`, `Adjustments.swift`, `SkinAdjustments.swift`, `FaceShapeAdjustments.swift`, `FeatureAdjustments.swift`, `BackgroundAdjustments.swift`, `BodySkinAdjustments.swift`, `BodyShapeAdjustments.swift`, `MakeupAdjustments.swift`, `EffectAdjustments.swift`, `PeopleAdjustments.swift`, `DetailAdjustments.swift`, `LookSelection.swift`, `GeometryAdjustments.swift`, `LocalEdit.swift` |
 | `session-file.v2.schema.json` | 작업 세션 파일 `session.json` 전체(사진 목록, 사진별 레시피와 실행 취소·다시 실행 기록, 선택한 사진, 사용자 프리셋) | `apple/Sources/MellowLibrary/Infrastructure/SessionFile.swift` |
 
 `session-file.v2`는 레시피 부분을 `edit-recipe.v2.schema.json`의 `$ref`로 가리킵니다. 검증기에는 두 스키마를 각자의 `$id`로 등록하거나, 같은 폴더에서 파일 이름으로 읽게 하세요. 어느 방식이든 `$ref`가 풀리도록 두 `$id`(`https://mellow.photo/schema/edit-recipe.v2.schema.json`, `…/session-file.v2.schema.json`)를 파일 이름과 같게 맞췄습니다.
@@ -22,6 +22,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 - `portrait.targetFace`는 왼쪽부터 센 얼굴 인덱스입니다. 값이 없으면 모든 얼굴에 적용합니다.
 - `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`, G의 피부 정밀 `darkCircles`·`nasolabial`·`marionette`·`glabella`·`toneEvening`·`shine` 0~1과 `redness` −1~1), `face`(얼굴형 10개, 가운데 0인 양방향, `smile`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
 - 최상위 `background`(배경 흐림), `bodySkin`(몸 피부 밝기·톤·매끄럽게, `tone`만 −1~1), `body`(체형 7개, `legLength`만 0~1), `makeup`(룩 id와 부위별 색 id·강도), `effects`(그레인·글로우 0~1, 룩 뒤 마지막 단계)가 있습니다. 렌더는 단계별로 들어오며 값이 기본이면 결과가 바뀌지 않습니다.
+- `people`은 사람별·성별 그룹 보정(H)입니다. `portrait`·`makeup`이 전체 층, `people.groups.male/female`이 성별 그룹 층, `people.individuals[].layer`가 개인 층이며 위 층이 아래 층을 키 단위로 덮어씁니다. 층은 있는 키만 담습니다(없음 = 상속). 층의 메이크업은 부위 단위로 덮어쓰고 부위 객체의 `colorID`가 없거나 `null`이면 "색 없음"으로 덮어씁니다. 층 스키마는 `$defs/portraitLayer` 하나입니다. `individuals[].anchor`는 정규화 얼굴 상자의 중심·폭이고 `gender`는 사용자가 지정한 성별만 담습니다(자동 추정은 저장하지 않음). `legacyIndex`는 옛 `targetFace`에서 이행한 기록에만 있습니다. Apple 구현은 레시피에 `people` 키를 늘 쓰고(`{}` 포함), 비어 있는 `groups`·`individuals`와 층의 빈 그룹 객체는 생략합니다.
 - B0까지 쓰던 `portrait.skinSmoothing`·`portrait.faceSlim`은 읽기만 합니다. `skin`이 없으면 `skin.smoothing = skinSmoothing`, `face`가 없으면 `face.width = −faceSlim`(0은 0)으로 읽고, 쓸 때는 새 키만 씁니다. 스키마에는 `deprecated: true`로 남아 있어 이전 파일도 검증을 통과합니다.
 - `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
 - `look`은 필터 선택입니다. `id`는 `shared/looks/looks.v1.json`의 룩 id이고, 값이 없으면 필터를 쓰지 않습니다. `intensity`는 원본과 룩 결과의 혼합 비율이며 기본값은 1입니다.
@@ -30,7 +31,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
   - 시계 방향 90° 회전: `quarterTurns` → (`quarterTurns` mod 4 + 1) mod 4, `crop` (x, y, w, h) → (y, 1 − x − w, h, w). `straightenDegrees`는 그대로입니다.
   - 좌우 반전은 화면에 보이는 그대로의 좌우입니다. `flipHorizontal`을 뒤집고, 회전이 홀수(1·3)면 `quarterTurns`에 2를 더합니다(mod 4). `crop`은 x → 1 − x − w, `straightenDegrees`는 부호를 바꿉니다(0은 0 그대로).
   - 렌더할 때 `crop`의 픽셀 경계는 변마다 가장 가까운 픽셀로 반올림합니다. 바깥으로 넓히지 않습니다.
-- 프리셋 `values`는 `color`·`portrait`·`detail`·`background`·`bodySkin`·`body`·`makeup`·`effects`를 담습니다. 없는 그룹은 기본값으로 읽습니다. 룩과 기하는 프리셋에 담지 않습니다.
+- 프리셋 `values`는 `color`·`portrait`·`detail`·`background`·`bodySkin`·`body`·`makeup`·`effects`·`people`을 담습니다. 없는 그룹은 기본값으로 읽습니다. 룩과 기하는 프리셋에 담지 않습니다. `people`은 `groups`만 담고 `individuals`는 읽을 때 버립니다.
 - `operations`는 사용자가 기록한 순서대로 재생합니다. 각 항목은 `"type": "spot"` 또는 `"type": "warp"`와 그 값을 같은 객체에 평평하게 담습니다.
 - 사진별 `undo`는 최대 40개입니다(`EditingPolicy.historyLimit`). 프리셋 이름은 최대 30자입니다(`LibraryPolicy.presetNameLimit`).
 - `filename`은 작업 사본의 파일 이름만 담습니다. 폴더는 플랫폼이 정합니다. Apple은 `Application Support/MellowPhoto/Library/<uuid>.<확장자>`에 둡니다.
@@ -110,9 +111,9 @@ v1 → v2 변환 규칙(`apple/Sources/MellowLibrary/Infrastructure/SessionFileV
 
 v1은 읽기만 합니다. 저장은 항상 v2로 합니다.
 
-## 키를 추가할 때의 규칙 (B~G)
+## 키를 추가할 때의 규칙 (B~H)
 
-B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다. G 단계는 `portrait.skin`에 피부 정밀 7개, 최상위 `bodySkin`·`effects`를 같은 규칙으로 더했습니다(기본값 0, schemaVersion 2 유지).
+B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다. G 단계는 `portrait.skin`에 피부 정밀 7개, 최상위 `bodySkin`·`effects`를 같은 규칙으로 더했습니다(기본값 0, schemaVersion 2 유지). H 단계는 최상위 `people`을 같은 규칙으로 더했습니다(기본값 비어 있음, schemaVersion 2 유지).
 
 1. **새 키는 반드시 기본값을 가집니다.** 키가 없는 기존 파일은 기본값으로 읽혀 지금과 같은 결과를 내야 합니다. 스키마에도 `default`를 적고 `required`에 넣지 않습니다.
 2. **키를 지우거나 이름을 바꾸지 않습니다.** 더 쓰지 않는 값도 읽기는 계속합니다. 의미를 바꿔야 하면 새 키를 만듭니다.

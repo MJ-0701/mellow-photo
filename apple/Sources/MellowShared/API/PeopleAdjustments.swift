@@ -343,3 +343,130 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         }
     }
 }
+
+/// 사진 안 한 사람.
+/// anchor로 다시 찾고 layer가 그 사람만의 값이다.
+/// gender는 수동 지정만 담는다(자동 추정은 분석 결과).
+public struct PersonRecord: Codable, Equatable, Identifiable, Sendable {
+    public var id: PersonID
+    public var anchor: PersonAnchor?
+    /// 옛 targetFace에서 온 기록만 가진다.
+    /// anchor가 채워지면 지운다.
+    public var legacyIndex: Int?
+    public var gender: Gender?
+    public var layer: PortraitLayer
+
+    public init(
+        id: PersonID = PersonID(), anchor: PersonAnchor? = nil, legacyIndex: Int? = nil, gender: Gender? = nil,
+        layer: PortraitLayer = PortraitLayer()
+    ) {
+        self.id = id
+        self.anchor = anchor
+        self.legacyIndex = legacyIndex
+        self.gender = gender
+        self.layer = layer
+    }
+
+    /// 성별도 층도 없는 기록.
+    /// 편집 규칙이 변경 뒤 지운다.
+    public var isEmpty: Bool { gender == nil && layer.isEmpty }
+}
+
+/// 성별 그룹 층 둘과 개인 기록.
+/// 전체 층은 EditRecipe.portrait·makeup이다.
+public struct PeopleAdjustments: Codable, Equatable, Sendable {
+    public var groups: [Gender: PortraitLayer]
+    public var individuals: [PersonRecord]
+
+    public init(groups: [Gender: PortraitLayer] = [:], individuals: [PersonRecord] = []) {
+        self.groups = groups
+        self.individuals = individuals
+    }
+
+    /// 어느 층이든 렌더를 바꾸는 값이 있는지.
+    /// 성별 지정만 있는 기록은 false다.
+    public var hasEffect: Bool {
+        groups.values.contains(where: \.hasEffect) || individuals.contains { $0.layer.hasEffect }
+    }
+
+    /// 모든 층의 숫자(유한성 검사용).
+    public var numericValues: [Double] {
+        groups.values.flatMap(\.numericValues) + individuals.flatMap(\.layer.numericValues)
+    }
+
+    public func person(_ id: PersonID) -> PersonRecord? {
+        individuals.first { $0.id == id }
+    }
+
+    /// anchor와 같은 사람의 기록.
+    /// Task 4가 PersonMatcher.isMatch로 바꾼다.
+    public func personID(at anchor: PersonAnchor) -> PersonID? {
+        individuals.first { $0.anchor.map { $0.isNear(anchor) } ?? false }?.id
+    }
+
+    /// 빈 기록을 지운다.
+    public mutating func prune() {
+        individuals.removeAll(where: \.isEmpty)
+    }
+
+    // MARK: Codable
+
+    // groups는 Gender rawValue를 JSON 키로 쓴다.
+    // 비어 있는 그룹 층과 빈 individuals는 쓰지 않는다.
+
+    private enum CodingKeys: String, CodingKey {
+        case groups
+        case individuals
+    }
+
+    private struct GenderKey: CodingKey {
+        let stringValue: String
+        var intValue: Int? { nil }
+
+        init(stringValue: String) {
+            self.stringValue = stringValue
+        }
+
+        init?(intValue: Int) {
+            nil
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        groups = [:]
+        if container.contains(.groups) {
+            let nested = try container.nestedContainer(keyedBy: GenderKey.self, forKey: .groups)
+            for gender in Gender.allCases {
+                groups[gender] = try nested.decodeIfPresent(
+                    PortraitLayer.self, forKey: GenderKey(stringValue: gender.rawValue))
+            }
+        }
+        individuals = try container.decodeIfPresent([PersonRecord].self, forKey: .individuals) ?? []
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let present = groups.filter { !$0.value.isEmpty }
+        if !present.isEmpty {
+            var nested = container.nestedContainer(keyedBy: GenderKey.self, forKey: .groups)
+            for gender in Gender.allCases {
+                try nested.encodeIfPresent(present[gender], forKey: GenderKey(stringValue: gender.rawValue))
+            }
+        }
+        if !individuals.isEmpty {
+            try container.encode(individuals, forKey: .individuals)
+        }
+    }
+}
+
+extension PersonAnchor {
+    /// Task 4의 PersonMatcher.isMatch와 같은 조건.
+    /// Task 4가 이 확장을 지우고 그 함수를 부른다.
+    fileprivate func isNear(_ other: PersonAnchor) -> Bool {
+        let larger = max(width, other.width)
+        let smaller = min(width, other.width)
+        guard smaller > 0, larger / smaller <= 2 else { return false }
+        return hypot(x - other.x, y - other.y) / larger <= 0.5
+    }
+}

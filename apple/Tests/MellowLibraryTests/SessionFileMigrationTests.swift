@@ -105,4 +105,23 @@ final class SessionFileMigrationTests: XCTestCase {
         XCTAssertFalse(text.contains("skinSmoothing"), "다시 저장하면 옛 키를 쓰지 않는다")
         XCTAssertFalse(text.contains("faceSlim"))
     }
+
+    func testPresetPeopleGroupsPersistAndIndividualsAreDropped() throws {
+        var values = PresetValues(color: ColorAdjustments(exposure: 0.2))
+        values.people.groups[.male] = PortraitLayer(skinSmoothing: 0.2)
+        let preset = Preset(name: "남녀", values: values)
+        let snapshot = SessionSnapshot(photos: [], selectedPhotoID: nil, presets: [preset])
+        let data = try SessionFile.encode(SessionFileMapper.file(from: snapshot))
+        let restored = SessionFileMapper.snapshot(from: try SessionFile.decode(data))
+        XCTAssertEqual(restored.presets[0].values.people.groups[.male], PortraitLayer(skinSmoothing: 0.2))
+        let json = """
+            {"schemaVersion":2,"photos":[],"presets":[{"id":"33333333-3333-3333-3333-333333333333","name":"옛",\
+            "values":{"color":{},"portrait":{},"people":{"groups":{"female":{"face":{"jaw":0.1}}},\
+            "individuals":[{"id":"44444444-4444-4444-4444-444444444444","anchor":{"x":0.5,"y":0.5,"width":0.2},\
+            "layer":{"skin":{"smoothing":1}}}]}}}]}
+            """
+        let decoded = SessionFileMapper.snapshot(from: try SessionFile.decode(Data(json.utf8)))
+        XCTAssertEqual(decoded.presets[0].values.people.groups[.female], PortraitLayer(face: [.jaw: 0.1]))
+        XCTAssertTrue(decoded.presets[0].values.people.individuals.isEmpty)
+    }
 }

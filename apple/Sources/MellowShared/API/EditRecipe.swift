@@ -14,6 +14,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var body = BodyShapeAdjustments()
     public var makeup = MakeupAdjustments()
     public var effects = EffectAdjustments()
+    /// 성별 그룹 층과 개인 기록.
+    /// portrait·makeup이 전체 층이다.
+    public var people = PeopleAdjustments()
     public var operations: [LocalEdit] = []
 
     public init(
@@ -21,7 +24,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         look: LookSelection = .init(), geometry: GeometryAdjustments = .init(),
         background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
         body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(), effects: EffectAdjustments = .init(),
-        operations: [LocalEdit] = []
+        people: PeopleAdjustments = .init(), operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
@@ -33,6 +36,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         self.body = body
         self.makeup = makeup
         self.effects = effects
+        self.people = people
         self.operations = operations
     }
 
@@ -48,6 +52,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case body
         case makeup
         case effects
+        case people
         case operations
     }
 
@@ -63,6 +68,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
         effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
+        people = try container.decodeIfPresent(PeopleAdjustments.self, forKey: .people) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
     }
 
@@ -79,6 +85,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(body, forKey: .body)
         try container.encode(makeup, forKey: .makeup)
         try container.encode(effects, forKey: .effects)
+        try container.encode(people, forKey: .people)
         try container.encode(operations, forKey: .operations)
     }
 
@@ -98,7 +105,8 @@ public struct EditRecipe: Codable, Equatable, Sendable {
 
     public var hasLocalEdits: Bool { !operations.isEmpty }
     /// 피부·얼굴형·눈·입·메이크업 중 하나라도 렌더를 바꾸면 얼굴 분석이 필요하다.
-    public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect }
+    /// 성별 그룹·개인 층의 값도 같다.
+    public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect || people.hasEffect }
     /// 배경 흐림과 몸 피부는 인물 마스크가 필요하다.
     public var dependsOnPerson: Bool { background.hasEffect || bodySkin.hasEffect }
     /// 체형은 관절점이 필요하다.
@@ -111,6 +119,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         let groups =
             portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
             + bodySkin.numericValues + body.numericValues + makeup.numericValues + effects.numericValues
+            + people.numericValues
         let locals = operations.flatMap(\.numericValues)
         return (scalars + groups + locals).allSatisfy(\.isFinite)
     }

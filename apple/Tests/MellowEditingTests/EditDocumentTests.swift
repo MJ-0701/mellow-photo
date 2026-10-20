@@ -626,7 +626,9 @@ final class EditDocumentTests: XCTestCase {
     func testBatchWithAllCategoriesCopiesEveryPresetGroup() {
         let values = filledPresetValues()
         let defaults = PresetValues()
-        for (filled, empty) in zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children) {
+        // people(성별 그룹 층)은 H2 Task 4가 동기화 층 규칙을 넣을 때 채우고 이 제외를 지운다.
+        let groups = zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children)
+        for (filled, empty) in groups where filled.label != "people" {
             XCTAssertNotEqual(
                 String(describing: filled.value), String(describing: empty.value), "\(filled.label ?? "") 그룹을 채운다")
         }
