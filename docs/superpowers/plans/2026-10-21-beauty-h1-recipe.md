@@ -8,9 +8,18 @@
 
 **Tech Stack:** Swift 5.9 tools / Swift 5 언어 모드, Foundation Codable(직접 구현), XCTest.
 
-**Spec:** `docs/superpowers/specs/2026-10-21-beauty-h-per-person-design.md` (H1에 해당하는 절: 1.1, 1.2, 1.3, 2의 레시피·해석·짝짓기 행, 5). 선행: G1·G2·G3 계획 전부 머지(`beauty-g-evoto`).
+**Spec:** `docs/superpowers/specs/2026-10-21-beauty-h-per-person-design.md` (H1에 해당하는 절: 1.1, 1.2, 1.3, 2의 레시피·해석·짝짓기 행, 5). 선행: G4-1과 H3 Task 1 머지(main `74fb2df` 이후). G4 개정은 아래 절.
 
 ## 사람이 확인할 것
+
+### G4 개정 (2026-10-21)
+
+[G4 스펙](../specs/2026-10-21-beauty-g4-one-touch-design.md) 5절에 따라 이 계획의 제약을 고쳤다. 결정은 바뀌지 않았다.
+
+- 기준 코드: main `74fb2df`(1.3.0 (8.1) TestFlight, G 머지됨). 브랜치 `beauty-g4`(worktree를 쓰면 `.claude/worktrees/beauty-g4`). `beauty-g-evoto`·`.claude/worktrees/beauty-g`는 더 쓰지 않는다.
+- **iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다**(SpringBoard 오류 창이 사용자를 방해함). `MELLOW_IOS_TESTS`를 켜지 않는다. `./scripts/test-apple.sh`는 로컬에서 iOS를 건너뛰며 iOS 검증은 CI(사용자가 요금 한도를 푼 뒤)다.
+- 실행 순서: G4-1 → H3 Task 1(생성 사진) → H1 → H2 → G4-2 → H3 Task 2·3 → G4-3 → H3 Task 4 → (승인 시) H4.
+- G4-2가 뒤에 `PortraitLayer.oneTouch`(표시 키)를 더한다. H1은 더하지 않는다(더하기만 규칙 유지).
 
 - **순서.** Task 1 층 값 타입 → 2 사람 기록·레시피·프리셋·스키마 → 3 층 해석 → 4 사람 짝짓기. 4개 Task, Task마다 Opus 구현 → 리뷰 → 수정, 끝에 전체 리뷰.
 - **외부 효과가 있는 단계.** 없음. 푸시·태그·TestFlight는 H 범위 밖(스펙 "돈·시간·외부 효과가 있는 단계").
@@ -36,8 +45,8 @@
 
 ## Global Constraints
 
-- 작업 위치: worktree `/Users/mj/IdeaProjects/mellow-photo/.claude/worktrees/beauty-g`, 브랜치 `beauty-g-evoto`. 부모 저장소로 `cd`하지 않는다. `PhotoPickerButton.swift`·`project.yml`·`scripts/test-apple.sh`·UI 테스트 타깃은 건드리지 않는다. 모든 Swift·xcodebuild 명령 전에 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
-- 시작 조건: G1·G2·G3이 모두 머지된 상태(`SkinRefinementKey` 7종, `BodySkinAdjustments`, `EffectAdjustments`, `SyncCategory`, `applyFromBatch(_:categories:)`가 있다). 시작 전에 `git log --oneline -5`와 `cd apple && swift test`로 확인한다.
+- 작업 위치: main `74fb2df` 이후에서 분기한 브랜치 `beauty-g4`(worktree를 쓰면 `/Users/mj/IdeaProjects/mellow-photo/.claude/worktrees/beauty-g4`, 부모 저장소로 `cd`하지 않는다). `PhotoPickerButton.swift`·`project.yml`·`scripts/test-apple.sh`·UI 테스트 타깃은 건드리지 않는다. 모든 Swift·xcodebuild 명령 전에 `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- 시작 조건: G4-1·H3 Task 1이 머지된 상태(`SkinRefinementKey` 7종, `BodySkinAdjustments`, `EffectAdjustments`, `SyncCategory`, `applyFromBatch(_:categories:)`, `DisplayScale`·`RealPortrait`, `PeopleFixtures`가 있다). 시작 전에 `git log --oneline -5`와 `cd apple && swift test`로 확인한다.
 - 모듈 의존성 표(`docs/architecture/modules.md`)와 `scripts/verify-modules.sh`는 바뀌지 않는다. 이 계획은 MellowShared 소스, `shared/recipe-schema/` 두 스키마와 README, MellowShared·MellowLibrary 테스트만 고친다. MellowShared는 Foundation·CoreGraphics만 import한다.
 - 레시피 `schemaVersion`은 2 유지, 키 추가만. `targetFace`의 읽기·쓰기·의미는 이 계획에서 바꾸지 않는다(H2 Task 5). 렌더·편집 코드는 이 계획에서 한 줄도 바꾸지 않는다.
 - 새 파일: `apple/Sources/MellowShared/API/PeopleAdjustments.swift`(Task 1·2), `PortraitResolver.swift`(Task 3), `PersonMatcher.swift`(Task 4). 새 테스트 파일: `apple/Tests/MellowSharedTests/PortraitLayerTests.swift`, `PortraitResolverTests.swift`, `PersonMatcherTests.swift`. 패키지 테스트는 폴더 전체가 타깃이라 `Package.swift`를 고치지 않는다.
@@ -45,7 +54,7 @@
 - 한 줄 한 문장, 세미콜론 금지. 한국어 사용자 문구 없음(모듈). `MellowError` 새 case 없음.
 - `cd apple && swift format lint --strict --recursive Sources Tests MellowPhoto MellowPhotoTests` 출력 없음(한도 120자). 새 빌드 경고 없음.
 - `./scripts/verify-modules.sh` 통과. 패키지 테스트: `cd apple && swift test`(모듈마다 `Executed N tests`). 이 계획은 앱 파일을 건드리지 않으므로 Mac 앱 테스트는 Task 4 끝에 한 번만 돌려 회귀가 없음을 확인한다(`xcodebuild -project apple/MellowPhoto.xcodeproj -scheme MellowPhoto -derivedDataPath apple/build -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"`).
-- iOS 시뮬레이터 테스트는 돌리지 않는다. Xcode를 열거나 앱을 띄우지 않는다. 푸시·태그·`scripts/release.sh` 금지.
+- iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다(CI만, `MELLOW_IOS_TESTS` 금지). Xcode를 열거나 앱·시뮬레이터를 띄우지 않는다. 푸시·태그·`scripts/release.sh` 금지.
 - 커밋: 한국어 Conventional Commits, 마지막 줄 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. `git add`는 Task에 나열한 경로만. 다른 에이전트가 같은 worktree에서 커밋할 수 있으므로 `git add -A`·`git commit -a`를 쓰지 않는다.
 - 기준 테스트 수: **시작 전에 `swift test`와 Mac 앱 테스트로 실측해 이 줄에 적는다**(G 계획의 목표값과 실제가 이미 다르다 — G1 끝 Rendering 246·Mac 72, G2 Task 4 뒤 Rendering 256). 이 계획이 더하는 수는 **Shared +9, Library +1**(Task 1 +2, Task 2 +3·Library +1, Task 3 +2, Task 4 +2)이고 다른 모듈·앱은 0이다. 아래 Task의 "Executed N tests"는 G3 계획 목표값(Shared 49 · Rendering 257 · Library 31 · Export 4 · Editing 36, 앱 Mac 78)을 기준으로 적은 명목치이므로 실측 기준값에 같은 증분을 더해 읽는다.
 

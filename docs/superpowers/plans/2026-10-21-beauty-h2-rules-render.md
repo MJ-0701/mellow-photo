@@ -12,6 +12,15 @@
 
 ## 사람이 확인할 것
 
+### G4 개정 (2026-10-21)
+
+[G4 스펙](../specs/2026-10-21-beauty-g4-one-touch-design.md) 5절에 따라 이 계획의 제약을 고쳤다. 결정은 바뀌지 않았다.
+
+- 기준 코드: main `74fb2df`(1.3.0 (8.1) TestFlight, G 머지됨). 브랜치 `beauty-g4`(worktree를 쓰면 `.claude/worktrees/beauty-g4`). `beauty-g-evoto`·`.claude/worktrees/beauty-g`는 더 쓰지 않는다.
+- **iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다**(SpringBoard 오류 창이 사용자를 방해함). `MELLOW_IOS_TESTS`를 켜지 않는다. `./scripts/test-apple.sh`는 로컬에서 iOS를 건너뛰며 iOS 검증은 CI(사용자가 요금 한도를 푼 뒤)다.
+- 실행 순서: G4-1 → H3 Task 1(생성 사진) → H1 → H2 → G4-2 → H3 Task 2·3 → G4-3 → H3 Task 4 → (승인 시) H4.
+- G4-2가 뒤에 `EditDocument.commit`에 `clearsStaleMarks` 인자와 `applyOneTouch`를 더하고 `merged`에 `oneTouch` 표시 규칙을 넣는다. H2의 `commit`·`merged`·`copy`·`resetAllLayer`·`appendPerson`은 그 확장이 가능하게 `private static`/`private mutating`으로 두되 이름을 바꾸지 않는다.
+
 - **순서.** Task 1 렌더 얼굴별 값 → 2 성별 추정 포트 → 3 층 편집 규칙 → 4 프리셋·동기화 층 규칙 → 5 `targetFace` 이행·제거와 앱 최소 변경. 5개 Task, Task마다 Opus 구현 → 리뷰 → 수정, 끝에 전체 리뷰.
 - **외부 효과가 있는 단계.** 없음.
 - **스펙이 정하지 않아 이 계획이 정한 것.**
@@ -38,7 +47,7 @@
 
 ## Global Constraints
 
-H1 계획의 Global Constraints를 그대로 따른다(worktree·브랜치·`DEVELOPER_DIR`·모듈 표 불변·lint·커밋 서명·`git add` 경로 제한·시뮬레이터 금지). 이 계획에서 다른 것:
+H1 계획의 Global Constraints(G4 개정 포함: 브랜치 `beauty-g4`, 로컬 iOS 시뮬레이터 금지)를 그대로 따른다(`DEVELOPER_DIR`·모듈 표 불변·lint·커밋 서명·`git add` 경로 제한). 이 계획에서 다른 것:
 
 - 시작 조건: H1 머지(`PeopleAdjustments`·`PortraitResolver`·`PersonMatcher` 존재). 기준 테스트 수는 **시작 전에 실측해 이 줄에 적는다**(H1 Global Constraints 참고). 이 계획이 더하는 수는 **Rendering +6, Editing +7, Library +1, Shared +2**(Task 1 Rendering +4, Task 2 Rendering +2, Task 3 Editing +5, Task 4 Editing +2·Library +1, Task 5 Shared +2), 앱 Mac 0(테스트 이름 교체만). 아래의 "Executed N tests"는 명목치(H1 끝 명목 387 → 403, Mac 78)이므로 실측 기준값에 같은 증분을 더해 읽는다.
 - MellowRendering은 `CoreImage`·`Foundation`·`MellowShared`·`Vision`만 import한다. `GenderEstimator`는 프로토콜만이고 Core ML을 import하지 않는다.

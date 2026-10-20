@@ -12,6 +12,16 @@
 
 ## 사람이 확인할 것
 
+### G4 개정 (2026-10-21)
+
+[G4 스펙](../specs/2026-10-21-beauty-g4-one-touch-design.md) 5절에 따라 이 계획의 제약을 고쳤다. 결정은 바뀌지 않았다.
+
+- 기준 코드: main `74fb2df`(1.3.0 (8.1) TestFlight, G 머지됨). 브랜치 `beauty-g4`(worktree를 쓰면 `.claude/worktrees/beauty-g4`). `beauty-g-evoto`·`.claude/worktrees/beauty-g`는 더 쓰지 않는다.
+- **iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다**(SpringBoard 오류 창이 사용자를 방해함). `MELLOW_IOS_TESTS`를 켜지 않는다. `./scripts/test-apple.sh`는 로컬에서 iOS를 건너뛰며 iOS 검증은 CI(사용자가 요금 한도를 푼 뒤)다.
+- 실행 순서: G4-1 → H3 Task 1(생성 사진) → H1 → H2 → G4-2 → H3 Task 2·3 → G4-3 → H3 Task 4 → (승인 시) H4.
+- Task 1(후보 모델 조사, 문서만)은 G4-1과 병행해 미리 할 수 있다(G4 스펙 질문 3). Task 2 이후는 사용자 승인 뒤 G4-3·H3 Task 4가 끝난 다음이다.
+- 원터치가 성별 표를 쓰므로 자동 추정이 들어오면 미지정 사람이 추정 성별의 표를 받게 된다(수동 지정이 늘 우선). 이 동작은 H2 `effectiveGender` 규칙 그대로이며 G4-2 `applyOneTouch(…in: .person)`은 기록의 **수동** 성별만 본다(추정은 렌더에서만 적용). VALIDATION에 이 차이를 적는다.
+
 - **순서.** Task 1 후보 모델 조사·권고 문서 → **사용자 승인(관문)** → 2 모듈 표·스크립트·모델 번들·추정기 → 3 라벨 정확도 측정·앱 주입 → 4 VALIDATION·스토어·개인정보 검토 항목. 4개 Task.
 - **외부 효과가 있는 단계.** 모델 파일 다운로드(크기 10~90 MB, 출처는 Task 1 표의 URL), 필요하면 coremltools 설치(스크래치 가상환경). 푸시·태그·TestFlight는 없다. 앱 크기가 모델만큼 는다.
 - **사용자가 정해야 하는 것(Task 1 뒤).** 후보 중 하나를 고르거나 H4를 하지 않기로 한다. 라이선스·배포 조건의 최종 판단은 사용자 몫이다(에이전트는 출처 링크와 원문 인용만 제공하고 해석하지 않는다).
@@ -410,7 +420,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 - [ ] **Step 1: 전체 검증**
 
-Run: `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer && MELLOW_IOS_TESTS=1 ./scripts/test-apple.sh` → 종료 코드 0. 시뮬레이터 상태 전후 확인(끄지 않는다).
+Run: `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer && ./scripts/test-apple.sh` → 종료 코드 0(로컬은 iOS 시뮬레이터를 건너뛴다. `MELLOW_IOS_TESTS` 금지. iOS는 CI에서 확인, 사용자 조치).
 
 - [ ] **Step 2: VALIDATION**
 

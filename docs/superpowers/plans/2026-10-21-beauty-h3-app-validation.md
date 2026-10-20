@@ -12,7 +12,17 @@
 
 ## 사람이 확인할 것
 
-- **순서.** Task 1 생성 사진 세트·라벨·README·테스트 타깃 사본 → 2 `AppModel`(칩 모델·성별·재설정·연결·삭제·캔버스 탭·legacy 연결) → 3 화면(`TargetChips`·성별 메뉴·슬라이더 표시·문구) → 4 시나리오·문서·VALIDATION·전체 검증. 4개 Task, Task마다 Opus 구현 → 리뷰 → 수정, 끝에 전체 리뷰.
+### G4 개정 (2026-10-21)
+
+[G4 스펙](../specs/2026-10-21-beauty-g4-one-touch-design.md) 5절에 따라 이 계획의 제약을 고쳤다. 결정은 바뀌지 않았다.
+
+- 기준 코드: main `74fb2df`(1.3.0 (8.1) TestFlight, G 머지됨). 브랜치 `beauty-g4`(worktree를 쓰면 `.claude/worktrees/beauty-g4`). `beauty-g-evoto`·`.claude/worktrees/beauty-g`는 더 쓰지 않는다.
+- **iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다**(SpringBoard 오류 창이 사용자를 방해함). `MELLOW_IOS_TESTS`를 켜지 않는다. `./scripts/test-apple.sh`는 로컬에서 iOS를 건너뛰며 iOS 검증은 CI(사용자가 요금 한도를 푼 뒤)다.
+- 실행 순서: G4-1 → H3 Task 1(생성 사진) → H1 → H2 → G4-2 → H3 Task 2·3 → G4-3 → H3 Task 4 → (승인 시) H4.
+- Task 1의 생성 사진은 G4-2 `RealPeople`(테스트 지원)도 쓴다. `labels.json`의 `gender`는 `Gender.rawValue`(`male`·`female`)와 같아야 한다(이미 그렇다).
+- Task 4의 VALIDATION H 절 뒤에 G4-3 Task 3이 G4 절을 더한다. 두 절 모두 "iOS 시뮬레이터는 CI"로 적는다.
+
+- **순서(G4 개정).** Task 1 생성 사진 세트·라벨·README·테스트 타깃 사본은 **G4-1 직후, H1 앞에** 따로 실행한다(G4-2 수용 테스트가 커플 사진을 쓴다). Task 2 `AppModel`(칩 모델·성별·재설정·연결·삭제·캔버스 탭·legacy 연결) → 3 화면(`TargetChips`·성별 메뉴·슬라이더 표시·문구)은 G4-2 뒤, Task 4 시나리오·문서·VALIDATION·전체 검증은 G4-3 뒤. Task마다 Opus 구현 → 리뷰 → 수정, 끝에 전체 리뷰.
 - **돈·시간·외부 효과가 있는 단계.** Task 1의 이미지 생성은 codex CLI(OpenAI 사용량)를 쓴다. 6~10장 규모. 푸시·태그·TestFlight는 없다.
 - **스펙이 정하지 않아 이 계획이 정한 것.**
 
@@ -44,7 +54,7 @@ H1 계획의 Global Constraints를 그대로 따른다. 이 계획에서 다른 
 - Task 1의 생성 파일은 `shared/fixtures/people/`(JPEG 1024px, 장당 600 KB 이내, 합계 5 MB 이내, `labels.json`, `README.md`)과 `apple/Tests/MellowRenderingTests/Fixtures/people/`(`couple-01.jpg`, `group-01.jpg`, `labels.json`)뿐이다. 중간 PNG는 스크래치 폴더에 두고 저장소에 넣지 않는다. 다운로드·생성물은 새 빈 폴더에 두고 그 폴더 안에서 인터프리터를 실행하지 않는다.
 - 생성 프롬프트에는 늘 "fictional people who do not resemble any real person or celebrity, no text, no watermark"를 넣는다. 실존 인물을 떠올리게 하는 결과는 버린다.
 - `Theme` 새 상수(Task 3): `targetChipHeight` 30, `targetChipPadding` 10, `overrideDotSize` 6. `AppModel.Policy` 새 상수(Task 2): 없음(얼굴 상자 히트테스트는 상자 그대로).
-- iOS 시뮬레이터 테스트는 Task 4의 `MELLOW_IOS_TESTS=1 ./scripts/test-apple.sh` 한 번. 직접 부팅하지 않은 시뮬레이터를 끄지 않는다. Xcode를 열거나 앱을 띄우지 않는다.
+- iOS 시뮬레이터 테스트는 로컬에서 돌리지 않는다(CI만, `MELLOW_IOS_TESTS` 금지). Task 4는 `./scripts/test-apple.sh`(로컬은 iOS 건너뜀)로 검증한다. Xcode를 열거나 앱·시뮬레이터를 띄우지 않는다.
 - 패키지 테스트: `cd apple && swift test`. Mac 앱 테스트 명령은 H1과 같다.
 
 ## Review Focus
@@ -990,7 +1000,7 @@ struct PersonGenderMenu: View {
 
 (`Section` 제목의 삼항식은 쓰지 않는다 — `Section(UserMessage.targetLabel) { … }`로 단순하게 쓴다. 위 코드에서 그 줄은 `Section(UserMessage.targetLabel) {`로 고쳐 넣는다.)
 
-`BeautyPanel.swift`: H2의 임시 `Picker`를 `TargetChips()`로 바꾸고, 세 탭의 슬라이더가 `model.scopedValues.portrait`를 보이며 `isOverridden: model.overriddenKeys.contains(key)`와 `onReset: { model.resetOverrides([key]) }`를 넘긴다(전체 대상에서는 `overriddenKeys`가 비어 표시가 없다). 자동 잡티 토글은 `scopedValues.portrait.skin.autoBlemish`. 얼굴 없음·분석 실패 안내는 그대로. 성별 안내 `UserMessage.assignGenderHint`는 사람 칩이 선택됐고 성별이 미지정일 때 한 줄.
+`BeautyPanel.swift`: H2의 임시 `Picker`를 `TargetChips()`로 바꾸고(칩은 패널 맨 위. 바로 뒤 G4-3가 칩 아래에 원터치 줄을 넣고 탭 피커 이하를 "세부 조정" 접기 안으로 옮기므로 탭 피커는 그대로 둔다), 세 탭의 슬라이더가 `model.scopedValues.portrait`를 보이며 `isOverridden: model.overriddenKeys.contains(key)`와 `onReset: { model.resetOverrides([key]) }`를 넘긴다(전체 대상에서는 `overriddenKeys`가 비어 표시가 없다). 자동 잡티 토글은 `scopedValues.portrait.skin.autoBlemish`. 얼굴 없음·분석 실패 안내는 그대로. 성별 안내 `UserMessage.assignGenderHint`는 사람 칩이 선택됐고 성별이 미지정일 때 한 줄.
 
 `MakeupPanel.swift`: 룩 칩 위에 `TargetChips()`, `makeup`은 `model.scopedValues.makeup`, 룩 칩 선택은 그 값의 `lookID`, 강도 슬라이더에 `isOverridden: model.overriddenKeys.contains(.makeupPart(part))`·`onReset`. "없음" 칩의 선택 조건은 `makeup == MakeupAdjustments()`에서 대상별로: 전체는 그대로, 그룹·개인은 `overriddenKeys.isSuperset(of: PortraitKey.makeup) && makeup.hasEffect == false`.
 
@@ -1100,11 +1110,11 @@ Run: Mac 앱 테스트 → `Executed 85 tests, with 0 failures`.
 
 - [ ] **Step 3: 전체 검증과 VALIDATION**
 
-Run: `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer && MELLOW_IOS_TESTS=1 ./scripts/test-apple.sh` → 종료 코드 0(모듈 검사, lint, xcodegen 차이 없음, 패키지 406, iPhone·iPad·Mac 앱 테스트 모두 `TEST SUCCEEDED`). 실패하면 고치고 다시 돌린다. 실행 전 `xcrun simctl list devices booted`로 켜져 있던 시뮬레이터를 적어 두고 실행 뒤 상태가 같은지 확인한다(끄지 않는다).
+Run: `export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer && ./scripts/test-apple.sh` → 종료 코드 0(모듈 검사, lint, xcodegen 차이 없음, 패키지, Mac 앱 테스트 `TEST SUCCEEDED`. 로컬은 iOS 시뮬레이터를 건너뛴다 — `MELLOW_IOS_TESTS`를 켜지 않는다). 실패하면 고치고 다시 돌린다. iPhone·iPad 시뮬레이터 테스트는 CI에서 확인한다(사용자 조치).
 
 `VALIDATION.md` 끝에 `## 인물 보정 H 사람별·성별 그룹 보정 (2026-10-XX)` 절을 G 절과 같은 소제목으로 쓴다:
 - 날짜·커밋·환경.
-- 자동 검증: 명령·종료 코드·테스트 수(모듈별)·시뮬레이터 상태.
+- 자동 검증: 명령·종료 코드·테스트 수(모듈별). "iOS 시뮬레이터 테스트는 로컬에서 돌리지 않았고 CI 확인은 사용자 조치"라고 적는다.
 - 자동 테스트가 확인하는 것: 스펙 §2 표를 실제 테스트 이름으로(층 왕복·이행·해석·짝짓기·층 편집·잠금·프리셋·동기화·얼굴별 렌더·그룹·짝 없는 기록·임계값·칩·캔버스 탭·시나리오·생성 사진 세트).
 - 옛 세션 이행: `targetFace`가 있던 사진은 "전체" 칩에서 값이 0으로 보이고 "사람 i" 칩에서 보인다. 렌더 바이트가 같음(H2 Task 5의 비교 절차 결과).
 - 생성 사진 세트: 장수·용량 합계·사진별 라벨 인원과 Vision 얼굴 수 표(5장 모두 실행해 적되 자동 테스트는 2장만 단언)·눈 확인 결과·사용 조건 README 위치.
