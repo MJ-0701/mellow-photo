@@ -9,7 +9,6 @@ public enum EditChange: Equatable, Sendable {
     case autoBlemish(Bool)
     case skinRefinement(SkinRefinementKey, Double)
     case faceShape(FaceShapeKey, Double)
-    case targetFace(Int?)
     case feature(FeatureKey, Double)
     case backgroundBlur(Double)
     case bodySkin(BodySkinKey, Double)
@@ -35,7 +34,7 @@ public enum EditChange: Equatable, Sendable {
     /// 성별이 바뀌면 그룹의 얼굴형 값이 다른 얼굴에 걸려 수동 편집 좌표가 어긋난다.
     public var affectsGeometry: Bool {
         switch self {
-        case .faceShape, .bodyShape, .targetFace, .gender:
+        case .faceShape, .bodyShape, .gender:
             return true
         default:
             return false

@@ -30,6 +30,18 @@ final class AppModel {
         var bodyAnalysisFailure: MellowError?
     }
 
+    /// 뷰티·메이크업 패널이 편집하는 대상.
+    /// 화면 상태라 파일에 저장하지 않는다.
+    enum BeautyTarget: Hashable {
+        case all
+        case gender(Gender)
+        /// 찾은 얼굴(기록이 있든 없든).
+        /// 왼쪽부터 센 인덱스다.
+        case face(Int)
+        /// 짝이 없는 사람 기록.
+        case person(PersonID)
+    }
+
     /// 배경 도구가 보여줄 상태. 분석 실패가 사람 없음보다 먼저다.
     enum BackgroundAvailability: Equatable {
         case ready
@@ -150,6 +162,9 @@ final class AppModel {
         guard compareMode == .split, let original, let heldOriginalGeometry else { return nil }
         return heldOriginalGeometry == previewGeometry ? original : nil
     }
+    /// 사진마다 마지막으로 본 뷰티 대상.
+    /// 앱을 다시 열면 전체다.
+    var beautyTargets: [PhotoID: BeautyTarget] = [:]
     /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
     var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
@@ -211,15 +226,56 @@ final class AppModel {
         }
         return selectedInfo?.hasBody == true ? .ready : .noBody
     }
-    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상 얼굴(모든 얼굴이면 전부)에 특징점이 없으면 noLandmarks다.
+    /// 선택 사진의 뷰티 대상.
+    var beautyTarget: BeautyTarget {
+        session.selectedPhotoID.flatMap { beautyTargets[$0] } ?? .all
+    }
+
+    /// 찾은 얼굴의 anchor.
+    /// 범위 밖이면 nil이다.
+    func anchor(forFace index: Int) -> PersonAnchor? {
+        faces.indices.contains(index) ? PersonAnchor(faceBox: faces[index].boundingBox) : nil
+    }
+
+    /// 대상이 가리키는 층.
+    /// .face는 렌더와 같은 짝짓기로 기록이 있으면 .person이고 없으면 nil이다(첫 변경이 기록을 만든다).
+    func scope(for target: BeautyTarget) -> PortraitScope? {
+        switch target {
+        case .all: return .all
+        case .gender(let gender): return .gender(gender)
+        case .person(let id): return .person(id)
+        case .face(let index):
+            return currentRecipe.people.personID(forFace: index, of: faces.map(\.boundingBox)).map(PortraitScope.person)
+        }
+    }
+
+    /// 뷰티·메이크업 패널이 보이는 값.
+    /// 대상 층까지 겹친 값이고 기록이 없는 얼굴은 전체 값이다.
+    var beautyValues: PortraitResolver.Resolved {
+        PortraitResolver.resolve(currentRecipe, scope: scope(for: beautyTarget) ?? .all, estimate: nil)
+    }
+
+    /// 대상이 가리키는 얼굴.
+    /// 전체·그룹은 모든 얼굴이다.
+    var targetedFaces: [FaceGeometry] {
+        switch beautyTarget {
+        case .all, .gender:
+            return faces
+        case .face(let index):
+            return faces.indices.contains(index) ? [faces[index]] : []
+        case .person(let id):
+            let paired = currentRecipe.people.peopleByFace(faces.map(\.boundingBox))
+            return paired.filter { $0.value.id == id }.keys.sorted().map { faces[$0] }
+        }
+    }
+
+    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상이 가리키는 얼굴(전체·그룹이면 전부)에 특징점이 없으면 noLandmarks다.
     var faceAvailability: FaceAvailability {
         if let failure = selectedInfo?.faceAnalysisFailure {
             return .unavailable(failure)
         }
         guard !faces.isEmpty else { return .noFace }
-        let targets =
-            currentRecipe.portrait.targetFace.map { index in faces.indices.contains(index) ? [faces[index]] : [] }
-            ?? faces
+        let targets = targetedFaces
         let lacksLandmarks = !targets.isEmpty && targets.allSatisfy { $0.landmarks.isEmpty }
         return lacksLandmarks ? .noLandmarks : .ready
     }

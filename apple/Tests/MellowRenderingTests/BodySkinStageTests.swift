@@ -22,8 +22,12 @@ final class BodySkinStageTests: XCTestCase {
     ) throws -> CIImage {
         var recipe = EditRecipe()
         recipe.bodySkin = values
-        recipe.portrait.targetFace = targetFace
-        let analysis = PhotoAnalysis(faces: faces ?? [synthetic.face], personMask: personMask)
+        let faces = faces ?? [synthetic.face]
+        if let targetFace {
+            recipe.portrait.skin.smoothing = 1
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
+        let analysis = PhotoAnalysis(faces: faces, personMask: personMask)
         let context = RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
         return try BodySkinStage().apply(synthetic.image, in: context)
     }
@@ -121,7 +125,7 @@ final class BodySkinStageTests: XCTestCase {
         let small = synthetic.face.transformed(scale: 0.3, offset: NormalizedPoint(x: 0.65, y: 0.6))
         let bright = BodySkinAdjustments(brightness: 1)
         let plain = try Support.bytes(output(synthetic, bright))
-        XCTAssertTrue(try Support.bytes(output(synthetic, bright, targetFace: 7)) == plain, "범위 밖 대상 얼굴도 동작")
+        XCTAssertTrue(try Support.bytes(output(synthetic, bright, targetFace: 7)) == plain, "짝이 없는 사람 기록이 있어도 동작")
         XCTAssertTrue(
             try Support.bytes(output(synthetic, bright, faces: [small, synthetic.face])) == plain, "기준은 가장 큰 얼굴")
         XCTAssertEqual(BodySkinStage.referenceFace([small, synthetic.face])?.boundingBox, synthetic.face.boundingBox)

@@ -139,10 +139,8 @@ final class ProjectSessionTests: XCTestCase {
         let source = entry("A")
         var locked = entry("B")
         locked.document.set(.faceShape(.width, -0.2))
-        locked.document.set(.targetFace(1))
         locked.document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
         var plain = entry("C")
-        plain.document.set(.targetFace(0))
         try session.add(source)
         try session.add(locked)
         try session.add(plain)
@@ -156,10 +154,8 @@ final class ProjectSessionTests: XCTestCase {
         }
         session.applyToAll(from: source.id)
         XCTAssertEqual(session.photos[1].document.recipe.portrait.face.width, -0.2)
-        XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 1)
         XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
         XCTAssertEqual(session.photos[2].document.recipe.portrait.face.width, -0.9)
-        XCTAssertNil(session.photos[2].document.recipe.portrait.targetFace)
         XCTAssertEqual(session.photos[0].document.recipe.color.exposure, 0.3, "원본 사진은 바뀌지 않는다")
         XCTAssertEqual(session.photos[1].document.recipe.background.blur, 0.4, "잠긴 사진도 배경 값은 복사한다")
         XCTAssertEqual(session.photos[2].document.recipe.background.blur, 0.4)
@@ -173,14 +169,17 @@ final class ProjectSessionTests: XCTestCase {
         try session.add(other)
         session.edit(source.id) { $0.set(.exposure(0.3)) }
         session.edit(source.id) { $0.set(.skinSmoothing(0.5)) }
-        session.edit(other.id) { $0.set(.targetFace(0)) }
+        let faces = [NormalizedRect(x: 0.2, y: 0.35, width: 0.2, height: 0.3)]
+        session.edit(other.id) { $0.set(.skinSmoothing(0.9), forFace: 0, of: faces) }
         session.applyToAll(from: source.id, categories: [.color])
         XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
         XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0, "피부는 고르지 않았다")
-        XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 0, "얼굴 항목이 없으면 대상 얼굴 유지")
+        XCTAssertEqual(
+            session.photos[1].document.recipe.people.individuals[0].layer.skinSmoothing, 0.9, "얼굴 항목이 없으면 개인 층 유지")
         session.applyToAll(from: source.id)
         XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0.5, "기본은 전부")
-        XCTAssertNil(session.photos[1].document.recipe.portrait.targetFace)
+        XCTAssertTrue(
+            session.photos[1].document.recipe.people.individuals.isEmpty, "피부를 동기화하면 개인 피부 키가 빠지고 빈 기록은 사라진다")
     }
 
     func testAddPresetTrimsAndLimitsName() throws {

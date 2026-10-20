@@ -143,7 +143,7 @@ final class FeatureStageTests: XCTestCase {
         ]
         var recipe = EditRecipe()
         recipe.portrait.features = FeatureAdjustments(eyeBrighten: 1, teethWhiten: 1, lipVitality: 1)
-        recipe.portrait.targetFace = 0
+        recipe = Support.restricted(recipe, toFace: 0, of: faces)
         let context = RenderContext(extent: extent, recipe: recipe, faces: faces, tuning: RenderTuning())
         let before = try Support.grid(image)
         let after = try Support.grid(FeatureStage().apply(image, in: context))

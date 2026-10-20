@@ -19,9 +19,11 @@ final class SessionFileMigrationTests: XCTestCase {
         XCTAssertEqual(first.filename, "11111111-1111-1111-1111-111111111111.heic")
         XCTAssertEqual(first.displayName, "사진 1")
         XCTAssertEqual(first.document.recipe.color.exposure, 0.4)
-        XCTAssertEqual(first.document.recipe.portrait.skin.smoothing, 0.3)
-        XCTAssertEqual(first.document.recipe.portrait.face.width, -0.2)
-        XCTAssertEqual(first.document.recipe.portrait.targetFace, 1)
+        XCTAssertEqual(first.document.recipe.portrait, PortraitAdjustments(), "selectedFace가 있던 사진은 전체 층이 빈다")
+        let person = try XCTUnwrap(first.document.recipe.people.individuals.first)
+        XCTAssertEqual(person.id, .legacy(index: 1))
+        XCTAssertEqual(person.legacyIndex, 1)
+        XCTAssertEqual(person.layer, PortraitLayer(skinSmoothing: 0.3, face: [.width: -0.2]))
         XCTAssertEqual(
             first.document.recipe.operations,
             [
@@ -95,15 +97,17 @@ final class SessionFileMigrationTests: XCTestCase {
             """
         let snapshot = SessionFileMapper.snapshot(from: try SessionFile.decode(Data(json.utf8)))
         let document = snapshot.photos[0].document
-        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.4)
-        XCTAssertEqual(document.recipe.portrait.face.width, -0.25)
-        XCTAssertEqual(document.recipe.portrait.targetFace, 0)
+        XCTAssertEqual(document.recipe.portrait, PortraitAdjustments())
+        XCTAssertEqual(
+            document.recipe.people.individuals[0].layer, PortraitLayer(skinSmoothing: 0.4, face: [.width: -0.25]))
+        XCTAssertEqual(document.recipe.people.individuals[0].legacyIndex, 0)
         XCTAssertEqual(document.undoStack[0].portrait.skin.smoothing, 0.1)
         XCTAssertEqual(snapshot.presets[0].values.portrait.face.width, -0.3)
         let rewritten = try SessionFile.encode(SessionFileMapper.file(from: snapshot))
         let text = try XCTUnwrap(String(data: rewritten, encoding: .utf8))
         XCTAssertFalse(text.contains("skinSmoothing"), "다시 저장하면 옛 키를 쓰지 않는다")
         XCTAssertFalse(text.contains("faceSlim"))
+        XCTAssertFalse(text.contains("targetFace"))
     }
 
     func testPresetPeopleGroupsPersistAndIndividualsAreDropped() throws {

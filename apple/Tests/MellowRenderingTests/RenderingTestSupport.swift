@@ -1026,3 +1026,18 @@ enum PeopleFixtures {
             .appendingPathComponent("shared/fixtures/people")
     }
 }
+
+extension RenderingTestSupport {
+    /// 전체 층 값을 faces[index]에 anchor로 묶인 개인 층으로 옮긴다.
+    /// 옛 targetFace 이행과 같은 규칙이다.
+    /// 범위 밖 index는 legacyIndex로 남아 짝이 없다.
+    static func restricted(_ recipe: EditRecipe, toFace index: Int, of faces: [FaceGeometry]) -> EditRecipe {
+        var moved = recipe
+        moved.migrateLegacyTargetFace(index)
+        if faces.indices.contains(index), !moved.people.individuals.isEmpty {
+            moved.people.individuals[0].anchor = PersonAnchor(faceBox: faces[index].boundingBox)
+            moved.people.individuals[0].legacyIndex = nil
+        }
+        return moved
+    }
+}

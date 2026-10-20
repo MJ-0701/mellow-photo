@@ -33,7 +33,6 @@ final class RecipeSchemaTests: XCTestCase {
 
     private func encodedSampleRecipe() throws -> [String: Any] {
         var recipe = EditRecipe()
-        recipe.portrait.targetFace = 1
         recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true, darkCircles: 0.2, redness: -0.1)
         recipe.portrait.face.width = -0.2
         recipe.portrait.features.eyeBrighten = 0.1
@@ -120,7 +119,7 @@ final class RecipeSchemaTests: XCTestCase {
     func testLegacyPortraitKeysStayInSchemaAsDeprecated() throws {
         let properties = try XCTUnwrap(try schema(named: "edit-recipe.v2.schema")["properties"] as? [String: Any])
         let portrait = try sectionProperties(properties["portrait"])
-        for key in ["skinSmoothing", "faceSlim"] {
+        for key in ["skinSmoothing", "faceSlim", "targetFace"] {
             let entry = try XCTUnwrap(portrait[key] as? [String: Any], key)
             XCTAssertEqual(entry["deprecated"] as? Bool, true, key)
         }

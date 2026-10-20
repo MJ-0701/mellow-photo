@@ -15,10 +15,12 @@ final class SkinStageTests: XCTestCase {
     ) throws -> CIImage {
         var recipe = EditRecipe()
         recipe.portrait.skin = skin
-        recipe.portrait.targetFace = targetFace
+        let faces = faces ?? [synthetic.face]
+        if let targetFace {
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
         let context = RenderContext(
-            extent: synthetic.image.extent, recipe: recipe, faces: faces ?? [synthetic.face], tuning: RenderTuning(),
-            blemishes: blemishes)
+            extent: synthetic.image.extent, recipe: recipe, faces: faces, tuning: RenderTuning(), blemishes: blemishes)
         return try SkinStage().apply(synthetic.image, in: context)
     }
 
@@ -600,7 +602,7 @@ final class SkinStageTests: XCTestCase {
         var recipe = EditRecipe()
         recipe.portrait.skin = SkinAdjustments(
             darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: 1, shine: 1)
-        recipe.portrait.targetFace = 0
+        recipe = Support.restricted(recipe, toFace: 0, of: faces)
         let context = RenderContext(extent: image.extent, recipe: recipe, faces: faces, tuning: RenderTuning())
         let before = try Support.grid(image)
         let after = try Support.grid(SkinStage().apply(image, in: context))

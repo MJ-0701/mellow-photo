@@ -64,14 +64,10 @@ public struct RenderContext: Sendable {
     /// 사람 기록을 얼굴에 짝짓고 얼굴마다 층을 겹친다.
     /// 짝짓기는 편집·앱과 같은 PeopleAdjustments.peopleByFace(전역 PersonMatcher.match)다.
     /// 성별은 기록의 수동 지정이 먼저이고 준비 때 받아들인 추정이 그다음이다.
-    /// H2 Task 5 전까지 옛 targetFace는 전체 층을 그 얼굴에만 건다(범위 밖이면 대상 없음).
     static func makeTargets(recipe: EditRecipe, analysis: PhotoAnalysis) -> [FaceTarget] {
         let faces = analysis.faces
         let personByFace = recipe.people.peopleByFace(faces.map(\.boundingBox))
-        return faces.indices.compactMap { index in
-            if let legacy = recipe.portrait.targetFace, legacy != index {
-                return nil
-            }
+        return faces.indices.map { index in
             let person = personByFace[index]
             let estimate = analysis.genderEstimates.indices.contains(index) ? analysis.genderEstimates[index] : nil
             let gender = PortraitResolver.effectiveGender(person: person, estimate: estimate?.gender)
@@ -81,13 +77,6 @@ public struct RenderContext: Sendable {
                 makeup: resolved.makeup, blemishes: analysis.blemishes.filter { $0.faceIndex == index })
         }
     }
-
-    /// faceTargets의 얼굴.
-    /// H2 Task 5에서 지운다.
-    public var targetFaces: [FaceGeometry] { faceTargets.map(\.face) }
-    /// faceTargets의 잡티.
-    /// H2 Task 5에서 지운다.
-    public var targetBlemishes: [BlemishSpot] { faceTargets.flatMap(\.blemishes) }
 
     /// 얼굴·잡티만 있는 분석으로 만든다. 단계 테스트가 쓰는 형태다.
     /// 새 분석 결과는 이 인자 목록에 더하지 않고 PhotoAnalysis에만 더한다.

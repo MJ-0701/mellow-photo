@@ -30,7 +30,7 @@ public struct PresetValues: Codable, Equatable, Sendable {
         self.people = PeopleAdjustments(groups: people.groups)
     }
 
-    /// 레시피의 슬라이더 그룹. 룩·기하·수동 편집은 담지 않는다. 대상 얼굴은 호출자가 정한다.
+    /// 레시피의 슬라이더 그룹. 룩·기하·수동 편집은 담지 않는다.
     /// 사람별 값은 성별 그룹 층만 담는다.
     public init(of recipe: EditRecipe) {
         self.init(

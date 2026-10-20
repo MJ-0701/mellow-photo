@@ -4,9 +4,15 @@ import MellowShared
 extension AppModel {
     private func mutateSelected(_ body: (inout EditDocument) -> EditDocument.Rejection?) {
         guard let id = session.selectedPhotoID, isReady, !isBusy else { return }
-        if session.edit(id, body) == .geometryLocked {
+        switch session.edit(id, body) {
+        case .geometryLocked:
             statusMessage = UserMessage.geometryLocked
             return
+        case .unknownPerson:
+            // 대상 사람이 사라졌으면 조용히 끝낸다.
+            return
+        case nil:
+            break
         }
         if let error = session.lastPersistenceError {
             present(error)
@@ -43,8 +49,36 @@ extension AppModel {
         endSliderEdit()
     }
 
+    /// 얼굴 의존 변경은 현재 뷰티 대상의 층에 쓴다.
+    /// 찾은 얼굴을 처음 만지면 기록이 만들어진다.
     func edit(_ change: EditChange) {
-        mutateSelected { $0.set(change) }
+        let target = beautyTarget
+        guard change.portraitKey != nil || isGenderChange(change) else {
+            mutateSelected { $0.set(change) }
+            return
+        }
+        switch target {
+        case .face(let index):
+            let boxes = faces.map(\.boundingBox)
+            mutateSelected { $0.set(change, forFace: index, of: boxes) }
+        default:
+            guard let scope = scope(for: target) else { return }
+            mutateSelected { $0.set(change, in: scope) }
+        }
+    }
+
+    private func isGenderChange(_ change: EditChange) -> Bool {
+        if case .gender = change {
+            return true
+        }
+        return false
+    }
+
+    /// 대상 전환은 화면 상태라 레시피를 바꾸지 않는다.
+    func setBeautyTarget(_ target: BeautyTarget) {
+        guard let id = session.selectedPhotoID else { return }
+        endSliderEditIfActive()
+        beautyTargets[id] = target
     }
 
     func applyPreset(_ values: PresetValues) {
@@ -72,8 +106,13 @@ extension AppModel {
         let look = makeupCatalog.look(id: id)
         guard id == nil || look != nil else { return }
         endSliderEditIfActive()
+        // 기록이 없는 얼굴에는 아직 룩을 걸 층이 없다(H3이 기록을 만들며 적용한다).
+        guard let scope = scope(for: beautyTarget) else {
+            statusMessage = UserMessage.pickASliderFirst
+            return
+        }
         mutateSelected { document in
-            document.applyMakeupLook(look)
+            document.applyMakeupLook(look, in: scope)
             return nil
         }
     }
@@ -122,11 +161,10 @@ extension AppModel {
         }
     }
 
-    /// 프리셋은 얼굴을 고르지 않는다. 대상 얼굴 번호는 사진마다 의미가 달라 저장하지 않는다.
+    /// 프리셋은 사람을 고르지 않는다. 개인 층은 사진마다 사람이 달라 저장하지 않는다.
     func savePreset(named name: String) {
-        var values = PresetValues(of: currentRecipe)
-        values.portrait.targetFace = nil
-        session.addPreset(named: name, values: values)
+        // 프리셋은 전체 층과 성별 그룹 층만 담는다(PresetValues(of:)가 개인 층을 버린다).
+        session.addPreset(named: name, values: PresetValues(of: currentRecipe))
     }
 
     func resetCloneSource() {

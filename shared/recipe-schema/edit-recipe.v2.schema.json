@@ -22,7 +22,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "targetFace": { "type": ["integer", "null"], "default": null, "description": "왼쪽부터 센 얼굴 인덱스. null이면 모든 얼굴." },
+        "targetFace": { "type": ["integer", "null"], "default": null, "deprecated": true, "description": "B0~G의 읽기 전용 키. people.individuals가 없을 때만 전체 층 값을 그 인덱스 사람의 개인 층(legacyIndex)으로 옮겨 읽는다. 쓰지 않는다." },
         "skin": {
           "type": "object", "additionalProperties": false,
           "properties": {

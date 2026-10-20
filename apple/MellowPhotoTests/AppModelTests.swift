@@ -201,19 +201,25 @@ final class AppModelTests: XCTestCase {
         XCTAssertTrue(model.preview === preview, "선택과 미리보기를 초기화하지 않는다")
     }
 
-    func testSavedPresetNeverCarriesTargetFace() async throws {
+    func testSavedPresetCarriesGroupLayersNotIndividuals() async throws {
         let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
         let model = TestSupport.makeModel(
-            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
-        await model.importFromFiles([staged])
-        try await waitUntil { model.isReady && model.preview != nil }
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.setBeautyTarget(.gender(.female))
+        model.edit(.skinSmoothing(0.5))
+        model.setBeautyTarget(.face(0))
         model.edit(.faceShape(.width, -0.4))
-        model.edit(.targetFace(1))
-        XCTAssertEqual(model.currentRecipe.portrait.targetFace, 1)
-        model.savePreset(named: "대상 얼굴")
+        XCTAssertEqual(model.currentRecipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.5))
+        XCTAssertEqual(model.currentRecipe.people.individuals.count, 1)
+        XCTAssertEqual(model.beautyValues.portrait.face.width, -0.4, "패널은 대상 층까지 겹친 값을 보인다")
+        model.savePreset(named: "남녀")
         let saved = try XCTUnwrap(model.session.presets.last)
-        XCTAssertNil(saved.values.portrait.targetFace, "프리셋은 얼굴을 고르지 않는다")
-        XCTAssertEqual(saved.values.portrait.face.width, -0.4)
+        XCTAssertEqual(saved.values.people.groups[.female], PortraitLayer(skinSmoothing: 0.5))
+        XCTAssertTrue(saved.values.people.individuals.isEmpty, "프리셋은 사람을 고르지 않는다")
+        XCTAssertEqual(saved.values.portrait.face.width, 0, "개인 층 값은 전체 층에 섞이지 않는다")
     }
 
     func testSliderDragSavesSessionOnceAtEnd() async throws {
@@ -905,15 +911,18 @@ final class AppModelTests: XCTestCase {
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
         XCTAssertEqual(model.faceAvailability, .ready, "특징점이 있는 얼굴이 대상에 있으면 준비됨")
-        model.edit(.targetFace(1))
+        model.setBeautyTarget(.face(1))
         XCTAssertEqual(model.faceAvailability, .noLandmarks)
         XCTAssertTrue(UserMessage.noLandmarksHint.contains("메이크업"))
         for tool in ["피부 보정", "얼룩 고르기", "붉은기", "번들거림", "잡티·변형"] {
             XCTAssertTrue(UserMessage.noLandmarksHint.contains(tool), "특징점 없이 쓸 수 있는 도구를 알린다: \(tool)")
         }
         XCTAssertTrue(UserMessage.noLandmarksHint.contains("주름 밝히기"), "특징점이 있어야 하는 주름 슬라이더를 알린다")
-        model.edit(.targetFace(0))
+        model.setBeautyTarget(.face(0))
         XCTAssertEqual(model.faceAvailability, .ready)
+        model.setBeautyTarget(.gender(.male))
+        XCTAssertEqual(model.faceAvailability, .ready, "그룹·전체는 모든 얼굴 기준")
+        XCTAssertEqual(model.currentRecipe, EditRecipe(), "대상 전환은 레시피를 바꾸지 않는다")
 
         let otherRoot = try TestSupport.temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: otherRoot) }

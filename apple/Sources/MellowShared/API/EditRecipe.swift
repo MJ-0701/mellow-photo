@@ -70,6 +70,32 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
         people = try container.decodeIfPresent(PeopleAdjustments.self, forKey: .people) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
+        // B0~G의 targetFace는 people이 없을 때만 개인 층으로 옮긴다.
+        let legacyTarget = try container.decodeIfPresent(LegacyPortraitProbe.self, forKey: .portrait)?.targetFace
+        if let legacyTarget, people.individuals.isEmpty {
+            migrateLegacyTargetFace(legacyTarget)
+        }
+    }
+
+    /// portrait 컨테이너의 옛 targetFace만 읽는다.
+    private struct LegacyPortraitProbe: Decodable {
+        var targetFace: Int?
+    }
+
+    /// B0~G의 portrait.targetFace("이 값을 i번 얼굴에만")를 H의 모양으로 옮긴다.
+    /// 전체 층 값 전부를 i번 사람의 개인 층(legacyIndex)으로 옮기고 전체 층은 비운다.
+    /// 렌더 결과는 같다.
+    /// id는 인덱스에서 결정적이라 같은 파일을 두 번 읽어도 같다.
+    /// 옮길 값이 없으면 기록을 만들지 않는다.
+    /// 음수·거대한 인덱스(손상 파일)는 범위의 마지막 값으로 모은다.
+    /// 어느 얼굴과도 짝이 되지 않아 옛 결과(빈 대상)와 같다.
+    public mutating func migrateLegacyTargetFace(_ index: Int) {
+        let layer = PortraitLayer.difference(portrait: portrait, makeup: makeup)
+        portrait = PortraitAdjustments()
+        makeup = MakeupAdjustments()
+        guard !layer.isEmpty else { return }
+        let safe = PersonID.legacyIndexRange.contains(index) ? index : PersonID.legacyIndexRange.upperBound
+        people.individuals = [PersonRecord(id: .legacy(index: safe), legacyIndex: safe, layer: layer)]
     }
 
     public func encode(to encoder: Encoder) throws {

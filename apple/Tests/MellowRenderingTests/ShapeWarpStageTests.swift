@@ -21,7 +21,9 @@ final class ShapeWarpStageTests: XCTestCase {
     ) -> RenderContext {
         var recipe = EditRecipe()
         recipe.portrait.face = face
-        recipe.portrait.targetFace = targetFace
+        if let targetFace {
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
         return RenderContext(extent: extent, recipe: recipe, faces: faces, tuning: tuning)
     }
 
@@ -33,7 +35,9 @@ final class ShapeWarpStageTests: XCTestCase {
         var recipe = EditRecipe()
         recipe.body = body
         recipe.portrait.face = face
-        recipe.portrait.targetFace = targetFace
+        if let targetFace {
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
         let analysis = PhotoAnalysis(faces: faces, bodies: bodies, bodyAnalysisFailure: bodyAnalysisFailure)
         return RenderContext(extent: extent ?? self.extent, recipe: recipe, analysis: analysis, tuning: tuning)
     }
@@ -303,7 +307,7 @@ final class ShapeWarpStageTests: XCTestCase {
         let stage = ShapeWarpStage()
         let fromIndividual = stage.facePrimitives(in: individual)
         XCTAssertGreaterThan(fromIndividual.count, 0)
-        XCTAssertEqual(fromIndividual.count, stage.facePrimitives(in: legacy).count, "옛 대상 얼굴과 같은 원소 수")
+        XCTAssertEqual(fromIndividual, stage.facePrimitives(in: legacy), "이행한 옛 대상 얼굴과 같은 원소")
         let everyone = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace])
         XCTAssertEqual(stage.facePrimitives(in: everyone).count, fromIndividual.count * 2)
     }

@@ -19,10 +19,10 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 ## v2 형식 요점
 
 - 좌표(`x`, `y`, `sourceX`, `sourceY`, `dx`, `dy`, `radius`)는 방향 보정된 이미지 기준 0~1 정규화 값이고, 원점은 왼쪽 아래입니다.
-- `portrait.targetFace`는 왼쪽부터 센 얼굴 인덱스입니다. 값이 없으면 모든 얼굴에 적용합니다.
+- B0~G의 `portrait.targetFace`(왼쪽부터 센 얼굴 인덱스, "이 값을 i번 얼굴에만")는 읽기만 합니다(`deprecated: true`). `people.individuals`가 비어 있을 때만 `portrait`(`skin`·`face`·`features`)와 `makeup` 중 기본값과 다른 키 전부를 `people.individuals[0].layer`로 옮기고 전체 층은 기본값으로 둡니다. 그 기록은 `legacyIndex = i`와 결정적 id(`B0000000-0000-0000-0000-` 뒤 12자리 인덱스)를 갖고 anchor가 없습니다. 인덱스가 0…999 999 999 999 밖이면(음수·손상 파일) 범위의 마지막 값으로 모아 어느 얼굴과도 짝이 되지 않게 합니다. 옮길 값이 없으면 기록을 만들지 않습니다. 렌더 결과는 옛 뜻과 같습니다. 사진을 준비한 뒤 `legacyIndex`의 얼굴로 anchor를 채우면 `legacyIndex`를 지웁니다. 쓸 때는 `targetFace`를 쓰지 않습니다.
 - `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`, G의 피부 정밀 `darkCircles`·`nasolabial`·`marionette`·`glabella`·`toneEvening`·`shine` 0~1과 `redness` −1~1), `face`(얼굴형 10개, 가운데 0인 양방향, `smile`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
 - 최상위 `background`(배경 흐림), `bodySkin`(몸 피부 밝기·톤·매끄럽게, `tone`만 −1~1), `body`(체형 7개, `legLength`만 0~1), `makeup`(룩 id와 부위별 색 id·강도), `effects`(그레인·글로우 0~1, 룩 뒤 마지막 단계)가 있습니다. 렌더는 단계별로 들어오며 값이 기본이면 결과가 바뀌지 않습니다.
-- `people`은 사람별·성별 그룹 보정(H)입니다. `portrait`·`makeup`이 전체 층, `people.groups.male/female`이 성별 그룹 층, `people.individuals[].layer`가 개인 층이며 위 층이 아래 층을 키 단위로 덮어씁니다. 층은 있는 키만 담습니다(없음 = 상속). 층의 메이크업은 부위 단위로 덮어쓰고 부위 객체의 `colorID`가 없거나 `null`이면 "색 없음"으로 덮어씁니다. 층 스키마는 `$defs/portraitLayer` 하나입니다. `individuals[].anchor`는 정규화 얼굴 상자의 중심·폭이고 `gender`는 사용자가 지정한 성별만 담습니다(자동 추정은 저장하지 않음). `legacyIndex`는 옛 `targetFace`에서 이행한 기록에만 있습니다. 기록에는 `anchor`와 `legacyIndex` 중 하나가 있어야 합니다(`anyOf`). 읽는 쪽은 관대하게 읽습니다: `layer`가 없으면 빈 층, 모르는 `gender` 문자열은 미지정이고, `id`나 `anchor`가 잘못된 기록은 그 기록만 버립니다. Apple 구현은 레시피에 `people` 키를 늘 쓰고(`{}` 포함), 비어 있는 `groups`·`individuals`와 층의 빈 그룹 객체는 생략합니다.
+- `people`은 사람별·성별 그룹 보정(H)입니다. `portrait`·`makeup`이 전체 층, `people.groups.male/female`이 성별 그룹 층, `people.individuals[].layer`가 개인 층이며 위 층이 아래 층을 키 단위로 덮어씁니다. 층은 있는 키만 담습니다(없음 = 상속). 층의 메이크업은 부위 단위로 덮어쓰고 부위 객체의 `colorID`가 없거나 `null`이면 "색 없음"으로 덮어씁니다. 층 스키마는 `$defs/portraitLayer` 하나입니다. `individuals[].anchor`는 정규화 얼굴 상자의 중심·폭이고 `gender`는 사용자가 지정한 성별만 담습니다(자동 추정은 저장하지 않음). `legacyIndex`는 옛 `targetFace`에서 이행한 기록에만 있습니다. 기록에는 `anchor`와 `legacyIndex` 중 하나가 있어야 합니다(`anyOf`). 읽는 쪽은 관대하게 읽습니다: `layer`가 없으면 빈 층, 모르는 `gender` 문자열은 미지정이고, `id`나 `anchor`가 잘못된 기록은 그 기록만 버리며, 같은 `id`의 기록이 둘 이상이면 앞의 것만 남깁니다. 편집과 렌더는 같은 전역 1:1 짝짓기 결과로 얼굴의 사람을 정합니다. Apple 구현은 레시피에 `people` 키를 늘 쓰고(`{}` 포함), 비어 있는 `groups`·`individuals`와 층의 빈 그룹 객체는 생략합니다.
 - B0까지 쓰던 `portrait.skinSmoothing`·`portrait.faceSlim`은 읽기만 합니다. `skin`이 없으면 `skin.smoothing = skinSmoothing`, `face`가 없으면 `face.width = −faceSlim`(0은 0)으로 읽고, 쓸 때는 새 키만 씁니다. 스키마에는 `deprecated: true`로 남아 있어 이전 파일도 검증을 통과합니다.
 - `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
 - `look`은 필터 선택입니다. `id`는 `shared/looks/looks.v1.json`의 룩 id이고, 값이 없으면 필터를 쓰지 않습니다. `intensity`는 원본과 룩 결과의 혼합 비율이며 기본값은 1입니다.
@@ -35,7 +35,7 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 - `operations`는 사용자가 기록한 순서대로 재생합니다. 각 항목은 `"type": "spot"` 또는 `"type": "warp"`와 그 값을 같은 객체에 평평하게 담습니다.
 - 사진별 `undo`는 최대 40개입니다(`EditingPolicy.historyLimit`). 프리셋 이름은 최대 30자입니다(`LibraryPolicy.presetNameLimit`).
 - `filename`은 작업 사본의 파일 이름만 담습니다. 폴더는 플랫폼이 정합니다. Apple은 `Application Support/MellowPhoto/Library/<uuid>.<확장자>`에 둡니다.
-- Apple 구현은 값이 없는 선택 키(`portrait.targetFace`, `look.id`, `geometry.crop`, `makeup.lookID`, `makeup.*.colorID`, `selectedPhotoID`)를 `null`로 쓰지 않고 키 자체를 생략합니다. 읽는 쪽은 생략과 `null`을 같은 뜻으로 받아야 합니다.
+- Apple 구현은 값이 없는 선택 키(`look.id`, `geometry.crop`, `makeup.lookID`, `makeup.*.colorID`, `people.individuals[].anchor`·`legacyIndex`·`gender`, `selectedPhotoID`)를 `null`로 쓰지 않고 키 자체를 생략합니다. 읽는 쪽은 생략과 `null`을 같은 뜻으로 받아야 합니다.
 - 읽을 때는 빠진 키를 기본값으로 채웁니다. 기본값은 스키마의 `default`와 같습니다.
 
 ### 값의 범위: 스키마 한계와 UI 권장 범위
@@ -103,7 +103,7 @@ v1 → v2 변환 규칙(`apple/Sources/MellowLibrary/Infrastructure/SessionFileV
 | `recipe.adjustments.{exposure,contrast,saturation,warmth}` | `recipe.color.*` |
 | `recipe.adjustments.skin` | `recipe.portrait.skin.smoothing` |
 | `recipe.adjustments.faceSlim` | `recipe.portrait.face.width` (부호 반대, 0은 0) |
-| `recipe.selectedFace` | `recipe.portrait.targetFace` |
+| `recipe.selectedFace` | `recipe.people.individuals[0]`(`legacyIndex`, 전체 층 값을 개인 층으로, 위 `targetFace` 이행과 같음) |
 | `{"spot":{"_0":{…}}}` | `{"type":"spot", …}` (warp도 같음) |
 | `undoHistory`/`redoHistory`의 해당 사진 항목 | 각 사진의 `undo`/`redo` |
 | `selectedID` | `selectedPhotoID` (목록에 없으면 첫 사진) |

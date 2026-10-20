@@ -10,7 +10,7 @@ struct MakeupPanel: View {
 
     var body: some View {
         @Bindable var model = model
-        let makeup = model.currentRecipe.makeup
+        let makeup = model.beautyValues.makeup
         let catalog = model.makeupCatalog
         let part = model.makeupPart
         switch model.faceAvailability {
@@ -24,6 +24,7 @@ struct MakeupPanel: View {
             Label(UserMessage.faceAnalysisUnavailableTitle, systemImage: "exclamationmark.triangle")
             Text(UserMessage.text(for: failure)).font(.caption).foregroundStyle(.secondary)
         }
+        BeautyTargetPicker()
         if catalog.isEmpty {
             Text(UserMessage.makeupCatalogUnavailable).font(.caption).foregroundStyle(.secondary)
         }

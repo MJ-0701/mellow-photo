@@ -108,8 +108,7 @@ struct SessionFileV1: Decodable {
     }
 
     private static func recipe(_ recipe: Recipe) -> EditRecipe {
-        var converted = values(recipe.adjustments)
-        converted.portrait.targetFace = recipe.selectedFace
+        let converted = values(recipe.adjustments)
         let operations = recipe.operations.map { operation -> LocalEdit in
             switch operation {
             case .spot(let spot):
@@ -120,6 +119,11 @@ struct SessionFileV1: Decodable {
                 return .warp(WarpStroke(x: warp.x, y: warp.y, dx: warp.dx, dy: warp.dy, radius: warp.radius))
             }
         }
-        return EditRecipe(color: converted.color, portrait: converted.portrait, operations: operations)
+        var result = EditRecipe(color: converted.color, portrait: converted.portrait, operations: operations)
+        // 옛 selectedFace는 B0~G의 targetFace와 같은 길로 개인 층에 옮긴다.
+        if let selected = recipe.selectedFace {
+            result.migrateLegacyTargetFace(selected)
+        }
+        return result
     }
 }

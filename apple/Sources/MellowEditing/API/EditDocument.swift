@@ -27,7 +27,7 @@ public struct EditDocument: Equatable, Sendable {
     public var canUndo: Bool { !undoStack.isEmpty }
     public var canRedo: Bool { !redoStack.isEmpty }
     public var hasEdits: Bool { !recipe.isDefault }
-    /// 수동 편집 좌표가 어긋나지 않도록 얼굴형·체형과 대상 얼굴을 고정한다.
+    /// 수동 편집 좌표가 어긋나지 않도록 얼굴형·체형과 성별 지정을 고정한다.
     public var isGeometryLocked: Bool { recipe.hasLocalEdits }
 
     public mutating func beginContinuousChange() {
@@ -146,12 +146,11 @@ public struct EditDocument: Equatable, Sendable {
         return changed
     }
 
-    /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
+    /// 사용자가 고른 프리셋. 프리셋은 사람을 고르지 않는다.
     /// 전체 층과 성별 그룹 층을 통째로 바꾸고 개인 층·성별 지정은 그대로 둔다.
     /// 잠긴 사진은 전체 층과 그룹 층의 얼굴형·체형을 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
     public mutating func apply(_ values: PresetValues) {
-        let updated = merged(
-            values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all, clearsIndividuals: false)
+        let updated = merged(values, categories: SyncCategory.all, clearsIndividuals: false)
         guard updated != recipe else { return }
         checkpoint()
         recipe = updated
@@ -159,21 +158,17 @@ public struct EditDocument: Equatable, Sendable {
 
     /// 다른 사진의 설정을 일괄 복사. 고른 항목만 전체·그룹 층에 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
     /// 복사한 얼굴 의존 항목은 받는 사진의 개인 층에서 그 키를 지운다. 성별 지정·anchor는 그대로다.
-    /// 잠기지 않은 사진은 얼굴 의존 항목을 복사할 때만 대상 얼굴을 전체로 되돌린다.
     /// 바뀌는 값이 없으면(잠긴 사진에 얼굴형만 복사하는 경우 등) 실행 취소 단계를 만들지 않는다.
     public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
         guard !categories.isEmpty else { return }
-        let resetsTarget = !isGeometryLocked && categories.contains { $0.dependsOnFaces }
-        let updated = merged(
-            values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories,
-            clearsIndividuals: true)
+        let updated = merged(values, categories: categories, clearsIndividuals: true)
         guard updated != recipe else { return }
         checkpoint()
         recipe = updated
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
-    /// 피부 정밀·치아 미백·입술 생기·대상 얼굴·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
+    /// 피부 정밀·치아 미백·입술 생기·성별 그룹·개인 층·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다. 적용했으면 true.
     @discardableResult
     public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
@@ -217,7 +212,7 @@ public struct EditDocument: Equatable, Sendable {
     /// 얼굴 의존 항목은 그룹 층의 그 키도 바꾸고, clearsIndividuals면 개인 층에서 그 키를 지운다.
     /// 잠긴 사진에서 건너뛴 얼굴형은 개인 층에서도 지우지 않는다.
     private func merged(
-        _ values: PresetValues, targetFace: Int?, categories: Set<SyncCategory>, clearsIndividuals: Bool
+        _ values: PresetValues, categories: Set<SyncCategory>, clearsIndividuals: Bool
     ) -> EditRecipe {
         var updated = recipe
         var applied = categories
@@ -266,7 +261,6 @@ public struct EditDocument: Equatable, Sendable {
             }
         }
         updated.people.prune()
-        updated.portrait.targetFace = targetFace
         return updated
     }
 
@@ -343,7 +337,6 @@ public struct EditDocument: Equatable, Sendable {
             updated.portrait.skin[key] = EditingPolicy.clamped(value, to: EditingPolicy.skinRefinementRange(key))
         case .faceShape(let key, let value):
             updated.portrait.face[key] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(key))
-        case .targetFace(let index): updated.portrait.targetFace = index
         case .feature(let key, let value):
             updated.portrait.features[key] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
         case .backgroundBlur(let value):

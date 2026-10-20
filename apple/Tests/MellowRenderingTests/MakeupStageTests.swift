@@ -176,7 +176,7 @@ final class MakeupStageTests: XCTestCase {
         }
     }
 
-    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. targetFace 0은 왼쪽 얼굴만, 범위 밖 인덱스는 아무 얼굴도 칠하지 않는다.
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. 왼쪽 사람의 개인 층은 왼쪽 얼굴만, 짝이 없는 기록은 아무 얼굴도 칠하지 않는다.
     /// 다섯 부위(립·블러셔·아이섀도·눈썹·쉐딩)를 모두 강도 1로 켠다.
     func testTargetFacePaintsOnlyThatFace() throws {
         let synthetic = SyntheticFace.makeFeatures()
@@ -199,7 +199,7 @@ final class MakeupStageTests: XCTestCase {
                 blush: MakeupTint(colorID: "blush-pink", intensity: 1),
                 eyeshadow: MakeupTint(colorID: "shadow-smoky", intensity: 1), brow: MakeupStrength(intensity: 1),
                 contour: MakeupStrength(intensity: 1))
-            recipe.portrait.targetFace = targetFace
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
             let context = RenderContext(
                 extent: extent, recipe: recipe, faces: faces, tuning: RenderTuning(), makeupCatalog: catalog)
             return try MakeupStage().apply(image, in: context)

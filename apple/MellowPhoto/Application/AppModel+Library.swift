@@ -78,6 +78,7 @@ extension AppModel {
         lookThumbnails[entry.id] = nil
         lookThumbnailRequests.remove(entry.id)
         photoInfo[entry.id] = nil
+        beautyTargets[entry.id] = nil
         preview = nil
         original = nil
         isReady = false

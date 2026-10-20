@@ -64,17 +64,18 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.undoStack.count, EditingPolicy.historyLimit)
     }
 
-    func testLocalEditLocksFaceShapeAndTargetFace() {
+    func testLocalEditLocksFaceShapeAndGender() {
         var document = EditDocument()
         document.set(.faceShape(.width, -0.2))
-        document.set(.targetFace(1))
+        document.set(.gender(.female), forFace: 0, of: twoFaces)
         document.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
         XCTAssertTrue(document.isGeometryLocked)
         XCTAssertEqual(document.set(.faceShape(.width, -0.9)), .geometryLocked)
         XCTAssertEqual(document.set(.faceShape(.jaw, 0.3)), .geometryLocked)
-        XCTAssertEqual(document.set(.targetFace(nil)), .geometryLocked)
+        XCTAssertEqual(
+            document.set(.gender(nil), in: .person(document.recipe.people.individuals[0].id)), .geometryLocked)
         XCTAssertEqual(document.recipe.portrait.face, FaceShapeAdjustments(width: -0.2))
-        XCTAssertEqual(document.recipe.portrait.targetFace, 1)
+        XCTAssertEqual(document.recipe.people.individuals[0].gender, .female)
         XCTAssertNil(document.set(.skinSmoothing(0.5)))
         // 피부 보정, 수동 편집 순으로 되돌린다.
         document.undo()
@@ -284,14 +285,14 @@ final class EditDocumentTests: XCTestCase {
 
     func testPresetReplacesEverythingWhenUnlocked() {
         var document = EditDocument()
-        document.set(.targetFace(2))
+        document.set(.gender(.male), forFace: 0, of: twoFaces)
         document.apply(
             PresetValues(
-                portrait: PortraitAdjustments(targetFace: 5, face: FaceShapeAdjustments(width: -0.7)),
+                portrait: PortraitAdjustments(face: FaceShapeAdjustments(width: -0.7)),
                 background: BackgroundAdjustments(blur: 0.4), body: BodyShapeAdjustments(waist: -0.3),
                 makeup: MakeupAdjustments(brow: MakeupStrength(intensity: 0.5))))
         XCTAssertEqual(document.recipe.portrait.face.width, -0.7)
-        XCTAssertEqual(document.recipe.portrait.targetFace, 2, "프리셋은 얼굴을 고르지 않으므로 사진의 대상 얼굴을 유지한다")
+        XCTAssertEqual(document.recipe.people.individuals[0].gender, .male, "프리셋은 사람을 고르지 않으므로 사진의 성별 지정을 유지한다")
         XCTAssertEqual(document.recipe.background.blur, 0.4)
         XCTAssertEqual(document.recipe.body.waist, -0.3)
         XCTAssertEqual(document.recipe.makeup.brow.intensity, 0.5)
@@ -300,32 +301,28 @@ final class EditDocumentTests: XCTestCase {
     func testBatchApplyKeepsLockedShapeAndCopiesTheRest() {
         var locked = EditDocument()
         locked.set(.faceShape(.width, -0.2))
-        locked.set(.targetFace(1))
         locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
         var unlocked = EditDocument()
-        unlocked.set(.targetFace(0))
         let values = PresetValues(
             color: ColorAdjustments(exposure: 0.3),
             portrait: PortraitAdjustments(
-                targetFace: 3, skin: SkinAdjustments(smoothing: 0.6), face: FaceShapeAdjustments(width: -0.9)),
+                skin: SkinAdjustments(smoothing: 0.6), face: FaceShapeAdjustments(width: -0.9)),
             body: BodyShapeAdjustments(legLength: 0.4),
             makeup: MakeupAdjustments(lip: MakeupTint(colorID: "lip-coral", intensity: 0.5)))
         locked.applyFromBatch(values)
         unlocked.applyFromBatch(values)
         XCTAssertEqual(locked.recipe.portrait.face.width, -0.2)
         XCTAssertEqual(locked.recipe.body, BodyShapeAdjustments(), "잠긴 사진은 체형도 유지한다")
-        XCTAssertEqual(locked.recipe.portrait.targetFace, 1)
         XCTAssertEqual(locked.recipe.portrait.skin.smoothing, 0.6, "피부는 잠금과 무관하게 복사한다")
         XCTAssertEqual(locked.recipe.makeup.lip.colorID, "lip-coral")
         XCTAssertEqual(locked.recipe.color.exposure, 0.3)
         XCTAssertEqual(unlocked.recipe.portrait.face.width, -0.9)
         XCTAssertEqual(unlocked.recipe.body.legLength, 0.4)
-        XCTAssertNil(unlocked.recipe.portrait.targetFace)
         XCTAssertTrue(locked.canUndo)
         XCTAssertTrue(unlocked.canUndo)
     }
 
-    func testBatchCopiesOnlyChosenCategoriesAndKeepsTargetFaceWithoutFaceCategories() {
+    func testBatchCopiesOnlyChosenCategoriesAndKeepsIndividualsWithoutFaceCategories() {
         var values = PresetValues(color: ColorAdjustments(exposure: 0.3), detail: DetailAdjustments(vignette: 0.2))
         values.portrait.skin.smoothing = 0.6
         values.portrait.face.width = -0.5
@@ -333,7 +330,7 @@ final class EditDocumentTests: XCTestCase {
         values.bodySkin.brightness = 0.4
         values.effects.grain = 0.3
         var document = EditDocument()
-        document.set(.targetFace(1))
+        document.set(.skinSmoothing(0.9), forFace: 0, of: twoFaces)
         document.set(.feature(.teethWhiten, 0.7))
         document.applyFromBatch(values, categories: [.color, .effects])
         XCTAssertEqual(document.recipe.color.exposure, 0.3)
@@ -343,10 +340,10 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.portrait.features.teethWhiten, 0.7)
         XCTAssertNil(document.recipe.makeup.lip.colorID)
         XCTAssertEqual(document.recipe.bodySkin.brightness, 0)
-        XCTAssertEqual(document.recipe.portrait.targetFace, 1, "얼굴 의존 항목이 없으면 대상 얼굴을 유지한다")
+        XCTAssertEqual(document.recipe.people.individuals[0].layer.skinSmoothing, 0.9, "얼굴 의존 항목이 없으면 개인 층을 유지한다")
         document.applyFromBatch(values, categories: [.skin])
         XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.6)
-        XCTAssertNil(document.recipe.portrait.targetFace, "얼굴 의존 항목을 복사하면 대상 얼굴을 전체로")
+        XCTAssertTrue(document.recipe.people.individuals.isEmpty, "피부를 복사하면 개인 피부 키를 지운다")
         var locked = EditDocument()
         locked.set(.faceShape(.width, -0.2))
         locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
@@ -367,7 +364,7 @@ final class EditDocumentTests: XCTestCase {
         recipe.makeup.lip = MakeupTint(colorID: "lip-rose", intensity: 0.4)
         var document = EditDocument(recipe: recipe)
         document.set(.faceShape(.width, -0.2))
-        document.set(.targetFace(1))
+        document.set(.skinSmoothing(0.9), forFace: 0, of: twoFaces)
         document.set(.lookID("film"))
         let before = document.undoStack.count
         let suggestion = AutoEnhanceSuggestion(
@@ -379,7 +376,7 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.detail.highlights, -0.2)
         XCTAssertEqual(document.recipe.portrait.skin, SkinAdjustments(smoothing: 0.3, autoBlemish: true))
         XCTAssertEqual(document.recipe.portrait.face.width, -0.2, "자동 보정은 얼굴형을 건드리지 않는다")
-        XCTAssertEqual(document.recipe.portrait.targetFace, 1)
+        XCTAssertEqual(document.recipe.people.individuals[0].layer.skinSmoothing, 0.9, "자동 보정은 전체 층에만 쓴다")
         XCTAssertEqual(document.recipe.body.waist, -0.3)
         XCTAssertEqual(document.recipe.makeup.lip.colorID, "lip-rose")
         XCTAssertEqual(document.recipe.look.id, "film", "자동 보정은 룩을 건드리지 않는다")
@@ -587,7 +584,7 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertTrue(document.canRedo, "바뀐 것이 없는 프리셋은 다시 실행 기록도 지우지 않는다")
     }
 
-    /// 모든 그룹을 기본값이 아닌 값으로 채운 프리셋. 대상 얼굴은 일괄 적용이 전체로 되돌리므로 nil이다.
+    /// 모든 그룹을 기본값이 아닌 값으로 채운 프리셋.
     private func filledPresetValues() -> PresetValues {
         var values = PresetValues(
             color: ColorAdjustments(exposure: 0.3, contrast: 1.2, saturation: 0.8, warmth: 0.1),
@@ -635,13 +632,14 @@ final class EditDocumentTests: XCTestCase {
         }
         let portraits = zip(
             Mirror(reflecting: values.portrait).children, Mirror(reflecting: defaults.portrait).children)
-        for (filled, empty) in portraits where filled.label != "targetFace" {
+        for (filled, empty) in portraits {
             XCTAssertNotEqual(
                 String(describing: filled.value), String(describing: empty.value), "\(filled.label ?? "") 묶음을 채운다")
         }
         var document = EditDocument()
-        document.set(.targetFace(1))
+        document.set(.skinSmoothing(0.9), forFace: 0, of: twoFaces)
         document.applyFromBatch(values, categories: SyncCategory.all)
+        XCTAssertTrue(document.recipe.people.individuals.isEmpty, "전부 복사하면 개인 층의 얼굴 키가 모두 빠진다")
         XCTAssertEqual(PresetValues(of: document.recipe), values, "전부를 고르면 프리셋의 모든 그룹을 복사한다")
     }
 

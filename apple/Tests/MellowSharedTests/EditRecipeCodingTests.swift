@@ -13,8 +13,9 @@ final class EditRecipeCodingTests: XCTestCase {
     func testRoundTripPreservesOperationsOrderAndSchemaVersion() throws {
         var recipe = EditRecipe()
         recipe.color.exposure = 0.4
-        recipe.portrait.skin.smoothing = 0.3
-        recipe.portrait.targetFace = 1
+        recipe.people.individuals = [
+            PersonRecord(id: .legacy(index: 1), legacyIndex: 1, layer: PortraitLayer(skinSmoothing: 0.3))
+        ]
         recipe.operations = [
             .spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.45, sourceY: 0.4, radius: 0.02)),
             .warp(WarpStroke(x: 0.5, y: 0.4, dx: 0.01, dy: 0, radius: 0.08)),
@@ -102,13 +103,14 @@ final class EditRecipeCodingTests: XCTestCase {
     func testLegacyPortraitKeysMigrateAndAreNotWritten() throws {
         let json = #"{"schemaVersion":2,"portrait":{"skinSmoothing":0.4,"faceSlim":0.3,"targetFace":1}}"#
         let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8))
-        XCTAssertEqual(decoded.portrait.skin, SkinAdjustments(smoothing: 0.4))
-        XCTAssertEqual(decoded.portrait.face, FaceShapeAdjustments(width: -0.3))
-        XCTAssertEqual(decoded.portrait.targetFace, 1)
+        XCTAssertEqual(decoded.portrait, PortraitAdjustments(), "옛 targetFace가 있어 값은 개인 층으로 간다")
+        XCTAssertEqual(
+            decoded.people.individuals.first?.layer, PortraitLayer(skinSmoothing: 0.4, face: [.width: -0.3]),
+            "옛 키를 먼저 옮긴 뒤 개인 층으로 옮긴다")
         let data = try JSONEncoder().encode(decoded)
         let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let portrait = try XCTUnwrap(encoded["portrait"] as? [String: Any])
-        XCTAssertEqual(Set(portrait.keys), ["targetFace", "skin", "face", "features"])
+        XCTAssertEqual(Set(portrait.keys), ["skin", "face", "features"])
         XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), decoded)
     }
 
@@ -468,5 +470,79 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(second.gender, .female)
         XCTAssertEqual(second.legacyIndex, 1)
         XCTAssertEqual(second.layer, PortraitLayer(face: [.width: -0.2]))
+    }
+
+    func testLegacyTargetFaceMigratesIntoAPersonRecord() throws {
+        let legacy = """
+            {"schemaVersion":2,"portrait":{"targetFace":1,"skin":{"smoothing":0.5,"autoBlemish":true,"darkCircles":0.2},\
+            "face":{"width":-0.3},"features":{"eyeBrighten":0.4}},\
+            "makeup":{"lookID":"daily","lip":{"colorID":"lip-coral","intensity":0.5},"brow":{"intensity":0.2}},\
+            "color":{"exposure":0.1}}
+            """
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.portrait, PortraitAdjustments(), "전체 층은 비운다")
+        XCTAssertEqual(decoded.makeup, MakeupAdjustments())
+        XCTAssertEqual(decoded.color.exposure, 0.1)
+        XCTAssertEqual(decoded.people.individuals.count, 1)
+        let record = decoded.people.individuals[0]
+        XCTAssertEqual(record.id, .legacy(index: 1))
+        XCTAssertEqual(record.legacyIndex, 1)
+        XCTAssertNil(record.anchor)
+        XCTAssertNil(record.gender)
+        XCTAssertEqual(
+            record.layer,
+            PortraitLayer(
+                skinSmoothing: 0.5, autoBlemish: true, skinRefinement: [.darkCircles: 0.2], face: [.width: -0.3],
+                features: [.eyeBrighten: 0.4],
+                makeup: [.lip: MakeupTint(colorID: "lip-coral", intensity: 0.5), .brow: MakeupTint(intensity: 0.2)],
+                makeupLookID: "daily"))
+        XCTAssertTrue(decoded.dependsOnFaces)
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8)), decoded, "이행은 결정적이다")
+        let reencoded = try XCTUnwrap(String(data: JSONEncoder().encode(decoded), encoding: .utf8))
+        XCTAssertFalse(reencoded.contains("targetFace"), "다시 쓰면 옛 키가 없다")
+        XCTAssertTrue(reencoded.contains("\"legacyIndex\":1"))
+        let bare = #"{"schemaVersion":2,"portrait":{"targetFace":0}}"#
+        XCTAssertTrue(try JSONDecoder().decode(EditRecipe.self, from: Data(bare.utf8)).isDefault, "옮길 값이 없으면 기록도 없다")
+        let outOfRange = #"{"schemaVersion":2,"portrait":{"targetFace":7,"skin":{"smoothing":0.5}}}"#
+        XCTAssertEqual(
+            try JSONDecoder().decode(EditRecipe.self, from: Data(outOfRange.utf8)).people.individuals[0].legacyIndex, 7,
+            "범위 밖 인덱스도 그대로 옮긴다(짝이 없어 렌더에서 빠짐, 옛 결과와 같음)")
+        let both = """
+            {"schemaVersion":2,"portrait":{"targetFace":0,"skin":{"smoothing":0.5}},\
+            "people":{"individuals":[{"id":"44444444-4444-4444-4444-444444444444","anchor":{"x":0.5,"y":0.5,"width":0.2},\
+            "layer":{"skin":{"smoothing":0.1}}}]}}
+            """
+        let kept = try JSONDecoder().decode(EditRecipe.self, from: Data(both.utf8))
+        XCTAssertEqual(kept.portrait.skin.smoothing, 0.5, "people이 이미 있으면 이행하지 않는다")
+        XCTAssertEqual(kept.people.individuals.count, 1)
+        for corrupt in ["-1", "9999999999999"] {
+            let json = #"{"schemaVersion":2,"portrait":{"targetFace":"# + corrupt + #","skin":{"smoothing":0.5}}}"#
+            let record = try XCTUnwrap(
+                JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8)).people.individuals.first)
+            XCTAssertEqual(record.legacyIndex, PersonID.legacyIndexRange.upperBound, "손상된 인덱스 \(corrupt)는 범위 끝으로")
+            XCTAssertTrue(
+                PersonMatcher.match([record], faces: [NormalizedRect(x: 0.1, y: 0.1, width: 0.2, height: 0.2)]).isEmpty)
+        }
+        var manual = EditRecipe()
+        manual.portrait.skin.smoothing = 0.3
+        manual.migrateLegacyTargetFace(2)
+        XCTAssertEqual(manual.people.individuals[0].id, .legacy(index: 2))
+        XCTAssertEqual(manual.portrait.skin.smoothing, 0)
+    }
+
+    func testPortraitAdjustmentsNoLongerCarryATargetFace() throws {
+        let json = try XCTUnwrap(
+            JSONSerialization.jsonObject(
+                with: JSONEncoder().encode(PortraitAdjustments(skin: SkinAdjustments(smoothing: 0.2))))
+                as? [String: Any])
+        XCTAssertEqual(Set(json.keys), ["skin", "face", "features"])
+        let schemaURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("shared/recipe-schema/edit-recipe.v2.schema.json")
+        let schema = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: schemaURL)) as? [String: Any])
+        let portrait = try XCTUnwrap(
+            ((schema["properties"] as? [String: Any])?["portrait"] as? [String: Any])?["properties"] as? [String: Any])
+        XCTAssertEqual((portrait["targetFace"] as? [String: Any])?["deprecated"] as? Bool, true)
     }
 }
