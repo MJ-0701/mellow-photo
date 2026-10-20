@@ -526,9 +526,9 @@ extension SyntheticFace {
     /// 코 날개 → 입꼬리 띠 위(코 쪽 40% 지점을 바깥으로 민 자리).
     static let leftNasolabial = CGPoint(x: 220, y: 173)
     static let rightNasolabial = CGPoint(x: 292, y: 173)
-    /// 입꼬리에서 턱 쪽으로 내려간 마리오네트 타원 안.
-    static let leftMarionette = CGPoint(x: 196, y: 124)
-    static let rightMarionette = CGPoint(x: 316, y: 124)
+    /// 입꼬리에서 턱 쪽으로 내려간 마리오네트 타원 안. 마스크 격자에서 값이 가장 큰 자리(0.9)다.
+    static let leftMarionette = CGPoint(x: 196, y: 120)
+    static let rightMarionette = CGPoint(x: 316, y: 120)
     /// 두 눈썹 안쪽 끝 사이.
     static let glabella = CGPoint(x: 256, y: 338)
 }

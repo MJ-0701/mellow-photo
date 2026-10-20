@@ -308,6 +308,30 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
+    /// 그늘 없는 피부에서 주름 밝히기가 띠 표본 점의 채널마다 바꿔도 되는 최대 바이트. 피부 질감 얼룩의 작은 밝힘만 허용한다.
+    private static let unshadowedFoldTolerance = 3
+
+    func testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast() throws {
+        let synthetic = SyntheticFace.make()
+        let before = try Support.grid(synthetic.image)
+        let cases: [(SkinAdjustments, [CGPoint])] = [
+            (SkinAdjustments(darkCircles: 1), [SyntheticFace.underLeftEye, SyntheticFace.underRightEye]),
+            (SkinAdjustments(nasolabial: 1), [SyntheticFace.leftNasolabial, SyntheticFace.rightNasolabial]),
+            (SkinAdjustments(marionette: 1), [SyntheticFace.leftMarionette, SyntheticFace.rightMarionette]),
+            (SkinAdjustments(glabella: 1), [SyntheticFace.glabella]),
+        ]
+        for (skin, points) in cases {
+            let after = try Support.grid(render(synthetic, skin: skin))
+            for point in points {
+                for channel in 0..<3 {
+                    XCTAssertEqual(
+                        Int(after.rgba(point)[channel]), Int(before.rgba(point)[channel]),
+                        accuracy: Self.unshadowedFoldTolerance, "그늘 없는 \(point) 채널 \(channel)은 밝은 얼룩·색 번짐이 없다")
+                }
+            }
+        }
+    }
+
     func testMissingLandmarksSkipOnlyThatFold() throws {
         let base = SyntheticFace.make()
         let image = darkened(
