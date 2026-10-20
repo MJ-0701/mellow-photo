@@ -569,11 +569,11 @@
 
 ## 인물 보정 G4-1 주름 재설계·보이는 강도 (2026-10-20)
 
-- 브랜치 `beauty-g4`(main `538a735`에서 분기), 코드 커밋 `c7b5c2c`까지.
+- 브랜치 `beauty-g4`(main `538a735`에서 분기), 코드 커밋 `c7b5c2c`와 최종 리뷰 수정(몸 피부 톤 0.035, 아래 "최종 리뷰 수정" 절)까지.
 - 환경: macOS 26.6.2, Xcode 27.1, Mac17,9. CI는 Xcode 26.3이다.
 - iOS 시뮬레이터 테스트와 실기기 검증은 하지 않았다.
 - 로컬 시뮬레이터는 SpringBoard 오류 창 때문에 돌리지 않는 규칙이고, iOS는 CI 몫, 실기기는 사용자 조치다.
-- iOS는 시뮬레이터용 빌드만(기기 부팅 없음) `30dc671`에서 성공했다(Task 5 수정 때). 그 뒤 `907d667`의 진단 변경 뒤에는 iOS 빌드를 다시 하지 않았다.
+- iOS는 로컬에서 시뮬레이터용 빌드만(`generic/platform=iOS Simulator`, 기기 부팅 없음) 했다. `30dc671`에서 성공했고, 최종 리뷰 수정 작업 트리(`ad7e894` + 수정)에서 다시 성공했다(경고는 기존 `CIKernel(source:)` 지원 중단 8건과 AppIntents 메타데이터 안내 1건).
 - 배포(릴리스 노트·태그·TestFlight)는 하지 않았다.
 
 ### 자동 검증
@@ -585,9 +585,11 @@
 - G 기준 384에서 Rendering이 17 늘었다(실사진 수용 14, 주름 밝히기 2, 몸 피부 대체 영역 1).
 - Mac 앱 **83**. 시작 전 실측 80에서 진단 1, 사진을 바꾸면 렌더 오류 지움 1, 진단의 수동 편집 개수 줄 1이 늘었다.
 - 상태 줄 테스트는 기존 테스트를 고친 것이라 수가 늘지 않았다.
-- CI: GitHub Actions "Apple checks" 실행 `39402590661`(`30dc671`, macos-15·Xcode 26.3, 컨트롤러가 띄움)은 2026-10-20 09:53 UTC에 한 번 확인했을 때 **진행 중이었고 결과는 미확인**이다.
-- 그때 "Modules, format, package and app tests" 단계가 돌고 있었고 앞 단계(도구, 릴리스 노트 자동화 테스트)는 통과했다.
-- 이 실행은 `907d667`·`c7b5c2c`를 포함하지 않는다.
+- CI: GitHub Actions "Apple checks" 실행 `39402590661`(`30dc671`, macos-15·Xcode 26.3)은 **성공**했다(2026-10-20 10:02 UTC 완료, `gh run view`로 확인).
+- 그 실행에서 패키지 401(1 건너뜀: 치아 미백)이 통과했고 실사진 수용 테스트도 macOS Vision에서 통과했다.
+- iOS 시뮬레이터(컨트롤러 전달: iOS 18.5) 앱 테스트 두 기기 각 81, Mac 앱 82, iPhone UI 테스트, 서명 없는 Release 빌드도 통과했다.
+- 그 실행에는 측정 출력 줄(`c7b5c2c`)이 없어 CI의 실측값(여유가 좁은 값 포함)은 남지 않았다.
+- `907d667`·`c7b5c2c`·`b33b569`와 최종 리뷰 수정 커밋은 다음 CI 실행이 확인한다. **그 실행은 아직 하지 않았다.**
 
 ### 실측 표 (데모 사진, 실제 Vision, 폰 화면 배율 가로 1170px, 값 1 또는 끝값)
 
@@ -622,7 +624,8 @@
 | | 심은 반사광 ΔY | > 10 | 28.0 | 28.0 | |
 | 몸 피부 밝기 1 | 전체 바뀐 비율 | ≥ 0.15 | 0.509 | 0.509 | 없음 |
 | | 몸 피부 영역 평균 ΔY (상한) | ≤ 25.5 | — | +18.3 | |
-| 몸 피부 톤 +1 | 피부 가중 (ΔR − ΔB) | ≥ 6 | 19.8 | 40.6 | `bodySkinToneMax` 0.025 → 0.05 |
+| 몸 피부 톤 +1 | 피부 가중 (ΔR − ΔB) | ≥ 6 | 19.8 | 28.7 | `bodySkinToneMax` 0.025 → 0.035(처음 0.05에서 40.6, 최종 리뷰로 내림) |
+| 몸 피부 톤 ±1 | 피부 가중 \|ΔR − ΔB\| (상한, 최종 리뷰 추가) | ≤ 30 | — | +1: 28.7 · −1: 28.7 | |
 | 바디 매끄럽게 1 | 전체 바뀐 비율 | ≥ 0.10 | 0.189 | 0.189 | 없음 |
 | 그레인 1 | 전체 ΔY 표준편차 | ≥ 5 | 5.58 | 14.5 | `grainMaxAmplitude` 0.12 → 0.30 |
 | | 알갱이 한 변(화면 px) | ≥ 2.5 | 1.40 | 2.93 | `grainSizeFraction` 0.0012 → 0.0025 |
@@ -634,17 +637,20 @@
 | 피부 8종 동시 | 얼굴 다각형을 얼굴 폭 5% 넓힌 영역 밖 바뀐 비율 (상한) | ≤ 0.002 | 0.0000 | 0.0000 | — |
 | 원터치 행 | 스펙 1.2·1.4의 원터치 행 | — | — | 재지 않음(G4-2 범위) | — |
 
-여유가 좁은 값은 두 개이고 CI의 Xcode·macOS Vision 차이로 뒤집힐 수 있다.
+여유가 좁은 값은 세 개이고 CI의 Xcode·macOS Vision 차이로 뒤집힐 수 있다.
 - 피부 보정 질감 비 0.882(문턱 0.85, 여유 0.03).
 - 눈 또렷하게 3.20(문턱 3.0, 여유 0.20).
+- 몸 피부 톤 상한 28.7(문턱 30, 여유 1.3/255).
 
 문턱 수치는 하나도 바꾸지 않았다.
 입술 생기의 지표 변경은 컨트롤러 판정이고 스펙 1.2와 결정 표에 적었다.
+몸 피부 톤 상한 30/255는 최종 리뷰 뒤 컨트롤러 판정으로 새로 더한 문턱이고 스펙 1.4와 결정 표에 적었다.
 
 ### 자동 테스트가 확인하는 것
 
 - `RealPhotoAcceptanceTests`(14): `testSkinSmoothingChangesTheFaceButKeepsPores`, `testToneEveningEvensSkinButKeepsPores`, `testDarkCirclesLiftUnderTheEyesVisiblyAndNaturally`, `testNasolabialLiftsTheFoldVisiblyAndNaturally`, `testMarionetteRecoversASyntheticShadow`, `testGlabellaRecoversASyntheticShadow`, `testRednessClearsASyntheticBlotchAndFlushIsVisible`, `testShineFlattensASyntheticHighlight`, `testBodySkinBrightnessToneAndSmoothingAreVisible`, `testGrainIsVisibleAtPhoneScale`, `testGlowIsVisibleAtPhoneScale`, `testEyeAndLipFeaturesAreVisible`, `testBlushIsVisible`, `testFaceItemsLeaveHairAndBackgroundUntouched`.
 - 데모 사진 준비(실제 Vision 얼굴 1개)가 실패하면 수용 테스트마다 오류로 실패하고 다른 테스트는 계속 돈다.
+- `testBodySkinBrightnessToneAndSmoothingAreVisible`는 인물 마스크가 없어도 건너뛰지 않는다(몸 피부 단계와 측정 영역이 함께 얼굴 둘레 대체 영역을 쓴다). 어느 영역이었는지는 `acceptance bodySkin personMask=` 줄로 남는다.
 - 주름 띠와 캐시: `FoldRegionsTests`(새 표본 점, 입꼬리 옆까지 이어지는 팔자 띠, 아래 띠), `RegionMaskCacheTests.testRefinementsUseOneSkinRasterAndOneFoldRaster`와 캐시 수 40·60.
 - 주름 밝히기: `SkinStageTests.testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast`(다시 정의), `testFoldLiftWithTooLittleSurroundSkinLeavesTheBandUnchanged`, `testFoldLiftIgnoresDarkFeaturesInTheSurround`.
 - 붉은기: `SkinStageTests.testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly`(볼 기대값을 기준 여유만큼 이동, 창백한 조각은 그대로).
@@ -654,7 +660,7 @@
 
 ### 스펙과 다르게 한 것
 
-앞의 여섯은 G4 스펙 결정 표에 "(G4-1 구현 중 변경)"으로 적었고, 표본 점은 스펙 2.1, 진단 줄은 스펙 6에 적었다.
+앞의 일곱은 G4 스펙 결정 표에 "(G4-1 구현 중 변경)"으로 적었고, 표본 점은 스펙 2.1, 진단 줄은 스펙 6에 적었다.
 
 - 눈 또렷하게 상수 `eyeWhiteLift` 0.2 → 0.3, `eyeIrisSharpen` 0.8 → 1.0(스펙 1.2의 조정 후보 안).
 - 입술 생기 하한을 휘도 대신 입술 마스크 가중 |ΔCr| ≥ 0.02로 잰다(입술 커널은 휘도를 바꾸지 않는다).
@@ -662,14 +668,33 @@
 - 사람 분석이 실패해도 얼굴이 있으면 몸 피부 슬라이더를 켠다(렌더가 대체 영역으로 실제 적용한다).
 - 합성 반사광 도우미가 아무것도 심지 못하던 버그를 고쳤다(고친 뒤 +28/255).
 - "띠 밖·마스크 밖 불변"은 채널 차이 1바이트 이내로 단언한다(섞기 반올림, G4 전에도 같음).
+- 몸 피부 톤 상수는 스펙 처음 값 0.05가 아니라 0.035이고 상한 \|ΔR − ΔB\| ≤ 30/255를 더했다(최종 리뷰, 자연스러움 우선).
 - 합성 얼굴 표본 점 몇 개를 격자로 확정한 자리로 옮겼다(스펙 2.1에 값과 이유, 문턱은 그대로).
 - 진단은 수동 편집(`operations`)을 점·획마다 적지 않고 `operations=N` 한 줄로 적는다(스펙 6의 "스크린샷 한 장" 목적).
+
+### 최종 리뷰 수정 (2026-10-20)
+
+브랜치 전체 리뷰(Important 2·3, Minor 7·10)를 반영했다. 스펙을 먼저 고친 문서 커밋 `ad7e894` 뒤에 코드를 고쳤다.
+
+- 몸 피부 톤 `bodySkinToneMax` 0.05 → 0.035. 0.025도 하한의 3.3배였고 0.05는 얼굴 전체가 주황빛으로 뜰 위험이 있었다.
+- 자연스러움 상한 "피부 톤(몸) ±1: 피부 가중 \|ΔR − ΔB\| ≤ 30/255"를 스펙 1.4와 수용 테스트(`Naturalness.bodyToneMaximumRedMinusBlue`)에 더했다. 하한 6/255 단언은 그대로다.
+- 몸 피부 수용 테스트의 "인물 마스크 없으면 건너뜀"을 없앴다. CI Vision이 사람을 못 찾으면 이제 건너뛰지 않고 대체 영역으로 잰다.
+- 로컬에서 인물 마스크를 임시로 nil로 바꿔 대체 영역 경로를 한 번 돌렸다(커밋하지 않음): 밝기 바뀐 비율 0.673, 몸 피부 평균 ΔY +15.8, 톤 +1 26.1 · −1 −26.2, 매끄럽게 바뀐 비율 0.269로 모두 통과.
+- `docs/architecture/modules.md` 테스트 열을 지금 테스트에 맞췄다(얼굴 없으면 항등, 인물 마스크 없으면 얼굴 둘레 대체 영역).
+- 스펙 1.2의 다크서클 fine 분산 비를 1.4·테스트와 같은 0.85로 맞췄다.
+
+자동 검증(최종 리뷰 수정 작업 트리에서 한 번 실행, 재시도 없음):
+
+- `./scripts/test-apple.sh` 종료 코드 **0**. 모듈 검사, lint, XcodeGen 차이 없음, 패키지, Mac 앱 테스트가 통과했고 iOS 시뮬레이터 앱 테스트·iPhone UI 테스트는 스크립트가 로컬에서 건너뛰었다.
+- 패키지 **401**(MellowShared 49, MellowRendering 279(1 건너뜀: 치아 미백), MellowLibrary 32, MellowExport 4, MellowEditing 37), Mac 앱 **83**. 테스트 수는 늘지 않았다(기존 몸 피부 수용 테스트에 단언을 더함).
+- `./scripts/verify-modules.sh` 통과, `swift format lint --strict` 출력 없음, iOS 시뮬레이터용 빌드 성공(부팅 없음).
+- 이 수정은 CI에서 아직 돌지 않았다.
 
 ### 미검증 (사용자 확인 필요)
 
 - iPhone 화면과 저장본에서 그레인 1이 보이는지, 저장본에서 거칠지 않은지.
 - iPhone 화면에서 다크서클·팔자·마리오네트·미간 1이 보이는지, 다크서클이 과하지 않은지(띠 평균 +9.4/255, Evoto +5.6).
-- 몸 피부 밝기 1과 톤 +1의 느낌. 톤 +1은 R − B 40.6/255로 1.3.0의 두 배이고 상한 테스트가 없다.
+- 몸 피부 밝기 1과 톤 ±1의 느낌. 톤 +1은 R − B 28.7/255(1.3.0의 약 1.4배)이고 상한 30/255 테스트가 있다. 기기에서 약하면 상한 안에서만 올린다.
 - 붉은기 −1에서 볼의 붉은 기 변화가 기준 아래로 모두 눌려 평평해 보이는지.
 - 주름 미리보기 지연. 주름마다 얼굴 폭 18% 흐림을 두 번(분자·분모) 돌린다.
 - 사람 영역이 없을 때 대체 영역(얼굴 상자 가로 3배·아래 4배)이 피부색 배경을 밝히는지.

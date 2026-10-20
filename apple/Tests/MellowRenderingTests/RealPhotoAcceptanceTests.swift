@@ -53,6 +53,9 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let fineVarianceRatioMinimum = 0.85
         static let toneEveningMaximumMeanLift = 0.03 * 255
         static let bodyBrightnessMaximumMeanLift = 0.10 * 255
+        /// 피부 톤(몸) ±1에서 피부 마스크 가중 |ΔR − ΔB|(8비트) 상한.
+        /// 얼굴 전체가 주황·푸른빛으로 뜨지 않게 한다(스펙 G4 1.4).
+        static let bodyToneMaximumRedMinusBlue = 30.0
         static let outsideFaceChangedFraction = 0.002
         /// "얼굴 밖"을 재기 전에 얼굴 다각형을 넓히는 폭.
         /// 얼굴 폭 비율(스펙 G4 1.4).
@@ -296,7 +299,9 @@ final class RealPhotoAcceptanceTests: XCTestCase {
 
     func testBodySkinBrightnessToneAndSmoothingAreVisible() throws {
         let portrait = try self.portrait()
-        try XCTSkipIf(portrait.analysis.personMask == nil, "데모 사진에서 인물 마스크를 찾지 못함")
+        // 인물 마스크가 없으면 몸 피부 단계는 얼굴 둘레 대체 영역을 쓰고 `bodySkinArea()`도 같은 영역을 잰다.
+        // 그래서 건너뛰지 않고 어느 영역이었는지만 출력 줄로 남긴다.
+        record("bodySkin", "personMask", portrait.analysis.personMask == nil ? 0 : 1)
         let before = try base().grid
         let bright = try grid { $0.bodySkin.brightness = 1 }
         XCTAssertGreaterThanOrEqual(
@@ -315,6 +320,14 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             - DisplayScale.channelDelta(before, warm, channel: 2, weight: skin)
         XCTAssertGreaterThanOrEqual(
             record("bodyTone", "redMinusBlue", redMinusBlue), Visibility.bodyToneRedMinusBlue, "따뜻한 톤이 보인다")
+        XCTAssertLessThanOrEqual(abs(redMinusBlue), Naturalness.bodyToneMaximumRedMinusBlue, "따뜻한 톤이 주황빛으로 뜨지 않음")
+        let cool = try grid { $0.bodySkin.tone = -1 }
+        let coolRedMinusBlue =
+            DisplayScale.channelDelta(before, cool, channel: 0, weight: skin)
+            - DisplayScale.channelDelta(before, cool, channel: 2, weight: skin)
+        XCTAssertLessThanOrEqual(
+            abs(record("bodyTone", "coolRedMinusBlue", coolRedMinusBlue)), Naturalness.bodyToneMaximumRedMinusBlue,
+            "차가운 톤이 푸른빛으로 뜨지 않음")
         let smooth = try grid { $0.bodySkin.smoothing = 1 }
         XCTAssertGreaterThanOrEqual(
             record("bodySmoothing", "changed", DisplayScale.changedFraction(before, smooth, in: nil)),

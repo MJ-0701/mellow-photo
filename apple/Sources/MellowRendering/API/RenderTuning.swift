@@ -184,7 +184,8 @@ public struct RenderTuning: Sendable {
     /// 피부 톤 ±1에서 감마 Cr에 더하고 Cb에서 빼는 값(따뜻).
     /// 음수는 반대.
     /// 1.3.0의 0.025는 폰 화면에서 약했다.
-    public var bodySkinToneMax: Double = 0.05
+    /// 0.05는 얼굴 전체가 주황빛으로 뜰 수 있어 자연스러움 상한(피부 가중 |ΔR − ΔB| ≤ 30/255) 안쪽에 둔다(스펙 G4 1.3·1.4).
+    public var bodySkinToneMax: Double = 0.035
     /// 인물 마스크가 없을 때 몸 피부가 쓰는 대체 영역: 가장 큰 얼굴 상자의 가로 배수와 상자 위끝에서 아래로의 높이 배수.
     public var bodySkinFallbackWidthScale: Double = 3
     public var bodySkinFallbackHeightScale: Double = 4
