@@ -97,12 +97,13 @@ public final class ProjectSession {
         photos[index].document.endContinuousChange()
     }
 
-    public func applyToAll(from id: PhotoID) {
+    /// 고른 사진의 설정을 나머지 사진에 일괄 복사. 고른 항목만 복사한다(기본은 전부).
+    public func applyToAll(from id: PhotoID, categories: Set<SyncCategory> = SyncCategory.all) {
         guard let source = photos.first(where: { $0.id == id }) else { return }
         let recipe = source.document.recipe
         let values = PresetValues(of: recipe)
         for index in photos.indices where photos[index].id != id {
-            photos[index].document.applyFromBatch(values)
+            photos[index].document.applyFromBatch(values, categories: categories)
         }
         persistQuietly()
     }

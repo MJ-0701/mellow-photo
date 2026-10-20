@@ -110,13 +110,16 @@ public struct EditDocument: Equatable, Sendable {
     /// 잠긴 사진은 얼굴형·체형도 유지한다.
     public mutating func apply(_ values: PresetValues) {
         checkpoint()
-        recipe = merged(values, targetFace: recipe.portrait.targetFace)
+        recipe = merged(values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all)
     }
 
-    /// 다른 사진의 설정을 일괄 복사. 잠기지 않은 사진은 대상 얼굴을 전체로 되돌린다.
-    public mutating func applyFromBatch(_ values: PresetValues) {
+    /// 다른 사진의 설정을 일괄 복사. 고른 항목만 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
+    /// 잠기지 않은 사진은 얼굴 의존 항목을 복사할 때만 대상 얼굴을 전체로 되돌린다.
+    public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
+        guard !categories.isEmpty else { return }
+        let resetsTarget = !isGeometryLocked && categories.contains { $0.dependsOnFaces }
         checkpoint()
-        recipe = merged(values, targetFace: isGeometryLocked ? recipe.portrait.targetFace : nil)
+        recipe = merged(values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories)
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
@@ -145,22 +148,38 @@ public struct EditDocument: Equatable, Sendable {
         recipe.makeup = makeup
     }
 
-    /// 슬라이더 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 둔다.
-    private func merged(_ values: PresetValues, targetFace: Int?) -> EditRecipe {
+    /// 고른 그룹을 프리셋 값으로 바꾼다. 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
+    private func merged(_ values: PresetValues, targetFace: Int?, categories: Set<SyncCategory>) -> EditRecipe {
         var updated = recipe
-        updated.color = values.color
-        updated.detail = values.detail
-        updated.portrait = values.portrait
-        updated.portrait.targetFace = targetFace
-        updated.background = values.background
-        updated.bodySkin = values.bodySkin
-        updated.body = values.body
-        updated.makeup = values.makeup
-        updated.effects = values.effects
-        if isGeometryLocked {
-            updated.portrait.face = recipe.portrait.face
-            updated.body = recipe.body
+        if categories.contains(.color) {
+            updated.color = values.color
+            updated.detail = values.detail
         }
+        if categories.contains(.effects) {
+            updated.effects = values.effects
+        }
+        if categories.contains(.skin) {
+            updated.portrait.skin = values.portrait.skin
+        }
+        if categories.contains(.faceShape), !isGeometryLocked {
+            updated.portrait.face = values.portrait.face
+        }
+        if categories.contains(.features) {
+            updated.portrait.features = values.portrait.features
+        }
+        if categories.contains(.makeup) {
+            updated.makeup = values.makeup
+        }
+        if categories.contains(.background) {
+            updated.background = values.background
+        }
+        if categories.contains(.body), !isGeometryLocked {
+            updated.body = values.body
+        }
+        if categories.contains(.bodySkin) {
+            updated.bodySkin = values.bodySkin
+        }
+        updated.portrait.targetFace = targetFace
         return updated
     }
 

@@ -165,6 +165,24 @@ final class ProjectSessionTests: XCTestCase {
         XCTAssertEqual(session.photos[2].document.recipe.background.blur, 0.4)
     }
 
+    func testApplyToAllWithCategoriesCopiesOnlyThose() throws {
+        let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        session.edit(source.id) { $0.set(.exposure(0.3)) }
+        session.edit(source.id) { $0.set(.skinSmoothing(0.5)) }
+        session.edit(other.id) { $0.set(.targetFace(0)) }
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(session.photos[1].document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0, "피부는 고르지 않았다")
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.targetFace, 0, "얼굴 항목이 없으면 대상 얼굴 유지")
+        session.applyToAll(from: source.id)
+        XCTAssertEqual(session.photos[1].document.recipe.portrait.skin.smoothing, 0.5, "기본은 전부")
+        XCTAssertNil(session.photos[1].document.recipe.portrait.targetFace)
+    }
+
     func testAddPresetTrimsAndLimitsName() throws {
         let session = ProjectSession(store: MemorySessionStore(), maxPhotos: 40)
         session.addPreset(named: "  " + String(repeating: "가", count: 40) + "  ", values: PresetValues())

@@ -325,6 +325,42 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertTrue(unlocked.canUndo)
     }
 
+    func testBatchCopiesOnlyChosenCategoriesAndKeepsTargetFaceWithoutFaceCategories() {
+        var values = PresetValues(color: ColorAdjustments(exposure: 0.3), detail: DetailAdjustments(vignette: 0.2))
+        values.portrait.skin.smoothing = 0.6
+        values.portrait.face.width = -0.5
+        values.makeup.lip = MakeupTint(colorID: "lip-coral", intensity: 0.5)
+        values.bodySkin.brightness = 0.4
+        values.effects.grain = 0.3
+        var document = EditDocument()
+        document.set(.targetFace(1))
+        document.set(.feature(.teethWhiten, 0.7))
+        document.applyFromBatch(values, categories: [.color, .effects])
+        XCTAssertEqual(document.recipe.color.exposure, 0.3)
+        XCTAssertEqual(document.recipe.detail.vignette, 0.2, "색감 항목은 디테일을 포함한다")
+        XCTAssertEqual(document.recipe.effects.grain, 0.3)
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0, "고르지 않은 피부는 그대로")
+        XCTAssertEqual(document.recipe.portrait.features.teethWhiten, 0.7)
+        XCTAssertNil(document.recipe.makeup.lip.colorID)
+        XCTAssertEqual(document.recipe.bodySkin.brightness, 0)
+        XCTAssertEqual(document.recipe.portrait.targetFace, 1, "얼굴 의존 항목이 없으면 대상 얼굴을 유지한다")
+        document.applyFromBatch(values, categories: [.skin])
+        XCTAssertEqual(document.recipe.portrait.skin.smoothing, 0.6)
+        XCTAssertNil(document.recipe.portrait.targetFace, "얼굴 의존 항목을 복사하면 대상 얼굴을 전체로")
+        var locked = EditDocument()
+        locked.set(.faceShape(.width, -0.2))
+        locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        let before = locked.recipe
+        locked.applyFromBatch(values, categories: [.faceShape, .body])
+        XCTAssertEqual(locked.recipe, before, "잠긴 사진의 얼굴형·체형은 복사하지 않는다")
+        let steps = locked.undoStack.count
+        locked.applyFromBatch(values, categories: [])
+        XCTAssertEqual(locked.undoStack.count, steps, "빈 선택은 아무것도 하지 않는다")
+        XCTAssertEqual(SyncCategory.allCases.count, 9)
+        XCTAssertEqual(SyncCategory.allCases.filter(\.dependsOnFaces), [.skin, .faceShape, .features, .makeup])
+        XCTAssertEqual(SyncCategory.all, Set(SyncCategory.allCases))
+    }
+
     func testApplyAutoIsOneUndoStepAndLeavesShapeAlone() {
         var recipe = EditRecipe()
         recipe.body.waist = -0.3
