@@ -10,10 +10,10 @@ final class ImportMenuUITests: XCTestCase {
         static let filesItem = "파일에서 고르기"
     }
 
-    /// 시스템 피커가 붙이는 접근성 식별자. 기기 언어와 무관하다.
+    /// 시스템 피커가 붙이는 접근성 식별자. 기기 언어와 무관하고 iOS 18·27 시뮬레이터에서 확인했다.
     private enum SystemPicker {
         static let photosCancel = "Cancel"
-        static let filesBrowser = "Browse View (Picker)"
+        static let filesNavigationBar = "FullDocumentManagerViewControllerNavigationBar"
     }
 
     private enum Timeout {
@@ -34,7 +34,7 @@ final class ImportMenuUITests: XCTestCase {
 
     func testFilesItemPresentsFileBrowser() {
         assertEveryImportButton(opens: Label.filesItem) { app in
-            app.otherElements[SystemPicker.filesBrowser]
+            app.navigationBars[SystemPicker.filesNavigationBar]
         }
     }
 
