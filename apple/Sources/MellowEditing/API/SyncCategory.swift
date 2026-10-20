@@ -20,8 +20,9 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
     public var id: Self { self }
     public static let all = Set(allCases)
     /// 원터치가 묶는 키를 담는 항목.
-    /// 셋을 모두 복사할 때만 oneTouch 표시를 복사한다.
-    public static let oneTouchCategories: Set<SyncCategory> = [.skin, .features, .makeup]
+    /// 몸 피부 밝기는 전체 층 표시에 묶인다.
+    /// 넷을 모두 복사할 때만 oneTouch 표시를 복사한다.
+    public static let oneTouchCategories: Set<SyncCategory> = [.skin, .features, .makeup, .bodySkin]
 
     /// 얼굴에 의존하는 항목.
     /// 복사하면 받는 사진의 개인 층에서 그 항목의 키를 지운다.

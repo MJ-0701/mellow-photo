@@ -393,9 +393,9 @@ public struct EditDocument: Equatable, Sendable {
 
     /// 프리셋·동기화의 원터치 표시 규칙(스펙 G4 3.3).
     /// 묶인 키가 바뀐 개인 층의 표시는 지운다.
-    /// 피부·눈입·메이크업을 모두 복사하면 전체 층·그룹 층 표시를 원본 것으로 둔다.
+    /// 피부·눈입·메이크업·몸 피부를 모두 복사하면 전체 층·그룹 층 표시를 원본 것으로 둔다.
     /// 하나라도 빠졌으면 표시가 거짓이 되므로 전체 층·그룹 층 표시를 지운다.
-    /// 셋 다 복사하지 않으면 묶인 키가 그대로라 표시도 그대로다.
+    /// 넷 다 복사하지 않으면 묶인 값이 그대로라 표시도 그대로다.
     private func carryOneTouchMarks(
         from values: PresetValues, applied: Set<SyncCategory>, into updated: inout EditRecipe
     ) {
