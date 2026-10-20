@@ -36,6 +36,7 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.portrait.skin = SkinAdjustments(smoothing: 0.3, autoBlemish: true, darkCircles: 0.2, redness: -0.1)
         recipe.portrait.face.width = -0.2
         recipe.portrait.features.eyeBrighten = 0.1
+        recipe.portrait.oneTouch = 0.6
         recipe.background.blur = 0.2
         recipe.bodySkin.tone = -0.2
         recipe.body.legLength = 0.3
@@ -51,7 +52,7 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.look = LookSelection(id: "film", intensity: 0.5)
         recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
         recipe.detail.sharpness = 0.2
-        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5)
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, oneTouch: 0.6)
         recipe.people.individuals = [
             PersonRecord(
                 id: PersonID(), anchor: PersonAnchor(x: 0.3, y: 0.6, width: 0.12), legacyIndex: 0, gender: .female,
@@ -102,7 +103,7 @@ final class RecipeSchemaTests: XCTestCase {
         XCTAssertEqual(try propertyKeys(item), ["id", "anchor", "legacyIndex", "gender", "layer"])
         let layer = try XCTUnwrap((schema["$defs"] as? [String: Any])?["portraitLayer"])
         let layerProperties = try sectionProperties(layer)
-        XCTAssertEqual(Set(layerProperties.keys), ["skin", "face", "features", "makeup"])
+        XCTAssertEqual(Set(layerProperties.keys), ["oneTouch", "skin", "face", "features", "makeup"])
         XCTAssertEqual(
             try propertyKeys(layerProperties["skin"]),
             Set(["smoothing", "autoBlemish"] + SkinRefinementKey.allCases.map(\.rawValue)))
@@ -114,6 +115,8 @@ final class RecipeSchemaTests: XCTestCase {
         let encodedRecord = try XCTUnwrap((encodedPeople["individuals"] as? [[String: Any]])?.first)
         let encodedLayer = try XCTUnwrap(encodedRecord["layer"] as? [String: Any])
         XCTAssertTrue(Set(encodedLayer.keys).isSubset(of: Set(layerProperties.keys)))
+        let encodedGroup = try XCTUnwrap((encodedPeople["groups"] as? [String: Any])?["female"] as? [String: Any])
+        XCTAssertEqual(Set(encodedGroup.keys), ["oneTouch", "skin"])
     }
 
     func testLegacyPortraitKeysStayInSchemaAsDeprecated() throws {

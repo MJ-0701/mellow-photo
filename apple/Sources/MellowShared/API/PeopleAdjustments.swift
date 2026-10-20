@@ -112,11 +112,15 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
     /// 이 층에서 마지막으로 적용한 룩.
     /// 부위를 바꾸면 지운다(전체 층과 같은 규칙).
     public var makeupLookID: String?
+    /// 원터치 표시.
+    /// 이 층의 묶인 항목이 OneTouchBundle 표 × 이 강도와 같다는 뜻이다.
+    /// 렌더는 읽지 않고 키(overriddenKeys)도 아니다.
+    public var oneTouch: Double?
 
     public init(
         skinSmoothing: Double? = nil, autoBlemish: Bool? = nil, skinRefinement: [SkinRefinementKey: Double] = [:],
         face: [FaceShapeKey: Double] = [:], features: [FeatureKey: Double] = [:],
-        makeup: [MakeupPart: MakeupTint] = [:], makeupLookID: String? = nil
+        makeup: [MakeupPart: MakeupTint] = [:], makeupLookID: String? = nil, oneTouch: Double? = nil
     ) {
         self.skinSmoothing = skinSmoothing
         self.autoBlemish = autoBlemish
@@ -125,9 +129,10 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         self.features = features
         self.makeup = makeup
         self.makeupLookID = makeupLookID
+        self.oneTouch = oneTouch
     }
 
-    public var isEmpty: Bool { overriddenKeys.isEmpty && makeupLookID == nil }
+    public var isEmpty: Bool { overriddenKeys.isEmpty && makeupLookID == nil && oneTouch == nil }
 
     /// 이 층이 덮어쓰는 키.
     /// 0으로 덮어쓴 키도 들어간다(상속을 끊음).
@@ -168,9 +173,10 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
     }
 
     /// 이 층의 모든 숫자(유한성 검사용).
+    /// 원터치 표시도 넣는다.
     public var numericValues: [Double] {
-        [skinSmoothing ?? 0] + Array(skinRefinement.values) + Array(face.values) + Array(features.values)
-            + makeup.values.map(\.intensity)
+        [skinSmoothing ?? 0, oneTouch ?? 0] + Array(skinRefinement.values) + Array(face.values)
+            + Array(features.values) + makeup.values.map(\.intensity)
     }
 
     /// 이 층의 키로 아래 층 값을 덮어쓴다.
@@ -255,6 +261,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
     // Swift 기본 [Enum: T] 인코딩은 배열이라 쓰지 않는다.
 
     private enum CodingKeys: String, CodingKey {
+        case oneTouch
         case skin
         case face
         case features
@@ -284,6 +291,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        oneTouch = try container.decodeIfPresent(Double.self, forKey: .oneTouch)
         skinRefinement = [:]
         makeup = [:]
         if container.contains(.skin) {
@@ -307,6 +315,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(oneTouch, forKey: .oneTouch)
         if skinSmoothing != nil || autoBlemish != nil || !skinRefinement.isEmpty {
             var skin = container.nestedContainer(keyedBy: RawKey.self, forKey: .skin)
             try skin.encodeIfPresent(skinSmoothing, forKey: Self.smoothingKey)

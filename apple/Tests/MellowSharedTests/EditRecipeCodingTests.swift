@@ -551,4 +551,23 @@ final class EditRecipeCodingTests: XCTestCase {
             ((schema["properties"] as? [String: Any])?["portrait"] as? [String: Any])?["properties"] as? [String: Any])
         XCTAssertEqual((portrait["targetFace"] as? [String: Any])?["deprecated"] as? Bool, true)
     }
+
+    func testPresetValuesCarryOneTouchMarksAndLegacyMigrationDropsThem() throws {
+        var recipe = EditRecipe()
+        OneTouchBundle.layer(for: nil, strength: 0.6).applied(to: &recipe.portrait, makeup: &recipe.makeup)
+        recipe.portrait.oneTouch = 0.6
+        recipe.people.groups[.male] = OneTouchBundle.layer(for: .male, strength: 0.6)
+        recipe.people.individuals = [PersonRecord(layer: PortraitLayer(oneTouch: 1))]
+        let values = PresetValues(of: recipe)
+        let decoded = try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values))
+        XCTAssertEqual(decoded, values)
+        XCTAssertEqual(decoded.portrait.oneTouch, 0.6, "프리셋은 전체 층 표시를 나른다")
+        XCTAssertEqual(decoded.people.groups[.male]?.oneTouch, 0.6, "프리셋은 그룹 층 표시를 나른다")
+        XCTAssertTrue(decoded.people.individuals.isEmpty, "개인 층 표시는 나르지 않는다")
+        let legacy = #"{"schemaVersion":2,"portrait":{"targetFace":1,"oneTouch":0.6,"skin":{"smoothing":0.4}}}"#
+        let migrated = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
+        XCTAssertNil(migrated.portrait.oneTouch, "옛 대상 이행은 전체 층을 비우므로 표시도 사라진다")
+        XCTAssertNil(migrated.people.individuals.first?.layer.oneTouch, "표시는 개인 층으로 옮기지 않는다")
+        XCTAssertEqual(migrated.people.individuals.first?.layer.skinSmoothing, 0.4)
+    }
 }
