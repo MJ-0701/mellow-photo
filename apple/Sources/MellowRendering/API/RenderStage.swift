@@ -63,6 +63,7 @@ public struct RenderContext: Sendable {
 
     /// 사람 기록을 얼굴에 짝짓고 얼굴마다 층을 겹친다.
     /// 짝짓기는 편집 쪽과 같은 PersonMatcher.match다.
+    /// 성별은 기록의 수동 지정이 먼저이고 준비 때 받아들인 추정이 그다음이다.
     /// H2 Task 5 전까지 옛 targetFace는 전체 층을 그 얼굴에만 건다(범위 밖이면 대상 없음).
     static func makeTargets(recipe: EditRecipe, analysis: PhotoAnalysis) -> [FaceTarget] {
         let faces = analysis.faces
@@ -76,7 +77,8 @@ public struct RenderContext: Sendable {
                 return nil
             }
             let person = personByFace[index]
-            let gender = person?.gender
+            let estimate = analysis.genderEstimates.indices.contains(index) ? analysis.genderEstimates[index] : nil
+            let gender = PortraitResolver.effectiveGender(person: person, estimate: estimate?.gender)
             let resolved = PortraitResolver.resolve(recipe, person: person, gender: gender)
             return FaceTarget(
                 index: index, face: faces[index], personID: person?.id, gender: gender, portrait: resolved.portrait,
