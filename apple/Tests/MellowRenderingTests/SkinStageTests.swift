@@ -330,4 +330,79 @@ final class SkinStageTests: XCTestCase {
         let folds = SkinAdjustments(darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1)
         XCTAssertTrue(try Support.bytes(render(boxOnly, skin: folds)) == Support.bytes(boxOnly.image), "특징점 없으면 그대로")
     }
+
+    /// 번들거림 테스트의 반사광 색. 피부색 가중치(σ 0.04) 안에 들면서 선형 휘도가 피부(0.44)보다 0.28 밝다.
+    private static let glossColor = CIColor(red: 0.98, green: 0.84, blue: 0.74)
+    /// 번들거림을 눌렀을 때 기대하는 최소 빨강 감소(바이트).
+    private static let mattifyMinimum = 15
+
+    func testToneEveningFlattensBlotchesAndKeepsPores() throws {
+        let synthetic = SyntheticFace.make()
+        let output = try render(synthetic, skin: SkinAdjustments(toneEvening: 1))
+        let radii = FrequencySeparation.radii(
+            faceWidth: FaceRegions.faceWidth(synthetic.face, extent: synthetic.image.extent), tuning: RenderTuning())
+        let patch = SyntheticFace.skinPatch
+        let before = try Support.bandVariances(synthetic.image, in: patch, fineRadius: radii.fine, midRadius: radii.mid)
+        let after = try Support.bandVariances(output, in: patch, fineRadius: radii.fine, midRadius: radii.mid)
+        XCTAssertEqual(after.fine / before.fine, 1, accuracy: 0.1, "모공 대역은 ±10% 안")
+        XCTAssertEqual(after.mid / before.mid, 1, accuracy: 0.25, "중간 대역은 피부 보정 0이라 거의 그대로")
+        let lowBefore = Support.variance(
+            try Support.luma(FrequencySeparation.blurred(synthetic.image, radius: radii.mid).cropped(to: patch)))
+        let lowAfter = Support.variance(
+            try Support.luma(FrequencySeparation.blurred(output, radius: radii.mid).cropped(to: patch)))
+        XCTAssertLessThan(lowAfter, lowBefore * 0.5, "저주파 얼룩이 준다")
+        let beforeGrid = try Support.grid(synthetic.image)
+        let afterGrid = try Support.grid(output)
+        for point in [
+            SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.backgroundInsideContour, SyntheticFace.outside,
+        ] {
+            XCTAssertEqual(afterGrid.rgba(point), beforeGrid.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
+
+    func testShineMattifiesOnlyBrightSkinSpots() throws {
+        let base = SyntheticFace.make()
+        let gloss = Support.hardEllipse(
+            center: SyntheticFace.forehead, radii: CGSize(width: 12, height: 12), extent: SyntheticFace.extent)
+        let image = CIImage(color: Self.glossColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: gloss]
+        ).cropped(to: SyntheticFace.extent)
+        let synthetic = SyntheticFace(image: image, face: base.face)
+        let before = try Support.grid(image)
+        let after = try Support.grid(render(synthetic, skin: SkinAdjustments(shine: 1)))
+        XCTAssertLessThanOrEqual(
+            Int(after.red(SyntheticFace.forehead)), Int(before.red(SyntheticFace.forehead)) - Self.mattifyMinimum,
+            "반사광이 눌린다")
+        for point in [SyntheticFace.cheek, CGPoint(x: 180, y: 220)] {
+            let expected = before.rgba(point)
+            let actual = after.rgba(point)
+            for channel in 0..<3 {
+                XCTAssertEqual(Int(actual[channel]), Int(expected[channel]), accuracy: 1, "보통 피부 \(point)는 거의 그대로")
+            }
+        }
+        for point in [SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.outside] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
+        }
+    }
+
+    func testSmoothingOnlyUsesTheLegacyBandMixPath() throws {
+        let synthetic = SyntheticFace.make()
+        let extent = synthetic.image.extent
+        let tuning = RenderTuning()
+        let faceWidth = FaceRegions.faceWidth(synthetic.face, extent: extent)
+        let bounds = FaceRegions.maskBounds(face: synthetic.face, extent: extent, tuning: tuning)
+        let mask = try FaceRegions.skinMask(
+            face: synthetic.face, image: synthetic.image, extent: extent, tuning: tuning)
+        let reference = try XCTUnwrap(
+            SkinStage.cheekReference(of: synthetic.image, face: synthetic.face, extent: extent))
+        let legacy = try FrequencySeparation.smoothed(
+            synthetic.image, bounds: bounds, faceWidth: faceWidth, smoothing: 0.7, tuning: tuning)
+        let refined = try FrequencySeparation.refined(
+            synthetic.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference, smoothing: 0.7,
+            toneEvening: 0, shine: 0, tuning: tuning)
+        XCTAssertTrue(try Support.bytes(refined) == Support.bytes(legacy), "얼룩·번들거림 0이면 기존 경로와 같은 바이트")
+        let combined = try render(synthetic, skin: SkinAdjustments(smoothing: 0.7, toneEvening: 0.5))
+        XCTAssertFalse(
+            try Support.bytes(combined) == Support.bytes(render(synthetic, skin: SkinAdjustments(smoothing: 0.7))))
+    }
 }

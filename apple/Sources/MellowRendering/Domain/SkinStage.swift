@@ -32,7 +32,7 @@ struct SkinStage: RenderStage {
         return copy
     }
 
-    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림). 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
     private func refine(_ image: CIImage, face: FaceGeometry, skin: SkinAdjustments, context: RenderContext) throws
         -> CIImage
     {
@@ -47,14 +47,31 @@ struct SkinStage: RenderStage {
             result = try SkinRefinement.liftFold(
                 result, region: fold.region, faceWidth: faceWidth, amount: fold.amount, tuning: tuning, extent: extent)
         }
-        guard skin.smoothing > 0 else { return result }
-        let mask = try FaceRegions.skinMask(
-            face: face, image: result, extent: extent, tuning: tuning, strength: tuning.skinMaskMaxStrength,
-            cache: context.regionMasks)
-        let smooth = try FrequencySeparation.smoothed(
-            result, bounds: bounds, faceWidth: faceWidth, smoothing: skin.smoothing, tuning: tuning)
-        return MaskBuilder.blend(smooth, over: result, mask: mask).cropped(to: extent)
+        guard skin.smoothing > 0 || skin.toneEvening > 0 || skin.shine > 0 else { return result }
+        let unitMask = try FaceRegions.skinMask(
+            face: face, image: result, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)
+        let blendMask = MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)
+        // 볼 상자가 없으면 번들거림의 기준이 없어 번들거림만 건너뛴다.
+        let reference = Self.cheekReference(of: result, face: face, extent: extent)
+        let smooth = try FrequencySeparation.refined(
+            result, bounds: bounds, faceWidth: faceWidth, mask: unitMask, reference: reference ?? Self.noReference,
+            smoothing: skin.smoothing, toneEvening: skin.toneEvening, shine: reference == nil ? 0 : skin.shine,
+            tuning: tuning)
+        return MaskBuilder.blend(smooth, over: result, mask: blendMask).cropped(to: extent)
     }
+
+    /// 기준이 없을 때 커널에 넘기는 자리 채움(쓰이지 않는다).
+    private static let noReference = CIImage(color: .black)
+
+    /// 볼 두 곳 평균을 반씩 섞은 기준색(무한 확장). 넘긴 이미지의 색공간을 따른다. 볼 상자가 없으면 nil.
+    static func cheekReference(of image: CIImage, face: FaceGeometry, extent: CGRect) -> CIImage? {
+        guard let cheeks = FaceRegions.cheekAverages(of: image, face: face, extent: extent) else { return nil }
+        return cheeks.left.applyingFilter(
+            "CIMix", parameters: [kCIInputBackgroundImageKey: cheeks.right, "inputAmount": Self.referenceMix])
+    }
+
+    /// 두 볼을 같은 비중으로 섞는다.
+    private static let referenceMix = 0.5
 
     /// 값이 0이 아니고 마스크를 만들 수 있는 주름 띠. 순서는 다크서클 → 팔자 → 마리오네트 → 미간. 특징점이 없는 띠는 빠진다.
     static func folds(for face: FaceGeometry, skin: SkinAdjustments, context: RenderContext)

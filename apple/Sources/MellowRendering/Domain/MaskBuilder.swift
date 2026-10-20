@@ -43,6 +43,18 @@ enum MaskBuilder {
         return gradient.transformed(by: stretch)
     }
 
+    /// 회색 마스크에 factor를 곱한다. 1이면 그대로다.
+    static func scaled(_ mask: CIImage, by factor: Double) -> CIImage {
+        guard factor != 1 else { return mask }
+        return mask.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: factor, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: factor, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: factor, w: 0),
+            ])
+    }
+
     static func blend(_ foreground: CIImage, over background: CIImage, mask: CIImage) -> CIImage {
         foreground.applyingFilter(
             "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: background, kCIInputMaskImageKey: mask])

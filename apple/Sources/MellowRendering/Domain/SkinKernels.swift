@@ -8,6 +8,7 @@ final class SkinKernels: @unchecked Sendable {
     private let chroma: CIColorKernel?
     private let bands: CIColorKernel?
     private let fold: CIColorKernel?
+    private let tone: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -38,6 +39,24 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(image.rgb + gap * amount, image.a);
                 }
                 """)
+        // luma는 BT.709 선형 휘도 계수다. 분모 하한 0.001은 마스크 밖(가중치 0)에서 0으로 나누지 않게 한다.
+        // 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다. 모공 대역은 그대로다.
+        tone = CIColorKernel(
+            source: """
+                kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample wideNumerator,
+                                    __sample wideDenominator, __sample reference, float keep, float even,
+                                    float shine, float shineOffset, float shineRamp) {
+                    vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+                    vec3 wide = wideNumerator.rgb / max(wideDenominator.r, 0.001);
+                    float gloss = clamp((dot(image.rgb, luma) - dot(reference.rgb, luma) - shineOffset) / shineRamp,
+                                        0.0, 1.0);
+                    float pull = max(even, shine * gloss);
+                    vec3 low = mix(midBlur.rgb, wide, pull);
+                    vec3 mid = (fineBlur.rgb - midBlur.rgb) * (1.0 - shine * gloss);
+                    vec3 fine = image.rgb - fineBlur.rgb;
+                    return vec4(low + mid * keep + fine, image.a);
+                }
+                """)
     }
 
     /// encoded는 sRGB 감마 값 이미지, left·right는 볼 평균을 무한 확장한 이미지. 결과는 회색 가중치.
@@ -64,5 +83,22 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [image, low, surround, amount]
         guard let lifted = fold.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return lifted
+    }
+
+    /// low = mix(midBlur, 마스크 가중 넓은 평균, max(even, shine × 번들거림 가중치)). mid는 (1 − shine × 가중치)배다.
+    /// 번들거림 가중치는 선형 휘도(BT.709)가 reference보다 shineOffset 이상 밝은 곳에서 shineRamp에 걸쳐 0 → 1.
+    /// shine이 0이면 mid는 bandMix와 같고 fine(모공)은 언제나 그대로다.
+    func toneMix(
+        image: CIImage, fineBlur: CIImage, midBlur: CIImage, wideNumerator: CIImage, wideDenominator: CIImage,
+        reference: CIImage, keep: Double, even: Double, shine: Double, shineOffset: Double, shineRamp: Double,
+        extent: CGRect
+    ) throws -> CIImage {
+        guard let tone, shineRamp > 0 else { throw MellowError.renderFailed }
+        let arguments: [Any] = [
+            image, fineBlur, midBlur, wideNumerator, wideDenominator, reference, keep, even, shine, shineOffset,
+            shineRamp,
+        ]
+        guard let mixed = tone.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
+        return mixed
     }
 }

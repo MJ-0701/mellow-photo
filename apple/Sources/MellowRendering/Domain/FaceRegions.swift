@@ -66,12 +66,10 @@ enum FaceRegions {
         let bounds = maskBounds(face: face, extent: extent, tuning: tuning)
         guard !bounds.isEmpty else { return black }
         var mask = skinPolygonRaster(face: face, extent: extent, tuning: tuning, cache: cache)
-        let cheeks = cheekRects(face: face, extent: extent)
-        if let left = cheeks.first, let right = cheeks.last {
-            let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        if let cheeks = cheekAverages(of: encoded, face: face, extent: extent) {
             let weight = try SkinKernels.shared.chromaWeight(
-                of: encoded, left: average(encoded, in: left), right: average(encoded, in: right),
-                sigma: tuning.skinChromaSigma, extent: extent)
+                of: encoded, left: cheeks.left, right: cheeks.right, sigma: tuning.skinChromaSigma, extent: extent)
             mask = mask.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: weight])
         }
         var feathered = mask.clampedToExtent()
@@ -86,6 +84,16 @@ enum FaceRegions {
                 ])
         }
         return feathered.cropped(to: bounds).composited(over: black)
+    }
+
+    /// 볼 두 곳의 평균색(무한 확장 이미지). 넘긴 이미지의 색공간 그대로다(감마 이미지면 감마 평균, 선형이면 선형 평균).
+    /// 볼 상자가 하나뿐이면 둘 다 그 상자이고, 하나도 없으면(얼굴이 사진 밖에 걸침) nil.
+    static func cheekAverages(of image: CIImage, face: FaceGeometry, extent: CGRect)
+        -> (left: CIImage, right: CIImage)?
+    {
+        let cheeks = cheekRects(face: face, extent: extent)
+        guard let left = cheeks.first, let right = cheeks.last else { return nil }
+        return (average(image, in: left), average(image, in: right))
     }
 
     /// 피부 다각형(윤곽 + 이마 호)에서 넓힌 눈·눈썹·입술을 뺀 비트맵(흐리기 전). skinMask와 메이크업 마스크가 같은 캐시 항목을 쓴다.

@@ -53,6 +53,16 @@ public struct RenderTuning: Sendable {
     public var foldSurroundFraction: Double = 0.12
     /// 주름 밝히기 1에서 "주변 평균 − 국소 저주파"의 양수 차이를 더하는 비율. 100%면 평평해 보인다.
     public var foldLiftMax: Double = 0.9
+    /// 얼룩 고르기·번들거림이 당기는 넓은 피부 평균의 반지름. 얼굴 폭 비율. 볼 그림자 같은 큰 명암은 남는다.
+    public var toneBandFraction: Double = 0.12
+    /// 얼룩 고르기 1에서 저주파를 넓은 평균 쪽으로 당기는 비율.
+    public var toneEveningMax: Double = 0.8
+    /// 선형 휘도가 볼 기준보다 이만큼 밝으면 번들거림으로 보기 시작한다. 피부 질감 잡음(±10%)은 걸리지 않는다.
+    public var shineLumaOffset: Double = 0.12
+    /// 시작점에서 이만큼 더 밝으면 번들거림 가중치 1.
+    public var shineLumaRamp: Double = 0.1
+    /// 번들거림 1에서 반사광의 저주파를 넓은 평균 쪽으로 당기고 중간 대역을 줄이는 비율. 모공 대역은 그대로다.
+    public var shineReductionMax: Double = 0.85
 
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25
