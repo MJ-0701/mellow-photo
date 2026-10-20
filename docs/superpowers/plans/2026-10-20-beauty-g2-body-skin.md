@@ -31,6 +31,8 @@
 ---
 
 ## 에이전트 참조
+> 구현 중 변경(G2 Task 3~4 리뷰): 매끄럽게 제외는 잘라내지 않은 얼굴 다각형 전체(`FaceRegions.wholeFaceMask`), 밝기·톤 제외는 눈·눈썹·입(`protectedPolygons`, 특징점 없으면 대체 타원)이고, 가장 큰 얼굴 선택은 `FaceRegions.widestFace` 하나로 모았다. 아래 Task 3·4 본문의 옛 이름·테스트 이름은 기록으로 남긴다.
+
 
 ## Global Constraints
 
@@ -71,7 +73,7 @@ BackgroundStage.personMask(_:extent:feather:) -> CIImage       // 사람 1·배�
 ToneShift.blueness: Double = 0                                  // 감마 Cb 가산, 커널 인자 추가
 FrequencySeparation.smoothed(_:bounds:radii:smoothing:tuning:)  // 반지름을 직접 받는 오버로드
 FaceRegions.featureMask(faces:extent:tuning:cache:) -> RegionMask?      // 모든 얼굴의 눈 + 바깥 입술 한 비트맵
-FaceRegions.skinPolygonUnion(faces:extent:tuning:cache:) -> CIImage     // 얼굴마다 skinPolygonRaster의 최대
+FaceRegions.wholeFaceMask(faces:extent:tuning:cache:) -> CIImage     // 얼굴마다 skinPolygonRaster의 최대
 RegionMaskCache.entriesPerFacePerResolution = 9
 RenderTuning: + bodySkin 상수 6개
 struct BodySkinStage: RenderStage { name "bodySkin"; static clamped(_:), referenceFace(_:), bodyRadii(shortSide:tuning:) }
@@ -330,7 +332,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - Test: `apple/Tests/MellowRenderingTests/FeatureStageTests.swift`, `FeatureRegionsTests.swift`, `RegionMaskCacheTests.swift`
 
 **Interfaces:**
-- Produces: `BackgroundStage.personMask(_:extent:feather:)`, `ToneShift.blueness`, `FrequencySeparation.smoothed(_:bounds:radii:smoothing:tuning:)`, `FaceRegions.featureMask(faces:…)`, `FaceRegions.skinPolygonUnion(faces:…)`, `RegionMaskCache.entriesPerFacePerResolution = 9`.
+- Produces: `BackgroundStage.personMask(_:extent:feather:)`, `ToneShift.blueness`, `FrequencySeparation.smoothed(_:bounds:radii:smoothing:tuning:)`, `FaceRegions.featureMask(faces:…)`, `FaceRegions.wholeFaceMask(faces:…)`, `RegionMaskCache.entriesPerFacePerResolution = 9`.
 
 설계 근거: 스펙 1.6 몸 피부. 배경 단계의 확대·흐림을 반전 없이 돌려받아 같은 마스크를 쓰고, 기존 `toneShift` 커널에 Cb 가산을 더해 새 커널 없이 톤을 바꾼다. `blueness` 기본 0이라 기존 호출 결과는 바뀌지 않는다.
 
@@ -382,7 +384,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         let second = synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.5))
         let cache = RegionMaskCache()
         _ = FaceRegions.skinPolygonRaster(face: synthetic.face, extent: extent, tuning: tuning, cache: cache)
-        let union = FaceRegions.skinPolygonUnion(faces: [synthetic.face, second], extent: extent, tuning: tuning, cache: cache)
+        let union = FaceRegions.wholeFaceMask(faces: [synthetic.face, second], extent: extent, tuning: tuning, cache: cache)
         let pixels = try Support.grid(union)
         XCTAssertGreaterThan(pixels.red(SyntheticFace.cheek), 200)
         XCTAssertGreaterThan(pixels.red(CGPoint(x: 256 + 180 / 2, y: 256 + 200 / 2)), 200, "두 번째 얼굴의 볼")
@@ -467,7 +469,7 @@ Run: `cd apple && swift test --filter "FeatureStageTests|FeatureRegionsTests|Reg
     }
 
     /// 얼굴마다 피부 다각형 비트맵(skinMask와 같은 캐시 항목)을 최대로 합친 extent 크기 마스크. 얼굴이 없으면 검정.
-    static func skinPolygonUnion(faces: [FaceGeometry], extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
+    static func wholeFaceMask(faces: [FaceGeometry], extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
         -> CIImage
     {
         var union = CIImage(color: .black).cropped(to: extent)
@@ -740,7 +742,7 @@ struct BodySkinStage: RenderStage {
         }
         var result = image
         if values.smoothing > 0 {
-            let faceSkin = FaceRegions.skinPolygonUnion(
+            let faceSkin = FaceRegions.wholeFaceMask(
                 faces: context.faces, extent: extent, tuning: tuning, cache: context.regionMasks)
             let smoothMask = Self.product(toneMask, Self.inverted(faceSkin, extent: extent), extent: extent)
             let smooth = try FrequencySeparation.smoothed(
@@ -991,7 +993,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 ## 자체 검토 결과
 
-- **스펙 대조:** §1.1 → `BodySkinKey`·`BodySkinAdjustments`(Task 1), `EditChange.bodySkin`(Task 2), `BodySkinStage`(Task 4), `ToneShift.blueness`(Task 3), `BeautyTab.skinTone`(Task 5), 새 import 없음. §1.2 → `bodySkin` 그룹·범위·`dependsOnPerson`·`PresetValues`·두 스키마·README(Task 1). §1.3 → `bodySkin`을 `skin` 뒤(Task 4, 순서 배열 갱신). §1.4 → 기준 얼굴 = 가장 넓은 얼굴(Task 4). §1.6 몸 피부 → 마스크 식·`personMask` 분리·`featureMask`·`skinPolygonUnion`·반지름 오버로드·적용 순서·상수 6개(Task 3·4), 캐시 상한 9(Task 3). §1.9 → 피부톤 탭·안내·켜짐 규칙·문구(Task 5). §1.10 → 프리셋·일괄·자동 보정(Task 2). §2 → 항등(Task 4), 마스크 밖 불변(옷·배경·눈, Task 4), 클램프(Task 4), 얼굴 없음·사람 없음 건너뜀(Task 4·5), 대상 얼굴 무관(Task 4), 얼굴 피부 제외(Task 4), 회귀(배경 테스트 불변, Task 3), 앱·시나리오(Task 5). §4 → Task 목록이 표와 같다.
-- **타입 일관성:** `BodySkinAdjustments.subscript`·`numericValues`·`hasEffect`, `AdjustmentRange.bodySkin`, `EditingPolicy.bodySkinRange`, `BackgroundStage.personMask`, `ToneShift.blueness`(memberwise 순서 `lift, yellowRemoval, saturation, redness, blueness`), `FrequencySeparation.smoothed(radii:)`, `FaceRegions.featureMask`·`skinPolygonUnion`, `BodySkinStage.clamped`·`referenceFace`·`bodyRadii`, `SyntheticFace.makeWithBody`와 표본 점, `AppModel.canAdjustBodySkin`, `UserMessage.bodySkinTitle` 등을 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: 패키지 354 → 356 → 358 → 361 → 367 → 367, 앱 Mac 72 → 74.
+- **스펙 대조:** §1.1 → `BodySkinKey`·`BodySkinAdjustments`(Task 1), `EditChange.bodySkin`(Task 2), `BodySkinStage`(Task 4), `ToneShift.blueness`(Task 3), `BeautyTab.skinTone`(Task 5), 새 import 없음. §1.2 → `bodySkin` 그룹·범위·`dependsOnPerson`·`PresetValues`·두 스키마·README(Task 1). §1.3 → `bodySkin`을 `skin` 뒤(Task 4, 순서 배열 갱신). §1.4 → 기준 얼굴 = 가장 넓은 얼굴(Task 4). §1.6 몸 피부 → 마스크 식·`personMask` 분리·`featureMask`·`wholeFaceMask`·반지름 오버로드·적용 순서·상수 6개(Task 3·4), 캐시 상한 9(Task 3). §1.9 → 피부톤 탭·안내·켜짐 규칙·문구(Task 5). §1.10 → 프리셋·일괄·자동 보정(Task 2). §2 → 항등(Task 4), 마스크 밖 불변(옷·배경·눈, Task 4), 클램프(Task 4), 얼굴 없음·사람 없음 건너뜀(Task 4·5), 대상 얼굴 무관(Task 4), 얼굴 피부 제외(Task 4), 회귀(배경 테스트 불변, Task 3), 앱·시나리오(Task 5). §4 → Task 목록이 표와 같다.
+- **타입 일관성:** `BodySkinAdjustments.subscript`·`numericValues`·`hasEffect`, `AdjustmentRange.bodySkin`, `EditingPolicy.bodySkinRange`, `BackgroundStage.personMask`, `ToneShift.blueness`(memberwise 순서 `lift, yellowRemoval, saturation, redness, blueness`), `FrequencySeparation.smoothed(radii:)`, `FaceRegions.featureMask`·`wholeFaceMask`, `BodySkinStage.clamped`·`referenceFace`·`bodyRadii`, `SyntheticFace.makeWithBody`와 표본 점, `AppModel.canAdjustBodySkin`, `UserMessage.bodySkinTitle` 등을 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: 패키지 354 → 356 → 358 → 361 → 367 → 367, 앱 Mac 72 → 74.
 - **Review Focus 매핑:** 1→Task 4·5, 2→Task 4·5, 3→Task 4, 4→Task 4, 5→Task 4, 6→Task 1. 모두 테스트 코드가 있다.
 - **플레이스홀더 점검:** "TBD/TODO/나중에" 없음. `ToneShift` 인자 순서 주의를 Task 4에 적었다.
