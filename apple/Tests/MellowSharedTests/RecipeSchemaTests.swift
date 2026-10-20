@@ -52,6 +52,7 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.look = LookSelection(id: "film", intensity: 0.5)
         recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
         recipe.detail.sharpness = 0.2
+        recipe.effects.grain = 0.1
         return try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any])
     }
 
@@ -60,7 +61,9 @@ final class RecipeSchemaTests: XCTestCase {
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let encoded = try encodedSampleRecipe()
         XCTAssertEqual(Set(properties.keys), Set(encoded.keys))
-        for key in ["color", "portrait", "detail", "look", "geometry", "background", "bodySkin", "body", "makeup"] {
+        for key in [
+            "color", "portrait", "detail", "look", "geometry", "background", "bodySkin", "body", "makeup", "effects",
+        ] {
             let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
             XCTAssertEqual(try activeKeys(properties[key]), Set(encodedSection.keys), key)
         }

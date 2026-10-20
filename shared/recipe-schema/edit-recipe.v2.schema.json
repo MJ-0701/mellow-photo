@@ -159,6 +159,14 @@
         }
       }
     },
+    "effects": {
+      "type": "object", "additionalProperties": false,
+      "description": "룩 뒤 마지막 단계. 분석이 필요 없다.",
+      "properties": {
+        "grain": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+        "glow": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
+      }
+    },
     "operations": {
       "type": "array",
       "description": "사용자가 기록한 순서대로 재생한다.",

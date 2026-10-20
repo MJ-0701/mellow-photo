@@ -322,4 +322,39 @@ final class EditRecipeCodingTests: XCTestCase {
         let legacy = try JSONDecoder().decode(PresetValues.self, from: Data(#"{"color":{},"portrait":{}}"#.utf8))
         XCTAssertEqual(legacy.bodySkin, BodySkinAdjustments())
     }
+
+    func testEffectsRoundTripDefaultsAndNeedNoAnalysis() throws {
+        let legacy = #"{"schemaVersion":2,"look":{"id":"film"}}"#
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.effects, EffectAdjustments(), "G3 이전 파일은 효과가 0")
+        var recipe = EditRecipe()
+        recipe.effects = EffectAdjustments(grain: 0.3, glow: 0.6)
+        XCTAssertEqual(recipe.effects.numericValues, [0.3, 0.6])
+        XCTAssertEqual(recipe.effects[.glow], 0.6)
+        XCTAssertTrue(recipe.effects.hasEffect)
+        XCTAssertFalse(recipe.dependsOnFaces)
+        XCTAssertFalse(recipe.dependsOnPerson)
+        XCTAssertFalse(recipe.dependsOnBody)
+        XCTAssertFalse(recipe.isDefault)
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(
+            Set(try XCTUnwrap(json["effects"] as? [String: Any]).keys), Set(EffectKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
+    }
+
+    func testEffectScalarsAreCheckedForFinitenessAndCarriedByPresets() throws {
+        for path in [\EditRecipe.effects.grain, \EditRecipe.effects.glow] {
+            var recipe = EditRecipe()
+            recipe[keyPath: path] = .nan
+            XCTAssertFalse(recipe.allValuesFinite, "\(path)")
+        }
+        var recipe = EditRecipe()
+        recipe.effects.grain = 0.2
+        let values = PresetValues(of: recipe)
+        XCTAssertEqual(values.effects.grain, 0.2)
+        XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values)), values)
+        let legacy = try JSONDecoder().decode(PresetValues.self, from: Data(#"{"color":{},"portrait":{}}"#.utf8))
+        XCTAssertEqual(legacy.effects, EffectAdjustments())
+    }
 }

@@ -13,13 +13,15 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var bodySkin = BodySkinAdjustments()
     public var body = BodyShapeAdjustments()
     public var makeup = MakeupAdjustments()
+    public var effects = EffectAdjustments()
     public var operations: [LocalEdit] = []
 
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
         look: LookSelection = .init(), geometry: GeometryAdjustments = .init(),
         background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
-        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(), operations: [LocalEdit] = []
+        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(), effects: EffectAdjustments = .init(),
+        operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
@@ -30,6 +32,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         self.bodySkin = bodySkin
         self.body = body
         self.makeup = makeup
+        self.effects = effects
         self.operations = operations
     }
 
@@ -44,6 +47,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case bodySkin
         case body
         case makeup
+        case effects
         case operations
     }
 
@@ -58,6 +62,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         bodySkin = try container.decodeIfPresent(BodySkinAdjustments.self, forKey: .bodySkin) ?? .init()
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
+        effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
     }
 
@@ -73,6 +78,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(bodySkin, forKey: .bodySkin)
         try container.encode(body, forKey: .body)
         try container.encode(makeup, forKey: .makeup)
+        try container.encode(effects, forKey: .effects)
         try container.encode(operations, forKey: .operations)
     }
 
@@ -104,7 +110,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         let scalars = [color.exposure, color.contrast, color.saturation, color.warmth, look.intensity]
         let groups =
             portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
-            + bodySkin.numericValues + body.numericValues + makeup.numericValues
+            + bodySkin.numericValues + body.numericValues + makeup.numericValues + effects.numericValues
         let locals = operations.flatMap(\.numericValues)
         return (scalars + groups + locals).allSatisfy(\.isFinite)
     }

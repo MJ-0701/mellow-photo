@@ -8,11 +8,13 @@ public struct PresetValues: Codable, Equatable, Sendable {
     public var bodySkin: BodySkinAdjustments
     public var body: BodyShapeAdjustments
     public var makeup: MakeupAdjustments
+    public var effects: EffectAdjustments
 
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
         background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
-        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init()
+        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(),
+        effects: EffectAdjustments = .init()
     ) {
         self.color = color
         self.portrait = portrait
@@ -21,13 +23,14 @@ public struct PresetValues: Codable, Equatable, Sendable {
         self.bodySkin = bodySkin
         self.body = body
         self.makeup = makeup
+        self.effects = effects
     }
 
     /// 레시피의 슬라이더 그룹. 룩·기하·수동 편집은 담지 않는다. 대상 얼굴은 호출자가 정한다.
     public init(of recipe: EditRecipe) {
         self.init(
             color: recipe.color, portrait: recipe.portrait, detail: recipe.detail, background: recipe.background,
-            bodySkin: recipe.bodySkin, body: recipe.body, makeup: recipe.makeup)
+            bodySkin: recipe.bodySkin, body: recipe.body, makeup: recipe.makeup, effects: recipe.effects)
     }
 
     public init(from decoder: Decoder) throws {
@@ -39,6 +42,7 @@ public struct PresetValues: Codable, Equatable, Sendable {
         bodySkin = try container.decodeIfPresent(BodySkinAdjustments.self, forKey: .bodySkin) ?? .init()
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
+        effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
     }
 }
 
