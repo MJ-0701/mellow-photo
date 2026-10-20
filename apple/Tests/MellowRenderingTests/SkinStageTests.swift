@@ -494,4 +494,84 @@ final class SkinStageTests: XCTestCase {
             XCTAssertEqual(flush.rgba(point), before.rgba(point), "피부 마스크 밖 \(point)")
         }
     }
+
+    func testZeroRefinementsAreIdentityAndOutOfRangeValuesRenderClamped() throws {
+        let synthetic = SyntheticFace.make()
+        let input = try Support.bytes(synthetic.image)
+        XCTAssertTrue(try Support.bytes(render(synthetic, skin: SkinAdjustments())) == input)
+        XCTAssertTrue(try Support.bytes(render(synthetic, skin: SkinAdjustments(shine: -1))) == input, "음수는 0")
+        let outOfRange = SkinAdjustments(darkCircles: 3, marionette: 2, toneEvening: 2, redness: -5)
+        let inRange = SkinAdjustments(darkCircles: 1, marionette: 1, toneEvening: 1, redness: -1)
+        XCTAssertTrue(
+            try Support.bytes(render(synthetic, skin: outOfRange)) == Support.bytes(render(synthetic, skin: inRange)),
+            "범위 밖 값은 자른 값과 같은 바이트")
+        XCTAssertEqual(
+            SkinStage.clamped(SkinAdjustments(smoothing: 4, marionette: -2, glabella: -1, redness: 2)),
+            SkinAdjustments(smoothing: 1, redness: 1))
+    }
+
+    func testBoxOnlyFaceSkipsFoldsButStillEvensTone() throws {
+        let boxOnly = SyntheticFace.make(landmarks: false)
+        let input = try Support.bytes(boxOnly.image)
+        let folds = SkinAdjustments(darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1)
+        XCTAssertTrue(try Support.bytes(render(boxOnly, skin: folds)) == input, "주름 띠는 특징점이 없으면 빠진다")
+        let before = try Support.grid(boxOnly.image)
+        let evened = try Support.grid(render(boxOnly, skin: SkinAdjustments(toneEvening: 1, redness: 1)))
+        XCTAssertNotEqual(evened.rgba(SyntheticFace.cheek), before.rgba(SyntheticFace.cheek), "대체 타원 마스크로 동작")
+        XCTAssertEqual(evened.rgba(SyntheticFace.outside), before.rgba(SyntheticFace.outside))
+    }
+
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. 비트맵으로 굳혀 마스크 밖 바이트를 그대로 비교한다.
+    func testTargetFaceRefinesOnlyThatFace() throws {
+        let synthetic = SyntheticFace.make()
+        let side = CGFloat(SyntheticFace.size)
+        let half = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        let left = synthetic.image.transformed(by: half.concatenating(CGAffineTransform(translationX: 0, y: side / 4)))
+        let right = synthetic.image.transformed(
+            by: half.concatenating(CGAffineTransform(translationX: side / 2, y: side / 4)))
+        let composed = left.composited(over: right).composited(over: CIImage(color: .gray))
+            .cropped(to: SyntheticFace.extent)
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(composed))
+        let faces = [
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25)),
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25)),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.skin = SkinAdjustments(
+            darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: 1, shine: 1)
+        recipe.portrait.targetFace = 0
+        let context = RenderContext(extent: image.extent, recipe: recipe, faces: faces, tuning: RenderTuning())
+        let before = try Support.grid(image)
+        let after = try Support.grid(SkinStage().apply(image, in: context))
+        var leftChanged = 0
+        var rightChanged = 0
+        for y in 0..<SyntheticFace.size {
+            for x in 0..<SyntheticFace.size {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if x < SyntheticFace.size / 2 {
+                    leftChanged += 1
+                } else {
+                    rightChanged += 1
+                }
+            }
+        }
+        XCTAssertGreaterThan(leftChanged, 0, "고른 얼굴은 보정된다")
+        XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
+    }
+
+    func testRefinementsReuseTheSkinRasterAndAddNoCacheEntries() throws {
+        let synthetic = SyntheticFace.make()
+        var recipe = EditRecipe()
+        recipe.portrait.skin = SkinAdjustments(
+            smoothing: 0.5, darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: -1,
+            shine: 1)
+        let analysis = PhotoAnalysis(faces: [synthetic.face])
+        let context = RenderContext(
+            extent: synthetic.image.extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
+        let first = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
+        XCTAssertEqual(analysis.regionMasks.count, 1, "주름 띠·대역 합성·붉은기 모두 피부 다각형 비트맵 하나를 쓴다")
+        XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+    }
 }
