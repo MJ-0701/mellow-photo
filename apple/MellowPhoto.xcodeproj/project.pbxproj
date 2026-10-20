@@ -16,6 +16,7 @@
 		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
 		1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F465BA3A1339352022E907AA /* AppModel+Live.swift */; };
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
+		281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */; };
 		2986031DF20FD411A4677470 /* EditorScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C781535D14BC45ED308E3C /* EditorScene.swift */; };
 		2BF138DBA2985AF7A3B3A78E /* MellowLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = E104DB4C3683E0F5CABAB0BD /* MellowLibrary */; };
 		2D128DF7E8DAC981A4578867 /* Ports.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */; };
@@ -75,6 +76,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		52DACCE5C9A860F09E1D7AC5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7AE6D02F3A4F358C49EC2319 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 09AD9F137D276D94FA5355DD;
+			remoteInfo = MellowPhoto;
+		};
 		991598D8797B226DCC7D5688 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 7AE6D02F3A4F358C49EC2319 /* Project object */;
@@ -145,8 +153,10 @@
 		E1DB811347F53AB847DE61D2 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActionBar.swift; sourceTree = "<group>"; };
 		E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundledLooksTests.swift; sourceTree = "<group>"; };
+		EA1FE7AA1267A55B90D3A984 /* MellowPhotoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F465BA3A1339352022E907AA /* AppModel+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Live.swift"; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportMenuUITests.swift; sourceTree = "<group>"; };
 		F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ports.swift; sourceTree = "<group>"; };
 		FA07672648D544B650764001 /* MellowPhoto.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MellowPhoto.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresetsTests.swift; sourceTree = "<group>"; };
@@ -174,6 +184,14 @@
 				D0604580F74993079C348EBA /* MellowPhotoApp.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		2CA38C13612C8B045C7DAF06 /* MellowPhotoUITests */ = {
+			isa = PBXGroup;
+			children = (
+				F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */,
+			);
+			path = MellowPhotoUITests;
 			sourceTree = "<group>";
 		};
 		430109513BF0F11EBF530FAF /* Shared */ = {
@@ -253,6 +271,7 @@
 			children = (
 				FA07672648D544B650764001 /* MellowPhoto.app */,
 				F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */,
+				EA1FE7AA1267A55B90D3A984 /* MellowPhotoUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -349,6 +368,7 @@
 				E22553BD5EDC15F8D3681E2D /* Config */,
 				AE2141319CF33EFDD0DDCFB7 /* MellowPhoto */,
 				B311DFE7F5F714F4C9CFA1E6 /* MellowPhotoTests */,
+				2CA38C13612C8B045C7DAF06 /* MellowPhotoUITests */,
 				766A793DBBD3C323293C274D /* Packages */,
 				A3B642CBAEA2E8418738D970 /* Products */,
 			);
@@ -394,6 +414,24 @@
 			productReference = FA07672648D544B650764001 /* MellowPhoto.app */;
 			productType = "com.apple.product-type.application";
 		};
+		8CC53E287E3870B57FB4CD15 /* MellowPhotoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE99068A64A2AF651D2883C7 /* Build configuration list for PBXNativeTarget "MellowPhotoUITests" */;
+			buildPhases = (
+				1E51F2B617B5F463AC4D29A3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				9351A5399FF79CC309085BBA /* PBXTargetDependency */,
+			);
+			name = MellowPhotoUITests;
+			packageProductDependencies = (
+			);
+			productName = MellowPhotoUITests;
+			productReference = EA1FE7AA1267A55B90D3A984 /* MellowPhotoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		BDF3783A77B85C7877C62062 /* MellowPhotoTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1BC619307FF19E31C2E191C5 /* Build configuration list for PBXNativeTarget "MellowPhotoTests" */;
@@ -425,6 +463,10 @@
 						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
+					8CC53E287E3870B57FB4CD15 = {
+						DevelopmentTeam = "";
+						TestTargetID = 09AD9F137D276D94FA5355DD;
+					};
 					BDF3783A77B85C7877C62062 = {
 						DevelopmentTeam = "";
 					};
@@ -449,6 +491,7 @@
 			targets = (
 				09AD9F137D276D94FA5355DD /* MellowPhoto */,
 				BDF3783A77B85C7877C62062 /* MellowPhotoTests */,
+				8CC53E287E3870B57FB4CD15 /* MellowPhotoUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -470,6 +513,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1E51F2B617B5F463AC4D29A3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4D677654CD33970CD3DCAB04 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -541,6 +592,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		9351A5399FF79CC309085BBA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 09AD9F137D276D94FA5355DD /* MellowPhoto */;
+			targetProxy = 52DACCE5C9A860F09E1D7AC5 /* PBXContainerItemProxy */;
+		};
 		D7B64220FB25A9EFD0ACC732 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 09AD9F137D276D94FA5355DD /* MellowPhoto */;
@@ -681,7 +737,6 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -689,6 +744,23 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
+		};
+		60B25129C844D6FCC9AFC971 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MellowPhoto;
+			};
+			name = Release;
 		};
 		9A25E9F4E9963320B48CDBF3 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -711,6 +783,23 @@
 				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Contents/MacOS/Mellow Photo";
 			};
 			name = Release;
+		};
+		9C81392E76D46DCC96991BD5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.mj.mellowphoto.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MellowPhoto;
+			};
+			name = Debug;
 		};
 		DEA0B0FD20C6D34A50C34B44 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -765,7 +854,6 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = auto;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -782,6 +870,15 @@
 			buildConfigurations = (
 				0EC5BAE952C6ABFABA88D4C2 /* Debug */,
 				9A25E9F4E9963320B48CDBF3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BE99068A64A2AF651D2883C7 /* Build configuration list for PBXNativeTarget "MellowPhotoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				9C81392E76D46DCC96991BD5 /* Debug */,
+				60B25129C844D6FCC9AFC971 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

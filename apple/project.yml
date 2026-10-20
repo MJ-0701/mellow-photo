@@ -72,6 +72,18 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Mellow Photo"
         "TEST_HOST[sdk=macosx*]": "$(BUILT_PRODUCTS_DIR)/Mellow Photo.app/Contents/MacOS/Mellow Photo"
+  MellowPhotoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [MellowPhotoUITests]
+    dependencies:
+      - target: MellowPhoto
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mj.mellowphoto.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TARGETED_DEVICE_FAMILY: "1,2"
+        TEST_TARGET_NAME: MellowPhoto
 schemes:
   MellowPhoto:
     build:
@@ -85,3 +97,12 @@ schemes:
       targets: [MellowPhotoTests]
     archive:
       config: Release
+  # 시스템 피커 표시는 iOS 시뮬레이터에서만 확인한다. Mac 대상이 있는 기본 스킴과 분리한다.
+  MellowPhotoUITests:
+    build:
+      targets:
+        MellowPhoto: [test]
+        MellowPhotoUITests: [test]
+    test:
+      config: Debug
+      targets: [MellowPhotoUITests]

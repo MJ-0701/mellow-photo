@@ -2,7 +2,7 @@
 source "$(dirname "$0")/env.sh"
 cd "$MELLOW_ROOT"
 bash scripts/verify-modules.sh
-(cd apple && swift format lint --strict --recursive Sources Tests MellowPhoto MellowPhotoTests)
+(cd apple && swift format lint --strict --recursive Sources Tests MellowPhoto MellowPhotoTests MellowPhotoUITests)
 PINNED_XCODEGEN="$(tr -d '[:space:]' < apple/.xcodegen-version)"
 command -v xcodegen >/dev/null || { echo "xcodegen이 없습니다. $PINNED_XCODEGEN 버전을 설치하세요." >&2; exit 1; }
 INSTALLED_XCODEGEN="$(xcodegen --version | sed -n 's/^Version: *//p')"
@@ -29,3 +29,9 @@ for destination in "${destinations[@]}"; do
   xcodebuild "${MELLOW_PROJECT[@]}" -destination "$destination" ${parallel[@]+"${parallel[@]}"} CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
   [[ "${PIPESTATUS[0]}" -eq 0 ]]
 done
+# 메뉴에서 시스템 피커를 띄우는 흐름은 단위 테스트로 잡히지 않아 iPhone에서 UI 테스트로 확인한다.
+if [[ -n "${IPHONE:-}" ]]; then
+  echo "== ui tests: iPhone"
+  xcodebuild -project "$MELLOW_ROOT/apple/MellowPhoto.xcodeproj" -scheme MellowPhotoUITests -derivedDataPath "$MELLOW_ROOT/apple/build" -destination "platform=iOS Simulator,id=$IPHONE" -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO test 2>&1 | grep -E "Executed|TEST (SUCCEEDED|FAILED)|error:"
+  [[ "${PIPESTATUS[0]}" -eq 0 ]]
+fi
