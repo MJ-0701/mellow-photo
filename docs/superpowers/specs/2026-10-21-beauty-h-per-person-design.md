@@ -73,7 +73,7 @@
 | `Gender`, `PersonID`, `PersonAnchor`, `PortraitKey`, `PortraitLayer`, `PersonRecord`, `PeopleAdjustments` | MellowShared/API (`PeopleAdjustments.swift`) | 층 값·사람 기록 |
 | `PortraitResolver`, `PersonMatcher`, `PersonMatching` | MellowShared/API (`PortraitResolver.swift`, `PersonMatcher.swift`) | 순수 계산. 렌더·편집·앱이 같은 함수를 쓴다 |
 | `EditRecipe.people`, `targetFace` 읽기 이행, `PresetValues.people` | MellowShared/API | 레시피 확장 |
-| `PortraitScope`, `EditChange.personGender`, `EditDocument.set(_:in:)`·`resetOverrides`·`person(at:)`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`overriddenKeys` | MellowEditing/API | 층을 지정하는 편집 규칙 |
+| `PortraitScope`, `EditChange.gender`, `EditDocument.set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`overriddenKeys` | MellowEditing/API | 층을 지정하는 편집 규칙 |
 | `FaceTarget`, `RenderContext.faceTargets`, `PhotoAnalysis.genderEstimates`, `GenderEstimator`·`GenderEstimate`, `PreparedPhoto.genders`, `RenderTuning` 상수 3개 | MellowRendering/API | 얼굴별 값과 추정 포트 |
 | `SkinStage`·`FeatureStage`·`MakeupStage`·`ShapeWarpStage` 반복문 | MellowRendering/Domain | `targetFaces` 대신 `faceTargets` |
 | `CoreMLGenderEstimator` (H4만) | MellowRendering/Infrastructure | H4에서 모듈 표의 Rendering 행에 CoreML을 더하고 `verify-modules.sh`도 같은 커밋에서 고친다 |
@@ -225,11 +225,14 @@ extension EditDocument {
     @discardableResult public mutating func set(_ change: EditChange, forFace index: Int, of faces: [NormalizedRect]) -> Rejection?
 
     /// 그 층에서 keys를 지워 상속으로 되돌린다. nil이면 층 전체(개인은 성별 지정 유지). .all은 그 키를 기본값으로 둔다. 체크포인트 한 번.
-    /// 잠긴 사진에서 얼굴형 키가 들어 있으면 .geometryLocked.
+    /// 잠긴 사진에서 실제로 바뀌는 얼굴형 키가 있으면 .geometryLocked.
+    /// 그룹·개인 층은 덮어쓴 얼굴형 키를 지울 때, 전체 층은 0이 아닌 얼굴형 값을 0으로 되돌릴 때다 (H2 구현 중 변경).
     @discardableResult public mutating func resetOverrides(_ keys: Set<PortraitKey>? = nil, in scope: PortraitScope) -> Rejection?
 
-    /// 찾지 못한 사람을 다른 얼굴에 연결. 체크포인트 한 번. 얼굴형 키가 있고 잠겼으면 거절.
+    /// 찾지 못한 사람을 다른 얼굴에 연결. 체크포인트 한 번.
+    /// 잠긴 사진에서 그 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형 키가 있으면 거절 (H2 구현 중 변경: 그룹 층 포함).
     @discardableResult public mutating func rebindPerson(_ id: PersonID, to anchor: PersonAnchor) -> Rejection?
+    /// 기록을 지운다. 체크포인트 한 번. 잠금 규칙은 rebindPerson과 같다.
     @discardableResult public mutating func removePerson(_ id: PersonID) -> Rejection?
     /// legacyIndex만 있는 기록에 faces[legacyIndex]의 anchor를 채운다. 체크포인트 없음. 바뀐 것이 있으면 true.
     public mutating func bindLegacyPeople(faces: [NormalizedRect]) -> Bool

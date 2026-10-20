@@ -210,8 +210,8 @@ Run: Mac 앱 테스트 → 컴파일 실패(`applyOneTouch` 없음).
         let value = strength ?? oneTouchStrength ?? EditingPolicy.oneTouchDefaultStrength
         switch beautyTarget {
         case .face(let index):
-            guard let anchor = anchor(forFace: index) else { return }
-            mutateSelected { $0.applyOneTouch(strength: value, forPersonAt: anchor) }
+            let boxes = faces.map(\.boundingBox)
+            mutateSelected { $0.applyOneTouch(strength: value, forFace: index, of: boxes) }
         default:
             guard let scope = scope(for: beautyTarget) else { return }
             mutateSelected { $0.applyOneTouch(strength: value, in: scope) }

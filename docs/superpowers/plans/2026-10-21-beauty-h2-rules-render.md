@@ -31,7 +31,7 @@
 | 자동 잡티는 사람마다 켜고 끈다. 단계는 켜진 얼굴의 잡티만 지운 뒤 모든 얼굴을 다듬는다(지금 순서 유지) | 잡티 복구가 다른 얼굴의 다듬기 뒤에 오면 복제 원본이 이미 바뀐 픽셀이 된다 | 작음 |
 | 층에서 룩 "없음"은 다섯 부위를 0으로 **덮어쓴다**(상속이 아님). 상속으로 돌리는 것은 "재설정" | "이 사람은 메이크업 없이"가 룩 없음의 뜻이고, 전체 층의 룩 없음(모두 지움)과 같은 결과를 그 사람에게 준다 | 작음 |
 | 층에 메이크업 색을 처음 고를 때의 기본 강도는 그 층 아래 값(전체 ⊕ 수동 성별 그룹)을 기준으로 한다 | 편집 규칙은 자동 추정을 모른다. 추정 성별로만 그룹이 걸린 사람은 아주 드문 경우에 기본 강도 기준이 다를 수 있고, 다음 드래그가 바로 고친다 | 작음 |
-| 성별 변경·사람 삭제·다시 연결은 그 기록(또는 그룹)에 얼굴형 키가 있을 때만 잠금 거절한다. 성별 변경은 어느 그룹에든 얼굴형 키가 있으면 거절 | 얼굴형이 안 걸리는 변경까지 막으면 잠긴 사진에서 성별도 못 고친다 | 작음 |
+| 잠긴 사진에서 성별 변경은 그룹의 얼굴형 키와 무관하게 늘 거절한다(스펙 결정 표와 같음, H2 구현 중 변경). 사람 삭제·다시 연결은 그 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형 키가 있을 때만 거절한다 | 성별 규칙은 스펙 결정 표를 따른다(조건부로 두면 두 사람 확인 영역이 어긋난다). 삭제·연결은 얼굴형이 안 걸리면 잠긴 사진에서도 찾지 못한 사람을 정리할 수 있게 한다 | 작음 |
 | 동기화 때 개인 키 제거는 실제로 복사한 항목에 대해서만 한다. 잠긴 사진에서 건너뛴 얼굴형은 개인 층에서도 지우지 않는다 | 잠금의 뜻(수동 편집 좌표 보존)과 같다 | 작음 |
 | 추정 임계값(신뢰도·얼굴 폭·yaw)은 준비 때 한 번 적용하고 통과한 추정만 `PhotoAnalysis`에 둔다 | 렌더·앱이 같은 값을 보고 임계값 로직이 한 곳이다 | 작음 |
 | 이행용 `EditRecipe.migrateLegacyTargetFace(_:)`를 public으로 두어 v1 세션 변환(MellowLibrary)과 테스트 지원이 같은 함수를 쓴다 | 이행 규칙이 두 군데 생기지 않는다 | 작음 |
@@ -63,7 +63,7 @@ H1 계획의 Global Constraints(G4 개정 포함: 브랜치 `beauty-g4`, 로컬 
 1. **G까지 저장한 세션(`targetFace = 1`, 피부 0.5)을 H2 끝에서 연다.** `portrait.skin.smoothing`은 0이고 `people.individuals[0]`이 `legacyIndex 1`·피부 0.5이며, 두 얼굴 사진의 렌더 바이트가 Task 5 전과 같아야 한다. → Task 5 `testLegacyTargetFaceMigratesIntoAPersonRecord`(Shared), `testTargetFaceLimitsPortraitStagesToOneFace`(Rendering, 이행된 레시피로 재작성), `testV1SessionDecodesToV2Snapshot`(Library, 단언 갱신).
 2. **개인 층만 바꾼 사진.** 그 얼굴만 바뀌고 다른 얼굴은 한 픽셀도 바뀌지 않아야 한다. → Task 1 `testIndividualLayerSmoothsOnlyThatFace`.
 3. **여성 그룹에 립을 넣고 한 사람만 여성으로 지정.** 그 사람만 바뀌고, 둘 다 지정하면 둘 다 바뀌어야 한다. → Task 1 `testGenderGroupPaintsOnlyFacesOfThatGender`.
-4. **잠긴 사진에서 성별을 바꾸려 한다(그룹에 얼굴형 키 있음).** 거절되어야 하고, 얼굴형 키가 없으면 허용. → Task 3 `testGenderAssignmentIsLockedByLocalEditsAndNeedsAPerson`.
+4. **잠긴 사진에서 성별을 바꾸려 한다.** 그룹의 얼굴형 키와 무관하게 거절되어야 한다(스펙 결정 표, H2 구현 중 변경). 같은 사진에서 피부·눈입 같은 얼굴형이 아닌 키는 어느 층에서든 허용. → Task 3 `testGenderAssignmentIsLockedByLocalEditsAndNeedsAPerson`.
 5. **색감만 동기화.** 받는 사진의 개인 층·성별이 그대로여야 하고, 피부를 동기화하면 개인 층의 피부 키만 빠지고 얼굴형 키·성별은 남아야 한다. → Task 4 `testBatchSyncCopiesGroupsAndClearsIndividualKeysOfSyncedCategories`.
 6. **추정기가 얼굴 수와 다른 길이를 돌려주거나 던진다.** 준비는 성공하고 추정은 모두 nil이어야 한다. → Task 2 `testGenderEstimatesAreThresholdedAndFailuresAreSilent`.
 

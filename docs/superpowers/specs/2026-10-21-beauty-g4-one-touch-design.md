@@ -307,13 +307,14 @@ extension EditDocument {
     /// .gender(g): 그 그룹 층 ← g 표. .person(id): 그 기록 층 ← 기록의 수동 성별 표(없으면 공통). 모르는 사람은 .unknownPerson.
     /// 잠긴 사진에서도 허용(얼굴형 키는 묶음에 없음).
     @discardableResult public mutating func applyOneTouch(strength: Double, in scope: PortraitScope = .all) -> Rejection?
-    /// anchor의 사람에게. 기록이 없으면 만든다(H2의 set(_:forPersonAt:)와 같은 길).
-    @discardableResult public mutating func applyOneTouch(strength: Double, forPersonAt anchor: PersonAnchor) -> Rejection?
+    /// faces[index]와 짝이 된 사람에게. 기록이 없으면 그 얼굴 anchor로 만든다(H2의 set(_:forFace:of:)와 같은 길, 렌더와 같은 짝짓기).
+    /// index가 범위 밖이면 .unknownPerson (H2 구현 중 변경: forPersonAt anchor 대신).
+    @discardableResult public mutating func applyOneTouch(strength: Double, forFace index: Int, of faces: [NormalizedRect]) -> Rejection?
 }
 ```
 
 - `.all`에서 그룹 층에 쓸 때 그룹 층의 묶음 밖 키(얼굴형 등)는 보존한다. 개인 층은 건드리지 않는다(사람이 따로 조정한 값은 남고, 그 사람에게는 개인 값이 이긴다 — H 규칙).
-- 표시 해제: `set(_:in:)`·`set(_:forPersonAt:)`·`applyMakeupLook(_:in:)`·`applyAuto`·`resetOverrides`·`merged`(프리셋·동기화)가 어떤 층의 묶인 키(`OneTouchBundle.keys`)를 실제로 바꾸면 **그 층의** `oneTouch`를 nil로 둔다. 같은 값이면 유지. 구현은 `commit` 전에 `clearOneTouchMarks(where:)`가 이전 레시피와 비교한다.
+- 표시 해제: `set(_:in:)`·`set(_:forFace:of:)`·`applyMakeupLook(_:in:)`·`applyAuto`·`resetOverrides`·`merged`(프리셋·동기화)가 어떤 층의 묶인 키(`OneTouchBundle.keys`)를 실제로 바꾸면 **그 층의** `oneTouch`를 nil로 둔다. 같은 값이면 유지. 구현은 `commit` 전에 `clearOneTouchMarks(where:)`가 이전 레시피와 비교한다.
 - `applyOneTouch`는 `face`·`body` 키를 절대 쓰지 않는다(변형은 묶음 밖, 1.4절 상한 테스트가 고정).
 - `applyAuto`: 질문 2가 "포함"이면 `applyAuto(_:oneTouch:)`가 색·디테일을 쓰고 얼굴이 있으면 `applyOneTouch(strength: oneTouchDefaultStrength, in: .all)`을 같은 체크포인트에서 한다(기존 피부 0.3·자동 잡티·눈 0.2 대입은 지움). "분리"면 지금 그대로이고 자동은 전체 층의 표시를 지운다(피부 보정이 바뀌므로).
 - 프리셋: `PresetValues`는 `portrait.oneTouch`와 `people.groups[*].oneTouch`를 그대로 나른다(값과 함께). `apply(_:)`는 통째로 바꾸므로 표시도 프리셋 것이 된다.
@@ -340,7 +341,7 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 5. `DisclosureGroup("세부 조정", isExpanded: $model.showsDetailAdjustments)` 안에 지금의 탭 피커와 네 탭 내용. `showsDetailAdjustments`는 세션 상태(기본 false, 파일에 저장 안 함). 세부 슬라이더가 묶인 키이고 그 층의 표시가 있으면 제목 옆에 작은 "원터치" 꼬리표(`Theme.oneTouchTagFont`)를 둔다 — 손으로 바꾸면 꼬리표와 표시가 사라진다.
 6. 피부톤 탭 맨 위 상태 줄(2.4절).
 
-`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forPersonAt:`, 그 외 `in: scope`), `oneTouchStrength: Double?`(현재 대상 층의 표시), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2에 따라 `autoEnhance()`가 `applyAuto(_:oneTouch:)`를 부름. `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
+`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forFace: i, of: 얼굴 상자들`, 그 외 `in: scope`), `oneTouchStrength: Double?`(현재 대상 층의 표시), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2에 따라 `autoEnhance()`가 `applyAuto(_:oneTouch:)`를 부름. `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
 
 메이크업 도구는 바꾸지 않는다(H3 칩만).
 
