@@ -533,6 +533,34 @@ extension SyntheticFace {
     static let glabella = CGPoint(x: 256, y: 338)
 }
 
+/// 합성 얼굴 아래에 몸 피부와 옷을 둔 사진. 몸 피부 단계 테스트용.
+extension SyntheticFace {
+    /// 턱(y 50) 아래 몸 피부. 피부 질감을 그대로 쓴다.
+    static let bodySkinRect = CGRect(x: 156, y: 0, width: 200, height: 48)
+    /// 몸 왼쪽 회색 옷. 피부색 가중치가 0이다.
+    static let leftShirtRect = CGRect(x: 100, y: 0, width: 56, height: 48)
+    static let shirtColor = CIColor(red: 0.5, green: 0.5, blue: 0.5)
+    /// 몸 피부 안 분산 측정 패치.
+    static let bodyPatch = CGRect(x: 226, y: 4, width: 60, height: 40)
+    static let bodySkinPoint = CGPoint(x: 256, y: 24)
+    static let shirtPoint = CGPoint(x: 128, y: 24)
+    /// 인물 마스크 밖 배경(왼쪽 x < 96, 머리 위 y > 416).
+    static let backgroundBesideBody = CGPoint(x: 40, y: 24)
+    static let backgroundAboveHead = CGPoint(x: 256, y: 450)
+    /// 64×64 스텁 인물 마스크. 사람 사각형 x 12…52, y 0…52 → 사진 x 96…416, y 0…416(얼굴·이마(y 380)·몸·옷을 덮는다).
+    static let bodyPersonMask = RenderingTestSupport.personMask(
+        size: CGSize(width: 64, height: 64), person: CGRect(x: 12, y: 0, width: 40, height: 52))
+
+    /// 비트맵으로 굳힌다. 마스크가 0인 곳(옷·얼굴 피부)의 바이트를 그대로 비교하려면 입력이 그래프가 아닌 비트맵이어야 한다.
+    static func makeWithBody() throws -> SyntheticFace {
+        let base = make()
+        var image = RenderingTestSupport.skinTexture(size: size).cropped(to: bodySkinRect).composited(over: base.image)
+        image = CIImage(color: shirtColor).cropped(to: leftShirtRect).composited(over: image)
+        let baked = CIImage(cgImage: try RenderingTestSupport.renderer.makeCGImage(image.cropped(to: extent)))
+        return SyntheticFace(image: baked, face: base.face)
+    }
+}
+
 extension FaceGeometry {
     /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
     func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {

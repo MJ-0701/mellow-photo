@@ -157,6 +157,18 @@ public struct RenderTuning: Sendable {
     public var backgroundBlurMaxFraction: Double = 0.02
     /// 인물 마스크를 키운 뒤 흐리는 반지름. 짧은 변 비율. 512×384 마스크 한 칸(1600px 미리보기에서 약 3px)의 두 배를 넘겨 계단을 덮는다.
     public var backgroundMaskFeather: Double = 0.006
+    /// 몸 피부의 피부색 거리 기준. 얼굴(skinChromaSigma 0.04)보다 넓다. 몸은 얼굴과 조명이 달라 색이 더 흩어진다.
+    public var bodySkinChromaSigma: Double = 0.05
+    /// 몸 피부가 쓰는 인물 마스크 흐림. 짧은 변 비율. 배경 흐림(0.006)보다 조금 좁게 둬 옷깃으로 덜 번진다.
+    public var bodySkinMaskFeather: Double = 0.004
+    /// 피부 밝기 1에서 흰색 쪽으로 섞는 비율(sRGB 감마 값). Evoto 전후 측정(+0.066)에 가깝다.
+    public var bodySkinLiftMax: Double = 0.2
+    /// 피부 톤 ±1에서 감마 Cr에 더하고 Cb에서 빼는 값(따뜻). 음수는 반대.
+    public var bodySkinToneMax: Double = 0.025
+    /// 몸 모공 대역의 위쪽 경계 반지름. 짧은 변 비율(1200px에서 2.4px).
+    public var bodySkinFineBandFraction: Double = 0.002
+    /// 몸 얼룩 대역의 위쪽 경계 반지름. 짧은 변 비율(1200px에서 14px).
+    public var bodySkinMidBandFraction: Double = 0.012
     /// 립 1에서 소프트 라이트 결과를 섞는 비율. 소프트 라이트는 입술 명암을 남겨 1에 가까워도 질감이 유지된다.
     public var makeupLipMaxOpacity: Double = 0.85
     /// 블러셔 1에서 소프트 라이트 결과를 섞는 비율.
