@@ -611,3 +611,282 @@ extension BodyGeometry {
         return copy
     }
 }
+
+/// 폰 화면 배율 측정. 비교할 이미지를 가로 1170px(iPhone 390pt × 3)로 맞춘 뒤 8비트로 읽는다(스펙 G4 1.1).
+enum DisplayScale {
+    static let phoneWidth: CGFloat = 1170
+    /// 세 채널 중 최대 |Δ|가 이 값 이상이면 "바뀐 픽셀"이다.
+    static let defaultMinimumDelta = 4
+    /// BT.601 휘도 계수.
+    private static let lumaWeights = (r: 0.299, g: 0.587, b: 0.114)
+    /// BT.601 Cb·Cr 계수(0…1 값 기준).
+    private static let cbWeights = (r: -0.168736, g: -0.331264, b: 0.5)
+    private static let crWeights = (r: 0.5, g: -0.418688, b: -0.081312)
+
+    static func grid(_ image: CGImage) throws -> PixelGrid {
+        let source = CIImage(cgImage: image)
+        let scale = phoneWidth / source.extent.width
+        let height = (source.extent.height * scale).rounded(.down)
+        let scaled = source.applyingFilter(
+            "CILanczosScaleTransform", parameters: [kCIInputScaleKey: scale, kCIInputAspectRatioKey: 1]
+        ).cropped(to: CGRect(x: 0, y: 0, width: phoneWidth, height: height))
+        return PixelGrid(try RenderingTestSupport.renderer.makeCGImage(scaled))
+    }
+
+    static func grid(_ image: CIImage) throws -> PixelGrid {
+        try grid(RenderingTestSupport.renderer.makeCGImage(image))
+    }
+
+    /// 정규화 사각형(원점 왼쪽 아래)을 격자 픽셀 사각형으로.
+    static func rect(_ normalized: NormalizedRect, in grid: PixelGrid) -> CGRect {
+        CGRect(
+            x: normalized.x * Double(grid.width), y: normalized.y * Double(grid.height),
+            width: normalized.width * Double(grid.width), height: normalized.height * Double(grid.height)
+        ).intersection(CGRect(x: 0, y: 0, width: grid.width, height: grid.height)).integral
+    }
+
+    private static func points(_ grid: PixelGrid, in rect: CGRect?) -> [CGPoint] {
+        let area = rect ?? CGRect(x: 0, y: 0, width: grid.width, height: grid.height)
+        var result: [CGPoint] = []
+        for y in Int(area.minY)..<Int(area.maxY) {
+            for x in Int(area.minX)..<Int(area.maxX) {
+                result.append(CGPoint(x: x, y: y))
+            }
+        }
+        return result
+    }
+
+    private static func luma(_ rgba: [UInt8]) -> Double {
+        lumaWeights.r * Double(rgba[0]) + lumaWeights.g * Double(rgba[1]) + lumaWeights.b * Double(rgba[2])
+    }
+
+    private static func chroma(_ rgba: [UInt8]) -> (cb: Double, cr: Double) {
+        let r = Double(rgba[0]) / 255
+        let g = Double(rgba[1]) / 255
+        let b = Double(rgba[2]) / 255
+        return (
+            cbWeights.r * r + cbWeights.g * g + cbWeights.b * b, crWeights.r * r + crWeights.g * g + crWeights.b * b
+        )
+    }
+
+    private static func weightValue(_ mask: PixelGrid?, _ point: CGPoint) -> Double {
+        mask.map { Double($0.red(point)) / 255 } ?? 1
+    }
+
+    static func changedFraction(
+        _ before: PixelGrid, _ after: PixelGrid, in rect: CGRect?, minimumDelta: Int = defaultMinimumDelta
+    ) -> Double {
+        let all = points(before, in: rect)
+        guard !all.isEmpty else { return 0 }
+        let changed = all.filter { point in
+            let a = before.rgba(point)
+            let b = after.rgba(point)
+            return (0..<3).contains { abs(Int(a[$0]) - Int(b[$0])) >= minimumDelta }
+        }
+        return Double(changed.count) / Double(all.count)
+    }
+
+    /// 가중 평균 ΔY와 평균 |ΔY|(8비트). weight가 nil이면 전체 평균.
+    static func lumaDelta(_ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid?) -> (
+        mean: Double, meanAbsolute: Double
+    ) {
+        var total = 0.0
+        var sum = 0.0
+        var absolute = 0.0
+        for point in points(before, in: nil) {
+            let w = weightValue(weight, point)
+            guard w > 0 else { continue }
+            let delta = luma(after.rgba(point)) - luma(before.rgba(point))
+            total += w
+            sum += w * delta
+            absolute += w * abs(delta)
+        }
+        guard total > 0 else { return (0, 0) }
+        return (sum / total, absolute / total)
+    }
+
+    /// 가중 평균 |ΔCb|·|ΔCr|(0…1).
+    static func chromaDelta(_ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid?) -> (cb: Double, cr: Double) {
+        var total = 0.0
+        var cb = 0.0
+        var cr = 0.0
+        for point in points(before, in: nil) {
+            let w = weightValue(weight, point)
+            guard w > 0 else { continue }
+            let a = chroma(before.rgba(point))
+            let b = chroma(after.rgba(point))
+            total += w
+            cb += w * abs(b.cb - a.cb)
+            cr += w * abs(b.cr - a.cr)
+        }
+        guard total > 0 else { return (0, 0) }
+        return (cb / total, cr / total)
+    }
+
+    /// 가중 평균 채널 Δ(8비트, 부호 있음). channel 0 = R, 2 = B.
+    static func channelDelta(_ before: PixelGrid, _ after: PixelGrid, channel: Int, weight: PixelGrid?) -> Double {
+        var total = 0.0
+        var sum = 0.0
+        for point in points(before, in: nil) {
+            let w = weightValue(weight, point)
+            guard w > 0 else { continue }
+            total += w
+            sum += w * (Double(after.rgba(point)[channel]) - Double(before.rgba(point)[channel]))
+        }
+        return total > 0 ? sum / total : 0
+    }
+
+    static func lumaDeltaStandardDeviation(_ before: PixelGrid, _ after: PixelGrid, in rect: CGRect?) -> Double {
+        let deltas = points(before, in: rect).map { luma(after.rgba($0)) - luma(before.rgba($0)) }
+        return RenderingTestSupport.variance(deltas).squareRoot()
+    }
+
+    static func percentileAbsoluteLumaDelta(
+        _ before: PixelGrid, _ after: PixelGrid, in rect: CGRect, percentile: Double
+    ) -> Double {
+        let deltas = points(before, in: rect).map { abs(luma(after.rgba($0)) - luma(before.rgba($0))) }.sorted()
+        guard !deltas.isEmpty else { return 0 }
+        let index = min(deltas.count - 1, Int(Double(deltas.count - 1) * percentile))
+        return deltas[index]
+    }
+
+    /// 가중 평균 Y(8비트).
+    static func luma(_ grid: PixelGrid, weight: PixelGrid) -> Double {
+        var total = 0.0
+        var sum = 0.0
+        for point in points(grid, in: nil) {
+            let w = weightValue(weight, point)
+            guard w > 0 else { continue }
+            total += w
+            sum += w * luma(grid.rgba(point))
+        }
+        return total > 0 ? sum / total : 0
+    }
+
+    /// (복구 − 결함) ÷ (원본 − 결함). 1이면 완전 복구, 0이면 그대로.
+    static func recovery(original: Double, defective: Double, repaired: Double) -> Double {
+        let drop = original - defective
+        guard abs(drop) > 1e-6 else { return 0 }
+        return (repaired - defective) / drop
+    }
+}
+
+/// 실사진 위에 심는 결함. 모두 실제 특징점 마스크·좌표를 쓴다(스펙 G4 1.1).
+enum SyntheticDefect {
+    /// image × (1 − depth × mask). 선형 공간 곱이다.
+    static func shadowed(_ image: CIImage, mask: CIImage, depth: Double) -> CIImage {
+        let factor = 1 - depth
+        let dimmed = image.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: factor, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: factor, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: factor, w: 0),
+            ])
+        return MaskBuilder.blend(dimmed, over: image, mask: mask).cropped(to: image.extent)
+    }
+
+    /// 붉은 반점. 감마 공간에서 R × 1.12, G·B × 0.95(Cr 약 +0.05)인 단단한 원.
+    static func reddened(_ image: CIImage, center: CGPoint, radius: CGFloat, extent: CGRect) -> CIImage {
+        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        let red = encoded.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: 1.12, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: 0.95, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: 0.95, w: 0),
+            ])
+        let mask = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: radius, height: radius), extent: extent)
+        return MaskBuilder.blend(red, over: encoded, mask: mask).applyingFilter("CISRGBToneCurveToLinear")
+            .cropped(to: extent)
+    }
+
+    /// 반사광. 선형 휘도를 가우시안 봉우리(중심에서 약 lift)만큼 더한다.
+    /// lift를 더한 사본을 봉우리 마스크로 섞어 image + lift × 봉우리가 된다.
+    /// 알파 0인 빛 층을 더하는 방식은 사전곱에서 빛이 0이 되어 쓰지 않는다.
+    static func highlighted(_ image: CIImage, center: CGPoint, radius: CGFloat, lift: Double, extent: CGRect) -> CIImage
+    {
+        let blob = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: radius, height: radius), extent: extent
+        ).applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: radius / 2]).cropped(to: extent)
+        let lifted = image.applyingFilter(
+            "CIColorMatrix", parameters: ["inputBiasVector": CIVector(x: lift, y: lift, z: lift, w: 0)])
+        return MaskBuilder.blend(lifted, over: image, mask: blob).cropped(to: extent)
+    }
+}
+
+/// 실제 Vision으로 분석한 데모 사진. 한 번만 준비해 모든 실사진 수용 테스트가 나눠 쓴다.
+final class RealPortrait: @unchecked Sendable {
+    static let shared: RealPortrait = {
+        do {
+            return try RealPortrait()
+        } catch {
+            fatalError("데모 사진 준비 실패: \(error)")
+        }
+    }()
+
+    let image: CIImage
+    let extent: CGRect
+    let analysis: PhotoAnalysis
+    let face: FaceGeometry
+    let faceWidth: CGFloat
+    let tuning = RenderTuning()
+
+    private init() throws {
+        guard
+            let url = Bundle.module.url(forResource: "demo-portrait", withExtension: "png", subdirectory: "Fixtures")
+        else { throw MellowError.cannotOpenPhoto(filename: "demo-portrait.png") }
+        image = try ImageLoader().load(url: url, maxDimension: tuning.previewMaxDimension)
+        extent = image.extent
+        let faces = try VisionFaceAnalyzer().analyze(image)
+        guard faces.count == 1 else { throw MellowError.faceAnalysisUnavailable(reason: "faces \(faces.count)") }
+        let mask = try VisionPersonAnalyzer().personMask(image)
+        let bodies = try VisionBodyAnalyzer().analyze(image)
+        analysis = PhotoAnalysis(faces: faces, personMask: mask, bodies: bodies)
+        face = faces[0]
+        faceWidth = FaceRegions.faceWidth(face, extent: image.extent)
+    }
+
+    func context(_ recipe: EditRecipe, image input: CIImage? = nil) -> RenderContext {
+        RenderContext(extent: (input ?? image).extent, recipe: recipe, analysis: analysis, tuning: tuning)
+    }
+
+    /// stage가 nil이면 전체 파이프라인.
+    func render(_ recipe: EditRecipe, stage: (any RenderStage)? = nil, input: CIImage? = nil) throws -> CGImage {
+        let source = input ?? image
+        let context = self.context(recipe, image: source)
+        let output =
+            try stage.map { try $0.apply(source, in: context) }
+            ?? RenderPipeline.standard.render(source, context: context)
+        return try RenderingTestSupport.renderer.makeCGImage(output)
+    }
+
+    /// 그래프를 비트맵으로 굳힌다. 결함을 심은 입력은 굳혀서 넘긴다.
+    func baked(_ graph: CIImage) throws -> CIImage {
+        CIImage(cgImage: try RenderingTestSupport.renderer.makeCGImage(graph.cropped(to: extent)))
+    }
+
+    /// 영역 마스크를 화면 배율 격자로. nil이면 실패.
+    func mask(_ region: FaceRegions.RegionMask?) throws -> PixelGrid {
+        guard let region else { throw MellowError.renderFailed }
+        return try DisplayScale.grid(region.image.cropped(to: extent))
+    }
+
+    func skinMask(strength: Double = 1) throws -> CIImage {
+        try FaceRegions.skinMask(face: face, image: image, extent: extent, tuning: tuning, strength: strength)
+    }
+}
+
+extension RenderingTestSupport {
+    /// rect 안 fine 대역 분산의 후/전 비. 1이면 질감 그대로, 작으면 뭉갬. 원본 배율에서 잰다.
+    static func fineVarianceRatio(
+        before: CIImage, after: CIImage, in rect: CGRect, fineRadius: Double, midRadius: Double
+    )
+        throws -> Double
+    {
+        let first = try bandVariances(before, in: rect, fineRadius: fineRadius, midRadius: midRadius).fine
+        let second = try bandVariances(after, in: rect, fineRadius: fineRadius, midRadius: midRadius).fine
+        return first > 0 ? second / first : 1
+    }
+}
