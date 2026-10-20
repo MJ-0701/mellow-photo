@@ -134,7 +134,7 @@
 | 글로우 1 | 전체 changedFraction ≥ 0.40 | 위 | 93%, 최대 75 | `glowMaxIntensity` |
 | 눈 또렷하게 1 | 눈 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `eyeWhiteLift`, `eyeIrisSharpen` |
 | 치아 미백 1 | 치아가 보이는 사진에서만(데모는 다문 입 → 건너뜀, XCTSkip) | — | — | `teethLift` |
-| 입술 생기 1 | 입술 마스크 가중 meanAbsoluteDelta ≥ 4/255 | 위 | 미측정 | `lipSaturationMax`, `lipRednessMax` |
+| 입술 생기 1 | 입술 마스크 가중 meanChromaDelta의 Cr ≥ 0.02 (G4-1 구현 중 변경: 입술 커널은 Cb·Cr만 바꾸고 휘도를 지키므로 휘도 지표로는 잴 수 없다) | 위 | 미측정 | `lipSaturationMax`, `lipRednessMax` |
 | 블러셔(복숭아) 1 | 블러셔 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `makeupBlushMaxOpacity` |
 | 원터치 여성 기본 0.6 | 얼굴 상자 changedFraction ≥ 0.05 | — | — | 표 값 |
 | 원터치 여성 1 | 얼굴 상자 changedFraction ≥ 0.10 | — | — | 표 값 |
@@ -209,6 +209,7 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 
 - `SkinStage.refine`는 **피부 마스크(`unitMask`)를 주름보다 먼저** 만든다(캐시된 비트맵이라 비용 없음).
 - 주변 기준: `surround = FrequencySeparation.maskedMean(image, mask: unitMask × (1 − region.image), radius: W × foldSurroundFraction)` → 분자·분모 두 이미지. 커널 `foldLift`는 `surround` 대신 `wideNumerator`·`wideDenominator`를 받아 `surroundLuma = dot(num.rgb / max(den.r, 0.001), luma601)`로 계산한다. 나머지(`gap = max(surroundLuma − lowLuma, 0)`, `gain = min(1 + amount × gap / max(lowLuma, floor), maxGain)`, `rgb × gain`)는 그대로.
+- G1 단위 테스트 `testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast`(그늘 없는 합성 피부, 허용 3바이트)는 G4-1 구현 중 바뀐다. 피부 전용 기준은 띠 안의 어두운 결 얼룩도 주변 피부 수준으로 고르므로 6~10바이트 오른다. 이 테스트는 "색 번짐 없음(띠 안 Cb·Cr 변화 ≤ 0.01)"과 "띠 안 평균 ΔY ≤ +0.08(1.4절 상한)"과 "띠 밖 불변"을 단언한다.
 - 왜 고쳐지나: 측정된 gap(다크 0.025, 팔자 0.002, 미간 −0.058)은 가중치 없는 반지름 12% 흐림에 눈·눈썹·속눈썹·콧구멍·입술이 들어가 주변이 그늘보다 어둡게 잡힌 값이다. 피부 마스크는 보호 영역과 피부색 가중치로 그것들을 0으로 두고, (1 − 띠)가 그늘 자신을 빼므로 기준이 "띠 둘레의 피부 밝기"가 된다. 반지름을 18%로 넓혀도 피부만 평균되므로 안전하다.
 - 질감·색: 곱셈 배율이라 모공 상대 대비와 색조·채도는 그대로다(G1 결정 유지). 합성 결함 없는 띠에서 Cb·Cr 평균 변화 ≤ 0.01을 테스트로 고정한다.
 - 마스크 가중 평균의 분모가 0에 가까운 곳(띠 둘레가 전부 보호 영역)은 커널의 `max(den, 0.001)`로 폭주를 막고, 그 경우 `gap`이 음수가 되어 배율 1이다.
@@ -221,7 +222,7 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 #### 2.4 몸 피부 조건 (`BodySkinStage`, 앱 피부톤 탭)
 
 - `personMask`가 nil이고 `faces`가 비어 있지 않으면 `BackgroundStage.personMask(...)` 대신 `BodySkinStage.fallbackPersonRegion(face: widest, extent:, tuning:)`을 쓴다: 가장 넓은 얼굴 상자를 중심 x 기준 가로 `bodySkinFallbackWidthScale`배, 상자 위끝에서 아래로 상자 높이 × `bodySkinFallbackHeightScale`만큼의 직사각형을 `MaskBuilder.ellipse`가 아니라 모서리가 둥근 부드러운 사각형(직사각형을 `shortSide × bodySkinFallbackFeather`로 흐림)으로 만든 마스크. 피부색 가중치와 눈·입 제외는 그대로 곱하므로 옷·배경은 가중치가 뺀다. 얼굴이 없으면 지금처럼 건너뛴다(G 결정).
-- `PreparedPhoto`·`PhotoInfo`는 바뀌지 않는다. 앱 `AppModel.bodySkinStatus: BodySkinStatus { ready, fallback(noPersonMask), noFace, faceAnalysisUnavailable, personAnalysisUnavailable }`를 계산해 피부톤 탭 맨 위에 한 줄로 보인다(`UserMessage.bodySkinStatus(_:)`: "사람 영역 ✓ · 기준 얼굴 ✓", "사람 영역 없음 → 얼굴 둘레로 대신 적용해요", …). `canAdjustBodySkin`은 `.ready`·`.fallback`에서 켠다.
+- `PreparedPhoto`·`PhotoInfo`는 바뀌지 않는다. 앱 `AppModel.bodySkinStatus: BodySkinStatus { ready, fallback(noPersonMask), noFace, faceAnalysisUnavailable, personAnalysisUnavailable }`를 계산해 피부톤 탭 맨 위에 한 줄로 보인다(`UserMessage.bodySkinStatus(_:)`: "사람 영역 ✓ · 기준 얼굴 ✓", "사람 영역 없음 → 얼굴 둘레로 대신 적용해요", …). `canAdjustBodySkin`은 `.ready`·`.fallback`·`.personAnalysisUnavailable`에서 켠다(G4-1 구현 중 변경: 사람 분석이 실패해도 얼굴이 있으면 렌더가 대체 영역을 쓰므로 슬라이더를 막지 않는다).
 
 ### 3. 원터치 묶음
 
