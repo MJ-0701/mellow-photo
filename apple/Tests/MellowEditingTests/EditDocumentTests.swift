@@ -482,4 +482,33 @@ final class EditDocumentTests: XCTestCase {
         document.undo()
         XCTAssertTrue(document.recipe.isDefault)
     }
+
+    func testBodySkinChangesClampAreNotLockedAndAreCopiedByPresetsAndBatch() {
+        var document = EditDocument()
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        XCTAssertFalse(EditChange.bodySkin(.tone, 0.5).affectsGeometry)
+        XCTAssertNil(document.set(.bodySkin(.brightness, 1.5)), "색만 바꾸므로 잠기지 않는다")
+        XCTAssertEqual(document.recipe.bodySkin.brightness, 1)
+        XCTAssertNil(document.set(.bodySkin(.tone, -4)))
+        XCTAssertEqual(document.recipe.bodySkin.tone, -1, "톤만 양방향")
+        document.set(.bodySkin(.smoothing, -0.5))
+        XCTAssertEqual(document.recipe.bodySkin.smoothing, 0)
+        XCTAssertEqual(EditingPolicy.bodySkinRange(.tone), EditingPolicy.bipolarRange)
+        XCTAssertEqual(EditingPolicy.bodySkinRange(.smoothing), EditingPolicy.unitRange)
+        var other = EditDocument()
+        other.apply(PresetValues(of: document.recipe))
+        XCTAssertEqual(other.recipe.bodySkin, BodySkinAdjustments(brightness: 1, tone: -1), "프리셋이 몸 피부를 나른다")
+        var third = EditDocument()
+        third.applyFromBatch(PresetValues(bodySkin: BodySkinAdjustments(smoothing: 0.4)))
+        XCTAssertEqual(third.recipe.bodySkin.smoothing, 0.4, "일괄 적용도 나른다")
+    }
+
+    func testApplyAutoKeepsBodySkin() {
+        var document = EditDocument()
+        document.set(.bodySkin(.brightness, 0.5))
+        let suggestion = AutoEnhanceSuggestion(
+            color: ColorAdjustments(exposure: 0.1), detail: DetailAdjustments(), portrait: PortraitAdjustments())
+        XCTAssertTrue(document.applyAuto(suggestion))
+        XCTAssertEqual(document.recipe.bodySkin.brightness, 0.5, "자동 보정은 몸 피부를 건드리지 않는다")
+    }
 }
