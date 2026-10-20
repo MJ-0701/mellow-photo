@@ -99,6 +99,7 @@ public struct EditDocument: Equatable, Sendable {
         layer.remove(targets)
         if keys == nil {
             layer.makeupLookID = nil
+            layer.oneTouch = nil
         }
         Self.store(layer, in: &updated, scope: scope)
         return commit(updated)
@@ -137,6 +138,98 @@ public struct EditDocument: Equatable, Sendable {
     private func carriesFaceShape(_ record: PersonRecord) -> Bool {
         let group = record.gender.flatMap { recipe.people.groups[$0] } ?? PortraitLayer()
         return record.layer.overriddenKeys.union(group.overriddenKeys).contains(where: \.isFaceShape)
+    }
+
+    /// 대상 층에 원터치 표 × 강도를 쓴다(스펙 G4 3.3).
+    /// 체크포인트 하나이고 연속 변경 중이면 만들지 않는다.
+    /// .all은 전체 층에 공통 표, 남성·여성 그룹 층에 각 성별 표, 몸 피부에 몸 피부 표를 쓴다.
+    /// 그룹 층의 묶음 밖 키와 개인 층은 그대로 둔다.
+    /// .gender는 그 그룹 층만, .person은 그 기록 층에 기록의 수동 성별 표(없으면 공통)를 쓴다.
+    /// 강도 0은 묶인 키를 지우고(전체 층은 기본값, 그 외 상속) 표시도 지운다.
+    /// 얼굴형 키를 쓰지 않으므로 잠긴 사진에서도 허용한다.
+    /// 모르는 사람이면 .unknownPerson이다.
+    @discardableResult
+    public mutating func applyOneTouch(strength: Double, in scope: PortraitScope = .all) -> Rejection? {
+        let clamped = OneTouchBundle.clampedStrength(strength)
+        var updated = recipe
+        switch scope {
+        case .all:
+            Self.writeOneTouch(strength: clamped, intoAllLayerOf: &updated)
+            for gender in Gender.allCases {
+                var group = updated.people.groups[gender] ?? PortraitLayer()
+                Self.writeOneTouch(gender: gender, strength: clamped, into: &group)
+                updated.people.groups[gender] = group.isEmpty ? nil : group
+            }
+            let body = OneTouchBundle.bodySkin(strength: clamped)
+            updated.bodySkin.brightness = body.brightness
+            updated.bodySkin.tone = body.tone
+        case .gender(let gender):
+            var group = updated.people.groups[gender] ?? PortraitLayer()
+            Self.writeOneTouch(gender: gender, strength: clamped, into: &group)
+            updated.people.groups[gender] = group.isEmpty ? nil : group
+        case .person(let id):
+            guard let index = updated.people.individuals.firstIndex(where: { $0.id == id }) else {
+                return .unknownPerson
+            }
+            Self.writeOneTouch(
+                gender: updated.people.individuals[index].gender, strength: clamped,
+                into: &updated.people.individuals[index].layer)
+        }
+        return commit(updated, clearsStaleMarks: false)
+    }
+
+    /// faces[index]와 짝이 된 사람에게 원터치를 쓴다.
+    /// 기록이 없으면 그 얼굴 anchor로 만든다(체크포인트 하나).
+    /// 짝짓기는 set(_:forFace:of:)·렌더와 같은 PeopleAdjustments.personID(forFace:of:)다.
+    /// index가 범위 밖이면 .unknownPerson이다.
+    @discardableResult
+    public mutating func applyOneTouch(strength: Double, forFace index: Int, of faces: [NormalizedRect]) -> Rejection? {
+        guard faces.indices.contains(index) else { return .unknownPerson }
+        var updated = recipe
+        let id =
+            updated.people.personID(forFace: index, of: faces)
+            ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[index]), to: &updated)
+        guard let recordIndex = updated.people.individuals.firstIndex(where: { $0.id == id }) else {
+            return .unknownPerson
+        }
+        Self.writeOneTouch(
+            gender: updated.people.individuals[recordIndex].gender, strength: OneTouchBundle.clampedStrength(strength),
+            into: &updated.people.individuals[recordIndex].layer)
+        return commit(updated, clearsStaleMarks: false)
+    }
+
+    /// 층의 묶인 키를 표 × 강도로 바꾸고 표시를 둔다.
+    /// 강도 0은 묶인 키를 지우고 표시도 지운다.
+    /// 메이크업 부위가 실제로 바뀌면 룩 이름을 지운다(전체 층과 같은 규칙).
+    private static func writeOneTouch(gender: Gender?, strength: Double, into layer: inout PortraitLayer) {
+        let previousMakeup = layer.makeup
+        layer.remove(OneTouchBundle.keys)
+        if strength > 0 {
+            copy(OneTouchBundle.keys, from: OneTouchBundle.layer(for: gender, strength: strength), into: &layer)
+            layer.oneTouch = strength
+        } else {
+            layer.oneTouch = nil
+        }
+        if layer.makeup != previousMakeup {
+            layer.makeupLookID = nil
+        }
+    }
+
+    /// 전체 층에 공통 표 × 강도를 쓴다.
+    /// 강도 0은 묶인 키를 기본값으로 두고 표시를 지운다.
+    private static func writeOneTouch(strength: Double, intoAllLayerOf recipe: inout EditRecipe) {
+        var makeup = recipe.makeup
+        resetAllLayer(OneTouchBundle.keys, in: &recipe)
+        if strength > 0 {
+            OneTouchBundle.layer(for: nil, strength: strength).applied(to: &recipe.portrait, makeup: &recipe.makeup)
+            recipe.portrait.oneTouch = strength
+        } else {
+            recipe.portrait.oneTouch = nil
+        }
+        makeup.lookID = recipe.makeup.lookID
+        if recipe.makeup != makeup {
+            recipe.makeup.lookID = nil
+        }
     }
 
     /// legacyIndex만 있는 기록에 faces[legacyIndex]의 anchor를 채운다.
@@ -182,18 +275,28 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다.
-    /// 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
+    /// oneTouchStrength가 nil이면 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
     /// 피부 정밀·치아 미백·입술 생기·성별 그룹·개인 층·얼굴형·체형·배경·몸 피부·메이크업·효과·룩·기하·수동 편집은 건드리지 않는다.
+    /// 피부 보정 값이 실제로 바뀌면 전체 층의 원터치 표시를 지운다.
+    /// oneTouchStrength가 있으면 색·디테일과 전체 대상 원터치(applyOneTouch(strength:in: .all))를 같은 체크포인트에서 쓰고 제안의 인물 값은 쓰지 않는다.
+    /// 얼굴이 있는지는 호출자가 보고 강도를 넘긴다.
     /// 이미 같은 값이면 아무것도 하지 않아 연타해도 실행 취소 한 번에 되돌아간다.
     /// 적용했으면 true.
     @discardableResult
-    public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion) -> Bool {
+    public mutating func applyAuto(_ suggestion: AutoEnhanceSuggestion, oneTouchStrength: Double? = nil) -> Bool {
         var updated = recipe
         updated.color = suggestion.color
         updated.detail = suggestion.detail
-        updated.portrait.skin.smoothing = suggestion.portrait.skin.smoothing
-        updated.portrait.skin.autoBlemish = suggestion.portrait.skin.autoBlemish
-        updated.portrait.features.eyeBrighten = suggestion.portrait.features.eyeBrighten
+        if let oneTouchStrength {
+            var document = EditDocument(recipe: updated)
+            document.applyOneTouch(strength: oneTouchStrength, in: .all)
+            updated = document.recipe
+        } else {
+            updated.portrait.skin.smoothing = suggestion.portrait.skin.smoothing
+            updated.portrait.skin.autoBlemish = suggestion.portrait.skin.autoBlemish
+            updated.portrait.features.eyeBrighten = suggestion.portrait.features.eyeBrighten
+            Self.clearStaleOneTouchMarks(previous: recipe, in: &updated)
+        }
         guard updated != recipe else { return false }
         checkpoint()
         recipe = updated
@@ -220,6 +323,7 @@ public struct EditDocument: Equatable, Sendable {
             layer.makeupLookID = look?.id
             Self.store(layer, in: &updated, scope: scope)
         }
+        Self.clearStaleOneTouchMarks(previous: recipe, in: &updated)
         updated.people.prune()
         guard updated != recipe else { return }
         checkpoint()
@@ -279,8 +383,28 @@ public struct EditDocument: Equatable, Sendable {
                 }
             }
         }
+        carryOneTouchMarks(from: values, applied: applied, into: &updated)
         updated.people.prune()
         return updated
+    }
+
+    /// 프리셋·동기화의 원터치 표시 규칙(스펙 G4 3.3).
+    /// 묶인 키가 바뀐 개인 층의 표시는 지운다.
+    /// 피부·눈입·메이크업을 모두 복사하면 전체 층·그룹 층 표시를 원본 것으로 둔다.
+    /// 하나라도 빠졌으면 표시가 거짓이 되므로 전체 층·그룹 층 표시를 지운다.
+    /// 셋 다 복사하지 않으면 묶인 키가 그대로라 표시도 그대로다.
+    private func carryOneTouchMarks(
+        from values: PresetValues, applied: Set<SyncCategory>, into updated: inout EditRecipe
+    ) {
+        Self.clearStaleOneTouchMarks(previous: recipe, in: &updated)
+        guard !applied.isDisjoint(with: SyncCategory.oneTouchCategories) else { return }
+        let copiesMarks = applied.isSuperset(of: SyncCategory.oneTouchCategories)
+        updated.portrait.oneTouch = copiesMarks ? values.portrait.oneTouch : nil
+        for gender in Gender.allCases {
+            guard var group = updated.people.groups[gender] else { continue }
+            group.oneTouch = copiesMarks ? values.people.groups[gender]?.oneTouch : nil
+            updated.people.groups[gender] = group
+        }
     }
 
     /// target의 keys를 source의 값으로 바꾼다(source에 없는 키는 지움).
@@ -302,15 +426,58 @@ public struct EditDocument: Equatable, Sendable {
         }
     }
 
-    /// 빈 기록과 빈 그룹 층을 지운 뒤 값이 그대로면 체크포인트 없이 끝낸다.
-    private mutating func commit(_ proposed: EditRecipe) -> Rejection? {
+    /// 묶인 키가 바뀐 층의 원터치 표시와 빈 기록·빈 그룹 층을 지운 뒤 값이 그대로면 체크포인트 없이 끝낸다.
+    /// 원터치를 쓰는 경로만 clearsStaleMarks를 끈다(방금 둔 표시를 지키려고).
+    private mutating func commit(_ proposed: EditRecipe, clearsStaleMarks: Bool = true) -> Rejection? {
         var updated = proposed
+        if clearsStaleMarks {
+            Self.clearStaleOneTouchMarks(previous: recipe, in: &updated)
+        }
         updated.people.prune()
         // 값이 그대로면 실행 취소 단계를 만들지 않는다.
         guard updated != recipe else { return nil }
         checkpointUnlessContinuous()
         recipe = updated
         return nil
+    }
+
+    /// 이전 레시피와 비교해 묶인 키가 실제로 바뀐 층의 원터치 표시를 지운다(메이크업 lookID와 같은 규칙).
+    /// 같은 값이면 표시를 남긴다.
+    private static func clearStaleOneTouchMarks(previous: EditRecipe, in updated: inout EditRecipe) {
+        if updated.portrait.oneTouch != nil,
+            bundledValues(previous.portrait, previous.makeup) != bundledValues(updated.portrait, updated.makeup)
+        {
+            updated.portrait.oneTouch = nil
+        }
+        for gender in Gender.allCases {
+            guard var group = updated.people.groups[gender], group.oneTouch != nil else { continue }
+            if bundled(previous.people.groups[gender] ?? PortraitLayer()) != bundled(group) {
+                group.oneTouch = nil
+                updated.people.groups[gender] = group.isEmpty ? nil : group
+            }
+        }
+        for index in updated.people.individuals.indices where updated.people.individuals[index].layer.oneTouch != nil {
+            let before = previous.people.person(updated.people.individuals[index].id)?.layer ?? PortraitLayer()
+            if bundled(before) != bundled(updated.people.individuals[index].layer) {
+                updated.people.individuals[index].layer.oneTouch = nil
+            }
+        }
+    }
+
+    /// 층에서 묶인 키만 남긴 사본이다(표시·룩 이름 제외).
+    /// 성긴 층을 그대로 비교하므로 0으로 덮어씀과 상속이 구분된다.
+    private static func bundled(_ layer: PortraitLayer) -> PortraitLayer {
+        var copy = layer
+        copy.remove(PortraitKey.all.subtracting(OneTouchBundle.keys))
+        copy.oneTouch = nil
+        copy.makeupLookID = nil
+        return copy
+    }
+
+    /// 전체 층의 묶인 값.
+    /// 전체 층은 빽빽한 값이라 기본값과 같은 키는 없음과 같게 본다.
+    private static func bundledValues(_ portrait: PortraitAdjustments, _ makeup: MakeupAdjustments) -> PortraitLayer {
+        bundled(PortraitLayer.difference(portrait: portrait, makeup: makeup))
     }
 
     /// 짝이 없는 얼굴의 새 기록.
@@ -328,6 +495,10 @@ public struct EditDocument: Equatable, Sendable {
             guard case .person(let id) = scope,
                 let index = updated.people.individuals.firstIndex(where: { $0.id == id })
             else { return .unknownPerson }
+            // 원터치 표시는 그 사람의 성별 표와 같다는 뜻이라 성별이 바뀌면 거짓이 된다.
+            if updated.people.individuals[index].gender != gender {
+                updated.people.individuals[index].layer.oneTouch = nil
+            }
             updated.people.individuals[index].gender = gender
             return nil
         }
