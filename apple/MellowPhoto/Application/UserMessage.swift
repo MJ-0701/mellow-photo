@@ -67,8 +67,24 @@ enum UserMessage {
     static let noFaceHint = "정면에 가까운 사진을 선택하거나 잡티·변형 도구를 직접 사용해 주세요."
     static let noLandmarksHint =
         "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정·얼룩 고르기·붉은기·번들거림과 잡티·변형 도구는 쓸 수 있고, 주름 밝히기 4종은 특징점이 있어야 바뀌어요."
-    static let beautyTargetLabel = "대상"
-    static let beautyTargetAll = "전체"
+    static let targetLabel = "대상"
+    static let targetAll = "전체"
+    static let genderLabel = "성별"
+    static let genderMale = "남성"
+    static let genderFemale = "여성"
+    static let genderUnset = "미지정"
+    static let genderEstimated = "추정"
+    static let genderManual = "지정"
+    /// 사람 칩 메뉴 단추의 접근성 이름.
+    static let personMenu = "사람 메뉴"
+    static let overrideReset = "재설정"
+    static let resetScope = "이 대상 초기화"
+    static let personUnmatched = "사진에서 찾지 못함"
+    static let rebindPerson = "이 얼굴에 연결"
+    static let removePerson = "삭제"
+    static let scopeHintGroup = "전체 값을 바탕으로 이 그룹에서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
+    static let scopeHintPerson = "전체·그룹 값을 바탕으로 이 사람에게서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
+    static let assignGenderHint = "성별을 지정하면 그 그룹의 값이 함께 적용돼요. 자동 추정이 틀리면 여기서 고칠 수 있어요."
     /// 원터치 줄 아래 안내(G4 스펙 4절).
     static let oneTouchHintAll =
         "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 그 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)은 성별을 지정한 사람에게는 그룹 값에 가려요. 성별은 사람 칩에서 지정해요."
@@ -127,18 +143,48 @@ enum UserMessage {
         "\(count)장을 저장하지 못했습니다."
     }
 
-    /// 성별 그룹 대상 이름.
-    static func beautyTargetGender(_ gender: Gender) -> String {
+    /// 찾은 얼굴 대상 이름.
+    /// 왼쪽부터 센 번호다.
+    static func personOrdinal(_ number: Int) -> String {
+        "사람 \(number)"
+    }
+
+    /// nil은 미지정이다.
+    static func genderTitle(_ gender: Gender?) -> String {
         switch gender {
-        case .male: return "남성 그룹"
-        case .female: return "여성 그룹"
+        case .male: return genderMale
+        case .female: return genderFemale
+        case nil: return genderUnset
         }
     }
 
-    /// 찾은 얼굴 대상 이름.
-    /// 왼쪽부터 센 번호다.
-    static func beautyTargetFace(_ number: Int) -> String {
-        "사람 \(number)"
+    /// 사람 메뉴의 성별 항목.
+    /// 추정으로 고른 성별이면 "· 추정"을 붙인다.
+    static func genderMenuTitle(_ gender: Gender, estimated: Bool) -> String {
+        estimated ? "\(genderTitle(gender)) · \(genderEstimated)" : genderTitle(gender)
+    }
+
+    /// 성별 그룹 대상 이름.
+    static func groupTitle(_ gender: Gender) -> String {
+        "\(genderTitle(gender)) 그룹"
+    }
+
+    static func rebindToFace(_ number: Int) -> String {
+        "\(personOrdinal(number))에 연결"
+    }
+
+    static func overriddenCount(_ count: Int) -> String {
+        "바꾼 항목 \(count)개"
+    }
+
+    /// 대상 칩 아래 안내.
+    /// 전체는 안내가 없다.
+    static func scopeHint(for target: AppModel.BeautyTarget) -> String? {
+        switch target {
+        case .all: return nil
+        case .gender: return scopeHintGroup
+        case .face, .person: return scopeHintPerson
+        }
     }
 
     /// 뷰티 › 얼굴 탭 슬라이더 이름. 화면 순서는 FaceShapeKey.allCases.

@@ -202,7 +202,9 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
             }
             target.setIntensity(tint.intensity, of: part)
         }
-        if let makeupLookID {
+        // 룩 이름은 메이크업 부위를 덮어쓴 가장 위 층의 것이다.
+        // 부위만 바꾼 층은 아래 층의 룩 이름을 지운다(겹친 값이 그 룩과 다르다).
+        if makeupLookID != nil || !makeup.isEmpty {
             target.lookID = makeupLookID
         }
     }

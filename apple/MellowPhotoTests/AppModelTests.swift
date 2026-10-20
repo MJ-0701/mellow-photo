@@ -1624,6 +1624,34 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotEqual(plain.currentRecipe, EditRecipe(), "색감·디테일은 바뀐다")
         XCTAssertNil(plain.presentedError)
     }
+
+    func testScopedPanelValuesShowInheritedAndOverriddenKeysPerTarget() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let faces = twoFaces()
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(faces)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.skinSmoothing(0.2))
+        model.setBeautyTarget(.face(0))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        model.applyMakeupLook(id: "daily")
+        XCTAssertEqual(model.scopedValues.makeup.lookID, "daily")
+        XCTAssertEqual(model.overriddenKeys, PortraitKey.makeup)
+        model.setBeautyTarget(.face(0))
+        XCTAssertEqual(model.scopedValues.makeup.lookID, "daily", "여성 그룹의 룩을 상속")
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.2, "전체 층의 피부를 상속")
+        XCTAssertEqual(model.overriddenKeys, [])
+        model.edit(.makeupIntensity(.lip, 0.9))
+        XCTAssertEqual(model.overriddenKeys, [.makeupPart(.lip)])
+        XCTAssertNil(model.scopedValues.makeup.lookID, "부위를 바꾸면 그 층의 룩 선택이 풀린다")
+        model.resetOverrides([.makeupPart(.lip)])
+        XCTAssertEqual(model.scopedValues.makeup.lookID, "daily")
+        XCTAssertEqual(UserMessage.scopeHint(for: .face(0)), UserMessage.scopeHintPerson)
+        XCTAssertEqual(UserMessage.scopeHint(for: .gender(.male)), UserMessage.scopeHintGroup)
+        XCTAssertNil(UserMessage.scopeHint(for: .all))
+    }
 }
 
 /// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.

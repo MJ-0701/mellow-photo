@@ -76,4 +76,23 @@ final class PortraitResolverTests: XCTestCase {
         withoutMale.people.groups[.male] = nil
         XCTAssertEqual(PortraitResolver.layer(withoutMale, scope: .gender(.male)), PortraitLayer(), "없는 그룹은 빈 층")
     }
+
+    /// 룩 이름은 메이크업 부위를 덮어쓴 가장 위 층의 것이다.
+    /// 부위를 안 건드린 층은 아래 층의 룩을 상속하고, 부위만 바꾼 층은 룩 이름을 지운다.
+    func testLookIDComesFromTheTopLayerThatOverridesMakeup() {
+        var recipe = EditRecipe()
+        recipe.makeup.lookID = "daily"
+        recipe.makeup.lip = MakeupTint(colorID: "lip-rose", intensity: 0.5)
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.4)
+        XCTAssertEqual(
+            PortraitResolver.resolve(recipe, person: nil, gender: .female).makeup.lookID, "daily",
+            "메이크업을 안 건드린 그룹은 전체의 룩을 상속")
+        recipe.people.groups[.female] = PortraitLayer(makeup: [.lip: MakeupTint(colorID: nil, intensity: 0.9)])
+        XCTAssertNil(
+            PortraitResolver.resolve(recipe, person: nil, gender: .female).makeup.lookID,
+            "부위만 바꾼 그룹은 룩 이름을 지운다")
+        recipe.people.groups[.female] = PortraitLayer(
+            makeup: [.lip: MakeupTint(colorID: "lip-coral", intensity: 0.4)], makeupLookID: "party")
+        XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .female).makeup.lookID, "party")
+    }
 }

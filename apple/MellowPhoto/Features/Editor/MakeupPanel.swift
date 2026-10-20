@@ -5,6 +5,7 @@ import SwiftUI
 /// 메이크업 도구. 룩 칩(없음 + 5개)이 위, 부위 탭이 아래, 부위마다 색 칩과 강도 슬라이더(스펙 7).
 /// 색만 바꾸므로 수동 편집이 있어도 끄지 않는다. 얼굴이 없거나 특징점이 없으면 안내를 보인다.
 /// 얼굴 분석이 실패하면 없음 칩만 남기고 끈다(canAdjustMakeup).
+/// 얼굴이 있으면 맨 위에 대상 칩을 두고, 대상 층까지 겹친 값을 보인다.
 struct MakeupPanel: View {
     @Environment(AppModel.self) private var model
 
@@ -13,6 +14,7 @@ struct MakeupPanel: View {
         let makeup = model.scopedValues.makeup
         let catalog = model.makeupCatalog
         let part = model.makeupPart
+        let overridden = model.overriddenKeys
         switch model.faceAvailability {
         case .ready:
             EmptyView()
@@ -26,14 +28,14 @@ struct MakeupPanel: View {
         }
         // 얼굴이 없거나 분석이 실패한 사진에는 고를 사람이 없다.
         if !model.faces.isEmpty {
-            BeautyTargetPicker()
+            TargetChips()
         }
         if catalog.isEmpty {
             Text(UserMessage.makeupCatalogUnavailable).font(.caption).foregroundStyle(.secondary)
         }
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                lookChip(id: nil, name: UserMessage.makeupNoLook, selected: makeup == MakeupAdjustments())
+                lookChip(id: nil, name: UserMessage.makeupNoLook, selected: isNoLook(makeup, overridden: overridden))
                 ForEach(catalog.looks) { look in
                     lookChip(id: look.id, name: look.name, selected: makeup.lookID == look.id)
                         .disabled(!model.canAdjustMakeup)
@@ -59,10 +61,22 @@ struct MakeupPanel: View {
             .disabled(!model.canAdjustMakeup)
         }
         AdjustmentSlider(
-            title: UserMessage.makeupIntensity, value: makeup.intensity(of: part), range: EditingPolicy.unitRange
+            title: UserMessage.makeupIntensity, value: makeup.intensity(of: part), range: EditingPolicy.unitRange,
+            isOverridden: overridden.contains(.makeupPart(part)),
+            onReset: { model.resetOverrides([.makeupPart(part)]) }
         ) { .makeupIntensity(part, $0) }
         .disabled(!model.canAdjustMakeup)
         Text(UserMessage.makeupHint).font(.caption).foregroundStyle(.secondary)
+    }
+
+    /// "없음" 칩 선택 조건.
+    /// 전체는 메이크업이 기본값일 때다.
+    /// 그룹·사람은 그 층이 모든 부위를 덮어써 빈 메이크업으로 만들었을 때다(상속으로 비어 보이는 것과 구분).
+    private func isNoLook(_ makeup: MakeupAdjustments, overridden: Set<PortraitKey>) -> Bool {
+        if model.beautyTarget == .all {
+            return makeup == MakeupAdjustments()
+        }
+        return overridden.isSuperset(of: PortraitKey.makeup) && !makeup.hasEffect
     }
 
     private func lookChip(id: String?, name: String, selected: Bool) -> some View {

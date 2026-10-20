@@ -19,6 +19,13 @@ enum Theme {
     /// 메이크업 룩 이름 칩의 최소 크기와 좌우 여백.
     static let makeupChipSize = CGSize(width: 56, height: 30)
     static let makeupChipPadding: CGFloat = 10
+    /// 뷰티·메이크업 대상 칩의 최소 높이와 좌우 여백.
+    static let targetChipHeight: CGFloat = 30
+    static let targetChipPadding: CGFloat = 10
+    /// 덮어쓴 슬라이더·사람 칩의 점 지름.
+    static let overrideDotSize: CGFloat = 6
+    /// 작은 아이콘 단추(사람 메뉴)를 누를 수 있는 최소 크기.
+    static let iconButtonHitSize: CGFloat = 44
     /// 메이크업 색 칩 지름.
     static let makeupSwatchSize: CGFloat = 28
     static let cropHandleSize: CGFloat = 22
