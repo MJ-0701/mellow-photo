@@ -10,5 +10,6 @@ final class CompareDividerTests: XCTestCase {
         XCTAssertEqual(CompareDivider.fraction(forX: -20, width: 300), 0)
         XCTAssertEqual(CompareDivider.fraction(forX: 400, width: 300), 1)
         XCTAssertEqual(CompareDivider.fraction(forX: 10, width: 0), AppModel.Policy.compareSplitDefault)
+        XCTAssertGreaterThan(Theme.compareHandleHitWidth, Theme.compareHandleSize, "잡는 띠가 그린 손잡이보다 넓다")
     }
 }

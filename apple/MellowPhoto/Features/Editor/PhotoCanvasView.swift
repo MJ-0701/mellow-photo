@@ -100,7 +100,7 @@ struct PhotoCanvasView: View {
     }
 
     /// 분할 모드: 보정본 위에 원본을 왼쪽 compareSplit 비율만 보이게 얹고 경계에 분할선을 둔다.
-    /// 원본은 미리보기와 같은 기하로 그린 것이라 같은 크기(size)에 겹치면 화소 위치가 맞는다.
+    /// 원본은 미리보기와 같은 기하로 그린 것만 받으므로(AppModel.splitCompareOriginal) 같은 크기(size)에 겹치면 화소 위치가 맞는다.
     @ViewBuilder
     private func splitOverlay(in size: CGSize) -> some View {
         if model.compareMode == .split {

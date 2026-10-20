@@ -23,7 +23,7 @@ struct CompareDivider: View {
                 )
                 .shadow(radius: 2)
         }
-        .frame(width: Theme.compareHandleSize, height: size.height)
+        .frame(width: Theme.compareHandleHitWidth, height: size.height)
         .contentShape(Rectangle())
         .position(x: size.width * model.compareSplit, y: size.height / 2)
         .gesture(

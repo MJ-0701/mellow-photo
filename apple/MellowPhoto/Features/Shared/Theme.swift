@@ -30,8 +30,10 @@ enum Theme {
     static let bipolarSnapWidth = 0.05
     /// 분할 비교 세로선 두께.
     static let compareDividerWidth: CGFloat = 2
-    /// 분할선 손잡이 지름.
+    /// 분할선 손잡이 지름. 그리는 크기다.
     static let compareHandleSize: CGFloat = 28
+    /// 분할선을 잡을 수 있는 띠의 폭. 손가락으로 잡기 쉬운 최소 터치 크기다.
+    static let compareHandleHitWidth: CGFloat = 44
     /// 캔버스 이미지 좌표계 이름. 분할선 드래그 위치를 이 좌표로 받는다.
     static let canvasCoordinateSpace = "canvas"
 

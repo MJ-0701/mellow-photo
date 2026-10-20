@@ -1132,4 +1132,68 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(UserMessage.compareBadge(.full), "원본")
         XCTAssertEqual(UserMessage.compareBadge(.off), "보정본")
     }
+
+    func testSplitCompareShowsTheOriginalOnlyWhenItsGeometryMatchesThePreview() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        try await waitUntil { !model.isRendering }
+        let gate = OriginalRenderGate()
+        let pipeline = model.pipeline
+        model.renderOriginal = { id, recipe in
+            try await gate.pass()
+            return try await pipeline.preview(id, recipe: recipe)
+        }
+        model.toggleSplitCompare()
+        XCTAssertNotNil(model.splitCompareOriginal, "같은 기하로 그린 원본을 겹친다")
+        let unflipped = model.preview
+        model.edit(.flipHorizontal(true))
+        try await waitUntil { model.preview !== unflipped && gate.calls == 1 }
+        let stale = try XCTUnwrap(model.original)
+        let preview = try XCTUnwrap(model.preview)
+        XCTAssertEqual(stale.width * preview.height, preview.width * stale.height, "뒤집기는 비율이 같다")
+        XCTAssertNil(model.splitCompareOriginal, "뒤집기 전 원본은 다시 그려질 때까지 겹치지 않는다")
+        gate.open()
+        try await waitUntil { model.splitCompareOriginal != nil }
+        XCTAssertTrue(model.original !== stale, "다시 그린 원본을 겹친다")
+        gate.fails = true
+        let flipped = model.preview
+        model.edit(.quarterTurns(1))
+        try await waitUntil { model.preview !== flipped && gate.calls == 2 }
+        XCTAssertNil(model.splitCompareOriginal, "원본을 다시 그리지 못하면 겹치지 않는다")
+        model.edit(.exposure(0.2))
+        try await waitUntil { gate.calls == 3 && !model.isRendering }
+        XCTAssertNil(model.splitCompareOriginal, "다시 시도도 실패하면 계속 숨긴다")
+        gate.fails = false
+        model.edit(.exposure(0.3))
+        try await waitUntil { model.splitCompareOriginal != nil }
+        XCTAssertNil(model.presentedError, "원본 실패는 알림을 띄우지 않는다")
+    }
+}
+
+/// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.
+@MainActor
+private final class OriginalRenderGate {
+    var fails = false
+    private(set) var calls = 0
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func pass() async throws {
+        calls += 1
+        if fails {
+            throw MellowError.renderFailed
+        }
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for waiter in waiters {
+            waiter.resume()
+        }
+        waiters.removeAll()
+    }
 }

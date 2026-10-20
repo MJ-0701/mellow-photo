@@ -73,9 +73,6 @@ final class AppModel {
         static let compareSplitRange = 0.0...1.0
         /// 보조 기술로 분할선을 한 번 옮기는 폭.
         static let compareSplitAccessibilityStep = 0.1
-        /// 분할 비교에서 원본을 겹치려면 미리보기와 가로세로 비율이 이만큼 안으로 같아야 한다.
-        /// 기하를 바꾼 직후 원본을 다시 그리는 동안 늘어난 원본이 겹치지 않게 한다.
-        static let compareAspectTolerance = 0.01
     }
 
     /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
@@ -132,13 +129,11 @@ final class AppModel {
     }
     /// 비교 중에는 캔버스 탭·브러시·자르기 틀을 막는다(두 모드 모두).
     var blocksCanvasTouch: Bool { compareMode != .off }
-    /// 분할 모드에서 보정본 위에 겹칠 원본. 기하가 바뀌어 원본을 다시 그리는 중이면 비율이 달라 nil이다.
+    /// 분할 모드에서 보정본 위에 겹칠 원본. 들고 있는 원본의 기하가 보이는 미리보기의 기하와 같을 때만 겹친다.
+    /// 기하를 바꾼 뒤 원본을 다시 그리는 중이거나 다시 그리지 못했으면 nil이다(뒤집기처럼 비율이 같아도).
     var splitCompareOriginal: CGImage? {
-        guard compareMode == .split, let original else { return nil }
-        guard let preview else { return original }
-        let originalAspect = Double(original.width) / Double(max(original.height, 1))
-        let previewAspect = Double(preview.width) / Double(max(preview.height, 1))
-        return abs(originalAspect - previewAspect) <= Policy.compareAspectTolerance ? original : nil
+        guard compareMode == .split, let original, let heldOriginalGeometry else { return nil }
+        return heldOriginalGeometry == previewGeometry ? original : nil
     }
     /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
     var syncCategories: Set<SyncCategory> = SyncCategory.all
@@ -154,8 +149,14 @@ final class AppModel {
     let renderScheduler: RenderScheduler
     private var selectionTask: Task<Void, Never>?
     var exportTask: Task<Void, Never>?
-    /// 비교 화면의 원본에 마지막으로 입힌 기하. 같으면 원본을 다시 그리지 않는다.
+    /// 비교 화면의 원본에 마지막으로 입힌 기하. 같으면 원본을 다시 그리지 않는다. 요청할 때 기록하므로 그리는 중에도 바뀌어 있다.
     private var originalGeometry: GeometryAdjustments?
+    /// 지금 들고 있는 원본(original)을 그린 기하. 원본을 받을 때만 바뀐다.
+    private var heldOriginalGeometry: GeometryAdjustments?
+    /// 지금 들고 있는 미리보기(preview)를 그린 기하. 자르기 화면이면 자르기를 뺀 기하다.
+    private var previewGeometry: GeometryAdjustments?
+    /// 기하를 바꾼 뒤 비교 화면의 원본을 다시 그린다. 테스트가 늦추거나 실패시키려고 바꿔 끼운다.
+    var renderOriginal: @MainActor (PhotoID, EditRecipe) async throws -> CGImage
 
     init(
         session: ProjectSession, pipeline: PhotoPipeline, copies: WorkingCopyStore, importer: any PhotoImporter,
@@ -170,6 +171,7 @@ final class AppModel {
         self.lookCatalog = lookCatalog
         self.makeupCatalog = makeupCatalog
         renderScheduler = RenderScheduler(debounce: renderDebounce)
+        renderOriginal = { id, recipe in try await pipeline.preview(id, recipe: recipe) }
     }
 
     var isBusy: Bool { isImporting || isExporting || isRestoring }
@@ -340,6 +342,8 @@ final class AppModel {
         cloneSource = nil
         isChoosingCloneSource = true
         originalGeometry = nil
+        heldOriginalGeometry = nil
+        previewGeometry = nil
         guard let entry = session.selected else { return }
         selectionTask = Task {
             do {
@@ -349,6 +353,7 @@ final class AppModel {
                 guard !Task.isCancelled, session.selectedPhotoID == id else { return }
                 original = base
                 originalGeometry = baseRecipe.geometry
+                heldOriginalGeometry = baseRecipe.geometry
                 isReady = true
                 scheduleRender()
                 if tool == .look {
@@ -402,6 +407,7 @@ final class AppModel {
             switch result {
             case .success(let image):
                 preview = image
+                previewGeometry = shownGeometry
                 refreshOriginalIfNeeded(id: id, geometry: shownGeometry)
             case .failure(let error): present(error)
             }
@@ -413,16 +419,17 @@ final class AppModel {
         guard originalGeometry != geometry else { return }
         originalGeometry = geometry
         let recipe = EditRecipe(geometry: geometry)
-        let pipeline = self.pipeline
+        let render = renderOriginal
         Task { [weak self] in
-            let image = try? await pipeline.preview(id, recipe: recipe)
+            let image = try? await render(id, recipe)
             guard let self, session.selectedPhotoID == id, originalGeometry == geometry else { return }
-            // 실패하면 다음 렌더가 다시 시도하도록 기록을 지운다. 그동안은 이전 원본을 보여준다.
+            // 실패하면 다음 렌더가 다시 시도하도록 기록을 지운다. 이전 원본은 기하가 달라 분할 비교에 겹치지 않는다.
             guard let image else {
                 originalGeometry = nil
                 return
             }
             original = image
+            heldOriginalGeometry = geometry
         }
     }
 
