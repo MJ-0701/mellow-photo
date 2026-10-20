@@ -1197,6 +1197,32 @@ final class AppModelTests: XCTestCase {
         try await waitUntil { model.splitCompareOriginal != nil }
         XCTAssertNil(model.presentedError, "원본 실패는 알림을 띄우지 않는다")
     }
+
+    func testDiagnosticLinesListBuildPhotoAnalysisAndNonDefaultRecipeKeys() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.effect(.grain, 1))
+        model.edit(.skinRefinement(.darkCircles, 0.5))
+        try await waitUntil { !model.isRendering }
+        let lines = model.diagnosticLines
+        XCTAssertTrue(lines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.build)) })
+        XCTAssertTrue(lines.contains { $0.contains("faces=1") })
+        XCTAssertTrue(lines.contains { $0.contains("preview=") })
+        XCTAssertTrue(lines.contains("effects.grain=1.00"))
+        XCTAssertTrue(lines.contains("portrait.skin.darkCircles=0.50"))
+        XCTAssertFalse(lines.contains { $0.hasPrefix("color.") }, "기본값인 키는 없다")
+        XCTAssertEqual(RecipeSummary.nonDefaultLines(EditRecipe()), [])
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        recipe.makeup.lip = MakeupTint(colorID: "lip-rose", intensity: 0.4)
+        XCTAssertEqual(
+            Set(RecipeSummary.nonDefaultLines(recipe)),
+            ["portrait.skin.autoBlemish=true", "makeup.lip.colorID=lip-rose", "makeup.lip.intensity=0.40"])
+    }
 }
 
 /// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.

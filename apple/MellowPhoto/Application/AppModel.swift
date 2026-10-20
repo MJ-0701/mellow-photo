@@ -120,6 +120,8 @@ final class AppModel {
     var statusMessage = UserMessage.welcomeStatus
     var presentedError: PresentedError?
     var selectionFailure: String?
+    /// 마지막 미리보기 렌더 실패 문구. 알림(presentedError)과 달리 닫아도 남아 진단 절에 보인다. 성공하면 지운다.
+    var lastRenderFailure: String?
 
     var tool: EditorTool = .look
     /// 뷰티 도구에서 마지막으로 본 탭. 도구를 바꿔도 유지한다.
@@ -436,8 +438,11 @@ final class AppModel {
             case .success(let image):
                 preview = image
                 previewGeometry = shownGeometry
+                lastRenderFailure = nil
                 refreshOriginalIfNeeded(id: id, geometry: shownGeometry)
-            case .failure(let error): present(error)
+            case .failure(let error):
+                lastRenderFailure = UserMessage.text(for: error)
+                present(error)
             }
         }
     }

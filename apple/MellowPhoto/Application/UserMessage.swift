@@ -165,6 +165,22 @@ enum UserMessage {
         }
     }
 
+    /// 정보 시트 진단 절 제목과 복사 버튼.
+    static let diagnosticsTitle = "진단"
+    static let copyDiagnostics = "복사"
+
+    /// 진단 줄 앞에 붙는 라벨. 값과 키 경로는 영어 식별자로 둔다.
+    static func diagnosticLabel(_ item: AppModel.DiagnosticItem) -> String {
+        switch item {
+        case .build: return "앱"
+        case .device: return "기기"
+        case .photo: return "사진"
+        case .preview: return "미리보기"
+        case .analysis: return "분석"
+        case .failure: return "마지막 오류"
+        }
+    }
+
     /// 뷰티 › 피부톤 탭 슬라이더 이름. 화면 순서는 BodySkinKey.allCases.
     static func bodySkinTitle(_ key: BodySkinKey) -> String {
         switch key {
