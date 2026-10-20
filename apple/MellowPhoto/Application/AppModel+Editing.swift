@@ -111,16 +111,38 @@ extension AppModel {
         }
     }
 
-    /// 레시피가 실제로 바뀌었으면 true. 이미 같은 값이거나 편집할 수 없는 상태면 false.
+    /// 레시피가 실제로 바뀌었으면 true.
+    /// 이미 같은 값이거나 편집할 수 없는 상태면 false.
+    /// Policy.autoIncludesOneTouch이고 얼굴이 있으면 전체 대상 원터치 기본 강도를 같은 단계에서 쓴다.
     @discardableResult
     func applyAutoSuggestion(_ suggestion: AutoEnhanceSuggestion) -> Bool {
         endSliderEditIfActive()
+        let oneTouch = Policy.autoIncludesOneTouch && !faces.isEmpty ? EditingPolicy.oneTouchDefaultStrength : nil
         var applied = false
-        mutateSelected { document in
-            applied = document.applyAuto(suggestion)
+        let accepted = mutateSelected { document in
+            applied = document.applyAuto(suggestion, oneTouchStrength: oneTouch)
             return nil
         }
-        return applied
+        return accepted && applied
+    }
+
+    /// 원터치를 현재 대상에 적용한다(스펙 G4 4절).
+    /// strength가 nil이면 버튼이다: 열린 드래그를 먼저 끝내고 표시(없으면 기본 강도)로 다시 적용한다.
+    /// 강도 슬라이더는 드래그 안에서 값을 넘겨 연속 변경 한 단계가 된다.
+    /// 전체는 세 층과 몸 피부 밝기, 그룹은 그 그룹 층, 사람은 그 사람 층(수동 성별 표)에 쓴다.
+    /// 찾은 얼굴을 처음 만지면 기록이 생긴다.
+    func applyOneTouch(strength: Double? = nil) {
+        if strength == nil {
+            endSliderEditIfActive()
+        }
+        let value = strength ?? oneTouchStrength ?? EditingPolicy.oneTouchDefaultStrength
+        if case .face(let index) = beautyTarget {
+            let boxes = faces.map(\.boundingBox)
+            mutateSelected { $0.applyOneTouch(strength: value, forFace: index, of: boxes) }
+            return
+        }
+        guard let scope = scope(for: beautyTarget) else { return }
+        mutateSelected { $0.applyOneTouch(strength: value, in: scope) }
     }
 
     /// 카탈로그의 룩을 현재 대상 층에 체크포인트 한 번으로 적용한다.

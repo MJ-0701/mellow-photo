@@ -126,6 +126,10 @@ final class AppModel {
         static let compareSplitRange = 0.0...1.0
         /// 보조 기술로 분할선을 한 번 옮기는 폭.
         static let compareSplitAccessibilityStep = 0.1
+        /// G4 질문 2의 판정(포함).
+        /// true면 자동 버튼이 색감·디테일 자동과 함께, 얼굴이 있으면 전체 대상 원터치 기본 강도를 한 단계로 적용한다.
+        /// false면 자동은 지금처럼 피부 보정·자동 잡티·눈 또렷하게만 쓴다.
+        static let autoIncludesOneTouch = true
     }
 
     /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
@@ -198,6 +202,9 @@ final class AppModel {
     /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
     var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
+    /// 뷰티 패널의 "세부 조정" 접기.
+    /// 세션 상태라 사진과 무관하고 파일에 저장하지 않는다.
+    var showsDetailAdjustments = false
     /// 이름 입력 시트가 떠 있는 동안 true. 메뉴의 ⌘Z/⇧⌘Z가 입력란의 실행 취소를 가로채지 않게 한다.
     var isTextEntryActive = false
     /// 마지막 저장 작업에서 실제로 저장된 장수. Mac 폴더 저장 뒤 Finder를 열지 판단한다.
@@ -359,6 +366,37 @@ final class AppModel {
             return PortraitResolver.resolve(recipe, person: nil, gender: estimate)
         }
         return PortraitResolver.resolve(recipe, scope: scope, estimate: estimate)
+    }
+
+    /// 현재 대상 층의 원터치 표시(강도 슬라이더 값).
+    /// 전체는 전체 층, 그룹·개인은 그 층의 표시이고 기록이 없는 얼굴은 nil이다.
+    /// 손상 파일의 값도 0…maximumStrength로 잘라 넘긴다.
+    var oneTouchStrength: Double? {
+        let marker: Double?
+        switch scope(for: beautyTarget) {
+        case .all: marker = currentRecipe.portrait.oneTouch
+        case .some(let scope): marker = PortraitResolver.layer(currentRecipe, scope: scope)?.oneTouch
+        case nil: marker = nil
+        }
+        return marker.map(OneTouchBundle.clampedStrength)
+    }
+
+    /// 세부 슬라이더에 "원터치" 꼬리표를 붙일지.
+    /// 묶인 키이고 현재 대상 층에 표시가 있을 때만이다(상속 중인 표시는 아니다).
+    func isOneTouchTagged(_ key: PortraitKey) -> Bool {
+        OneTouchBundle.keys.contains(key) && oneTouchStrength != nil
+    }
+
+    /// 몸 피부 슬라이더의 꼬리표.
+    /// 몸 피부는 사진 단위라 대상과 무관하게 전체 층 표시를 본다.
+    /// 밝기만 묶이고 톤은 원터치가 쓸 때만 묶인다.
+    func isOneTouchTagged(_ key: BodySkinKey) -> Bool {
+        guard currentRecipe.portrait.oneTouch != nil else { return false }
+        switch key {
+        case .brightness: return true
+        case .tone: return OneTouchBundle.writesBodyTone
+        case .smoothing: return false
+        }
     }
 
     /// 현재 대상 층에서 덮어쓴 키.

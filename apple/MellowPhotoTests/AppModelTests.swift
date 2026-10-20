@@ -580,12 +580,13 @@ final class AppModelTests: XCTestCase {
         try await importOne(model, staged)
         model.edit(.faceShape(.width, -0.4))
         await model.autoEnhance()
-        XCTAssertEqual(
-            model.currentRecipe.portrait.skin,
-            SkinAdjustments(smoothing: RenderTuning().autoSkinSmoothing, autoBlemish: true))
+        // 자동은 원터치를 포함하므로(Policy.autoIncludesOneTouch) 인물 값은 공통 표 × 기본 강도다.
+        let common = OneTouchBundle.layer(for: nil, strength: EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertEqual(model.currentRecipe.portrait.skin.smoothing, common.skinSmoothing)
+        XCTAssertTrue(model.currentRecipe.portrait.skin.autoBlemish)
         XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.4, "자동 보정은 얼굴형을 건드리지 않는다")
         XCTAssertEqual(
-            model.currentRecipe.portrait.features.eyeBrighten, RenderTuning().autoEyeBrighten, "자동 보정은 눈 또렷하게를 켠다")
+            model.currentRecipe.portrait.features.eyeBrighten, common.features[.eyeBrighten], "자동 보정은 눈 또렷하게를 켠다")
     }
 
     func testBeautyTabSurvivesToolSwitch() {
@@ -1505,6 +1506,123 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.isGeometryLocked, "실행 취소는 검사하지 않는다")
         model.removePerson(owner.id)
         XCTAssertNil(model.currentRecipe.people.person(owner.id), "잠기지 않은 사진은 지울 수 있다")
+    }
+
+    func testOneTouchRoutesToTheCurrentTargetAndRemembersStrength() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertFalse(model.showsDetailAdjustments, "세부 조정은 접혀서 시작")
+        XCTAssertNil(model.oneTouchStrength)
+        model.applyOneTouch()
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.oneTouch, EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertEqual(
+            model.currentRecipe.bodySkin.brightness,
+            OneTouchBundle.Table.bodyBrightness * EditingPolicy.oneTouchDefaultStrength, accuracy: 1e-12)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1, "세 층 + 몸 피부가 한 단계")
+        XCTAssertTrue(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        XCTAssertFalse(model.isOneTouchTagged(.faceShape(.width)), "얼굴형은 묶음 밖")
+        model.setBeautyTarget(.face(0))
+        XCTAssertNil(model.oneTouchStrength, "개인 층에는 표시가 없다(그룹 값 상속)")
+        XCTAssertFalse(model.isOneTouchTagged(.skinRefinement(.darkCircles)), "상속 중인 표시는 꼬리표가 아니다")
+        model.setGender(.female)
+        model.beginSliderEdit()
+        model.applyOneTouch(strength: 0.3)
+        model.applyOneTouch(strength: 1)
+        model.endSliderEdit()
+        XCTAssertEqual(model.oneTouchStrength, 1)
+        let person = try XCTUnwrap(model.currentRecipe.people.individuals.first)
+        XCTAssertEqual(person.layer, OneTouchBundle.layer(for: .female, strength: 1), "사람 대상은 그 사람의 성별 표")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3, "원터치 1 + 성별 지정 1 + 드래그 1")
+        XCTAssertEqual(
+            model.currentRecipe.bodySkin.brightness,
+            OneTouchBundle.Table.bodyBrightness * EditingPolicy.oneTouchDefaultStrength, accuracy: 1e-12,
+            "사람 대상은 몸 피부를 쓰지 않는다")
+        model.setBeautyTarget(.all)
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength, "전체 층 표시는 그대로")
+        model.edit(.skinRefinement(.darkCircles, 0.1))
+        XCTAssertNil(model.oneTouchStrength, "묶인 키를 손으로 바꾸면 표시가 사라진다")
+        XCTAssertFalse(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        XCTAssertEqual(
+            model.currentRecipe.people.groups[.male]?.oneTouch, EditingPolicy.oneTouchDefaultStrength, "그룹 표시는 남는다")
+        model.applyOneTouch()
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength, "표시가 없으면 기본 강도로 다시 적용")
+        model.setBeautyTarget(.gender(.male))
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength)
+        model.applyOneTouch(strength: 0)
+        XCTAssertNil(model.currentRecipe.people.groups[.male], "강도 0은 그룹의 묶인 키를 지운다")
+        XCTAssertNil(model.oneTouchStrength)
+        model.setBeautyTarget(.all)
+        try await lockWithRetouch(model)
+        model.applyOneTouch(strength: 1)
+        XCTAssertEqual(model.oneTouchStrength, 1, "잠긴 사진에서도 원터치는 된다")
+        XCTAssertEqual(model.currentRecipe.portrait.face, FaceShapeAdjustments())
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        model.showsDetailAdjustments = true
+        model.select(model.session.photos[0].id)
+        XCTAssertTrue(model.showsDetailAdjustments, "접기 상태는 사진과 무관")
+    }
+
+    func testOneTouchButtonEndsAnOpenDragAndStrengthIsClampedForTheSlider() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.2))
+        model.applyOneTouch()
+        XCTAssertFalse(model.isSliderEditActive, "버튼은 열린 드래그를 먼저 끝낸다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 2, "드래그 1 + 원터치 1")
+        XCTAssertTrue(model.isOneTouchTagged(.brightness), "몸 피부 밝기는 전체 층 표시에 묶인다")
+        XCTAssertFalse(model.isOneTouchTagged(.tone))
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertTrue(model.isOneTouchTagged(.brightness), "몸 피부는 사진 단위라 대상과 무관")
+        var corrupted = model.currentRecipe
+        corrupted.portrait.oneTouch = 3
+        corrupted.people.groups[.female]?.oneTouch = -1
+        model.session.edit(model.session.photos[0].id) { document in
+            document = EditDocument(recipe: corrupted)
+            return nil
+        }
+        XCTAssertEqual(model.oneTouchStrength, 0, "손상 파일 값도 0…1로 잘라 슬라이더에 넘긴다")
+        model.setBeautyTarget(.all)
+        XCTAssertEqual(model.oneTouchStrength, OneTouchBundle.maximumStrength)
+        XCTAssertTrue(UserMessage.oneTouchHintAll.contains("립"), "전체 안내는 그룹 층이 메이크업도 가린다고 말한다")
+        XCTAssertTrue(UserMessage.oneTouchHintGroup.contains("몸 피부"), "그룹 원터치는 몸 피부를 쓰지 않는다")
+        XCTAssertTrue(UserMessage.oneTouchHintPerson.contains("몸 피부"), "사람 원터치는 몸 피부를 쓰지 않는다")
+    }
+
+    func testAutoEnhanceIncludesOneTouchOnlyWhenFacesExist() async throws {
+        XCTAssertTrue(AppModel.Policy.autoIncludesOneTouch)
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        await model.autoEnhance()
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength, "자동이 원터치를 포함한다")
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.oneTouch, EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 1)
+        XCTAssertEqual(model.statusMessage, UserMessage.autoEnhanced)
+        let otherRoot = try TestSupport.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: otherRoot) }
+        let faceless = try TestSupport.solidPNG(in: otherRoot, name: "faceless")
+        let plain = TestSupport.makeModel(
+            root: otherRoot, importer: FakeImporter(staged: [.success(StagedPhoto(url: faceless, displayName: nil))]))
+        try await importOne(plain, faceless)
+        await plain.autoEnhance()
+        try await waitUntil { !plain.isRendering }
+        XCTAssertNil(plain.oneTouchStrength, "얼굴이 없으면 색감만")
+        XCTAssertTrue(plain.currentRecipe.people.groups.isEmpty)
+        XCTAssertEqual(plain.currentRecipe.portrait, PortraitAdjustments())
+        XCTAssertNotEqual(plain.currentRecipe, EditRecipe(), "색감·디테일은 바뀐다")
+        XCTAssertNil(plain.presentedError)
     }
 }
 
