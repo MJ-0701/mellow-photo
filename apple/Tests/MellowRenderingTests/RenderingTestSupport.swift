@@ -2,6 +2,7 @@ import CoreImage
 import Foundation
 import ImageIO
 import MellowShared
+import XCTest
 
 @testable import MellowRendering
 
@@ -77,6 +78,25 @@ enum RenderingTestSupport {
 
     static func grid(_ image: CIImage) throws -> PixelGrid {
         PixelGrid(try renderer.makeCGImage(image))
+    }
+
+    /// 두 격자가 다른 픽셀 수를 왼쪽 절반·오른쪽 절반으로 나눠 센다.
+    /// 격자 크기는 같아야 한다.
+    static func changedPixelsByHalf(_ before: PixelGrid, _ after: PixelGrid) -> (left: Int, right: Int) {
+        var left = 0
+        var right = 0
+        for y in 0..<before.height {
+            for x in 0..<before.width {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if x < before.width / 2 {
+                    left += 1
+                } else {
+                    right += 1
+                }
+            }
+        }
+        return (left, right)
     }
 
     /// rect 안 휘도(선형 sRGB)의 대역별 분산. fine = 원본 − blur(r1), mid = blur(r1) − blur(r2).
@@ -571,6 +591,25 @@ extension SyntheticFace {
     }
 }
 
+extension SyntheticFace {
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓고 비트맵으로 굳힌다.
+    /// faces[0]이 왼쪽(x 0…0.5), faces[1]이 오른쪽이다.
+    static func pair(_ synthetic: SyntheticFace, renderer: Renderer) throws -> (image: CIImage, faces: [FaceGeometry]) {
+        let half = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        let side = CGFloat(size)
+        let left = synthetic.image.transformed(by: half.concatenating(CGAffineTransform(translationX: 0, y: side / 4)))
+        let right = synthetic.image.transformed(
+            by: half.concatenating(CGAffineTransform(translationX: side / 2, y: side / 4)))
+        let composed = left.composited(over: right).composited(over: CIImage(color: .gray)).cropped(to: extent)
+        let image = CIImage(cgImage: try renderer.makeCGImage(composed))
+        let faces = [
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25)),
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25)),
+        ]
+        return (image, faces)
+    }
+}
+
 extension FaceGeometry {
     /// 특징점을 pivot 둘레로 angle만큼 반시계로 돌리고 roll을 angle로 둔다. 상자는 그대로다. 정사각형 extent에서만 쓴다.
     func rotated(by angle: Double, about pivot: NormalizedPoint) -> FaceGeometry {
@@ -696,6 +735,29 @@ enum DisplayScale {
         }
         return Double(changed.count) / Double(all.count)
     }
+
+    /// weight(회색 마스크)가 절반을 넘는 픽셀 중 바뀐 비율.
+    /// 그런 픽셀이 없으면 0이다(호출자가 maskedPixelCount로 빈 마스크를 먼저 막는다).
+    static func changedFraction(
+        _ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid, minimumDelta: Int = defaultMinimumDelta
+    ) -> Double {
+        let inside = points(before, in: nil).filter { weight.red($0) > maskHalf }
+        guard !inside.isEmpty else { return 0 }
+        let changed = inside.filter { point in
+            let a = before.rgba(point)
+            let b = after.rgba(point)
+            return (0..<3).contains { abs(Int(a[$0]) - Int(b[$0])) >= minimumDelta }
+        }
+        return Double(changed.count) / Double(inside.count)
+    }
+
+    /// weight가 절반을 넘는 픽셀 수.
+    static func maskedPixelCount(_ weight: PixelGrid) -> Int {
+        points(weight, in: nil).filter { weight.red($0) > maskHalf }.count
+    }
+
+    /// 8비트 마스크의 절반.
+    private static let maskHalf: UInt8 = 127
 
     /// 가중 평균 ΔY와 평균 |ΔY|(8비트).
     /// weight가 nil이면 전체 평균.
@@ -891,6 +953,48 @@ final class RealPortrait: @unchecked Sendable {
         return try DisplayScale.grid(region.image.cropped(to: extent))
     }
 
+    /// 얼굴 다각형(이마 호 포함)을 얼굴 폭 dilationFraction만큼 넓힌 영역 밖에서 바뀐 비율(화면 배율).
+    /// 머리카락·배경 불변 검사다(스펙 G4 1.4).
+    /// excluding(회색 마스크, 화면 배율)가 0이 아닌 픽셀도 뺀다.
+    /// 몸 피부가 켜진 원터치는 몸 피부 영역을 빼고 잰다(스펙 G4 1.4 "사람 영역 밖").
+    func outsideFaceChangedFraction(
+        before: PixelGrid, after: PixelGrid, dilationFraction: CGFloat, excluding: PixelGrid? = nil
+    ) -> Double {
+        let polygon = FaceRegions.skinPolygon(face: face, extent: extent, tuning: tuning)
+        let inside = FaceRegions.containment(polygons: [polygon], dilation: faceWidth * dilationFraction)
+        let scale = extent.width / DisplayScale.phoneWidth
+        var changed = 0
+        var total = 0
+        for y in 0..<before.height {
+            for x in 0..<before.width {
+                guard !inside(CGPoint(x: CGFloat(x) * scale, y: CGFloat(y) * scale)) else { continue }
+                let point = CGPoint(x: x, y: y)
+                if let excluding, excluding.red(point) > 0 {
+                    continue
+                }
+                total += 1
+                let a = before.rgba(point)
+                let b = after.rgba(point)
+                if (0..<3).contains(where: { abs(Int(a[$0]) - Int(b[$0])) >= DisplayScale.defaultMinimumDelta }) {
+                    changed += 1
+                }
+            }
+        }
+        return total > 0 ? Double(changed) / Double(total) : 0
+    }
+
+    /// 두 눈썹 다각형 마스크(화면 배율).
+    /// 눈썹 특징점이 없으면 실패한다.
+    func browMask() throws -> PixelGrid {
+        let brows = [FaceLandmark.leftEyebrow, .rightEyebrow].compactMap {
+            FaceRegions.landmarkPolygon(face, $0, extent)
+        }
+        guard !brows.isEmpty else { throw MellowError.renderFailed }
+        return try mask(
+            FaceRegions.featheredPolygonMask(
+                fill: brows, cut: [], face: face, extent: extent, tuning: tuning, cache: nil))
+    }
+
     func skinMask(strength: Double = 1) throws -> CIImage {
         try FaceRegions.skinMask(face: face, image: image, extent: extent, tuning: tuning, strength: strength)
     }
@@ -944,5 +1048,83 @@ extension RenderingTestSupport {
         guard total > 0, fine.count == weights.count else { throw MellowError.renderFailed }
         let mean = zip(fine, weights).reduce(0) { $0 + $1.0 * $1.1 } / total
         return zip(fine, weights).reduce(0) { $0 + $1.1 * ($1.0 - mean) * ($1.0 - mean) } / total
+    }
+}
+
+/// 생성 사진 세트의 정답 라벨(shared/fixtures/people/labels.json).
+/// people은 왼쪽부터다.
+struct PeopleLabels: Decodable {
+    struct Person: Decodable {
+        var gender: String
+        var ageBand: String
+        var glasses: Bool
+        var pose: String
+        var occlusion: String
+        var ambiguous: Bool
+    }
+
+    struct Photo: Decodable {
+        var file: String
+        var people: [Person]
+    }
+
+    var version: Int
+    var photos: [Photo]
+}
+
+/// 테스트 타깃에 복사한 생성 사진(couple-01·group-01)과 라벨.
+enum PeopleFixtures {
+    static func url(_ name: String) throws -> URL {
+        try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: nil, subdirectory: "Fixtures/people"))
+    }
+
+    static func labels() throws -> PeopleLabels {
+        try JSONDecoder().decode(PeopleLabels.self, from: Data(contentsOf: url("labels.json")))
+    }
+
+    /// 저장소 원본 폴더.
+    /// apple/Tests/MellowRenderingTests/RenderingTestSupport.swift에서 네 단계 위가 저장소 루트다.
+    static var sharedFolder: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("shared/fixtures/people")
+    }
+}
+
+/// 생성 커플 사진(couple-01.jpg)과 실제 Vision 얼굴, 라벨 성별(왼쪽부터).
+/// 한 번만 준비해 나눠 쓴다.
+final class RealPeople: @unchecked Sendable {
+    /// 준비 결과.
+    /// 실패는 테스트마다 get()에서 오류로 나온다(RealPortrait와 같은 이유).
+    static let couple = Result { try RealPeople(file: "couple-01.jpg") }
+
+    let image: CIImage
+    let extent: CGRect
+    let faces: [FaceGeometry]
+    let labels: [Gender]
+    let tuning = RenderTuning()
+
+    private init(file: String) throws {
+        image = try ImageLoader().load(url: try PeopleFixtures.url(file), maxDimension: tuning.previewMaxDimension)
+        extent = image.extent
+        faces = try VisionFaceAnalyzer().analyze(image)
+        let photo = try PeopleFixtures.labels().photos.first { $0.file == file }
+        labels = (photo?.people ?? []).compactMap { Gender(rawValue: $0.gender) }
+    }
+}
+
+extension RenderingTestSupport {
+    /// 전체 층 값을 faces[index]에 anchor로 묶인 개인 층으로 옮긴다.
+    /// 옛 targetFace 이행과 같은 규칙이다.
+    /// 범위 밖 index는 legacyIndex로 남아 짝이 없다.
+    static func restricted(_ recipe: EditRecipe, toFace index: Int, of faces: [FaceGeometry]) -> EditRecipe {
+        var moved = recipe
+        moved.migrateLegacyTargetFace(index)
+        if faces.indices.contains(index), !moved.people.individuals.isEmpty {
+            moved.people.individuals[0].anchor = PersonAnchor(faceBox: faces[index].boundingBox)
+            moved.people.individuals[0].legacyIndex = nil
+        }
+        return moved
     }
 }

@@ -18,6 +18,11 @@ public struct PhotoAnalysis: Sendable {
     public var bodies: [BodyGeometry]
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var bodyAnalysisFailure: MellowError?
+    /// 얼굴별 성별 추정.
+    /// faces와 같은 길이이거나 빈 배열이다.
+    /// 임계값을 통과한 추정만 들어 있다.
+    /// 영속화하지 않는다.
+    public var genderEstimates: [GenderEstimate?]
     /// 다각형 마스크 비트맵 캐시. 묶음을 복사해도 같은 캐시를 나눠 쓴다. 키에 다각형 점이 들어 있어 얼굴이 바뀌어도 낡은 값을 쓰지 않는다.
     /// 상한은 준비 때 찾은 얼굴 수에 비례한다(RegionMaskCache.capacity(forFaces:)).
     let regionMasks: RegionMaskCache
@@ -25,7 +30,7 @@ public struct PhotoAnalysis: Sendable {
     public init(
         faces: [FaceGeometry] = [], faceAnalysisFailure: MellowError? = nil, blemishes: [BlemishSpot] = [],
         personMask: CIImage? = nil, personAnalysisFailure: MellowError? = nil, bodies: [BodyGeometry] = [],
-        bodyAnalysisFailure: MellowError? = nil
+        bodyAnalysisFailure: MellowError? = nil, genderEstimates: [GenderEstimate?] = []
     ) {
         self.faces = faces
         self.faceAnalysisFailure = faceAnalysisFailure
@@ -34,6 +39,7 @@ public struct PhotoAnalysis: Sendable {
         self.personAnalysisFailure = personAnalysisFailure
         self.bodies = bodies
         self.bodyAnalysisFailure = bodyAnalysisFailure
+        self.genderEstimates = genderEstimates
         regionMasks = RegionMaskCache(maximumEntries: RegionMaskCache.capacity(forFaces: faces.count))
     }
 }

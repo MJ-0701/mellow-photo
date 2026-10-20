@@ -13,12 +13,13 @@ struct ShapeWarpStage: RenderStage {
             primitives, to: image, extent: context.extent, limit: context.tuning.shapeDisplacementLimit)
     }
 
+    /// 얼굴마다 그 얼굴에 해석한 얼굴형 값으로 원소를 만든다.
     func facePrimitives(in context: RenderContext) -> [ShapePrimitive] {
-        let adjustments = context.recipe.portrait.face
-        guard adjustments.hasEffect else { return [] }
-        return context.targetFaces.flatMap { face in
-            FaceShapeRig.primitives(
-                face: face, adjustments: adjustments, extent: context.extent, tuning: context.tuning)
+        context.faceTargets.flatMap { target -> [ShapePrimitive] in
+            let adjustments = target.portrait.face
+            guard adjustments.hasEffect else { return [] }
+            return FaceShapeRig.primitives(
+                face: target.face, adjustments: adjustments, extent: context.extent, tuning: context.tuning)
         }
     }
 

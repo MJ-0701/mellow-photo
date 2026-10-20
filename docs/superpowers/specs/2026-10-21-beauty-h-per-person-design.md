@@ -4,7 +4,7 @@
 
 사용자 요구(원문): "사람이 한명씩 지정이 가능 해야하고 또 남자랑 여자가 각각 지정이 돼서 다 따로따로 보정이 가능해야 한다 함".
 
-> **G4 연계(2026-10-21).** [인물 보정 G4](2026-10-21-beauty-g4-one-touch-design.md)가 이 설계 위에 원터치 묶음(성별 표를 전체·그룹·개인 층에 쓰는 매크로, 층별 `oneTouch` 표시 키)을 얹는다. 이 문서의 결정은 바뀌지 않았다. 계획 순서·브랜치·로컬 iOS 금지는 G4 스펙 5절과 각 H 계획의 "G4 개정" 절을 따른다. 지금은 `recipe.portrait` 값 묶음 하나를 `targetFace`로 모든 얼굴 또는 한 얼굴에 거는 구조라, 사람 A와 B가 다른 값을 가질 수 없고 성별 개념이 없다.
+> **G4 연계(2026-10-21).** [인물 보정 G4](2026-10-21-beauty-g4-one-touch-design.md)가 이 설계 위에 원터치 묶음(성별 표를 전체·그룹·개인 층에 쓰는 매크로, 층별 `oneTouch` 표시 키)을 얹는다. 이 문서의 결정은 "자동 보정은 전체 층에만 쓴다" 한 행만 바뀌었다(G4 질문 2, 결정 표의 "(G4 변경)" 행). 계획 순서·브랜치·로컬 iOS 금지는 G4 스펙 5절과 각 H 계획의 "G4 개정" 절을 따른다. 지금은 `recipe.portrait` 값 묶음 하나를 `targetFace`로 모든 얼굴 또는 한 얼굴에 거는 구조라, 사람 A와 B가 다른 값을 가질 수 없고 성별 개념이 없다.
 
 ## 사람이 확인할 것
 
@@ -17,7 +17,7 @@
 | 값은 세 층으로 겹친다: **전체 → 성별 그룹(남성·여성) → 개인**. 위 층이 아래 층을 **키 단위**로 덮어쓰고, 층에는 사용자가 그 층에서 바꾼 키만 저장한다 | Evoto와 같은 조작 모델. 키 단위라 "모두 피부 0.3, B만 0.6"을 해 둔 뒤 전체의 자동 잡티를 켜면 B도 따라온다(묶음 단위면 B의 피부 묶음이 통째로 얼어붙음). 바꾼 키만 저장하니 "상속 중/덮어씀"을 화면에 그대로 보일 수 있다 | **큼** (파일 형식·렌더·편집 규칙 전부) |
 | 성별은 **자동 추정이 기본**이고, 추정이 안 되면(신뢰도 낮음·모델 없음·작은 얼굴·옆얼굴·틀린 결과) 사용자가 사람마다 **수동 지정**한다. 수동이 자동보다 우선이고 재분석이 수동을 덮지 않는다. 미지정인 사람은 그룹 값을 받지 않고 전체 값과 개인 값만 받는다. 수동 지정 화면은 H 필수 | 사용자 결정("자동으로 안되면 사용자가 수동으로"). 수동 지정은 레시피에, 자동 추정은 분석 결과에 두므로 분석을 다시 해도 수동 값이 남는 것이 구조로 보장된다 | 작음 |
 | **자동 추정 모델은 H1~H3에서 만들지 않고 포트(`GenderEstimator`)만 둔 채 H4로 미룬다.** H1~H3에서는 모든 사람이 미지정으로 시작해 사용자가 지정한다 (사용자 결정) | Vision에는 성별 분류기가 없다. 공개 Core ML 후보는 크기 10~90 MB, 데이터셋 라이선스(연구용 전용인 것이 많음) 확인, 피부톤·나이·옆얼굴 편향 평가, 앱 스토어·개인정보 문구 검토, 그리고 MellowRendering에 CoreML import를 허용하는 모듈 표 변경이 필요하다. 핵심 요구("각각 지정해 따로 보정")는 수동만으로 충족되고 위험이 0이다. 모델은 라벨 있는 생성 사진으로 정확도를 재 본 뒤 넣을지 정하는 편이 안전하다 | 중간 (H4를 하면 모듈 표·스크립트 변경) |
-| 사람의 식별 키는 얼굴 인덱스가 아니라 **정규화 얼굴 상자의 중심과 폭(`anchor`)**이다. 다시 분석할 때마다 저장된 anchor와 찾은 얼굴을 거리(얼굴 폭의 50% 이내, 크기 비 2배 이내)로 1:1 짝짓는다. 짝이 없는 사람의 값은 **버리지 않고 렌더에서만 빠지며** 화면에 "사진에서 찾지 못함"으로 보이고 다른 얼굴에 다시 연결하거나 지울 수 있다 | 인덱스는 얼굴 수가 하나만 달라져도 옆 사람에게 값이 붙는다. 좌표는 원본 기준 정규화라 미리보기·원본 해상도·자르기·회전과 무관하고, 같은 사진은 Vision이 거의 같은 상자를 주므로 50% 오차면 충분하다. 얼굴 임베딩은 Vision에 공개 API가 없어 과하다 | **큼** (파일 형식) |
+| 사람의 식별 키는 얼굴 인덱스가 아니라 **정규화 얼굴 상자의 중심과 폭(`anchor`)**이다. 다시 분석할 때마다 저장된 anchor와 찾은 얼굴을 거리(얼굴 폭의 50% 이내, 크기 비 2배 이내)로 1:1 짝짓는다. 편집(얼굴을 만질 때)도 렌더와 **같은 전역 1:1 짝짓기 결과**로 얼굴 → 사람을 정한다(anchor 하나에 가장 가까운 기록을 따로 찾으면 겹친 얼굴에서 다른 얼굴의 기록에 값이 들어가므로, H2 구현 중 변경). 짝이 없는 사람의 값은 **버리지 않고 렌더에서만 빠지며** 화면에 "사진에서 찾지 못함"으로 보이고 다른 얼굴에 다시 연결하거나 지울 수 있다 | 인덱스는 얼굴 수가 하나만 달라져도 옆 사람에게 값이 붙는다. 좌표는 원본 기준 정규화라 미리보기·원본 해상도·자르기·회전과 무관하고, 같은 사진은 Vision이 거의 같은 상자를 주므로 50% 오차면 충분하다. 얼굴 임베딩은 Vision에 공개 API가 없어 과하다 | **큼** (파일 형식) |
 | `portrait.targetFace`는 **쓰지 않고 읽기만** 한다. 옛 레시피의 `targetFace = i`는 읽을 때 "전체 층은 비우고, 지금 값 전부를 i번째 사람의 개인 층으로" 옮긴다(anchor 없이 `legacyIndex`로 두고, 사진을 준비한 뒤 처음 편집할 때 anchor를 채움). `schemaVersion`은 2 유지 | 옛 의미("이 값을 i번 얼굴에만")와 렌더 결과가 같다. 키 추가·읽기 전용 이행은 B~G의 `skinSmoothing`·`faceSlim`과 같은 규칙이라 v3가 필요 없다. v1 세션(`selectedFace`)도 같은 길로 들어온다 | 중간 (플랫폼 공통 계약) |
 | "지금 어느 대상을 편집 중인가"(전체·남성·여성·사람 n)는 **앱 세션 상태**이고 파일에 저장하지 않는다. 사진을 바꾸면 그 사진의 마지막 대상을 기억하되 앱을 다시 열면 전체 | 렌더 결과에 영향이 없는 화면 상태다. `targetFace`를 레시피에 두던 것은 렌더를 바꾸는 값이었기 때문이고 H에서는 그 역할이 사라진다 | 작음 |
 | 프리셋과 "전체 사진에 적용"(G3 선택 동기화)은 **전체 층과 성별 그룹 층만** 나른다. **개인 층과 성별 지정은 복사하지 않는다.** 얼굴 의존 항목(피부·얼굴형·눈입·메이크업)을 동기화하면 받는 사진의 **그 항목 개인 덮어쓰기를 지운다**(G3의 "대상 얼굴을 전체로 되돌림" 규칙을 승계). 성별 지정은 남긴다 (사용자 결정) | 같은 사람을 사진 사이에서 알아볼 수 없다. 동기화한 항목은 받는 사진에서 원본 사진과 같아 보여야 하는데 개인 덮어쓰기가 남으면 그 사람만 다르다. 성별 그룹 값은 사진이 달라도 뜻이 같으니 나른다 | 작음 |
@@ -25,7 +25,9 @@
 | H에서 사람별·성별이 되는 것은 **피부(정밀 7종·자동 잡티 포함)·얼굴형·눈입·메이크업**이다. 체형·몸 피부·배경·색감·효과는 사진 단위로 둔다. 사람별 체형은 나중 후보로 기록 (사용자 결정) | 네 가지는 이미 "대상 얼굴마다" 도는 단계라 값만 얼굴마다 다르게 주면 된다. 체형은 사람 한 명(가장 큰 사람)이고 얼굴–관절 짝짓기와 여러 사람 변형 간섭 문제가 따로 있다. 몸 피부는 인물 마스크가 사람을 구분하지 않는다 | 작음 (나중 확장 가능) |
 | 렌더는 **얼굴마다 해석한 값**(`FaceTarget`)으로 기존 네 단계가 그대로 돈다. 새 단계·새 마스크·캐시 변경 없음 | 단계는 이미 얼굴마다 반복한다. 얼굴마다 값이 다르면 반복 안의 값만 바뀐다. 다각형 비트맵 캐시 키는 다각형이라 영향 없음 | 작음 |
 | 성별 지정 변경과 얼굴형 키의 재설정은 수동 편집 잠금 대상이다 | 성별이 바뀌면 그룹의 얼굴형 값이 다른 얼굴에 걸려 수동 편집 좌표가 어긋난다(기존 `targetFace` 잠금과 같은 이유) | 작음 |
-| 자동 보정은 전체 층에만 쓴다 | 지금과 같다. 그룹·개인 층은 사용자가 고른 값이다 | 작음 |
+| **(H3 구현 중 변경)** 잠긴 사진에서 사람 삭제·다시 연결·층 재설정·원터치처럼 기록을 지우거나 옮기는 편집이 얼굴과 기록의 짝을 바꿔 어느 얼굴의 얼굴형 값이라도 달라지게 하면 거절하고 잠금 안내를 보인다. 옛 기록(`legacyIndex`)의 anchor는 지금 짝짓기에서 그 인덱스로 짝이 된 기록에만 채운다. 다른 사진으로의 동기화는 이 검사를 하지 않는다 | 기록 하나가 빠지면 전역 짝짓기가 다른 기록을 다른 얼굴에 붙여 얼굴형 값이 옮겨 갈 수 있다(H2 리뷰). 인덱스만 보고 채우면 다른 기록이 가진 얼굴을 거리 0으로 빼앗아 체크포인트 없이 렌더가 바뀐다. 동기화는 잠긴 사진의 얼굴형을 이미 건너뛰고, 남는 경우(동기화로 비어 지워진 기록이 짝을 바꿈)는 드물다 | 작음 |
+| **(H3 구현 중 변경)** 겹친 값의 메이크업 룩 이름은 메이크업 부위를 덮어쓴 가장 위 층의 것이다. 메이크업을 안 건드린 그룹·사람은 아래 층의 룩을 상속해 그 룩 칩이 선택돼 보이고, 부위만 바꾼 층은 룩 이름을 지운다 | 상속 값이 그 룩과 같으면 룩 칩이 선택돼 보여야 하고, 부위를 바꿔 값이 룩과 달라졌는데 아래 층의 룩 이름이 남으면 칩이 거짓 선택을 보였다. 렌더는 룩 이름을 읽지 않는다 | 작음 |
+| **(G4 변경)** 자동 보정은 얼굴이 있으면 원터치(강도 0.6, 전체 대상)를 포함하므로 전체 층과 함께 남성·여성 그룹 층의 묶인 키(피부·눈입·블러셔·립)도 다시 쓴다. 개인 층은 건드리지 않는다. 얼굴이 없으면 전체 층(색감·디테일)만 쓴다 | 원래 결정은 "전체 층에만"이었으나 G4 질문 2의 판정(자동이 원터치 포함)으로 바뀌었다. 사용자가 그룹에서 바꾼 묶인 키 값은 자동을 누르면 성별 표 값으로 덮인다(실행 취소 한 번으로 되돌림) | 작음 (`AppModel.Policy.autoIncludesOneTouch`를 끄면 원래대로) |
 | 화면: 뷰티·메이크업 패널 맨 위 얼굴 피커를 **대상 칩**(전체 · 남성 · 여성 · 사람 1…n)으로 바꾼다. 사람 칩에는 성별 메뉴(남성/여성/미지정, 자동이면 "추정" 배지)가 있고, 전체가 아닌 대상에서는 덮어쓴 슬라이더에 표시와 "재설정"이 붙는다. 뷰티·메이크업 도구에서 캔버스의 얼굴을 탭하면 그 사람이 대상이 된다 | Evoto의 핵심 조작(얼굴 클릭 → 그 사람 값). 상속 중인 값과 덮어쓴 값을 구분해 보여야 "왜 이 값인가"를 알 수 있다 | 작음 |
 | 테스트 사진은 **codex CLI로 만든 가상의 커플·단체 사진**이다. 커플 1장 이상(남 1·여 1), 단체 1장 이상(4~6명, 남녀 혼합), 피부톤·나이·안경·옆얼굴·가림을 섞고, 사진마다 왼쪽부터 인원·성별 정답 라벨(JSON)을 둔다. 자동 테스트의 1차 근거는 기존 `SyntheticFace`이고 생성 사진은 시나리오·수동 확인·성별 추정 정확도 측정용 | 사용자 결정("가상의 단체사진과 커플사진을 만들어서 테스트"). 실존 인물을 닮지 않은 가상 인물만 만든다. 생성 사진에서 Vision 얼굴·특징점이 실사진과 다르게 동작할 수 있어 1차 근거로 삼지 않는다 | 작음 |
 | 생성 사진은 긴 변 1024px JPEG로 `shared/fixtures/people/`에 두고(합계 5 MB 이내, 출처·사용 조건 README 포함), 테스트 타깃에는 시나리오 테스트가 쓰는 2장만 복사한다 (사용자 결정) | 지금 `demo-portrait.png` 2.4 MB가 두 곳에 있는 것과 같은 방식. 전부 복사하면 저장소가 두 배로 는다 | 작음 |
@@ -71,9 +73,9 @@
 | 새 타입·변경 | 모듈·폴더 | 설명 |
 |---|---|---|
 | `Gender`, `PersonID`, `PersonAnchor`, `PortraitKey`, `PortraitLayer`, `PersonRecord`, `PeopleAdjustments` | MellowShared/API (`PeopleAdjustments.swift`) | 층 값·사람 기록 |
-| `PortraitResolver`, `PersonMatcher`, `PersonMatching` | MellowShared/API (`PortraitResolver.swift`, `PersonMatcher.swift`) | 순수 계산. 렌더·편집·앱이 같은 함수를 쓴다 |
+| `PortraitScope`, `PortraitResolver`, `PersonMatcher`, `PersonMatching` | MellowShared/API (`PortraitResolver.swift`, `PersonMatcher.swift`) | 순수 계산. 렌더·편집·앱이 같은 함수를 쓴다. (H1 구현 중 변경) `PortraitScope`는 해석(`PortraitResolver`)도 받으므로 Shared에 둔다 |
 | `EditRecipe.people`, `targetFace` 읽기 이행, `PresetValues.people` | MellowShared/API | 레시피 확장 |
-| `PortraitScope`, `EditChange.personGender`, `EditDocument.set(_:in:)`·`resetOverrides`·`person(at:)`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`overriddenKeys` | MellowEditing/API | 층을 지정하는 편집 규칙 |
+| `EditChange.gender`, `EditDocument.set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`applyMakeupLook(_:forFace:of:)` | MellowEditing/API | 층을 지정하는 편집 규칙 |
 | `FaceTarget`, `RenderContext.faceTargets`, `PhotoAnalysis.genderEstimates`, `GenderEstimator`·`GenderEstimate`, `PreparedPhoto.genders`, `RenderTuning` 상수 3개 | MellowRendering/API | 얼굴별 값과 추정 포트 |
 | `SkinStage`·`FeatureStage`·`MakeupStage`·`ShapeWarpStage` 반복문 | MellowRendering/Domain | `targetFaces` 대신 `faceTargets` |
 | `CoreMLGenderEstimator` (H4만) | MellowRendering/Infrastructure | H4에서 모듈 표의 Rendering 행에 CoreML을 더하고 `verify-modules.sh`도 같은 커밋에서 고친다 |
@@ -101,12 +103,12 @@
 
 - `portrait`·`makeup`은 그대로 **전체 층**이다(빽빽한 값, 기본값 = 항등). `portrait.targetFace`는 더 쓰지 않는다(스키마 `deprecated: true`, 읽기 전용).
 - **층(`PortraitLayer`)은 성긴 값**이다. 있는 키만 덮어쓰고 없는 키는 아래 층을 상속한다. 모양은 전체 층의 `portrait`·`makeup`과 같은 중첩이되 모든 잎이 선택이다. 메이크업은 **부위 단위**로 덮어쓴다(`lip` 객체가 있으면 색과 강도를 함께 덮어씀, `colorID`가 없거나 null이면 "색 없음"으로 덮어씀). `lookID`는 그 층에서 마지막으로 적용한 룩 이름이고 부위를 바꾸면 지운다(기존 규칙).
-- `individuals[]`: `id`(UUID 문자열, 편집이 사람을 가리키는 키), `anchor`(정규화 얼굴 상자 중심 `x`·`y`와 폭 `width`, 원점 왼쪽 아래, 원본 기준), `legacyIndex`(옛 `targetFace`에서 온 기록만, anchor가 채워지면 지움), `gender`(**수동 지정만**, 없으면 미지정), `layer`. anchor와 legacyIndex 중 하나는 있어야 한다.
+- `individuals[]`: `id`(UUID 문자열, 편집이 사람을 가리키는 키), `anchor`(정규화 얼굴 상자 중심 `x`·`y`와 폭 `width`, 원점 왼쪽 아래, 원본 기준), `legacyIndex`(옛 `targetFace`에서 온 기록만, anchor가 채워지면 지움), `gender`(**수동 지정만**, 없으면 미지정), `layer`. anchor와 legacyIndex 중 하나는 있어야 한다(스키마 `anyOf`). 읽기는 관대하다(H1 구현 중 변경): `layer`가 없으면 빈 층, 모르는 `gender` 문자열은 미지정으로 읽고, `id`·`anchor`가 잘못된 기록은 그 기록만 버린다(세션 전체를 못 여는 일이 없게). 같은 `id`의 기록이 둘 이상이면 앞의 것만 남긴다(손상 파일에서 두 얼굴이 한 층을 나누지 않게, H2 구현 중 변경).
 - 자동 추정 성별은 레시피에 쓰지 않는다. 얼굴과 같이 분석 결과(`PhotoAnalysis`)이고 영속화하지 않는다. 그래서 다시 분석해도 수동 지정이 덮이지 않는다.
-- **읽기 이행**: `EditRecipe.init(from:)`가 `portrait` 컨테이너의 `targetFace`를 따로 읽어(`PortraitAdjustments`는 더 이상 이 키를 갖지 않음) 값이 있고 `people.individuals`가 비어 있으면 (1) `portrait.skin/face/features`와 `makeup` 중 기본값과 다른 키 전부를 성긴 층으로 만들고 (2) `individuals = [PersonRecord(id: 새 UUID, legacyIndex: i, layer: 그 층)]`, (3) `portrait`·`makeup`을 기본값으로 둔다. `targetFace`가 범위 밖이었다면(렌더가 빈 대상이던 상태) 그대로 옮긴다(짝이 없는 사람 = 렌더 안 함, 옛 결과와 같음). 옮길 값이 하나도 없으면(모두 기본값) 기록을 만들지 않는다. 실행 취소 기록의 레시피도 같은 디코더를 거치므로 함께 이행된다. 이행으로 만든 기록의 id는 인덱스에서 결정적으로 만든다(`PersonID.legacy(index:)` = `B0000000-0000-0000-0000-` 뒤 12자리 인덱스). 그래서 같은 파일을 두 번 읽어도 같고, 실행 취소 기록의 레시피와 현재 레시피가 내용이 같으면 `==`도 같다(체크포인트 중복이 생기지 않는다).
+- **읽기 이행**: `EditRecipe.init(from:)`가 `portrait` 컨테이너의 `targetFace`를 따로 읽어(`PortraitAdjustments`는 더 이상 이 키를 갖지 않음) 값이 있고 `people.individuals`가 비어 있으면 (1) `portrait.skin/face/features`와 `makeup` 중 기본값과 다른 키 전부를 성긴 층으로 만들고 (2) `individuals = [PersonRecord(id: 새 UUID, legacyIndex: i, layer: 그 층)]`, (3) `portrait`·`makeup`을 기본값으로 둔다. `targetFace`가 범위 밖이었다면(렌더가 빈 대상이던 상태) 그대로 옮긴다(짝이 없는 사람 = 렌더 안 함, 옛 결과와 같음). 옮길 값이 하나도 없으면(모두 기본값) 기록을 만들지 않는다. 실행 취소 기록의 레시피도 같은 디코더를 거치므로 함께 이행된다. 이행으로 만든 기록의 id는 인덱스에서 결정적으로 만든다(`PersonID.legacy(index:)` = `B0000000-0000-0000-0000-` 뒤 12자리 인덱스). 인덱스가 `PersonID.legacyIndexRange`(0…999 999 999 999) 밖이면(음수·손상 파일) 크래시하지 않고 범위의 마지막 값으로 모은다. 이행은 `legacyIndex`에도 같은 값을 써서 어느 얼굴과도 짝이 되지 않게 한다(옛 범위 밖 `targetFace`와 같은 결과, H1 구현 중 변경). 그래서 같은 파일을 두 번 읽어도 같고, 실행 취소 기록의 레시피와 현재 레시피가 내용이 같으면 `==`도 같다(체크포인트 중복이 생기지 않는다).
 - **적용 순서**: H1은 `people`을 더하기만 하고(렌더·편집 동작 불변, `targetFace`는 그대로), H2가 렌더·편집이 `people`을 읽게 한 뒤 마지막 Task 하나에서 `targetFace` 읽기 이행·속성 제거·앱 최소 변경을 한 번에 한다(그 사이 어느 커밋에서도 옛 세션의 렌더 결과가 바뀌지 않는다).
 - `EditRecipe.dependsOnFaces = portrait.dependsOnFaces || makeup.hasEffect || people.hasEffect`. `people.hasEffect`는 어느 층이든 기본값과 다른 값이 하나라도 있으면 true(성별 지정만 있는 기록은 false).
-- `isDefault`는 그대로(`people`이 비면 기본). 빈 기록(성별 없음·층 비움)은 편집 규칙이 변경 뒤 지운다(1.4).
+- `isDefault`는 그대로(`people`이 비면 기본). 빈 기록(성별 없음·층 비움)과 빈 그룹 층은 편집 규칙이 변경 뒤 `prune()`으로 지운다(1.4). 빈 그룹 층은 인코드에서 빠지므로 지우지 않으면 저장 전후 `==`와 `isDefault`가 어긋난다(H1 구현 중 변경).
 - `allValuesFinite`에 모든 층의 숫자 포함.
 - `PresetValues.people`: `groups`만 담는다. `init(of:)`가 `individuals`를 버리고 인코드도 `groups`만 쓴다. 디코드에서 `individuals`가 와도 무시한다.
 - `shared/recipe-schema/edit-recipe.v2.schema.json`: `people` 추가(`groups`는 `male`·`female` 키의 층, `individuals`는 위 필드, 층 스키마는 `$defs/portraitLayer` 하나로 두고 `additionalProperties: false`), `portrait.targetFace`에 `deprecated: true`와 이행 설명. `session-file.v2.schema.json`의 프리셋 `values`에 `people`(`groups`만) 추가. README의 v2 요점·v1 변환 표(`selectedFace` → `people.individuals[0].legacyIndex`)·"키를 추가할 때의 규칙"에 H 항목 추가.
@@ -165,8 +167,11 @@ public struct PeopleAdjustments: Codable, Equatable, Sendable {
     public var hasEffect: Bool
     public var numericValues: [Double]
     public func person(_ id: PersonID) -> PersonRecord?
-    public func personID(at anchor: PersonAnchor) -> PersonID?      // PersonMatcher.isMatch로 찾음
-    public mutating func prune()                                     // isEmpty인 기록 제거
+    /// PersonMatcher.match(individuals, faces:) 결과의 얼굴 인덱스 → 기록. 렌더(makeTargets)·편집·앱이 같은 함수를 쓴다 (H2 구현 중 변경)
+    public func peopleByFace(_ faces: [NormalizedRect]) -> [Int: PersonRecord]
+    /// peopleByFace(faces)[index]?.id. H1의 personID(at:)(anchor 하나에 가장 가까운 기록)는 렌더 짝짓기와 어긋날 수 있어 지웠다 (H2 구현 중 변경)
+    public func personID(forFace index: Int, of faces: [NormalizedRect]) -> PersonID?
+    public mutating func prune()                                     // isEmpty인 기록과 빈 그룹 층 제거, 같은 id는 앞의 것만 (H1·H2 구현 중 변경)
 }
 ```
 
@@ -179,8 +184,10 @@ public enum PortraitResolver {
     public static func resolve(_ recipe: EditRecipe, person: PersonRecord?, gender: Gender?) -> Resolved
     /// 수동 지정이 있으면 그것, 없으면 추정값.
     public static func effectiveGender(person: PersonRecord?, estimate: Gender?) -> Gender?
-    /// 화면용. scope 층까지 겹친 값. person은 recipe.people에서 찾고 gender는 호출자가 유효 성별을 넘긴다.
-    public static func resolve(_ recipe: EditRecipe, scope: PortraitScope, gender: Gender?) -> Resolved
+    /// 화면용. scope 층까지 겹친 값. person은 recipe.people에서 찾는다. estimate는 그 얼굴의 자동 추정이고 .person의 유효 성별은 effectiveGender(기록의 수동 성별 ?? estimate)로 함수 안에서 정한다. 모르는 사람은 전체 값 (H1 구현 중 변경: 인자 gender → estimate)
+    public static func resolve(_ recipe: EditRecipe, scope: PortraitScope, estimate: Gender?) -> Resolved
+    /// 그 scope의 층. .all은 nil, 없는 그룹은 빈 층, 모르는 사람은 nil.
+    public static func layer(_ recipe: EditRecipe, scope: PortraitScope) -> PortraitLayer?
     /// 화면용. 그 층에서 덮어쓴 키. .all은 빈 집합.
     public static func overriddenKeys(_ recipe: EditRecipe, scope: PortraitScope) -> Set<PortraitKey>
 }
@@ -214,17 +221,22 @@ extension EditDocument {
     /// scope가 .all이면 지금과 같이 전체 층을 쓰고, 그룹·개인이면 그 층의 키를 (같은 클램프로) 쓴다. 나머지 케이스는 scope를 무시한다.
     /// 개인 scope의 기록이 없거나 .gender를 개인이 아닌 scope에 보내면 .unknownPerson을 돌려주고 아무것도 하지 않는다.
     @discardableResult public mutating func set(_ change: EditChange, in scope: PortraitScope = .all) -> Rejection?
-    /// anchor에 해당하는 기록이 있으면 그 기록에, 없으면 새 기록을 만들어 같은 변경을 쓴다(한 체크포인트). 찾은 얼굴을 처음 만질 때의 경로.
-    @discardableResult public mutating func set(_ change: EditChange, forPersonAt anchor: PersonAnchor) -> Rejection?
+    /// faces[index]와 짝이 된 기록(렌더와 같은 personID(forFace:of:))이 있으면 그 기록에, 없으면 그 얼굴의 anchor로 새 기록을 만들어 같은 변경을 쓴다(한 체크포인트).
+    /// 찾은 얼굴을 처음 만질 때의 경로. index가 범위 밖이면 .unknownPerson.
+    /// (H2 구현 중 변경: anchor 하나만 받던 set(_:forPersonAt:)를 대신한다. 다른 얼굴을 모르면 겹친 얼굴에서 렌더와 다른 기록을 고른다.)
+    @discardableResult public mutating func set(_ change: EditChange, forFace index: Int, of faces: [NormalizedRect]) -> Rejection?
 
     /// 그 층에서 keys를 지워 상속으로 되돌린다. nil이면 층 전체(개인은 성별 지정 유지). .all은 그 키를 기본값으로 둔다. 체크포인트 한 번.
-    /// 잠긴 사진에서 얼굴형 키가 들어 있으면 .geometryLocked.
+    /// 잠긴 사진에서 실제로 바뀌는 얼굴형 키가 있으면 .geometryLocked.
+    /// 그룹·개인 층은 덮어쓴 얼굴형 키를 지울 때, 전체 층은 0이 아닌 얼굴형 값을 0으로 되돌릴 때다 (H2 구현 중 변경).
     @discardableResult public mutating func resetOverrides(_ keys: Set<PortraitKey>? = nil, in scope: PortraitScope) -> Rejection?
 
-    /// 찾지 못한 사람을 다른 얼굴에 연결. 체크포인트 한 번. 얼굴형 키가 있고 잠겼으면 거절.
+    /// 찾지 못한 사람을 다른 얼굴에 연결. 체크포인트 한 번.
+    /// 잠긴 사진에서 그 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형 키가 있으면 거절 (H2 구현 중 변경: 그룹 층 포함).
     @discardableResult public mutating func rebindPerson(_ id: PersonID, to anchor: PersonAnchor) -> Rejection?
+    /// 기록을 지운다. 체크포인트 한 번. 잠금 규칙은 rebindPerson과 같다.
     @discardableResult public mutating func removePerson(_ id: PersonID) -> Rejection?
-    /// legacyIndex만 있는 기록에 faces[legacyIndex]의 anchor를 채운다. 체크포인트 없음. 바뀐 것이 있으면 true.
+    /// legacyIndex만 있는 기록 중 지금 짝짓기에서 faces[legacyIndex]와 짝이 된 기록에 그 anchor를 채운다(H3 구현 중 변경: 짝을 바꾸지 않는 기록만). 체크포인트 없음. 바뀐 것이 있으면 true.
     public mutating func bindLegacyPeople(faces: [NormalizedRect]) -> Bool
     public mutating func applyMakeupLook(_ look: MakeupLook?, in scope: PortraitScope = .all)
 }
@@ -232,10 +244,10 @@ extension EditDocument {
 
 - `Rejection`에 `unknownPerson` 추가.
 - `affectsGeometry`: `.faceShape`, `.bodyShape`, `.gender`(그리고 제거 전까지 `.targetFace`).
-- 모든 변경은 적용 뒤 `people.prune()`으로 빈 기록(성별 없음·층 비움)을 지운 다음 "값이 그대로면 체크포인트 없음" 비교를 한다. `anchor`를 받은 기록은 `legacyIndex`를 지운다.
+- 모든 변경은 적용 뒤 `people.prune()`으로 빈 기록(성별 없음·층 비움)과 빈 그룹 층을 지운 다음 "값이 그대로면 체크포인트 없음" 비교를 한다. `anchor`를 받은 기록은 `legacyIndex`를 지운다.
 - 층에 메이크업 색을 처음 고를 때의 기본 강도 규칙은 그 층 아래(전체 ⊕ 그룹, 그룹은 기록의 수동 성별 기준)를 겹친 값을 기준으로 한다.
 - 그룹·개인 층의 값 변경도 "값이 그대로면 체크포인트 없음" 규칙을 따른다. 연속 변경(`beginContinuousChange`)은 scope와 무관하게 지금과 같다.
-- `applyAuto`: 전체 층만(지금과 같음).
+- `applyAuto(_:oneTouchStrength:)`: 색감·디테일은 전체 층에 쓴다. (G4 변경) `oneTouchStrength`가 있으면(앱은 얼굴이 있을 때 0.6) 같은 단계에서 전체 대상 원터치를 써 남성·여성 그룹 층의 묶인 키도 다시 쓴다. 개인 층은 건드리지 않는다.
 - `apply(_ values:)`(프리셋): `color`·`detail`·`background`·`body`·전체 층 `portrait`·`makeup`·`people.groups`를 덮어쓴다. 개인 층·성별 지정은 그대로. 잠긴 사진은 전체 층과 그룹 층의 얼굴형을 보존.
 - `applyFromBatch(_:categories:)`(G3 위에): 고른 항목을 전체 층과 그룹 층에서 덮어쓴다. `categories` 중 `dependsOnFaces`인 항목은 **받는 사진의 모든 개인 층에서 그 항목의 키를 지운다**(`skin` → `skinSmoothing`·`autoBlemish`·`skinRefinement(*)`, `faceShape` → `faceShape(*)`, `features` → `feature(*)`, `makeup` → `makeupPart(*)`·`makeupLookID`). 성별 지정·anchor는 그대로. 잠긴 사진은 `faceShape`·`body`를 건너뛴다(G3 그대로). G3의 `merged(values, targetFace:, categories:)`에서 `targetFace` 인자가 사라지고 위 규칙이 들어간다.
 - `isGeometryLocked`는 그대로. 잠긴 사진에서 scope 전환은 화면 상태라 막지 않는다.
@@ -262,7 +274,7 @@ public struct FaceTarget: Sendable {
 ```
 
 - `PhotoAnalysis.genderEstimates: [GenderEstimate?]`(기본 빈 배열). `PhotoPipeline.init(…, genderEstimator: (any GenderEstimator)? = nil)`. `prepare`가 얼굴 뒤에 추정을 돌리고 실패는 조용히 빈 배열(추정은 보조 정보라 `PreparedPhoto`에 실패 사유를 두지 않는다). 임계값은 준비 때 적용한다: 신뢰도 < `genderMinConfidence`, 얼굴 폭 < `genderMinFaceWidth`, |yaw| > `genderMaxYaw`면 nil. `PreparedPhoto.genders: [Gender?]`로 앱에 넘긴다.
-- `RenderContext.init`이 `targetFaces`·`targetBlemishes` 대신 `faceTargets`를 만든다: `matches = PersonMatcher.match(recipe.people.individuals, faces: faces.map(\.boundingBox))` → 얼굴 i마다 `person = 짝이 된 기록`, `gender = PortraitResolver.effectiveGender(person:, estimate: genderEstimates[i]?.gender)`, `resolved = PortraitResolver.resolve(recipe, person:, gender:)`, 잡티는 `faceIndex == i`. 짝이 없는 기록은 어느 얼굴에도 들어가지 않는다. `faces`·`blemishes` 접근자는 유지. `targetFaces`는 제거하고 테스트를 `faceTargets.map(\.face)`로 옮긴다.
+- `RenderContext.init`이 `targetFaces`·`targetBlemishes` 대신 `faceTargets`를 만든다: `people = recipe.people.peopleByFace(faces.map(\.boundingBox))`(내부는 `PersonMatcher.match`, 편집과 같은 함수, H2 구현 중 변경) → 얼굴 i마다 `person = people[i]`, `gender = PortraitResolver.effectiveGender(person:, estimate: genderEstimates[i]?.gender)`, `resolved = PortraitResolver.resolve(recipe, person:, gender:)`, 잡티는 `faceIndex == i`. 짝이 없는 기록은 어느 얼굴에도 들어가지 않는다. `faces`·`blemishes` 접근자는 유지. `targetFaces`는 제거하고 테스트를 `faceTargets.map(\.face)`로 옮긴다.
 - 네 단계: `SkinStage`는 `faceTargets` 중 `clamped(target.portrait.skin).hasEffect`인 것만 돌고 자동 잡티는 그 얼굴의 `target.blemishes`로 `healSpots`를 만든다(`SourceRules` 얼굴별 구성은 그대로). `FeatureStage`·`MakeupStage`는 `target.portrait.features`·`target.makeup`. `ShapeWarpStage.facePrimitives`는 `target.portrait.face`. 각 단계의 "값이 없으면 입력 그대로" 조기 반환은 "어느 대상에도 효과가 없으면"으로 바뀐다.
 - `renderOriginal`의 `dependsOnFaces` 검사는 레시피 속성이 바뀌므로 그대로 동작한다.
 - 캐시: `RegionMaskCache` 키·상한 불변. `PreviewCache` 불변. 성능: 단계는 이미 얼굴마다 반복하므로 얼굴 6명 단체 사진의 비용은 지금 "모든 얼굴" 선택과 같다. 해석·짝짓기는 얼굴 수에 비례하는 산술이다.
@@ -275,15 +287,18 @@ public struct FaceTarget: Sendable {
 
 #### 1.6 앱 화면
 
-- `AppModel.BeautyTarget { all, gender(Gender), face(Int), person(PersonID) }` — `.face(i)`는 찾은 얼굴(기록이 있든 없든), `.person(id)`는 짝이 없는 기록. 얼굴 의존 변경은 `.face(i)`면 `set(_:forPersonAt: anchor(i))`, `.person(id)`면 `set(_:in: .person(id))`, 그룹·전체는 `set(_:in:)`으로 보낸다. `beautyTargets: [PhotoID: BeautyTarget]`(세션 상태), `beautyTarget`(선택 사진 기준, 기본 `.all`), `setBeautyTarget(_:)`. 사진을 지우면 항목도 지운다. 파일에 저장하지 않는다.
+- `AppModel.BeautyTarget { all, gender(Gender), face(Int), person(PersonID) }` — `.face(i)`는 찾은 얼굴(기록이 있든 없든), `.person(id)`는 짝이 없는 기록. 얼굴 의존 변경은 `.face(i)`면 `set(_:forFace: i, of: 얼굴 상자들)`, `.person(id)`면 `set(_:in: .person(id))`, 그룹·전체는 `set(_:in:)`으로 보낸다. `beautyTargets: [PhotoID: BeautyTarget]`(세션 상태), `beautyTarget`(선택 사진 기준, 기본 `.all`), `setBeautyTarget(_:)`. 사진을 지우면 항목도 지운다. 파일에 저장하지 않는다.
 - `PhotoInfo.genders: [Gender?]`(`PreparedPhoto.genders`). `remember(_:_:)` 뒤 `session.edit`로 `bindLegacyPeople(faces:)`를 한 번 부른다(바뀐 것이 있을 때만 저장이 일어남).
 - `personChips: [PersonChip]` — 찾은 얼굴마다 `{ faceIndex, personID?, effectiveGender, source(.manual/.estimated/.none), overriddenCount }`, 왼쪽부터. 뒤에 짝이 없는 기록 `{ personID, gender, overriddenCount, unmatched: true }`.
-- `TargetChips`(새 파일 `Features/Editor/TargetChips.swift`): 가로 스크롤 칩 `전체` · `남성` · `여성` · `1`…`n`(성별 아이콘 + 번호, 미지정은 물음표) · 찾지 못한 기록(경고 아이콘). 덮어쓴 키가 있는 칩에는 점. 사람 칩 길게 누르기/`contextMenu`에 `PersonGenderMenu`(남성 · 여성 · 미지정, 추정이면 항목 옆 "추정" 표시)와 "이 대상 초기화", 찾지 못한 기록에는 "이 얼굴에 연결 → 얼굴 n" 하위 메뉴와 "삭제". 뷰티·메이크업 패널의 기존 `Picker`를 이것으로 바꾼다.
-- 사람 칩을 처음 만질 때(성별 지정이나 슬라이더 변경) `AppModel`이 `document.set(change, forPersonAt: PersonAnchor(faceBox: faces[i].boundingBox))`로 보내 기록이 그때 만들어진다.
-- 슬라이더: `AdjustmentSlider`에 `isOverridden: Bool = false`, `onReset: (() -> Void)? = nil`. scope가 `.all`이 아니면 패널이 `PortraitResolver.resolve(...)`의 값을 보이고 `overriddenKeys`에 든 키에 점과 "재설정"(컨텍스트 메뉴·Mac은 작은 x 버튼)을 붙인다. 패널 위에 안내 한 줄: 그룹이면 "전체 값을 바탕으로 바뀐 항목만 저장돼요", 개인이면 "전체·그룹 값을 바탕으로…". 메이크업 룩 칩은 scope 층의 `makeupLookID`를 선택으로 보인다.
+- `TargetChips`(새 파일 `Features/Editor/TargetChips.swift`): 가로 스크롤 칩 `전체` · `남성` · `여성` · `1`…`n`(성별 아이콘 + 번호, 미지정은 물음표) · 찾지 못한 기록(경고 아이콘). 덮어쓴 키가 있는 칩에는 점. 사람 칩 길게 누르기/`contextMenu`에 `PersonGenderMenu`(남성 · 여성 · 미지정, 추정이면 항목 옆 "추정" 표시)와 "이 대상 초기화", 찾지 못한 기록에는 "이 얼굴에 연결 → 얼굴 n" 하위 메뉴와 "삭제". 뷰티·메이크업 패널의 기존 `Picker`를 이것으로 바꾼다. (H3 리뷰 변경) 선택된 사람 칩 아래 상태 줄에 글자가 보이는 "성별: 남성/여성/미지정 ⌄" 단추를 두어 같은 메뉴를 연다(길게 누르기를 몰라도 수동 지정). 단추의 누름 영역은 44pt이되 줄 높이는 늘리지 않는다. 그룹·개인 안내(`scopeHint`)는 뷰티 패널에서는 "세부 조정" 접기 안 맨 위에 둔다(점 표시를 설명하는 문구라서, 그리고 iPhone 조절 영역 200pt 안에 칩·원터치 줄·"세부 조정" 머리가 스크롤 없이 보이게). 메이크업 패널은 칩 아래 그대로다.
+- 사람 칩을 처음 만질 때(성별 지정이나 슬라이더 변경) `AppModel`이 `document.set(change, forFace: i, of: faces.map(\.boundingBox))`로 보내 기록이 그때 만들어진다.
+- 슬라이더: `AdjustmentSlider`에 `isOverridden: Bool = false`, `onReset: (() -> Void)? = nil`. scope가 `.all`이 아니면 패널이 `PortraitResolver.resolve(...)`의 값을 보이고 `overriddenKeys`에 든 키에 점과 "재설정"(컨텍스트 메뉴·Mac은 작은 x 버튼)을 붙인다. 패널 위에 안내 한 줄: 그룹이면 "전체 값을 바탕으로 바뀐 항목만 저장돼요", 개인이면 "전체·그룹 값을 바탕으로…". 메이크업 룩 칩은 겹친 값의 `lookID`를 선택으로 보인다(H3 구현 중 변경: `PortraitLayer.applied`가 메이크업 부위를 덮어쓴 층이면 그 층의 `makeupLookID`로, nil이어도 바꾼다. 메이크업을 안 건드린 층은 아래 층의 룩을 상속).
 - `faceAvailability`의 `noLandmarks` 판정은 scope가 가리키는 얼굴(전체·그룹이면 해당 얼굴 전부, 개인이면 그 얼굴)로 한다.
-- 캔버스: `tool`이 `.beauty`·`.makeup`일 때 탭을 `touch(from:to:)`에서 받아 `outputTransform.toOriginal`로 바꾼 점이 들어 있는 가장 작은 얼굴 상자를 고르고 그 사람을 scope로 한다(얼굴 밖이면 `.all`). 비교 모드·렌더 중·자르기 화면에서는 지금처럼 막는다.
-- `UserMessage`: `targetLabel`("대상"), `targetAll`("전체"), `genderMale`("남성"), `genderFemale`("여성"), `genderUnset`("미지정"), `personOrdinal(n)`("사람 n"), `genderEstimated`("추정"), `genderManual`("지정"), `overrideReset`("재설정"), `resetScope`("이 대상 초기화"), `personUnmatched`("사진에서 찾지 못함"), `rebindPerson`("이 얼굴에 연결"), `removePerson`("삭제"), `scopeHintGroup`, `scopeHintPerson`, `assignGenderHint`("성별을 지정하면 그룹 값이 적용돼요"). `faceCount`·`faceOrdinal`·`allFaces`는 쓰는 곳이 없어지면 지운다.
+- (H3 구현 중 변경) 사람 삭제는 지운 사람이 지금 대상(그 사람 칩이나 그 사람과 짝인 얼굴)이면 대상을 전체로 되돌린다. 다시 연결은 기록과 짝이 없는 얼굴에만 한다(`AppModel.unpairedFaceIndices`). 잠긴 사진에서 얼굴마다 해석한 얼굴형 값(수동 성별 ?? 추정)이 편집 전후로 달라지면 `AppModel`이 그 편집을 거절하고 `UserMessage.geometryLocked`를 보인다(실행 취소·다시 실행·초기화는 검사하지 않는다).
+- (H3 구현 중 변경) 찾은 얼굴에 기록이 없을 때 룩을 적용하면 `EditDocument.applyMakeupLook(_:forFace:of:)`가 기록을 만들며 적용한다(체크포인트 한 번). 그래서 "먼저 슬라이더를 움직이라"는 임시 안내(`pickASliderFirst`)는 지운다.
+- 패널 값은 `AppModel.scopedValues`(얼굴 대상은 추정 성별까지 넣어 해석)이고 H2의 `beautyValues`(추정 무시)를 대신한다.
+- 캔버스: `tool`이 `.beauty`·`.makeup`일 때 탭을 `touch(from:to:)`에서 받아 `outputTransform.toOriginal`로 바꾼 점이 들어 있는 가장 작은 얼굴 상자를 고르고 그 사람을 scope로 한다(얼굴 밖이면 `.all`). 비교 모드·자르기 화면에서는 지금처럼 막는다. (H3 리뷰 변경) 뷰티·메이크업 캔버스는 드래그 층이 아니라 탭 제스처만 받아 확대한 사진의 한 손가락 이동을 스크롤 뷰에 남긴다. 모델은 누른 점과 뗀 점이 `AppModel.Policy.targetTapTolerance`(캔버스 정규화 0.02)보다 멀면 탭이 아니라 이동으로 보고 대상을 바꾸지 않는다. 대상 고르기는 편집이 아니므로 렌더 중에도 받는다.
+- `UserMessage`: `targetLabel`("대상"), `targetAll`("전체"), `genderMale`("남성"), `genderFemale`("여성"), `genderUnset`("미지정"), `personOrdinal(n)`("사람 n"), `genderEstimated`("추정"), `genderManual`("지정"), `overrideReset`("재설정"), `resetScope`("이 대상 초기화"), `personUnmatched`("사진에서 찾지 못함"), `rebindPerson`("이 얼굴에 연결"), `removePerson`("삭제"), `scopeHintGroup`, `scopeHintPerson`, `assignGenderHint`("성별을 지정하면 그 그룹 값이 함께 적용돼요. 위의 성별 단추에서 지정해요."). `faceCount`·`faceOrdinal`·`allFaces`는 쓰는 곳이 없어지면 지운다.
 - `Theme`: 칩 높이·점 크기.
 
 ### 2. 테스트 전략
@@ -293,7 +308,7 @@ public struct FaceTarget: Sendable {
 | 레시피 | 층·기록 왕복, 없는 키는 상속(인코드에 안 나옴), `targetFace = i` 읽기 이행(전체 층 비고 개인 층에 값·legacyIndex), 범위 밖 `targetFace`, 실행 취소 기록도 이행, v1 픽스처(`selectedFace 1`, skin 0.3, faceSlim 0.2 → 개인 층 `smoothing 0.3`·`face.width −0.2`), `dependsOnFaces`·`hasEffect`·`allValuesFinite`, 스키마 키 집합(`people`·`$defs/portraitLayer`), 프리셋에 `groups`만, 딕셔너리 키가 rawValue | `MellowSharedTests`, `MellowLibraryTests/SessionFileMigrationTests` |
 | 해석 | 전체 ⊕ 그룹 ⊕ 개인 키 단위, 미지정은 그룹 건너뜀, 메이크업 부위 단위·`colorID` null 덮어쓰기, `effectiveGender` 우선순위 | `PortraitResolverTests` |
 | 짝짓기 | 같은 상자는 같은 사람, 얼굴 하나가 사라져도 나머지 유지(인덱스가 밀려도), 허용치 밖은 짝 없음, 크기 비 초과는 짝 없음, 1:1(두 기록이 한 얼굴을 다투면 가까운 쪽), legacyIndex 폴백, 결정적 | `PersonMatcherTests` |
-| 편집 | scope별 set·클램프, 상속으로 재설정, 층 전체 초기화(성별 유지), 빈 기록 자동 제거, `person(at:)` 중복 방지, 성별 지정 잠금 거절, 얼굴형 키 재설정 잠금 거절, 실행 취소 한 단계, 프리셋이 개인 층·성별을 보존, 동기화가 그룹을 복사하고 얼굴 의존 항목의 개인 키를 지우며 성별·anchor 유지, `unknownPerson`, `bindLegacyPeople` | `MellowEditingTests`, `MellowLibraryTests/ProjectSessionTests` |
+| 편집 | scope별 set·클램프, 상속으로 재설정, 층 전체 초기화(성별 유지), 빈 기록 자동 제거, 얼굴 → 사람이 렌더 짝짓기와 같음(겹친 얼굴 반례), 같은 얼굴에 기록 중복 없음, 성별 지정 잠금 거절, 얼굴형 키 재설정 잠금 거절, 실행 취소 한 단계, 프리셋이 개인 층·성별을 보존, 동기화가 그룹을 복사하고 얼굴 의존 항목의 개인 키를 지우며 성별·anchor 유지, `unknownPerson`, `bindLegacyPeople` | `MellowEditingTests`, `MellowLibraryTests/ProjectSessionTests` |
 | 렌더 | 얼굴 셋 합성(`SyntheticFace` 셋을 가로로 배치): 개인 층만 바꾼 얼굴만 바뀌고 다른 두 얼굴은 같은 바이트, 그룹 층은 그 성별 얼굴만, 미지정 얼굴은 전체 값만, 짝 없는 기록은 어떤 얼굴도 안 바꿈, 자동 잡티가 얼굴별로 켜짐, 메이크업·얼굴형도 같은 검사, 추정 포트 스텁(신뢰도·폭·yaw 임계값), `faceTargets` 구성, 캐시 항목 수 불변, 기존 `targetFaces` 테스트 이식 | `RenderContextTests`, `SkinStageTests`, `FeatureStageTests`, `MakeupStageTests`, `ShapeWarpStageTests`, `PhotoPipelineTests` |
 | 앱 | 칩 목록 구성(추정·지정·미지정·찾지 못함), scope 전환이 레시피를 바꾸지 않음, 사람 칩 첫 변경이 기록을 만들고 실행 취소 한 단계, 성별 메뉴, 재설정, 캔버스 탭 → scope, 사진 전환 시 scope 기억·삭제 시 제거, 잠금 안내, 문구 | `AppModelTests` |
 | 시나리오 | 생성 사진 `couple-01`·`group-01`(실제 Vision): 얼굴 수가 라벨과 같은지(다르면 그 사진은 자동 시나리오에서 빼고 VALIDATION에 적음), 라벨대로 성별 수동 지정 → 여성 그룹 피부 0.5 → 사람 1 얼굴 폭 −0.3 → 동기화(피부만)로 다른 사진에 그룹 값 복사·개인 값 미복사 → 저장 성공 | `EditorScenarioTests`(macOS) |
@@ -332,7 +347,7 @@ public struct FaceTarget: Sendable {
 | 계획 | 파일 | 주요 Task |
 |---|---|---|
 | H1 (4 Task, 더하기만) | `docs/superpowers/plans/2026-10-21-beauty-h1-recipe.md` | `Gender`·`PersonID`·`PersonAnchor`·`PortraitKey`·`PortraitLayer`, `PersonRecord`·`PeopleAdjustments`·`EditRecipe.people`·`PresetValues.people`·스키마 두 파일·README, `PortraitScope`·`PortraitResolver`, `PersonMatcher`·`PersonMatching`. `targetFace`는 건드리지 않는다 |
-| H2 (5 Task) | `docs/superpowers/plans/2026-10-21-beauty-h2-rules-render.md` | `FaceTarget`·`RenderContext.faceTargets`·네 단계, `GenderEstimator`·`PhotoAnalysis.genderEstimates`·`PreparedPhoto.genders`·`RenderTuning` 3개, `EditChange.gender`·`set(_:in:)`·`set(_:forPersonAt:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`applyMakeupLook(_:in:)`, 프리셋·동기화 층 규칙(G3 `merged` 변경), 마지막 Task에서 `targetFace` 읽기 이행·제거와 앱 최소 변경(임시 대상 피커) |
+| H2 (5 Task) | `docs/superpowers/plans/2026-10-21-beauty-h2-rules-render.md` | `FaceTarget`·`RenderContext.faceTargets`·네 단계, `GenderEstimator`·`PhotoAnalysis.genderEstimates`·`PreparedPhoto.genders`·`RenderTuning` 3개, `EditChange.gender`·`set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`applyMakeupLook(_:in:)`, 프리셋·동기화 층 규칙(G3 `merged` 변경), 마지막 Task에서 `targetFace` 읽기 이행·제거와 앱 최소 변경(임시 대상 피커) |
 | H3 (4 Task) | `docs/superpowers/plans/2026-10-21-beauty-h3-app-validation.md` | 생성 사진 세트(codex CLI, 눈 확인, 라벨, README, 테스트 타깃 복사), `AppModel.BeautyTarget`·칩 모델·`PhotoInfo.genders`·legacy 연결·캔버스 얼굴 탭, `TargetChips`·`PersonGenderMenu`·슬라이더 덮어쓰기 표시·`UserMessage`·`Theme`, 시나리오 테스트·`modules.md`·VALIDATION·전체 검증 |
 | H4 (선택, 4 Task) | `docs/superpowers/plans/2026-10-21-beauty-h4-gender-estimator.md` | 후보 모델 비교표(크기·라이선스·학습 데이터·편향 보고)와 사용자 승인 관문, Core ML 변환·번들·모듈 표 Rendering 행 CoreML 허용 + `verify-modules.sh`, `CoreMLGenderEstimator`(Vision `VNCoreMLRequest`로 얼굴 상자 잘라 추론), 라벨 정확도 측정·VALIDATION 표 |
 

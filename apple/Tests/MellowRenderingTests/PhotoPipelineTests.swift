@@ -19,6 +19,11 @@ struct StubBodyAnalyzer: BodyAnalyzer {
     func analyze(_ image: CIImage) throws -> [BodyGeometry] { try result.get() }
 }
 
+struct StubGenderEstimator: GenderEstimator {
+    var result: Result<[GenderEstimate?], MellowError>
+    func estimate(_ image: CIImage, faces: [FaceGeometry]) throws -> [GenderEstimate?] { try result.get() }
+}
+
 /// 호출마다 다음 결과를 돌려주고 마지막 결과는 계속 되풀이한다. 다시 준비할 때 분석이 달라지는 경우를 흉내 낸다.
 final class SequencedBodyAnalyzer: BodyAnalyzer, @unchecked Sendable {
     private let lock = NSLock()
@@ -531,5 +536,65 @@ final class PhotoPipelineTests: XCTestCase {
         _ = try await bare.prepare(id, at: url)
         let skipped = try await bare.preview(id, recipe: recipe)
         XCTAssertEqual(bytes(skipped), bytes(plain), "카탈로그가 없으면 립만 건너뛰고 오류를 던지지 않는다")
+    }
+
+    func testGenderEstimatesAreThresholdedAndFailuresAreSilent() async throws {
+        let tuning = RenderTuning()
+        let big = FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.2, width: 0.3, height: 0.4), yaw: 0.1)
+        let small = FaceGeometry(boundingBox: NormalizedRect(x: 0.5, y: 0.2, width: 0.03, height: 0.04))
+        let turned = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.2, width: 0.3, height: 0.4), yaw: 0.9)
+        let faces = [big, small, turned]
+        let estimates: [GenderEstimate?] = [
+            GenderEstimate(gender: .female, confidence: 0.9), GenderEstimate(gender: .male, confidence: 0.99),
+            GenderEstimate(gender: .male, confidence: 0.95),
+        ]
+        let accepted = PhotoPipeline.acceptedEstimates(estimates, faces: faces, tuning: tuning)
+        XCTAssertEqual(accepted.map { $0?.gender }, [.female, nil, nil], "작은 얼굴·돌아간 얼굴은 버린다")
+        let weak: [GenderEstimate?] = [GenderEstimate(gender: .female, confidence: 0.6), nil, nil]
+        XCTAssertEqual(PhotoPipeline.acceptedEstimates(weak, faces: faces, tuning: tuning), [nil, nil, nil])
+        XCTAssertEqual(
+            PhotoPipeline.acceptedEstimates(
+                [GenderEstimate(gender: .female, confidence: 1)], faces: faces, tuning: tuning),
+            [nil, nil, nil], "길이가 다르면 모두 버린다")
+        let url = try Support.writePNG(Support.skinTexture(size: 256), name: "genders")
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            genderEstimator: StubGenderEstimator(result: .success(estimates)), tuning: tuning)
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertEqual(prepared.genders, [.female, nil, nil])
+        let analysis = await pipeline.preparedAnalysis(id)
+        XCTAssertEqual(analysis?.genderEstimates.map { $0?.gender }, [.female, nil, nil])
+        let failing = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            genderEstimator: StubGenderEstimator(result: .failure(.faceAnalysisUnavailable(reason: "stub"))),
+            tuning: tuning)
+        let silent = try await failing.prepare(PhotoID(), at: url)
+        XCTAssertEqual(silent.genders, [nil, nil, nil], "추정 실패는 준비를 막지 않는다")
+        XCTAssertNil(silent.faceAnalysisFailure)
+        let none = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success(faces)), tuning: tuning)
+        let unestimated = try await none.prepare(PhotoID(), at: url)
+        XCTAssertEqual(unestimated.genders, [nil, nil, nil], "추정기가 없으면 모두 미지정")
+    }
+
+    func testEstimatedGenderSelectsGroupLayerUnlessManuallyAssigned() {
+        let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.05, y: 0.1, width: 0.35, height: 0.8))
+        let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
+        var recipe = EditRecipe()
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5)
+        recipe.people.groups[.male] = PortraitLayer(skinSmoothing: 0.1)
+        recipe.people.individuals = [PersonRecord(anchor: PersonAnchor(faceBox: right.boundingBox), gender: .male)]
+        let analysis = PhotoAnalysis(
+            faces: [left, right],
+            genderEstimates: [
+                GenderEstimate(gender: .female, confidence: 0.9), GenderEstimate(gender: .female, confidence: 0.9),
+            ])
+        let context = RenderContext(
+            extent: CGRect(x: 0, y: 0, width: 64, height: 64), recipe: recipe, analysis: analysis,
+            tuning: RenderTuning())
+        XCTAssertEqual(context.faceTargets[0].gender, .female, "추정만 있는 얼굴은 추정 성별")
+        XCTAssertEqual(context.faceTargets[0].portrait.skin.smoothing, 0.5)
+        XCTAssertEqual(context.faceTargets[1].gender, .male, "수동 지정이 추정을 이긴다")
+        XCTAssertEqual(context.faceTargets[1].portrait.skin.smoothing, 0.1)
     }
 }

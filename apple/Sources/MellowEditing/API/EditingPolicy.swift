@@ -10,6 +10,10 @@ public enum EditingPolicy {
     public static let bipolarRange = AdjustmentRange.bipolar
     /// 메이크업 색을 처음 고를 때 그 부위 강도가 0이면 두는 값. 색 칩을 눌렀는데 아무것도 안 바뀌는 일을 막는다.
     public static let makeupDefaultIntensity = 0.5
+    /// 원터치 기본 강도.
+    /// 값의 정의는 MellowShared의 OneTouchBundle.defaultStrength다.
+    /// 강도 1은 OneTouchBundle 표 값 그대로이고 그것이 상한이다.
+    public static let oneTouchDefaultStrength = OneTouchBundle.defaultStrength
 
     /// 미소만 한 방향이다.
     public static func faceShapeRange(_ key: FaceShapeKey) -> ClosedRange<Double> {

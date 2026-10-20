@@ -105,7 +105,6 @@ final class AutoEnhancerTests: XCTestCase {
         XCTAssertEqual(
             withFaces.features, FeatureAdjustments(eyeBrighten: RenderTuning().autoEyeBrighten),
             "얼굴이 있으면 눈 또렷하게만 제안한다(스펙 7)")
-        XCTAssertNil(withFaces.targetFace)
     }
 
     func testSuggestionDoesNotDependOnCurrentRecipe() throws {

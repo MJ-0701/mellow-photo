@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "photos": [
+    { "file": "couple-01.jpg", "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "couple-02.jpg", "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": true,  "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "turned",  "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "group-01.jpg", "people": [
+        { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "senior", "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "group-02.jpg", "people": [
+        { "gender": "male",   "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "male",   "ageBand": "senior", "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "partial", "ambiguous": false },
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "profile", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "group-03.jpg", "people": [
+        { "gender": "female", "ageBand": "adult",  "glasses": true,  "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "partial", "ambiguous": false },
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] }
+  ]
+}

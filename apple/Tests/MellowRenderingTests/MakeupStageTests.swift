@@ -176,7 +176,7 @@ final class MakeupStageTests: XCTestCase {
         }
     }
 
-    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. targetFace 0은 왼쪽 얼굴만, 범위 밖 인덱스는 아무 얼굴도 칠하지 않는다.
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓는다. 왼쪽 사람의 개인 층은 왼쪽 얼굴만, 짝이 없는 기록은 아무 얼굴도 칠하지 않는다.
     /// 다섯 부위(립·블러셔·아이섀도·눈썹·쉐딩)를 모두 강도 1로 켠다.
     func testTargetFacePaintsOnlyThatFace() throws {
         let synthetic = SyntheticFace.makeFeatures()
@@ -199,7 +199,7 @@ final class MakeupStageTests: XCTestCase {
                 blush: MakeupTint(colorID: "blush-pink", intensity: 1),
                 eyeshadow: MakeupTint(colorID: "shadow-smoky", intensity: 1), brow: MakeupStrength(intensity: 1),
                 contour: MakeupStrength(intensity: 1))
-            recipe.portrait.targetFace = targetFace
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
             let context = RenderContext(
                 extent: extent, recipe: recipe, faces: faces, tuning: RenderTuning(), makeupCatalog: catalog)
             return try MakeupStage().apply(image, in: context)
@@ -287,5 +287,30 @@ final class MakeupStageTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(luma(foreheadAfter), luma(foreheadBefore) + minimumLumaChange, "하이라이터는 밝게")
         XCTAssertLessThanOrEqual(
             hueDistance(hue(foreheadAfter), hue(foreheadBefore)), maximumHueShift, "하이라이터 색상각")
+    }
+
+    func testGenderGroupPaintsOnlyFacesOfThatGender() throws {
+        let pair = try SyntheticFace.pair(SyntheticFace.makeFeatures(), renderer: Support.renderer)
+        let catalog = try Support.sharedMakeupCatalog()
+        func rendered(genders: [Gender?]) throws -> CIImage {
+            var recipe = EditRecipe()
+            recipe.people.groups[.female] = PortraitLayer(makeup: [.lip: MakeupTint(colorID: "lip-red", intensity: 1)])
+            recipe.people.individuals = zip(pair.faces, genders).compactMap { face, gender in
+                gender.map { PersonRecord(anchor: PersonAnchor(faceBox: face.boundingBox), gender: $0) }
+            }
+            let context = RenderContext(
+                extent: pair.image.extent, recipe: recipe, faces: pair.faces, tuning: RenderTuning(),
+                makeupCatalog: catalog)
+            return try MakeupStage().apply(pair.image, in: context)
+        }
+        let before = try Support.grid(pair.image)
+        let rightOnly = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [nil, .female])))
+        XCTAssertEqual(rightOnly.left, 0, "미지정인 사람은 그룹 값을 받지 않는다")
+        XCTAssertGreaterThan(rightOnly.right, 0)
+        let both = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [.female, .female])))
+        XCTAssertGreaterThan(both.left, 0)
+        XCTAssertGreaterThan(both.right, 0)
+        let male = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [.male, nil])))
+        XCTAssertEqual(male.left + male.right, 0, "다른 그룹은 받지 않는다")
     }
 }

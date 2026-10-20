@@ -25,25 +25,28 @@ public struct ColorAdjustments: Codable, Equatable, Sendable {
 }
 
 /// 얼굴에 의존하는 보정. 옛 키 skinSmoothing·faceSlim은 읽기만 하고 쓰지 않는다.
+/// 옛 키 targetFace는 EditRecipe가 읽어 개인 층으로 옮긴다.
 public struct PortraitAdjustments: Codable, Equatable, Sendable {
-    /// 왼쪽부터 센 얼굴 인덱스. nil이면 모든 얼굴.
-    public var targetFace: Int?
     public var skin: SkinAdjustments
     public var face: FaceShapeAdjustments
     public var features: FeatureAdjustments
+    /// 원터치 표시.
+    /// 전체 층의 묶인 항목이 OneTouchBundle 공통 표 × 이 강도와 같다는 뜻이다.
+    /// 렌더는 읽지 않는다.
+    public var oneTouch: Double?
 
     public init(
-        targetFace: Int? = nil, skin: SkinAdjustments = .init(), face: FaceShapeAdjustments = .init(),
-        features: FeatureAdjustments = .init()
+        skin: SkinAdjustments = .init(), face: FaceShapeAdjustments = .init(), features: FeatureAdjustments = .init(),
+        oneTouch: Double? = nil
     ) {
-        self.targetFace = targetFace
         self.skin = skin
         self.face = face
         self.features = features
+        self.oneTouch = oneTouch
     }
 
     private enum CodingKeys: String, CodingKey {
-        case targetFace
+        case oneTouch
         case skin
         case face
         case features
@@ -54,7 +57,6 @@ public struct PortraitAdjustments: Codable, Equatable, Sendable {
     /// 새 키가 있으면 새 키, 없으면 B0까지의 옛 키를 옮긴다.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        targetFace = try container.decodeIfPresent(Int.self, forKey: .targetFace)
         if let skin = try container.decodeIfPresent(SkinAdjustments.self, forKey: .skin) {
             self.skin = skin
         } else {
@@ -68,16 +70,26 @@ public struct PortraitAdjustments: Codable, Equatable, Sendable {
             face = FaceShapeAdjustments(legacyFaceSlim: legacy)
         }
         features = try container.decodeIfPresent(FeatureAdjustments.self, forKey: .features) ?? .init()
+        oneTouch = try container.decodeIfPresent(Double.self, forKey: .oneTouch)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(targetFace, forKey: .targetFace)
         try container.encode(skin, forKey: .skin)
         try container.encode(face, forKey: .face)
         try container.encode(features, forKey: .features)
+        try container.encodeIfPresent(oneTouch, forKey: .oneTouch)
     }
 
+    /// 원터치 표시는 렌더 값이 아니라 보지 않는다.
     public var dependsOnFaces: Bool { skin.hasEffect || face.hasEffect || features.hasEffect }
-    public var numericValues: [Double] { skin.numericValues + face.numericValues + features.numericValues }
+    /// 유한성 검사에는 원터치 표시도 넣는다.
+    public var numericValues: [Double] {
+        let marker: Double = oneTouch ?? 0
+        var values: [Double] = skin.numericValues
+        values += face.numericValues
+        values += features.numericValues
+        values.append(marker)
+        return values
+    }
 }

@@ -114,9 +114,19 @@ struct PhotoCanvasView: View {
         }
     }
 
+    /// 뷰티·메이크업은 탭 제스처만 붙여 확대한 사진의 한 손가락 이동을 스크롤 뷰에 남긴다.
+    /// 잡티·변형은 드래그가 곧 편집이라 드래그 층을 쓴다.
     @ViewBuilder
     private func touchLayer(in size: CGSize) -> some View {
-        if model.tool.usesCanvasTouch, !model.blocksCanvasTouch {
+        if model.tool.usesCanvasTouch, !model.blocksCanvasTouch, model.tool.selectsTargetByTap {
+            Color.clear.contentShape(Rectangle())
+                .gesture(
+                    SpatialTapGesture().onEnded { value in
+                        guard size.width > 0, size.height > 0 else { return }
+                        let point = Self.normalized(value.location, in: size)
+                        model.touch(from: point, to: point)
+                    })
+        } else if model.tool.usesCanvasTouch, !model.blocksCanvasTouch {
             Color.clear.contentShape(Rectangle())
                 .gesture(
                     DragGesture(minimumDistance: 0).onChanged { _ in
@@ -130,18 +140,21 @@ struct PhotoCanvasView: View {
                         isDragging = false
                         dragSawPinch = false
                         guard !pinched, size.width > 0, size.height > 0 else { return }
-                        func normalized(_ point: CGPoint) -> NormalizedPoint {
-                            NormalizedPoint(
-                                x: max(0, min(1, point.x / size.width)), y: max(0, min(1, 1 - point.y / size.height)))
-                        }
                         #if os(macOS)
                             if model.tool == .retouch, NSEvent.modifierFlags.contains(.option) {
                                 model.resetCloneSource()
                             }
                         #endif
-                        model.touch(from: normalized(value.startLocation), to: normalized(value.location))
+                        model.touch(
+                            from: Self.normalized(value.startLocation, in: size),
+                            to: Self.normalized(value.location, in: size))
                     })
         }
+    }
+
+    /// 이미지 위 점(원점 왼쪽 위)을 정규화·원점 왼쪽 아래로 바꾼다.
+    private static func normalized(_ point: CGPoint, in size: CGSize) -> NormalizedPoint {
+        NormalizedPoint(x: max(0, min(1, point.x / size.width)), y: max(0, min(1, 1 - point.y / size.height)))
     }
 
     private func recoveryActions(_ message: String) -> some View {

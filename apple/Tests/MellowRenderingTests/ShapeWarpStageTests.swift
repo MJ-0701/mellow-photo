@@ -21,7 +21,9 @@ final class ShapeWarpStageTests: XCTestCase {
     ) -> RenderContext {
         var recipe = EditRecipe()
         recipe.portrait.face = face
-        recipe.portrait.targetFace = targetFace
+        if let targetFace {
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
         return RenderContext(extent: extent, recipe: recipe, faces: faces, tuning: tuning)
     }
 
@@ -33,7 +35,9 @@ final class ShapeWarpStageTests: XCTestCase {
         var recipe = EditRecipe()
         recipe.body = body
         recipe.portrait.face = face
-        recipe.portrait.targetFace = targetFace
+        if let targetFace {
+            recipe = Support.restricted(recipe, toFace: targetFace, of: faces)
+        }
         let analysis = PhotoAnalysis(faces: faces, bodies: bodies, bodyAnalysisFailure: bodyAnalysisFailure)
         return RenderContext(extent: extent ?? self.extent, recipe: recipe, analysis: analysis, tuning: tuning)
     }
@@ -288,5 +292,23 @@ final class ShapeWarpStageTests: XCTestCase {
             let shift = try markerShift(at: side, in: targeted)
             XCTAssertGreaterThan(abs(shift.dx), 3, "얼굴 \(target)을 골라도 허리가 움직인다")
         }
+    }
+
+    func testIndividualFaceShapeMakesPrimitivesOnlyForThatFace() throws {
+        let leftFace = SyntheticFace.make().face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25))
+        let rightFace = SyntheticFace.make().face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25))
+        var recipe = EditRecipe()
+        recipe.people.individuals = [
+            PersonRecord(anchor: PersonAnchor(faceBox: leftFace.boundingBox), layer: PortraitLayer(face: [.width: -1]))
+        ]
+        let individual = RenderContext(
+            extent: SyntheticFace.extent, recipe: recipe, faces: [leftFace, rightFace], tuning: RenderTuning())
+        let legacy = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace], targetFace: 0)
+        let stage = ShapeWarpStage()
+        let fromIndividual = stage.facePrimitives(in: individual)
+        XCTAssertGreaterThan(fromIndividual.count, 0)
+        XCTAssertEqual(fromIndividual, stage.facePrimitives(in: legacy), "이행한 옛 대상 얼굴과 같은 원소")
+        let everyone = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace])
+        XCTAssertEqual(stage.facePrimitives(in: everyone).count, fromIndividual.count * 2)
     }
 }

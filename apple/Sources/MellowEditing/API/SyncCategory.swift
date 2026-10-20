@@ -1,6 +1,7 @@
 import MellowShared
 
-/// "전체 사진에 적용"이 복사할 수 있는 항목. 레시피 그룹과의 대응과 잠금·대상 얼굴 규칙은 EditDocument.applyFromBatch에 있다.
+/// "전체 사진에 적용"이 복사할 수 있는 항목.
+/// 레시피 그룹과의 대응과 잠금·개인 층 규칙은 EditDocument.applyFromBatch에 있다.
 public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     /// 색감 + 디테일.
     case color
@@ -18,12 +19,29 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
 
     public var id: Self { self }
     public static let all = Set(allCases)
+    /// 원터치가 묶는 키를 담는 항목.
+    /// 몸 피부 밝기는 전체 층 표시에 묶인다.
+    /// 넷을 모두 복사할 때만 oneTouch 표시를 복사한다.
+    public static let oneTouchCategories: Set<SyncCategory> = [.skin, .features, .makeup, .bodySkin]
 
-    /// 얼굴에 의존하는 항목. 하나라도 복사하면 잠기지 않은 사진의 대상 얼굴을 전체로 되돌린다.
+    /// 얼굴에 의존하는 항목.
+    /// 복사하면 받는 사진의 개인 층에서 그 항목의 키를 지운다.
     public var dependsOnFaces: Bool {
         switch self {
         case .skin, .faceShape, .features, .makeup: return true
         case .color, .effects, .background, .body, .bodySkin: return false
+        }
+    }
+
+    /// 이 항목이 층에서 다루는 키.
+    /// 얼굴 의존 항목만 값이 있다.
+    public var portraitKeys: Set<PortraitKey>? {
+        switch self {
+        case .skin: return PortraitKey.skin
+        case .faceShape: return PortraitKey.faceShape
+        case .features: return PortraitKey.features
+        case .makeup: return PortraitKey.makeup
+        case .color, .effects, .background, .body, .bodySkin: return nil
         }
     }
 }

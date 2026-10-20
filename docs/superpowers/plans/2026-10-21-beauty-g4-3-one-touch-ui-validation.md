@@ -210,8 +210,8 @@ Run: Mac 앱 테스트 → 컴파일 실패(`applyOneTouch` 없음).
         let value = strength ?? oneTouchStrength ?? EditingPolicy.oneTouchDefaultStrength
         switch beautyTarget {
         case .face(let index):
-            guard let anchor = anchor(forFace: index) else { return }
-            mutateSelected { $0.applyOneTouch(strength: value, forPersonAt: anchor) }
+            let boxes = faces.map(\.boundingBox)
+            mutateSelected { $0.applyOneTouch(strength: value, forFace: index, of: boxes) }
         default:
             guard let scope = scope(for: beautyTarget) else { return }
             mutateSelected { $0.applyOneTouch(strength: value, in: scope) }
@@ -301,9 +301,9 @@ Run: Mac 앱 테스트 → 컴파일 실패(`OneTouchRow` 없음).
     static let oneTouchTag = "원터치"
     static let strengthUnset = "—"
     static let detailAdjustments = "세부 조정"
-    static let oneTouchHintAll = "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요."
-    static let oneTouchHintGroup = "이 그룹의 표만 다시 써요. 다른 그룹과 전체는 그대로예요."
-    static let oneTouchHintPerson = "이 사람에게 지정한 성별의 표를 써요. 미지정이면 공통 표예요."
+    static let oneTouchHintAll = "성별을 지정한 사람은 성별 표, 나머지는 공통 표로 보정돼요. 그룹 값(립·블러셔 포함)이 전체보다 앞서요."
+    static let oneTouchHintGroup = "이 그룹 표만 다시 써요. 다른 층과 몸 피부는 그대로예요."
+    static let oneTouchHintPerson = "이 사람의 성별 표로 보정해요. 몸 피부는 그대로예요."
     static let assignGenderForOneTouch = "성별을 지정하면 남녀가 다르게 보정돼요"
 ```
 

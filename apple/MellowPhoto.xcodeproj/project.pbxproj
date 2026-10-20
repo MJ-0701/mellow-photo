@@ -17,6 +17,7 @@
 		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
 		1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F465BA3A1339352022E907AA /* AppModel+Live.swift */; };
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
+		25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */; };
 		281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */; };
 		2986031DF20FD411A4677470 /* EditorScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C781535D14BC45ED308E3C /* EditorScene.swift */; };
 		2A655FCF4910A8E8A22BEA34 /* CompareDividerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */; };
@@ -26,6 +27,7 @@
 		3767C6140008302C2C497B32 /* CropOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */; };
 		3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */; };
 		3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFA6571D26629D5ED075E50 /* ToolStrip.swift */; };
+		3BF956860D2433E83A0582EB /* OneTouchRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */; };
 		3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */; };
 		3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */ = {isa = PBXBuildFile; productRef = 213FE2825489D6DA1E427B12 /* MellowRendering */; };
 		48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0604580F74993079C348EBA /* MellowPhotoApp.swift */; };
@@ -41,6 +43,7 @@
 		61873CD9B42105AA437C882A /* LookPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB3268705F4B92286899B4B /* LookPanel.swift */; };
 		676C118D9E438D7EE534C2F1 /* PresetSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A03AC7B91F35D1BE3DDBF0BB /* PresetSheet.swift */; };
 		745E7956E0512754CD7DA628 /* AdjustmentSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2538784DB91D254D98C9CA /* AdjustmentSlider.swift */; };
+		7BA8C67978B43E2CE303C831 /* TargetChipsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */; };
 		7BFDD642D98C57752A53D502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E1DB811347F53AB847DE61D2 /* Assets.xcassets */; };
 		7C24BB3E8309788DE6994157 /* ExportMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AC98B66372F456AF761759B /* ExportMenu.swift */; };
 		81E9E3535322C86715B77D38 /* AppModel+Geometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */; };
@@ -54,6 +57,7 @@
 		94DCFD6C43D5566F3B20C7F3 /* LegacyMacPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */; };
 		993A4E12BFC546B09EB5A44E /* AppModel+Editing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D41FC59ED8903FB97642854A /* AppModel+Editing.swift */; };
 		9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */; };
+		9CCACC56A441C098938B6042 /* TargetChips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */; };
 		A6638DE9800F8B3C5FA0B8B6 /* makeup.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 9D32CC590745242241C9A2F3 /* makeup.v1.json */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
@@ -99,6 +103,7 @@
 
 /* Begin PBXFileReference section */
 		022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCanvasView.swift; sourceTree = "<group>"; };
+		0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchRow.swift; sourceTree = "<group>"; };
 		0AFA6571D26629D5ED075E50 /* ToolStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolStrip.swift; sourceTree = "<group>"; };
 		0CC7503240254DB929DE6204 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotosTests.swift; sourceTree = "<group>"; };
@@ -108,6 +113,7 @@
 		14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		205D153168A529D037BF40EE /* ThumbnailCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCell.swift; sourceTree = "<group>"; };
 		22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresets.swift; sourceTree = "<group>"; };
+		2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetChipsTests.swift; sourceTree = "<group>"; };
 		2F0DE03B3D7090AE3713F35C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		370CF7443944DB02164CF8DD /* RenderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderScheduler.swift; sourceTree = "<group>"; };
 		39A51E7E5ED431D27897013E /* EditorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorScenarioTests.swift; sourceTree = "<group>"; };
@@ -139,6 +145,7 @@
 		ADD5E80F3B80B364E7019C06 /* StatusBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBar.swift; sourceTree = "<group>"; };
 		B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackgroundPanel.swift; sourceTree = "<group>"; };
 		BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPhotoImporter.swift; sourceTree = "<group>"; };
+		BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetChips.swift; sourceTree = "<group>"; };
 		BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoPickerButton.swift; sourceTree = "<group>"; };
 		BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemPhotoImporterTests.swift; sourceTree = "<group>"; };
 		BD2538784DB91D254D98C9CA /* AdjustmentSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdjustmentSlider.swift; sourceTree = "<group>"; };
@@ -147,6 +154,7 @@
 		C329A06E195C3E422C0EFF76 /* SyncMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMenu.swift; sourceTree = "<group>"; };
 		C4711AEF3097752E578444CB /* ImportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotos.swift; sourceTree = "<group>"; };
 		CDC8069CC675408C9A682CA6 /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
+		CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchRowTests.swift; sourceTree = "<group>"; };
 		CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayTests.swift; sourceTree = "<group>"; };
 		D0604580F74993079C348EBA /* MellowPhotoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MellowPhotoApp.swift; sourceTree = "<group>"; };
 		D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTool.swift; sourceTree = "<group>"; };
@@ -271,8 +279,10 @@
 				C0C781535D14BC45ED308E3C /* EditorScene.swift */,
 				3FB3268705F4B92286899B4B /* LookPanel.swift */,
 				119D17BD418BDE81F1E2622E /* MakeupPanel.swift */,
+				0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
 				C329A06E195C3E422C0EFF76 /* SyncMenu.swift */,
+				BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */,
 				0AFA6571D26629D5ED075E50 /* ToolStrip.swift */,
 			);
 			path = Editor;
@@ -312,8 +322,10 @@
 				5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */,
 				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
 				FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */,
+				CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */,
 				6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */,
 				BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */,
+				2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */,
 				E4447CFE328C5B08BDB9982E /* TestEnvironmentTests.swift */,
 				0CC7503240254DB929DE6204 /* TestSupport.swift */,
 			);
@@ -549,8 +561,10 @@
 				E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */,
 				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
 				5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */,
+				25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */,
 				102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */,
 				865DD46860E65C891D8D186C /* SystemPhotoImporterTests.swift in Sources */,
+				7BA8C67978B43E2CE303C831 /* TargetChipsTests.swift in Sources */,
 				00F4C33BE606D515F9ED95B7 /* TestEnvironmentTests.swift in Sources */,
 				8D84CF1378E138B0D0E29826 /* TestSupport.swift in Sources */,
 			);
@@ -591,6 +605,7 @@
 				61873CD9B42105AA437C882A /* LookPanel.swift in Sources */,
 				F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */,
 				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
+				3BF956860D2433E83A0582EB /* OneTouchRow.swift in Sources */,
 				CF26FC52CE99423A4017446D /* PhotoCanvasView.swift in Sources */,
 				BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */,
 				3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */,
@@ -601,6 +616,7 @@
 				D7785F99F50B89FFF24DB692 /* StatusBar.swift in Sources */,
 				F45D6414E50067A97D199532 /* SyncMenu.swift in Sources */,
 				3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */,
+				9CCACC56A441C098938B6042 /* TargetChips.swift in Sources */,
 				F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */,
 				FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */,
 				3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */,

@@ -96,6 +96,12 @@ public struct RenderTuning: Sendable {
     public var shapeDisplacementLimit: Double = 0.25
     /// |yaw|가 이보다 크면 얼굴형 이동을 cos(|yaw|) / cos(이 값)으로 줄인다(스펙 0.35rad ≈ 20°). 이 값에서 1이라 끊기지 않는다.
     public var faceShapeYawThreshold: Double = 0.35
+    /// 성별 추정을 받아들이는 최소 신뢰도.
+    public var genderMinConfidence: Double = 0.75
+    /// 정규화 얼굴 상자 폭(이미지 폭 비율)이 이 미만이면 추정하지 않는다.
+    public var genderMinFaceWidth: Double = 0.05
+    /// |yaw|(라디안)가 이보다 큰 얼굴은 추정하지 않는다.
+    public var genderMaxYaw: Double = 0.6
     /// 얼굴 폭 ±1에서 한쪽 윤곽을 미는 양. 얼굴 폭 비율. 같은 쪽 점 수로 나눠 겹치므로 실효 최대는 약 0.034
     /// (140mm 얼굴에서 약 5mm)이고 B0 얼굴 미세 조정(0.035)과 비슷하다.
     public var faceWidthMaxShift: Double = 0.06

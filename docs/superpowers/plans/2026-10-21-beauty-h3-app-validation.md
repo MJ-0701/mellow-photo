@@ -31,8 +31,8 @@
 | 생성 사진은 5장(커플 2·단체 3)을 목표로 하고, 눈 확인을 통과한 것만 남긴다. 시나리오 테스트는 `couple-01`·`group-01`만 쓴다 | 스펙 최소(커플 1·단체 1)를 넘기되 저장소 5 MB 상한 안. 두 장만 테스트 타깃에 복사 | 작음 |
 | Vision이 라벨과 다른 얼굴 수를 내는 사진은 다시 만들거나 다른 사진으로 바꾼다. 테스트 단언을 약하게 하지 않는다 | 시나리오 테스트의 "얼굴 수 = 라벨 인원"은 사진의 쓸모를 보증하는 최소 조건 | 작음 |
 | 칩 순서: 전체 · 남성 · 여성 · 사람 1…n(왼쪽부터) · 찾지 못한 기록(경고 아이콘). 사람 칩 라벨은 번호이고 성별 아이콘(`person`·`person.fill`·물음표)과 덮어쓰기 점을 붙인다 | 글자가 짧아 iPhone 폭에 맞고, 성별·덮어씀 상태가 한눈에 보인다 | 작음 |
-| 성별 메뉴·초기화·연결·삭제는 칩의 `contextMenu`(iPhone은 길게 누르기)이고, 선택된 사람 칩에는 메뉴 단추(…)를 따로 둔다 | 길게 누르기를 모르는 사용자도 단추로 열 수 있다 | 작음 |
-| 찾은 얼굴에 기록이 없을 때 "이 사람"에 룩을 적용하면 기록을 만들며 룩을 쓴다(`applyMakeupLook(_:forPersonAt:)`, 체크포인트 한 번) | H2 Task 5의 임시 안내 문구를 없애고 스펙 "룩 적용은 체크포인트 한 번"을 지킨다. MellowEditing에 메서드 하나를 더한다 | 작음 |
+| 성별 메뉴·초기화·연결·삭제는 칩의 `contextMenu`(iPhone은 길게 누르기)이고, 선택된 사람 칩에는 메뉴 단추를 따로 둔다(H3 리뷰 변경: 단추는 "…"가 아니라 현재 성별이 보이는 "성별: 미지정 ⌄" 글자 단추) | 길게 누르기를 모르는 사용자도 단추로 열 수 있다 | 작음 |
+| 찾은 얼굴에 기록이 없을 때 "이 사람"에 룩을 적용하면 기록을 만들며 룩을 쓴다(`applyMakeupLook(_:forFace:of:)`, 체크포인트 한 번, 짝짓기는 렌더와 같음 — H2 구현 중 변경) | H2 Task 5의 임시 안내 문구를 없애고 스펙 "룩 적용은 체크포인트 한 번"을 지킨다. MellowEditing에 메서드 하나를 더한다 | 작음 |
 | 캔버스 탭은 뷰티·메이크업 도구에서 탭 위치가 든 가장 작은 얼굴 상자를 고르고, 어느 얼굴도 아니면 전체로 돌아간다 | 겹친 얼굴에서 앞사람(작은 상자)이 우선 | 작음 |
 | 슬라이더 덮어쓰기 표시는 제목 앞 작은 점(강조색)과 컨텍스트 메뉴 "재설정"(Mac은 제목 옆 x 단추). 상속 중인 값은 평소 모양 | 덮어쓴 것만 눈에 띄게 | 작음 |
 | 생성 사진 README의 사용 조건은 "저장소 안 테스트·데모·수동 확인용, 가상 인물, 권리는 OpenAI 이용 약관에 따름(최종 확인은 사용자)" | 약관 해석은 에이전트가 단정하지 않는다 | 작음 |
@@ -75,7 +75,7 @@ struct PeopleLabels: Decodable { version: Int; photos: [Photo]; struct Photo { f
     struct Person { gender: String; ageBand: String; glasses: Bool; pose: String; occlusion: String; ambiguous: Bool } }
 
 // MellowEditing (Task 2)
-EditDocument.applyMakeupLook(_ look: MakeupLook?, forPersonAt anchor: PersonAnchor)   // 기록이 없으면 만들며 적용, 체크포인트 한 번
+EditDocument.applyMakeupLook(_ look: MakeupLook?, forFace index: Int, of faces: [NormalizedRect])   // 기록이 없으면 만들며 적용, 체크포인트 한 번
 
 // 앱 (Task 2)
 AppModel.PhotoInfo.genders: [Gender?]
@@ -294,7 +294,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ### Task 2: AppModel — 칩 모델, 성별 지정, 재설정, 연결·삭제, 캔버스 얼굴 탭, legacy 연결
 
 **Files:**
-- Modify: `apple/Sources/MellowEditing/API/EditDocument.swift` (`applyMakeupLook(_:forPersonAt:)`)
+- Modify: `apple/Sources/MellowEditing/API/EditDocument.swift` (`applyMakeupLook(_:forFace:of:)`)
 - Modify: `apple/MellowPhoto/Application/AppModel.swift`, `AppModel+Editing.swift`, `AppModel+Library.swift`
 - Modify: `apple/MellowPhotoTests/TestSupport.swift`
 - Test: `apple/Tests/MellowEditingTests/EditDocumentTests.swift`, `apple/MellowPhotoTests/AppModelTests.swift`
@@ -308,6 +308,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 `EditDocumentTests.swift` 끝에 추가:
 
 ```swift
+    // twoFaces는 H2가 EditDocumentTests에 둔 두 얼굴 상자(중심 x 0.3·0.7)다.
     func testLookForAFaceWithoutARecordCreatesItInOneStep() {
         let look = MakeupLook(
             id: "daily", name: "데일리", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
@@ -315,12 +316,12 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
             eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.2), brow: MakeupStrength(intensity: 0.4),
             contour: MakeupStrength(intensity: 0.1))
         var document = EditDocument()
-        document.applyMakeupLook(look, forPersonAt: faceAnchor)
+        document.applyMakeupLook(look, forFace: 0, of: twoFaces)
         XCTAssertEqual(document.undoStack.count, 1)
         XCTAssertEqual(document.recipe.people.individuals.count, 1)
         XCTAssertEqual(document.recipe.people.individuals[0].layer.makeupLookID, "daily")
         XCTAssertEqual(document.recipe.people.individuals[0].layer.makeup[.lip], MakeupTint(colorID: "lip-coral", intensity: 0.5))
-        document.applyMakeupLook(look, forPersonAt: faceAnchor)
+        document.applyMakeupLook(look, forFace: 0, of: twoFaces)
         XCTAssertEqual(document.undoStack.count, 1, "같은 룩은 단계를 만들지 않는다")
         document.undo()
         XCTAssertTrue(document.recipe.people.individuals.isEmpty)
@@ -484,7 +485,9 @@ struct StubGenderEstimator: GenderEstimator {
         try await importOne(model, staged)
         let strayID = PersonID()
         model.session.edit(model.session.photos[0].id) { document in
-            document.set(.skinSmoothing(0.8), forPersonAt: PersonAnchor(x: 0.5, y: 0.97, width: 0.03))
+            // 사진의 어느 얼굴과도 짝이 되지 않는 상자(중심 0.5·0.97, 폭 0.03)에 기록을 만든다.
+            let stray = NormalizedRect(x: 0.485, y: 0.955, width: 0.03, height: 0.03)
+            document.set(.skinSmoothing(0.8), forFace: 0, of: [stray])
             return nil
         }
         let stray = try XCTUnwrap(model.currentRecipe.people.individuals.first)
@@ -520,17 +523,23 @@ struct StubGenderEstimator: GenderEstimator {
 
 - [ ] **Step 2: 실패 확인**
 
-Run: Mac 앱 테스트 → 컴파일 실패(`personChips` 없음). `cd apple && swift test --filter EditDocumentTests` → 컴파일 실패(`applyMakeupLook(_:forPersonAt:)` 없음).
+Run: Mac 앱 테스트 → 컴파일 실패(`personChips` 없음). `cd apple && swift test --filter EditDocumentTests` → 컴파일 실패(`applyMakeupLook(_:forFace:of:)` 없음).
 
 - [ ] **Step 3: 구현**
 
 `EditDocument.swift`에 추가:
 
 ```swift
-    /// anchor의 사람에게 룩을 적용한다. 기록이 없으면 만들며 적용한다(체크포인트 한 번). 같은 값이면 아무것도 하지 않는다.
-    public mutating func applyMakeupLook(_ look: MakeupLook?, forPersonAt anchor: PersonAnchor) {
+    /// faces[index]와 짝이 된 사람에게 룩을 적용한다.
+    /// 기록이 없으면 그 얼굴 anchor로 만들며 적용한다(체크포인트 한 번).
+    /// 짝짓기는 set(_:forFace:of:)·렌더와 같다.
+    /// 같은 값이면 아무것도 하지 않는다.
+    public mutating func applyMakeupLook(_ look: MakeupLook?, forFace faceIndex: Int, of faces: [NormalizedRect]) {
+        guard faces.indices.contains(faceIndex) else { return }
         var updated = recipe
-        let id = updated.people.personID(at: anchor) ?? Self.appendPerson(at: anchor, to: &updated)
+        let id =
+            updated.people.personID(forFace: faceIndex, of: faces)
+            ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[faceIndex]), to: &updated)
         guard var layer = PortraitResolver.layer(updated, scope: .person(id)) else { return }
         let adjustments = look?.adjustments ?? MakeupAdjustments()
         for part in MakeupPart.allCases {
@@ -678,7 +687,7 @@ Run: Mac 앱 테스트 → 컴파일 실패(`personChips` 없음). `cd apple && 
     }
 ```
 
-`applyMakeupLook(id:)`를 대상별로 바꾼다: `.face(index)`면 `document.applyMakeupLook(look, forPersonAt: anchor)`, 그 외는 `document.applyMakeupLook(look, in: scope(for: beautyTarget) ?? .all)`. H2 Task 5의 `pickASliderFirst` 분기와 문구를 지운다.
+`applyMakeupLook(id:)`를 대상별로 바꾼다: `.face(index)`면 `document.applyMakeupLook(look, forFace: index, of: faces.map(\.boundingBox))`, 그 외는 `document.applyMakeupLook(look, in: scope(for: beautyTarget) ?? .all)`. H2 Task 5의 `pickASliderFirst` 분기와 문구를 지운다.
 
 `touch(from:to:)`의 `switch tool`에 `.beauty, .makeup` 분기를 추가하고 `case .look, .crop, .adjust, .body, .background: return`으로 나머지를 정리한다:
 
@@ -818,7 +827,7 @@ Run: Mac 앱 테스트 → 컴파일 실패(`TargetChips` 없음).
     static let removePerson = "삭제"
     static let scopeHintGroup = "전체 값을 바탕으로 이 그룹에서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
     static let scopeHintPerson = "전체·그룹 값을 바탕으로 이 사람에게서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
-    static let assignGenderHint = "성별을 지정하면 그 그룹의 값이 함께 적용돼요. 자동 추정이 틀리면 여기서 고칠 수 있어요."
+    static let assignGenderHint = "성별을 지정하면 그 그룹 값이 함께 적용돼요. 위의 성별 단추에서 지정해요."
 
     static func personOrdinal(_ number: Int) -> String { "사람 \(number)" }
     static func genderTitle(_ gender: Gender?) -> String {
@@ -1101,7 +1110,7 @@ Run: Mac 앱 테스트 → `Executed 85 tests, with 0 failures`.
 
 `docs/architecture/modules.md`:
 - MellowShared 공개 API에 `Gender`, `PersonID`, `PersonAnchor`, `PortraitKey`, `PortraitLayer`, `PersonRecord`, `PeopleAdjustments`, `PortraitScope`, `PortraitResolver`, `PersonMatcher`, `PersonMatching` 추가. 규칙에 "H 레시피 `people`(성별 그룹 층 둘·개인 기록, 성긴 층은 있는 키만 덮어씀, 메이크업은 부위 단위), 전체 → 그룹 → 개인 해석은 `PortraitResolver` 한 곳, 사람 짝짓기는 `PersonMatcher`(anchor 거리 ≤ 폭 50%·크기 비 ≤ 2, 1:1 탐욕, legacyIndex 폴백) 한 곳, `portrait.targetFace`는 읽기 전용이고 `people`이 없을 때 개인 층(`legacyIndex`, 결정적 `PersonID.legacy`)으로 이행, 프리셋은 `people.groups`만" 추가.
-- MellowEditing 공개 API 그대로(`EditChange.gender` 케이스 추가 언급). 규칙에 "얼굴 의존 변경은 `set(_:in:)`·`set(_:forPersonAt:)`로 층을 가리킴(같은 클램프), 빈 기록은 변경 뒤 제거, 성별 변경·얼굴형 키 재설정·얼굴형 키가 든 기록의 연결·삭제는 수동 편집 잠금 대상, `resetOverrides`는 상속으로(전체는 기본값으로), 프리셋·동기화는 전체·그룹 층만 나르고 동기화한 얼굴 의존 항목의 개인 키를 지움, 룩은 `applyMakeupLook(_:in:)`·`(_:forPersonAt:)`" 추가. 기존 "일괄 적용하면 대상 얼굴을 모든 얼굴로 되돌림" 문장은 위 문장으로 대체.
+- MellowEditing 공개 API 그대로(`EditChange.gender` 케이스 추가 언급). 규칙에 "얼굴 의존 변경은 `set(_:in:)`·`set(_:forFace:of:)`로 층을 가리킴(얼굴의 사람은 렌더와 같은 전역 짝짓기)(같은 클램프), 빈 기록은 변경 뒤 제거, 성별 변경·얼굴형 키 재설정·얼굴형 키가 든 기록의 연결·삭제는 수동 편집 잠금 대상, `resetOverrides`는 상속으로(전체는 기본값으로), 프리셋·동기화는 전체·그룹 층만 나르고 동기화한 얼굴 의존 항목의 개인 키를 지움, 룩은 `applyMakeupLook(_:in:)`·`(_:forFace:of:)`" 추가. 기존 "일괄 적용하면 대상 얼굴을 모든 얼굴로 되돌림" 문장은 위 문장으로 대체.
 - MellowRendering 공개 API에 `FaceTarget`, `GenderEstimator`, `GenderEstimate` 추가. 규칙에 "`RenderContext.faceTargets`가 얼굴마다 해석한 값이고 `skin`·`feature`·`makeup`·`shapeWarp`가 그 목록을 돎(자동 잡티도 사람별), `GenderEstimator`는 포트만(기본 nil = 모두 미지정), 추정은 준비 때 신뢰도 0.75·얼굴 폭 5%·yaw 0.6rad 임계값을 거쳐 `PhotoAnalysis.genderEstimates`에 두고 영속화하지 않음, 수동 지정이 추정을 이김" 추가. 테스트 목록에 H 항목 요약(얼굴별 값, 그룹·개인, 짝 없는 기록, 임계값, 생성 사진 세트 검사).
 - 앱 타깃: `AppModel.BeautyTarget`·`PersonChip`, `TargetChips`·`PersonGenderMenu`, "대상은 사진별 세션 상태(저장 안 함)", 캔버스 탭(뷰티·메이크업).
 - 검증 절은 그대로(의존성 표 불변).
@@ -1136,6 +1145,6 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ## 자체 검토 결과
 
 - **스펙 대조:** §1.6 → `BeautyTarget` 라우팅(H2)·`PhotoInfo.genders`·legacy 연결·`personChips`·`TargetChips`·`PersonGenderMenu`·슬라이더 덮어쓰기 표시·`scopedValues`·`overriddenKeys`·`faceAvailability`·캔버스 탭·`UserMessage`·`Theme`(Task 2·3). §2 앱·시나리오 행 → Task 2·3·4. §3 생성 사진 세트(도구·구성·프롬프트 제약·눈 확인·파일·라벨 형식·용도·Vision 불일치 처리) → Task 1. §4 VALIDATION 항목 → Task 4. §5 → H3 "4 Task"와 같다.
-- **타입 일관성:** `PeopleFixtures.url`·`labels`·`sharedFolder`, `PeopleLabels`, `StubGenderEstimator`(앱 테스트), `TestSupport.makeModel(genderEstimator:)`, `EditDocument.applyMakeupLook(_:forPersonAt:)`, `AppModel.PhotoInfo.genders`·`GenderSource`·`PersonChip`·`personMatches`·`personChips`·`effectiveGender(forFace:)`·`genderSource(forFace:)`·`scopedValues`·`overriddenKeys`·`setGender`·`resetOverrides`·`rebindPerson(_:toFace:)`·`removePerson`, `EditorTool.usesCanvasTouch`, `TargetChips.title`·`symbolName`·`accessibilityLabel`·`statusLine`, `PersonGenderMenu`, `AdjustmentSlider(isOverridden:onReset:)`, `UserMessage.targetLabel`·`targetAll`·`genderTitle`·`groupTitle`·`personOrdinal`·`genderEstimated`·`genderManual`·`overrideReset`·`resetScope`·`personUnmatched`·`rebindPerson`·`rebindToFace`·`removePerson`·`scopeHint(for:)`·`scopeHintGroup`·`scopeHintPerson`·`assignGenderHint`·`overriddenCount`, `Theme.targetChipHeight`·`targetChipPadding`·`overrideDotSize`를 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: 패키지 403 → 405(T1) → 406(T2) → 406 → 406, 앱 Mac 78 → 78(T1) → 82(T2) → 84(T3) → 85(T4).
+- **타입 일관성:** `PeopleFixtures.url`·`labels`·`sharedFolder`, `PeopleLabels`, `StubGenderEstimator`(앱 테스트), `TestSupport.makeModel(genderEstimator:)`, `EditDocument.applyMakeupLook(_:forFace:of:)`, `AppModel.PhotoInfo.genders`·`GenderSource`·`PersonChip`·`personMatches`·`personChips`·`effectiveGender(forFace:)`·`genderSource(forFace:)`·`scopedValues`·`overriddenKeys`·`setGender`·`resetOverrides`·`rebindPerson(_:toFace:)`·`removePerson`, `EditorTool.usesCanvasTouch`, `TargetChips.title`·`symbolName`·`accessibilityLabel`·`statusLine`, `PersonGenderMenu`, `AdjustmentSlider(isOverridden:onReset:)`, `UserMessage.targetLabel`·`targetAll`·`genderTitle`·`groupTitle`·`personOrdinal`·`genderEstimated`·`genderManual`·`overrideReset`·`resetScope`·`personUnmatched`·`rebindPerson`·`rebindToFace`·`removePerson`·`scopeHint(for:)`·`scopeHintGroup`·`scopeHintPerson`·`assignGenderHint`·`overriddenCount`, `Theme.targetChipHeight`·`targetChipPadding`·`overrideDotSize`를 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: 패키지 403 → 405(T1) → 406(T2) → 406 → 406, 앱 Mac 78 → 78(T1) → 82(T2) → 84(T3) → 85(T4).
 - **Review Focus 매핑:** 1→Task 4, 2→Task 2, 3→Task 2, 4→Task 2, 5→Task 2, 6→Task 1. 모두 테스트 코드가 있다.
 - **플레이스홀더 점검:** Task 1의 라벨 JSON `…`과 커밋 메시지의 `<사진별 …>`·`<N>`은 실제 생성 결과로 채우는 자리이며 그렇게 명시했다. 그 밖에 "TBD/TODO/나중에" 없음.

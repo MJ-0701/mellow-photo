@@ -16,11 +16,14 @@ public struct PreparedPhoto: Sendable {
     public let hasBody: Bool
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public let bodyAnalysisFailure: MellowError?
+    /// 임계값을 통과한 추정 성별.
+    /// 얼굴과 같은 길이이거나 빈 배열이다.
+    public let genders: [Gender?]
 
     public init(
         pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
         hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil, hasBody: Bool = false,
-        bodyAnalysisFailure: MellowError? = nil
+        bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = []
     ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
@@ -30,6 +33,7 @@ public struct PreparedPhoto: Sendable {
         self.personAnalysisFailure = personAnalysisFailure
         self.hasBody = hasBody
         self.bodyAnalysisFailure = bodyAnalysisFailure
+        self.genders = genders
     }
 }
 
@@ -51,6 +55,7 @@ public actor PhotoPipeline {
     private let analyzer: any FaceAnalyzer
     private let personAnalyzer: (any PersonAnalyzer)?
     private let bodyAnalyzer: (any BodyAnalyzer)?
+    private let genderEstimator: (any GenderEstimator)?
     private let tuning: RenderTuning
     private let lookCatalog: LookCatalog
     private let makeupCatalog: MakeupCatalog
@@ -59,15 +64,17 @@ public actor PhotoPipeline {
     private var cache: PreviewCache
 
     /// personAnalyzer·bodyAnalyzer가 nil이면 그 분석을 하지 않는다(사람 없음과 같다). 앱은 Vision 구현을 넘긴다.
+    /// genderEstimator가 nil이면 모든 얼굴의 추정 성별이 미지정이다.
     /// makeupCatalog가 비어 있으면 색을 고르는 메이크업 부위만 빠진다.
     public init(
         analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil,
-        bodyAnalyzer: (any BodyAnalyzer)? = nil, tuning: RenderTuning, lookCatalog: LookCatalog = .empty,
-        makeupCatalog: MakeupCatalog = .empty
+        bodyAnalyzer: (any BodyAnalyzer)? = nil, genderEstimator: (any GenderEstimator)? = nil, tuning: RenderTuning,
+        lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty
     ) {
         self.analyzer = analyzer
         self.personAnalyzer = personAnalyzer
         self.bodyAnalyzer = bodyAnalyzer
+        self.genderEstimator = genderEstimator
         self.tuning = tuning
         self.lookCatalog = lookCatalog
         self.makeupCatalog = makeupCatalog
@@ -101,10 +108,11 @@ public actor PhotoPipeline {
         }
         let person = analyzePerson(in: preview)
         let body = analyzeBodies(in: preview)
+        let genders = estimateGenders(in: preview, faces: faces)
         let analysis = PhotoAnalysis(
             faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces),
             personMask: person.mask, personAnalysisFailure: person.failure, bodies: body.bodies,
-            bodyAnalysisFailure: body.failure)
+            bodyAnalysisFailure: body.failure, genderEstimates: genders)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
         entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
@@ -114,7 +122,7 @@ public actor PhotoPipeline {
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
             hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable != nil,
-            bodyAnalysisFailure: body.failure)
+            bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender })
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.
@@ -197,6 +205,29 @@ public actor PhotoPipeline {
             return (nil, error)
         } catch {
             return (nil, .personAnalysisUnavailable(reason: error.localizedDescription))
+        }
+    }
+
+    /// 추정 실패는 준비를 막지 않는다.
+    /// 추정은 보조 정보라 실패 사유도 남기지 않고 모든 얼굴을 미지정으로 둔다.
+    private func estimateGenders(in image: CIImage, faces: [FaceGeometry]) -> [GenderEstimate?] {
+        guard let genderEstimator, !faces.isEmpty else { return Array(repeating: nil, count: faces.count) }
+        let raw = (try? genderEstimator.estimate(image, faces: faces)) ?? []
+        return Self.acceptedEstimates(raw, faces: faces, tuning: tuning)
+    }
+
+    /// 임계값(신뢰도·얼굴 폭·yaw)을 적용한다.
+    /// 길이가 얼굴 수와 다르면 모두 nil이다.
+    /// yaw를 모르는 얼굴은 정면으로 본다.
+    public static func acceptedEstimates(_ estimates: [GenderEstimate?], faces: [FaceGeometry], tuning: RenderTuning)
+        -> [GenderEstimate?]
+    {
+        guard estimates.count == faces.count else { return Array(repeating: nil, count: faces.count) }
+        return zip(estimates, faces).map { estimate, face in
+            guard let estimate, estimate.confidence >= tuning.genderMinConfidence,
+                face.boundingBox.width >= tuning.genderMinFaceWidth, abs(face.yaw ?? 0) <= tuning.genderMaxYaw
+            else { return nil }
+            return estimate
         }
     }
 

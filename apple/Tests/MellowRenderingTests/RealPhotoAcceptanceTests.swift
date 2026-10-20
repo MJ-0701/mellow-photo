@@ -409,27 +409,293 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             smoothing: 1, darkCircles: 1, nasolabial: 1, marionette: 1, glabella: 1, toneEvening: 1, redness: -1,
             shine: 1)
         let after = try DisplayScale.grid(portrait.render(recipe, stage: SkinStage()))
-        let polygon = FaceRegions.skinPolygon(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
-        let dilation = portrait.faceWidth * Naturalness.outsideFaceDilationFraction
-        let inside = FaceRegions.containment(polygons: [polygon], dilation: dilation)
-        let scale = portrait.extent.width / DisplayScale.phoneWidth
-        var outsideChanged = 0
-        var outsideTotal = 0
-        for y in 0..<before.height {
-            for x in 0..<before.width {
-                let point = CGPoint(x: x, y: y)
-                guard !inside(CGPoint(x: CGFloat(x) * scale, y: CGFloat(y) * scale)) else { continue }
-                outsideTotal += 1
-                let a = before.rgba(point)
-                let b = after.rgba(point)
-                if (0..<3).contains(where: { abs(Int(a[$0]) - Int(b[$0])) >= DisplayScale.defaultMinimumDelta }) {
-                    outsideChanged += 1
-                }
-            }
-        }
         XCTAssertLessThanOrEqual(
-            record("outsideFace", "changed", Double(outsideChanged) / Double(max(outsideTotal, 1))),
+            record(
+                "outsideFace", "changed",
+                portrait.outsideFaceChangedFraction(
+                    before: before, after: after, dilationFraction: Naturalness.outsideFaceDilationFraction)),
             Naturalness.outsideFaceChangedFraction,
             "얼굴 다각형 밖은 그대로")
     }
+
+    // MARK: 원터치
+
+    /// 원터치 하한(스펙 G4 1.2 원터치 행).
+    /// 화면 배율 얼굴 상자 changedFraction.
+    enum OneTouchVisibility {
+        static let femaleDefaultChangedFraction = 0.05
+        /// 남성·공통 기본 0.6도 같은 하한(스펙 G4 1.2, G4-2 구현 중 추가).
+        static let maleDefaultChangedFraction = 0.05
+        static let commonDefaultChangedFraction = 0.05
+        static let femaleMaximumChangedFraction = 0.10
+        static let maleMaximumChangedFraction = 0.06
+        static let femaleMaleDifferenceFraction = 0.02
+        static let coupleMinimumChangedFraction = 0.03
+    }
+
+    /// 원터치 상한(스펙 G4 1.4 원터치 행).
+    enum OneTouchNaturalness {
+        static let skinMeanLiftRange = (0.005 * 255)...(0.05 * 255)
+        static let defaultFineVarianceRatio = 0.9
+        static let maximumFineVarianceRatio = 0.85
+        static let percentileAbsoluteLuma = 60.0
+        static let percentile = 0.99
+        static let skinChroma = 0.015
+        static let maleLipChroma = 0.01
+        static let femaleLipChroma = 0.03
+        static let browChangedFraction = 0.05
+        static let outsideFaceChangedFraction = 0.002
+    }
+
+    /// 전체 대상 원터치와 같은 층(전체 층 공통 표, 그룹 층 성별 표)에 faces[i]를 genders[i]로 지정한 레시피.
+    /// 하한(보임)과 남녀 비교는 몸 피부 없이 얼굴만 잰다(보수적).
+    /// 상한(자연)은 withBodySkin으로 전체 대상 원터치가 실제로 내는 결과를 잰다(스펙 G4 1.4 "위 항목들의 합").
+    /// 미지정(nil)은 기록을 만들지 않는다.
+    private static func oneTouchRecipe(
+        strength: Double, faces: [FaceGeometry], genders: [Gender?], withBodySkin: Bool = false
+    ) -> EditRecipe {
+        var recipe = EditRecipe()
+        if withBodySkin {
+            recipe.bodySkin = OneTouchBundle.bodySkin(strength: strength)
+        }
+        OneTouchBundle.layer(for: nil, strength: strength).applied(to: &recipe.portrait, makeup: &recipe.makeup)
+        for group in Gender.allCases {
+            recipe.people.groups[group] = OneTouchBundle.layer(for: group, strength: strength)
+        }
+        recipe.people.individuals = zip(faces, genders).compactMap { face, gender in
+            gender.map { PersonRecord(anchor: PersonAnchor(faceBox: face.boundingBox), gender: $0) }
+        }
+        return recipe
+    }
+
+    /// 데모 사진에 원터치를 건 전체 파이프라인 결과(메이크업 팔레트 포함).
+    private func oneTouchRender(_ recipe: EditRecipe) throws -> (grid: PixelGrid, output: CIImage) {
+        let portrait = try self.portrait()
+        let context = RenderContext(
+            extent: portrait.extent, recipe: recipe, analysis: portrait.analysis, tuning: portrait.tuning,
+            makeupCatalog: try Support.sharedMakeupCatalog())
+        let output = try RenderPipeline.standard.render(portrait.image, context: context)
+        return (try DisplayScale.grid(output), output)
+    }
+
+    private func oneTouchRender(strength: Double, gender: Gender?, withBodySkin: Bool = false) throws -> (
+        grid: PixelGrid, output: CIImage
+    ) {
+        let portrait = try self.portrait()
+        return try oneTouchRender(
+            Self.oneTouchRecipe(
+                strength: strength, faces: [portrait.face], genders: [gender], withBodySkin: withBodySkin))
+    }
+
+    private func label(_ gender: Gender?, _ strength: Double) -> String {
+        "oneTouch-\(gender?.rawValue ?? "common")-\(strength)"
+    }
+
+    func testOneTouchIsVisibleForEachGenderAndDiffersBetweenThem() throws {
+        let portrait = try self.portrait()
+        let before = try base().grid
+        let rect = try faceRect
+        let femaleDefault = try oneTouchRender(strength: OneTouchBundle.defaultStrength, gender: .female).grid
+        XCTAssertGreaterThanOrEqual(
+            record(
+                label(.female, OneTouchBundle.defaultStrength), "changed",
+                DisplayScale.changedFraction(before, femaleDefault, in: rect)),
+            OneTouchVisibility.femaleDefaultChangedFraction)
+        let defaults: [(gender: Gender?, minimum: Double)] = [
+            (.male, OneTouchVisibility.maleDefaultChangedFraction),
+            (nil, OneTouchVisibility.commonDefaultChangedFraction),
+        ]
+        for item in defaults {
+            let result = try oneTouchRender(strength: OneTouchBundle.defaultStrength, gender: item.gender).grid
+            XCTAssertGreaterThanOrEqual(
+                record(
+                    label(item.gender, OneTouchBundle.defaultStrength), "changed",
+                    DisplayScale.changedFraction(before, result, in: rect)),
+                item.minimum, "\(label(item.gender, OneTouchBundle.defaultStrength)) 기본 강도도 보인다")
+        }
+        let female = try oneTouchRender(strength: OneTouchBundle.maximumStrength, gender: .female).grid
+        XCTAssertGreaterThanOrEqual(
+            record(label(.female, 1), "changed", DisplayScale.changedFraction(before, female, in: rect)),
+            OneTouchVisibility.femaleMaximumChangedFraction)
+        let male = try oneTouchRender(strength: OneTouchBundle.maximumStrength, gender: .male).grid
+        XCTAssertGreaterThanOrEqual(
+            record(label(.male, 1), "changed", DisplayScale.changedFraction(before, male, in: rect)),
+            OneTouchVisibility.maleMaximumChangedFraction)
+        XCTAssertGreaterThanOrEqual(
+            record("oneTouch-femaleVsMale-1", "changed", DisplayScale.changedFraction(female, male, in: rect)),
+            OneTouchVisibility.femaleMaleDifferenceFraction, "남녀 결과가 다르다")
+        let unassigned = try oneTouchRender(strength: OneTouchBundle.maximumStrength, gender: nil).grid
+        var commonOnly = Self.oneTouchRecipe(
+            strength: OneTouchBundle.maximumStrength, faces: [portrait.face], genders: [nil])
+        commonOnly.people.groups = [:]
+        let common = try oneTouchRender(commonOnly).grid
+        XCTAssertEqual(DisplayScale.changedFraction(unassigned, common, in: nil), 0, "미지정은 공통 표만 받는다")
+        let lips = try portrait.mask(
+            FaceRegions.lipMask(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning))
+        let maleLips = DisplayScale.chromaDelta(before, male, weight: lips)
+        XCTAssertLessThanOrEqual(
+            record(label(.male, 1), "lipChroma", max(maleLips.cb, maleLips.cr)), OneTouchNaturalness.maleLipChroma,
+            "남성은 립 없음")
+    }
+
+    func testOneTouchStaysNaturalAtDefaultAndMaximum() throws {
+        let portrait = try self.portrait()
+        let before = try base().grid
+        let rect = try faceRect
+        let skin = try skinWeight()
+        let blush = try portrait.mask(
+            FaceRegions.blushMask(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning))
+        let skinWithoutBlush = try subtract(skin, blush)
+        let brows = try portrait.browMask()
+        XCTAssertGreaterThan(DisplayScale.maskedPixelCount(brows), 0, "눈썹 마스크가 비어 있지 않다")
+        let lips = try portrait.mask(
+            FaceRegions.lipMask(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning))
+        let bodySkinArea = try DisplayScale.grid(portrait.bodySkinArea())
+        let skinBounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let cases: [(gender: Gender?, strength: Double, fineRatio: Double)] = [
+            (.female, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (.male, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (nil, OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultFineVarianceRatio),
+            (.female, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
+            (.male, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
+            (nil, OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumFineVarianceRatio),
+        ]
+        for item in cases {
+            let result = try oneTouchRender(strength: item.strength, gender: item.gender, withBodySkin: true)
+            let name = label(item.gender, item.strength)
+            if item.strength == OneTouchBundle.defaultStrength {
+                let lift = DisplayScale.lumaDelta(before, result.grid, weight: skin).mean
+                XCTAssertTrue(
+                    OneTouchNaturalness.skinMeanLiftRange.contains(record(name, "skinMeanLuma", lift)),
+                    "\(name) 피부 평균 ΔY \(lift)")
+            }
+            let fineRatio = try Support.fineVarianceRatio(
+                before: portrait.image, after: result.output, weight: portrait.skinMask(), in: skinBounds,
+                fineRadius: fineRadius())
+            XCTAssertGreaterThanOrEqual(record(name, "fineRatio", fineRatio), item.fineRatio, "\(name) 질감")
+            XCTAssertLessThanOrEqual(
+                record(
+                    name, "p99AbsLuma",
+                    DisplayScale.percentileAbsoluteLumaDelta(
+                        before, result.grid, in: rect, percentile: OneTouchNaturalness.percentile)),
+                OneTouchNaturalness.percentileAbsoluteLuma, "\(name) 국소 폭주 없음")
+            let chroma = DisplayScale.chromaDelta(
+                before, result.grid, weight: item.gender == .female ? skinWithoutBlush : skin)
+            XCTAssertLessThanOrEqual(
+                record(name, "skinChroma", max(chroma.cb, chroma.cr)), OneTouchNaturalness.skinChroma, "\(name) 색 기 없음")
+            XCTAssertLessThanOrEqual(
+                record(name, "browChanged", DisplayScale.changedFraction(before, result.grid, weight: brows)),
+                OneTouchNaturalness.browChangedFraction, "\(name) 눈썹")
+            XCTAssertLessThanOrEqual(
+                record(
+                    name, "outsideFace",
+                    portrait.outsideFaceChangedFraction(
+                        before: before, after: result.grid, dilationFraction: Naturalness.outsideFaceDilationFraction,
+                        excluding: bodySkinArea)),
+                OneTouchNaturalness.outsideFaceChangedFraction, "\(name) 얼굴·몸 피부 밖")
+            // 얼굴 항목(피부·눈입·메이크업)은 몸 피부 없이 렌더해 넓힌 얼굴 다각형 밖 전체를 뺌 없이 잰다.
+            let faceOnly = try oneTouchRender(strength: item.strength, gender: item.gender).grid
+            XCTAssertLessThanOrEqual(
+                record(
+                    name, "outsideFaceFaceOnly",
+                    portrait.outsideFaceChangedFraction(
+                        before: before, after: faceOnly, dilationFraction: Naturalness.outsideFaceDilationFraction)),
+                OneTouchNaturalness.outsideFaceChangedFraction, "\(name) 얼굴 항목은 얼굴 밖을 바꾸지 않는다")
+            let lipChroma = DisplayScale.chromaDelta(before, result.grid, weight: lips)
+            XCTAssertLessThanOrEqual(
+                record(name, "lipChroma", max(lipChroma.cb, lipChroma.cr)),
+                item.gender == .female ? OneTouchNaturalness.femaleLipChroma : OneTouchNaturalness.maleLipChroma,
+                "\(name) 입술")
+        }
+    }
+
+    /// 변형은 묶음 밖이다(스펙 G4 1.4 마지막 행).
+    /// 얼굴마다 해석한 얼굴형이 0이고 체형이 기본이며 변형 단계가 아무것도 바꾸지 않는다.
+    func testOneTouchNeverReshapesTheFaceOrBody() throws {
+        let portrait = try self.portrait()
+        for gender in [Gender?.none, .female, .male] {
+            let recipe = Self.oneTouchRecipe(
+                strength: OneTouchBundle.maximumStrength, faces: [portrait.face], genders: [gender])
+            let context = portrait.context(recipe)
+            XCTAssertEqual(
+                context.faceTargets.map(\.portrait.face), [FaceShapeAdjustments()], "\(String(describing: gender))")
+            XCTAssertEqual(recipe.body, BodyShapeAdjustments())
+            let warped = try DisplayScale.grid(portrait.render(recipe, stage: ShapeWarpStage()))
+            XCTAssertEqual(DisplayScale.changedFraction(try base().grid, warped, in: nil), 0, "변형 단계는 그대로")
+        }
+    }
+
+    /// 커플 생성 사진: 라벨대로 성별을 지정하고 전체 원터치를 건다.
+    /// 두 얼굴이 다 바뀌되 여성이 더 많이 바뀌고 남성 입술 색은 그대로다.
+    func testOneTouchOnTheCouplePhotoTreatsMaleAndFemaleDifferently() throws {
+        let people = try RealPeople.couple.get()
+        XCTAssertEqual(people.faces.count, people.labels.count, "Vision 얼굴 수가 라벨과 같아야 한다(PeopleFixturesTests)")
+        let catalog = try Support.sharedMakeupCatalog()
+        let analysis = PhotoAnalysis(faces: people.faces)
+        func render(_ recipe: EditRecipe) throws -> PixelGrid {
+            let context = RenderContext(
+                extent: people.extent, recipe: recipe, analysis: analysis, tuning: people.tuning,
+                makeupCatalog: catalog)
+            return try DisplayScale.grid(RenderPipeline.standard.render(people.image, context: context))
+        }
+        let before = try render(EditRecipe())
+        let after = try render(
+            Self.oneTouchRecipe(strength: OneTouchBundle.maximumStrength, faces: people.faces, genders: people.labels))
+        var changed: [Gender: Double] = [:]
+        for (face, gender) in zip(people.faces, people.labels) {
+            let rect = DisplayScale.rect(face.boundingBox, in: before)
+            let fraction = record(
+                "oneTouch-couple-\(gender.rawValue)", "changed", DisplayScale.changedFraction(before, after, in: rect))
+            changed[gender] = fraction
+            XCTAssertGreaterThanOrEqual(fraction, OneTouchVisibility.coupleMinimumChangedFraction, "\(gender) 얼굴이 바뀐다")
+        }
+        XCTAssertGreaterThan(changed[.female] ?? 0, changed[.male] ?? 0, "여성 표가 더 많이 바꾼다")
+        let maleIndex = try XCTUnwrap(people.labels.firstIndex(of: .male))
+        let maleLips = try XCTUnwrap(
+            FaceRegions.lipMask(face: people.faces[maleIndex], extent: people.extent, tuning: people.tuning))
+        let chroma = DisplayScale.chromaDelta(
+            before, after, weight: try DisplayScale.grid(maleLips.image.cropped(to: people.extent)))
+        XCTAssertLessThanOrEqual(
+            record("oneTouch-couple-male", "lipChroma", max(chroma.cb, chroma.cr)), OneTouchNaturalness.maleLipChroma,
+            "남성 입술 색은 그대로")
+        let unassigned = try render(
+            Self.oneTouchRecipe(
+                strength: OneTouchBundle.maximumStrength, faces: people.faces, genders: people.labels.map { _ in nil }))
+        for (index, face) in people.faces.enumerated() {
+            let rect = DisplayScale.rect(face.boundingBox, in: before)
+            XCTAssertGreaterThanOrEqual(
+                record(
+                    "oneTouch-couple-unassigned-\(index)", "changed",
+                    DisplayScale.changedFraction(before, unassigned, in: rect)),
+                OneTouchVisibility.coupleMinimumChangedFraction, "미지정도 공통 표로 바뀐다")
+        }
+    }
+
+    /// 두 마스크의 차(a − b, 0 아래는 0).
+    /// PixelGrid는 읽기 전용이라 같은 크기의 비트맵을 색 관리 없이 다시 만든다.
+    private func subtract(_ a: PixelGrid, _ b: PixelGrid) throws -> PixelGrid {
+        var bytes = [UInt8](repeating: 0, count: a.width * a.height * Self.bytesPerPixel)
+        for y in 0..<a.height {
+            for x in 0..<a.width {
+                let point = CGPoint(x: x, y: y)
+                let value = UInt8(max(0, Int(a.red(point)) - Int(b.red(point))))
+                let offset = ((a.height - 1 - y) * a.width + x) * Self.bytesPerPixel
+                bytes[offset] = value
+                bytes[offset + 1] = value
+                bytes[offset + 2] = value
+            }
+        }
+        let provider = try XCTUnwrap(CGDataProvider(data: Data(bytes) as CFData))
+        let image = try XCTUnwrap(
+            CGImage(
+                width: a.width, height: a.height, bitsPerComponent: Self.bitsPerComponent,
+                bitsPerPixel: Self.bitsPerComponent * Self.bytesPerPixel, bytesPerRow: a.width * Self.bytesPerPixel,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue), provider: provider,
+                decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        return PixelGrid(image)
+    }
+
+    private static let bitsPerComponent = 8
+    private static let bytesPerPixel = 4
 }

@@ -89,16 +89,27 @@ final class RenderPipelineTests: XCTestCase {
         let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
         var all = EditRecipe()
         all.portrait.skin.smoothing = 1
-        var onlyLeft = all
-        onlyLeft.portrait.targetFace = 0
-        var outOfRange = all
-        outOfRange.portrait.targetFace = 7
+        let onlyLeft = Support.restricted(all, toFace: 0, of: [left, right])
+        let outOfRange = Support.restricted(all, toFace: 7, of: [left, right])
         XCTAssertNotEqual(
             try Support.bytes(Support.render(input, recipe: all, faces: [left, right])),
             try Support.bytes(Support.render(input, recipe: onlyLeft, faces: [left, right])))
         XCTAssertEqual(
             try Support.bytes(Support.render(input, recipe: outOfRange, faces: [left, right])),
             try Support.bytes(input), "범위 밖 인덱스는 아무 얼굴도 고치지 않는다")
+        // 옛 세션은 anchor 없이 legacyIndex로 읽혀 짝짓기의 legacyIndex 폴백으로 그 얼굴에 걸린다.
+        let legacyJSON = #"{"schemaVersion":2,"portrait":{"targetFace":1,"skin":{"smoothing":1}}}"#
+        let legacy = try JSONDecoder().decode(EditRecipe.self, from: Data(legacyJSON.utf8))
+        XCTAssertNil(legacy.people.individuals.first?.anchor)
+        XCTAssertEqual(legacy.people.individuals.first?.legacyIndex, 1)
+        let legacyBytes = try Support.bytes(Support.render(input, recipe: legacy, faces: [left, right]))
+        XCTAssertEqual(
+            legacyBytes,
+            try Support.bytes(
+                Support.render(
+                    input, recipe: Support.restricted(all, toFace: 1, of: [left, right]), faces: [left, right])),
+            "옛 targetFace 1은 오른쪽 얼굴에만 건 것과 같은 바이트")
+        XCTAssertNotEqual(legacyBytes, try Support.bytes(Support.render(input, recipe: all, faces: [left, right])))
     }
 
     func testFaceWidthWorksInBothDirections() throws {
@@ -160,7 +171,8 @@ final class RenderPipelineTests: XCTestCase {
             BlemishSpot(x: 0.7, y: 0.2, radius: 0.01, faceIndex: 1),
         ]
         var recipe = EditRecipe()
-        recipe.portrait.targetFace = 1
+        recipe.portrait.skin.smoothing = 0.3
+        recipe = Support.restricted(recipe, toFace: 1, of: [left, right])
         let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
         let legacy = RenderContext(
             extent: extent, recipe: recipe, faces: [left, right], tuning: RenderTuning(), blemishes: spots)
@@ -169,8 +181,64 @@ final class RenderPipelineTests: XCTestCase {
             tuning: RenderTuning())
         XCTAssertEqual(legacy.faces, bundled.faces)
         XCTAssertEqual(legacy.blemishes, bundled.blemishes)
-        XCTAssertEqual(legacy.targetFaces, [right])
-        XCTAssertEqual(bundled.targetFaces, [right])
-        XCTAssertEqual(bundled.targetBlemishes, [spots[1]])
+        XCTAssertEqual(legacy.faceTargets.map(\.face), [left, right])
+        XCTAssertEqual(bundled.faceTargets.map(\.face), [left, right])
+        XCTAssertEqual(bundled.faceTargets[1].blemishes, [spots[1]])
+        XCTAssertEqual(bundled.faceTargets.map(\.portrait.skin.smoothing), [0, 0.3], "옮긴 값은 그 얼굴에만")
+        XCTAssertEqual(legacy.faceTargets.map(\.portrait.skin.smoothing), [0, 0.3])
+    }
+
+    func testFaceTargetsResolvePeopleLayersPerFace() {
+        let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.05, y: 0.1, width: 0.35, height: 0.8))
+        let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
+        let spots = [
+            BlemishSpot(x: 0.2, y: 0.2, radius: 0.01, faceIndex: 0),
+            BlemishSpot(x: 0.7, y: 0.2, radius: 0.01, faceIndex: 1),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.skin.smoothing = 0.2
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, features: [.eyeBrighten: 0.3])
+        let id = PersonID()
+        recipe.people.individuals = [
+            PersonRecord(
+                id: id, anchor: PersonAnchor(faceBox: right.boundingBox), gender: .female,
+                layer: PortraitLayer(skinSmoothing: 0.9, face: [.jaw: 0.4])),
+            PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.98, width: 0.01), layer: PortraitLayer(skinSmoothing: 1)),
+        ]
+        let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
+        let context = RenderContext(
+            extent: extent, recipe: recipe, faces: [left, right], tuning: RenderTuning(), blemishes: spots)
+        XCTAssertEqual(context.faceTargets.map(\.index), [0, 1])
+        let first = context.faceTargets[0]
+        XCTAssertNil(first.personID)
+        XCTAssertNil(first.gender)
+        XCTAssertEqual(first.portrait.skin.smoothing, 0.2, "짝이 없는 얼굴은 전체 값")
+        XCTAssertEqual(first.blemishes, [spots[0]])
+        let second = context.faceTargets[1]
+        XCTAssertEqual(second.personID, id)
+        XCTAssertEqual(second.gender, .female)
+        XCTAssertEqual(second.portrait.skin.smoothing, 0.9)
+        XCTAssertEqual(second.portrait.features.eyeBrighten, 0.3, "그룹 값은 상속")
+        XCTAssertEqual(second.portrait.face.jaw, 0.4)
+        XCTAssertEqual(second.blemishes, [spots[1]])
+    }
+
+    func testOverlappingFacesUseTheSameGlobalPairingAsEditing() {
+        // A(중심 0.50)·B(0.60)와 얼굴 0.48·0.54(폭 모두 0.2).
+        // 얼굴 1에 가장 가까운 기록은 A지만 짝짓기는 B를 얼굴 1에 둔다.
+        let faces = [
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.38, y: 0.35, width: 0.2, height: 0.3)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.44, y: 0.35, width: 0.2, height: 0.3)),
+        ]
+        let recordA = PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male)
+        let recordB = PersonRecord(
+            anchor: PersonAnchor(x: 0.6, y: 0.5, width: 0.2), layer: PortraitLayer(skinSmoothing: 0.8))
+        let recipe = EditRecipe(people: PeopleAdjustments(individuals: [recordA, recordB]))
+        let context = RenderContext(
+            extent: CGRect(x: 0, y: 0, width: 64, height: 64), recipe: recipe, faces: faces, tuning: RenderTuning())
+        XCTAssertEqual(context.faceTargets.map(\.personID), [recordA.id, recordB.id])
+        XCTAssertEqual(
+            recipe.people.personID(forFace: 1, of: faces.map(\.boundingBox)), recordB.id, "편집이 고르는 사람과 같다")
+        XCTAssertEqual(context.faceTargets.map(\.portrait.skin.smoothing), [0, 0.8], "B의 값은 얼굴 1에만")
     }
 }

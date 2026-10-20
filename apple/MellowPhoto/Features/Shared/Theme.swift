@@ -19,6 +19,29 @@ enum Theme {
     /// 메이크업 룩 이름 칩의 최소 크기와 좌우 여백.
     static let makeupChipSize = CGSize(width: 56, height: 30)
     static let makeupChipPadding: CGFloat = 10
+    /// 뷰티·메이크업 대상 칩의 최소 높이와 좌우 여백.
+    static let targetChipHeight: CGFloat = 30
+    static let targetChipPadding: CGFloat = 10
+    /// 덮어쓴 슬라이더·사람 칩의 점 지름.
+    static let overrideDotSize: CGFloat = 6
+    /// 원터치 보정 단추의 최소 폭.
+    static let oneTouchButtonMinWidth: CGFloat = 96
+    /// 세부 슬라이더 제목 옆 "원터치" 꼬리표 글꼴과 좌우 여백.
+    static let oneTouchTagFont = Font.caption2
+    static let oneTouchTagPadding: CGFloat = 4
+    /// 강조색 배경(선택된 칩·꼬리표)의 불투명도.
+    static let accentFillOpacity = 0.2
+    /// 고르지 않은 칩 배경의 불투명도.
+    static let chipFillOpacity = 0.15
+    /// 고른 칩 테두리 두께.
+    static let chipStrokeWidth: CGFloat = 2
+    /// 상태 줄 성별 단추의 위아래 누름 여백.
+    /// 캡션 한 줄(약 16pt)에 더해 누름 높이가 44pt쯤 된다.
+    /// 단추 바깥에서 같은 만큼 빼 줄 높이는 그대로다.
+    static let statusButtonHitPadding: CGFloat = 14
+    /// 뷰티 패널 안 세로 간격.
+    /// 도구 패널 기본(16)보다 좁혀 iPhone 조절 영역에 칩·원터치·세부 조정 머리가 들어가게 한다.
+    static let beautyPanelSpacing: CGFloat = 8
     /// 메이크업 색 칩 지름.
     static let makeupSwatchSize: CGFloat = 28
     static let cropHandleSize: CGFloat = 22

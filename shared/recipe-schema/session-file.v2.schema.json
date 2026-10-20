@@ -42,7 +42,8 @@
               "bodySkin": { "$ref": "edit-recipe.v2.schema.json#/properties/bodySkin" },
               "body": { "$ref": "edit-recipe.v2.schema.json#/properties/body" },
               "makeup": { "$ref": "edit-recipe.v2.schema.json#/properties/makeup" },
-              "effects": { "$ref": "edit-recipe.v2.schema.json#/properties/effects" }
+              "effects": { "$ref": "edit-recipe.v2.schema.json#/properties/effects" },
+              "people": { "$ref": "edit-recipe.v2.schema.json#/properties/people", "description": "프리셋은 groups만 쓴다. individuals는 읽을 때 버린다." }
             }
           }
         }

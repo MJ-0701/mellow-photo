@@ -11,10 +11,11 @@ struct FeatureStage: RenderStage {
     private static let minimumSharpenRadius: CGFloat = 1
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let values = Self.clamped(context.recipe.portrait.features)
-        guard values.hasEffect, !context.targetFaces.isEmpty else { return image }
+        let targets = context.faceTargets.map { ($0.face, Self.clamped($0.portrait.features)) }
+            .filter { $0.1.hasEffect }
+        guard !targets.isEmpty else { return image }
         var result = image
-        for face in context.targetFaces {
+        for (face, values) in targets {
             result = try brightenEyes(result, face: face, amount: values.eyeBrighten, context: context)
             result = try whitenTeeth(result, face: face, amount: values.teethWhiten, context: context)
             result = try reviveLips(result, face: face, amount: values.lipVitality, context: context)

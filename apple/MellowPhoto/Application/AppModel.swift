@@ -28,6 +28,48 @@ final class AppModel {
         var hasBody = false
         /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
         var bodyAnalysisFailure: MellowError?
+        /// 얼굴마다 받아들인 성별 추정(faces와 같은 순서).
+        /// 저장하지 않고 수동 지정이 늘 우선한다.
+        var genders: [Gender?] = []
+    }
+
+    /// 뷰티·메이크업 패널이 편집하는 대상.
+    /// 화면 상태라 파일에 저장하지 않는다.
+    enum BeautyTarget: Hashable {
+        case all
+        case gender(Gender)
+        /// 찾은 얼굴(기록이 있든 없든).
+        /// 왼쪽부터 센 인덱스다.
+        case face(Int)
+        /// 짝이 없는 사람 기록.
+        case person(PersonID)
+    }
+
+    /// 칩에 보이는 성별의 출처.
+    enum GenderSource: Equatable {
+        /// 기록에 수동으로 지정했다.
+        case manual
+        /// 수동 지정은 없고 추정이 있다.
+        case estimated
+        case none
+    }
+
+    /// 대상 칩 하나.
+    /// 찾은 얼굴(기록이 있든 없든)이거나 짝이 없는 기록이다.
+    struct PersonChip: Identifiable, Equatable {
+        let id: String
+        let target: BeautyTarget
+        /// 찾은 얼굴의 인덱스(왼쪽부터).
+        /// 짝이 없는 기록은 nil이다.
+        let faceIndex: Int?
+        let personID: PersonID?
+        /// 수동 지정 ?? 추정.
+        let gender: Gender?
+        let source: GenderSource
+        /// 그 사람 층에서 덮어쓴 키 수.
+        let overriddenCount: Int
+
+        var isUnmatched: Bool { faceIndex == nil }
     }
 
     /// 배경 도구가 보여줄 상태. 분석 실패가 사람 없음보다 먼저다.
@@ -84,6 +126,13 @@ final class AppModel {
         static let compareSplitRange = 0.0...1.0
         /// 보조 기술로 분할선을 한 번 옮기는 폭.
         static let compareSplitAccessibilityStep = 0.1
+        /// G4 질문 2의 판정(포함).
+        /// true면 자동 버튼이 색감·디테일 자동과 함께, 얼굴이 있으면 전체 대상 원터치 기본 강도를 한 단계로 적용한다.
+        /// false면 자동은 지금처럼 피부 보정·자동 잡티·눈 또렷하게만 쓴다.
+        static let autoIncludesOneTouch = true
+        /// 뷰티·메이크업 캔버스 탭의 허용 이동 거리(캔버스 정규화).
+        /// 누른 점과 뗀 점이 이보다 멀면 탭이 아니라 이동이라 대상을 바꾸지 않는다.
+        static let targetTapTolerance = 0.02
     }
 
     /// 전후 비교 모드. full은 기존 전체 토글, split은 분할선.
@@ -150,9 +199,15 @@ final class AppModel {
         guard compareMode == .split, let original, let heldOriginalGeometry else { return nil }
         return heldOriginalGeometry == previewGeometry ? original : nil
     }
+    /// 사진마다 마지막으로 본 뷰티 대상.
+    /// 앱을 다시 열면 전체다.
+    var beautyTargets: [PhotoID: BeautyTarget] = [:]
     /// 전체 사진에 적용이 복사할 항목. 세션 상태라 파일에 저장하지 않고 실행할 때마다 전부로 시작한다.
     var syncCategories: Set<SyncCategory> = SyncCategory.all
     var exportOptions = ExportOptions()
+    /// 뷰티 패널의 "세부 조정" 접기.
+    /// 세션 상태라 사진과 무관하고 파일에 저장하지 않는다.
+    var showsDetailAdjustments = false
     /// 이름 입력 시트가 떠 있는 동안 true. 메뉴의 ⌘Z/⇧⌘Z가 입력란의 실행 취소를 가로채지 않게 한다.
     var isTextEntryActive = false
     /// 마지막 저장 작업에서 실제로 저장된 장수. Mac 폴더 저장 뒤 Finder를 열지 판단한다.
@@ -211,15 +266,181 @@ final class AppModel {
         }
         return selectedInfo?.hasBody == true ? .ready : .noBody
     }
-    /// 선택 사진의 뷰티·메이크업 얼굴 상태. 대상 얼굴(모든 얼굴이면 전부)에 특징점이 없으면 noLandmarks다.
+    /// 선택 사진의 뷰티 대상.
+    /// 기억한 대상이 지금 없는 사람(실행 취소·초기화로 사라짐)이나 범위 밖 얼굴이면 전체로 읽는다.
+    /// 기억은 그대로 두어 얼굴을 다시 찾으면 돌아온다.
+    var beautyTarget: BeautyTarget {
+        guard let stored = session.selectedPhotoID.flatMap({ beautyTargets[$0] }) else { return .all }
+        switch stored {
+        case .all, .gender:
+            return stored
+        case .face(let index):
+            return faces.indices.contains(index) ? stored : .all
+        case .person(let id):
+            return currentRecipe.people.person(id) == nil ? .all : stored
+        }
+    }
+
+    /// 찾은 얼굴의 anchor.
+    /// 범위 밖이면 nil이다.
+    /// 찾지 못한 기록을 다시 연결할 때 쓴다.
+    func anchor(forFace index: Int) -> PersonAnchor? {
+        faces.indices.contains(index) ? PersonAnchor(faceBox: faces[index].boundingBox) : nil
+    }
+
+    /// 얼굴 인덱스 → 그 얼굴과 짝이 된 기록.
+    /// 렌더·편집과 같은 전역 짝짓기다.
+    var peopleByFace: [Int: PersonRecord] {
+        currentRecipe.people.peopleByFace(faces.map(\.boundingBox))
+    }
+
+    /// 기록과 짝이 없는 얼굴(왼쪽부터).
+    /// 찾지 못한 기록은 이 얼굴에만 다시 연결한다.
+    var unpairedFaceIndices: [Int] {
+        let paired = peopleByFace
+        return faces.indices.filter { paired[$0] == nil }
+    }
+
+    /// 그 얼굴의 받아들인 성별 추정.
+    func estimatedGender(forFace index: Int) -> Gender? {
+        let genders = selectedInfo?.genders ?? []
+        return genders.indices.contains(index) ? genders[index] : nil
+    }
+
+    /// 그 얼굴의 유효 성별(수동 지정 ?? 추정).
+    func effectiveGender(forFace index: Int) -> Gender? {
+        PortraitResolver.effectiveGender(person: peopleByFace[index], estimate: estimatedGender(forFace: index))
+    }
+
+    func genderSource(forFace index: Int) -> GenderSource {
+        if peopleByFace[index]?.gender != nil {
+            return .manual
+        }
+        return estimatedGender(forFace: index) == nil ? .none : .estimated
+    }
+
+    /// 왼쪽부터 찾은 얼굴, 그 뒤 짝이 없는 기록(레시피 순서).
+    var personChips: [PersonChip] {
+        let recipe = currentRecipe
+        let paired = peopleByFace
+        var chips = faces.indices.map { index -> PersonChip in
+            let record = paired[index]
+            let estimate = estimatedGender(forFace: index)
+            let source: GenderSource = record?.gender != nil ? .manual : (estimate == nil ? .none : .estimated)
+            return PersonChip(
+                id: "face-\(index)", target: .face(index), faceIndex: index, personID: record?.id,
+                gender: PortraitResolver.effectiveGender(person: record, estimate: estimate), source: source,
+                overriddenCount: record?.layer.overriddenKeys.count ?? 0)
+        }
+        let matched = Set(paired.values.map(\.id))
+        for record in recipe.people.individuals where !matched.contains(record.id) {
+            chips.append(
+                PersonChip(
+                    id: "person-\(record.id.rawValue.uuidString)", target: .person(record.id), faceIndex: nil,
+                    personID: record.id, gender: record.gender, source: record.gender == nil ? .none : .manual,
+                    overriddenCount: record.layer.overriddenKeys.count))
+        }
+        return chips
+    }
+
+    /// 얼굴마다 해석한 얼굴형 값(렌더와 같은 짝짓기·유효 성별).
+    /// 잠긴 사진에서 편집이 얼굴형 값을 다른 얼굴로 옮기는지 볼 때 쓴다.
+    func resolvedFaceShapes(of recipe: EditRecipe) -> [FaceShapeAdjustments] {
+        let people = recipe.people.peopleByFace(faces.map(\.boundingBox))
+        return faces.indices.map { index in
+            let person = people[index]
+            let gender = PortraitResolver.effectiveGender(person: person, estimate: estimatedGender(forFace: index))
+            return PortraitResolver.resolve(recipe, person: person, gender: gender).portrait.face
+        }
+    }
+
+    /// 대상이 가리키는 층.
+    /// .face는 렌더와 같은 짝짓기로 기록이 있으면 .person이고 없으면 nil이다(첫 변경이 기록을 만든다).
+    func scope(for target: BeautyTarget) -> PortraitScope? {
+        switch target {
+        case .all: return .all
+        case .gender(let gender): return .gender(gender)
+        case .person(let id): return .person(id)
+        case .face(let index):
+            return currentRecipe.people.personID(forFace: index, of: faces.map(\.boundingBox)).map(PortraitScope.person)
+        }
+    }
+
+    /// 뷰티·메이크업 패널이 보이는 값.
+    /// 전체 → 그룹 → 개인을 대상 층까지 겹친 값이다.
+    /// 얼굴 대상은 수동 지정이 없으면 추정 성별의 그룹 값을 받고, 기록이 없는 얼굴은 전체 ⊕ 그 그룹이다.
+    var scopedValues: PortraitResolver.Resolved {
+        let recipe = currentRecipe
+        guard case .face(let index) = beautyTarget else {
+            return PortraitResolver.resolve(recipe, scope: scope(for: beautyTarget) ?? .all, estimate: nil)
+        }
+        let estimate = estimatedGender(forFace: index)
+        guard let scope = scope(for: beautyTarget) else {
+            return PortraitResolver.resolve(recipe, person: nil, gender: estimate)
+        }
+        return PortraitResolver.resolve(recipe, scope: scope, estimate: estimate)
+    }
+
+    /// 현재 대상 층의 원터치 표시(강도 슬라이더 값).
+    /// 전체는 전체 층, 그룹·개인은 그 층의 표시이고 기록이 없는 얼굴은 nil이다.
+    /// 손상 파일의 값도 0…maximumStrength로 잘라 넘긴다.
+    var oneTouchStrength: Double? {
+        let marker: Double?
+        switch scope(for: beautyTarget) {
+        case .all: marker = currentRecipe.portrait.oneTouch
+        case .some(let scope): marker = PortraitResolver.layer(currentRecipe, scope: scope)?.oneTouch
+        case nil: marker = nil
+        }
+        return marker.map(OneTouchBundle.clampedStrength)
+    }
+
+    /// 세부 슬라이더에 "원터치" 꼬리표를 붙일지.
+    /// 묶인 키이고 현재 대상 층에 표시가 있을 때만이다(상속 중인 표시는 아니다).
+    func isOneTouchTagged(_ key: PortraitKey) -> Bool {
+        OneTouchBundle.keys.contains(key) && oneTouchStrength != nil
+    }
+
+    /// 몸 피부 슬라이더의 꼬리표.
+    /// 몸 피부는 사진 단위라 대상과 무관하게 전체 층 표시를 본다.
+    /// 밝기만 묶이고 톤은 원터치가 쓸 때만 묶인다.
+    func isOneTouchTagged(_ key: BodySkinKey) -> Bool {
+        guard currentRecipe.portrait.oneTouch != nil else { return false }
+        switch key {
+        case .brightness: return true
+        case .tone: return OneTouchBundle.writesBodyTone
+        case .smoothing: return false
+        }
+    }
+
+    /// 현재 대상 층에서 덮어쓴 키.
+    /// 전체와 기록이 없는 얼굴은 빈 집합이다.
+    var overriddenKeys: Set<PortraitKey> {
+        scope(for: beautyTarget).map { PortraitResolver.overriddenKeys(currentRecipe, scope: $0) } ?? []
+    }
+
+    /// 대상이 가리키는 얼굴.
+    /// 전체·그룹은 모든 얼굴이다.
+    var targetedFaces: [FaceGeometry] {
+        switch beautyTarget {
+        case .all, .gender:
+            return faces
+        case .face(let index):
+            return faces.indices.contains(index) ? [faces[index]] : []
+        case .person(let id):
+            let paired = currentRecipe.people.peopleByFace(faces.map(\.boundingBox))
+            return paired.filter { $0.value.id == id }.keys.sorted().map { faces[$0] }
+        }
+    }
+
+    /// 선택 사진의 뷰티·메이크업 얼굴 상태.
+    /// 대상이 가리키는 얼굴(전체·그룹이면 전부)에 특징점이 없으면 noLandmarks다.
     var faceAvailability: FaceAvailability {
         if let failure = selectedInfo?.faceAnalysisFailure {
             return .unavailable(failure)
         }
         guard !faces.isEmpty else { return .noFace }
-        let targets =
-            currentRecipe.portrait.targetFace.map { index in faces.indices.contains(index) ? [faces[index]] : [] }
-            ?? faces
+        let targets = targetedFaces
+        // 짝이 없는 사람은 가리키는 얼굴이 없지만 분석 실패가 아니므로 준비됨이다.
         let lacksLandmarks = !targets.isEmpty && targets.allSatisfy { $0.landmarks.isEmpty }
         return lacksLandmarks ? .noLandmarks : .ready
     }
@@ -339,7 +560,24 @@ final class AppModel {
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
-            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure)
+            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders)
+        bindLegacyPeople(id, faces: prepared.faces)
+    }
+
+    /// 옛 기록(legacyIndex)에 준비한 얼굴의 anchor를 채운다.
+    /// 체크포인트가 아니고, 바뀔 것이 없으면 세션을 쓰지 않는다.
+    private func bindLegacyPeople(_ id: PhotoID, faces: [FaceGeometry]) {
+        guard let index = session.index(of: id) else { return }
+        let boxes = faces.map(\.boundingBox)
+        var probe = session.photos[index].document
+        guard probe.bindLegacyPeople(faces: boxes) else { return }
+        session.edit(id) { document in
+            _ = document.bindLegacyPeople(faces: boxes)
+            return nil
+        }
+        if let error = session.lastPersistenceError {
+            present(error)
+        }
     }
 
     /// 미리보기 캐시에서 밀려난 사진을 다시 준비한다. 다시 준비하면 분석도 새로 하므로 사진 정보를 함께 바꾼다.
@@ -436,7 +674,8 @@ final class AppModel {
         renderScheduler.schedule { [weak self] in
             // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
             try await self?.reprepareIfEvicted(id, at: url)
-            return try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
+        } render: {
+            try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }
             isRendering = false

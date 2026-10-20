@@ -291,6 +291,9 @@ final class EditorScenarioTests: XCTestCase {
         let firstID = model.session.photos[0].id
         model.select(firstID)
         try await waitUntil { model.isReady && model.preview != nil }
+        // 기다림이 실패했을 때 느린 렌더와 렌더 실패를 구분한다.
+        XCTAssertNil(model.selectionFailure)
+        XCTAssertNil(model.lastRenderFailure)
         for category in SyncCategory.allCases where category != .color {
             model.setSyncCategory(category, enabled: false)
         }
@@ -303,5 +306,128 @@ final class EditorScenarioTests: XCTestCase {
 
         let size = try await exportedPixelSize(model)
         XCTAssertEqual(size.width, size.height, "다리를 늘리고 메이크업을 해도 정사각형 원본 크기 그대로 저장된다")
+    }
+
+    /// 원터치 → 강도 → 세부 조정에서 묶인 키 변경(꼬리표 해제) → 저장.
+    func testOneTouchThenStrengthThenDetailOverrideThenExportSucceeds() async throws {
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([Self.demoFace])),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([try demoPortraitCopy()])
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.selectTool(.beauty)
+        let baseline = previewBytes(model)
+        model.applyOneTouch()
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != baseline }
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertTrue(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        let defaultBytes = previewBytes(model)
+        model.beginSliderEdit()
+        model.applyOneTouch(strength: 1)
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != defaultBytes }
+        XCTAssertEqual(model.oneTouchStrength, 1)
+        model.showsDetailAdjustments = true
+        model.beginSliderEdit()
+        model.edit(.skinRefinement(.darkCircles, 0.1))
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.oneTouchStrength, "세부 조정이 표시를 지운다")
+        XCTAssertFalse(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.oneTouch, 1, "그룹 표시는 남는다")
+        model.undo()
+        XCTAssertEqual(model.oneTouchStrength, 1, "실행 취소 한 번에 표시가 돌아온다")
+        let size = try await exportedPixelSize(model)
+        XCTAssertGreaterThan(size.width, 0)
+        XCTAssertNil(model.presentedError)
+    }
+
+    /// 생성 사진 라벨 중 시나리오가 읽는 부분.
+    /// 전체 형식(PeopleLabels)은 렌더링 테스트 타깃에 있다.
+    private struct ScenarioLabels: Decodable {
+        struct Photo: Decodable {
+            struct Person: Decodable {
+                let gender: String
+            }
+            let file: String
+            let people: [Person]
+        }
+        let photos: [Photo]
+    }
+
+    private var peopleFixtureFolder: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("shared/fixtures/people")
+    }
+
+    private func scenarioLabels() throws -> ScenarioLabels {
+        let data = try Data(contentsOf: peopleFixtureFolder.appendingPathComponent("labels.json"))
+        return try JSONDecoder().decode(ScenarioLabels.self, from: data)
+    }
+
+    /// 가져오기는 받은 파일을 옮기므로 생성 사진을 임시 폴더에 복사해서 넘긴다.
+    private func peopleFixtureCopy(_ name: String) throws -> URL {
+        let copy = root.appendingPathComponent(name)
+        try FileManager.default.copyItem(at: peopleFixtureFolder.appendingPathComponent(name), to: copy)
+        return copy
+    }
+
+    /// 생성 커플 사진(실제 Vision): 라벨대로 성별을 지정하고 여성 그룹·개인 값을 넣은 뒤 단체 사진에 피부만 동기화하고 저장한다.
+    func testCoupleFixtureManualGenderGroupAndIndividualThenSyncAndExport() async throws {
+        let labels = try scenarioLabels()
+        let couple = try XCTUnwrap(labels.photos.first { $0.file == "couple-01.jpg" })
+        let group = try XCTUnwrap(labels.photos.first { $0.file == "group-01.jpg" })
+        let model = TestSupport.makeModel(
+            root: root, analyzer: VisionFaceAnalyzer(), importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([try peopleFixtureCopy("couple-01.jpg"), try peopleFixtureCopy("group-01.jpg")])
+        try await waitUntil({ model.session.photos.count == 2 && model.isReady && model.preview != nil }, timeout: 30)
+        XCTAssertEqual(model.session.selectedPhotoID, model.session.photos[0].id, "처음 가져오면 첫 사진(커플)을 고른다")
+        XCTAssertEqual(model.faces.count, couple.people.count, "Vision 얼굴 수가 라벨 인원과 같다(PeopleFixturesTests가 보증)")
+        let baseline = previewBytes(model)
+        model.selectTool(.beauty)
+        for (index, person) in couple.people.enumerated() {
+            model.setBeautyTarget(.face(index))
+            model.setGender(person.gender == "male" ? .male : .female)
+        }
+        XCTAssertEqual(model.personChips.map(\.source), Array(repeating: .manual, count: couple.people.count))
+        XCTAssertEqual(
+            model.personChips.map(\.gender), couple.people.map { $0.gender == "male" ? Gender.male : .female },
+            "칩의 성별이 라벨과 같다")
+        model.setBeautyTarget(.gender(.female))
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.8))
+        model.endSliderEdit()
+        try await waitUntil({ !model.isRendering && self.previewBytes(model) != baseline }, timeout: 30)
+        let femaleIndex = try XCTUnwrap(couple.people.firstIndex { $0.gender == "female" })
+        let maleIndex = try XCTUnwrap(couple.people.firstIndex { $0.gender == "male" })
+        model.setBeautyTarget(.face(maleIndex))
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0, "남성은 여성 그룹 값을 받지 않는다")
+        model.setBeautyTarget(.face(femaleIndex))
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.8)
+        model.beginSliderEdit()
+        model.edit(.faceShape(.width, -0.3))
+        model.endSliderEdit()
+        try await waitUntil({ !model.isRendering }, timeout: 30)
+        XCTAssertEqual(model.overriddenKeys, [.faceShape(.width)])
+        let coupleRecipe = model.currentRecipe
+        XCTAssertEqual(coupleRecipe.people.individuals.count, couple.people.count)
+        for category in SyncCategory.allCases where category != .skin {
+            model.setSyncCategory(category, enabled: false)
+        }
+        model.applyToAll()
+        let groupRecipe = model.session.photos[1].document.recipe
+        XCTAssertEqual(groupRecipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.8), "그룹 층은 복사")
+        XCTAssertTrue(groupRecipe.people.individuals.isEmpty, "개인 층·성별 지정은 복사하지 않는다")
+        XCTAssertEqual(model.currentRecipe, coupleRecipe, "보낸 사진의 레시피는 그대로")
+        model.select(model.session.photos[1].id)
+        try await waitUntil({ model.isReady && model.preview != nil }, timeout: 30)
+        XCTAssertEqual(model.faces.count, group.people.count)
+        XCTAssertTrue(model.personChips.allSatisfy { $0.source == .none }, "단체 사진은 아직 모두 미지정")
+        model.select(model.session.photos[0].id)
+        try await waitUntil({ model.isReady && model.preview != nil }, timeout: 30)
+        let size = try await exportedPixelSize(model)
+        XCTAssertGreaterThan(size.width, 0)
+        XCTAssertNil(model.presentedError)
     }
 }

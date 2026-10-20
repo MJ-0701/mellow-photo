@@ -71,7 +71,7 @@ PortraitLayer.oneTouch: Double?                // 그룹·개인 층 표시, isE
 // MellowEditing (Task 2)
 EditingPolicy.oneTouchDefaultStrength = 0.6
 EditDocument.applyOneTouch(strength:in: PortraitScope = .all) -> Rejection?
-EditDocument.applyOneTouch(strength:forPersonAt: PersonAnchor) -> Rejection?
+EditDocument.applyOneTouch(strength:forFace: Int, of: [NormalizedRect]) -> Rejection?   // H2 구현 중 변경: forPersonAt 대신
 EditDocument.applyAuto(_:oneTouchStrength: Double? = nil) -> Bool
 SyncCategory.oneTouchCategories: Set<SyncCategory> = [.skin, .features, .makeup]
 // 내부: EditDocument.clearStaleOneTouchMarks(previous:in:), commit(_:clearsStaleMarks:)
@@ -351,6 +351,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         XCTAssertEqual(document.recipe.people.groups[.female]?.face[.jaw], 0.3)
     }
 
+    // twoFaces는 H2가 EditDocumentTests에 둔 두 얼굴 상자(중심 x 0.3·0.7)다.
     func testOneTouchOnGroupAndPersonUsesThatGenderTableOnly() {
         var document = EditDocument()
         XCTAssertNil(document.applyOneTouch(strength: 1, in: .gender(.male)))
@@ -358,12 +359,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         XCTAssertNil(document.recipe.people.groups[.female], "다른 그룹은 그대로")
         XCTAssertEqual(document.recipe.portrait, PortraitAdjustments(), "전체 층도 그대로")
         XCTAssertEqual(document.recipe.bodySkin, BodySkinAdjustments(), "몸 피부는 전체 대상에서만")
-        XCTAssertNil(document.set(.gender(.female), forPersonAt: faceAnchor))
+        XCTAssertNil(document.set(.gender(.female), forFace: 0, of: twoFaces))
         let id = document.recipe.people.individuals[0].id
         XCTAssertNil(document.applyOneTouch(strength: 1, in: .person(id)))
         XCTAssertEqual(document.recipe.people.person(id)?.layer, OneTouchBundle.layer(for: .female, strength: 1), "사람은 수동 성별 표")
-        let other = PersonAnchor(x: 0.7, y: 0.5, width: 0.2)
-        XCTAssertNil(document.applyOneTouch(strength: 0.5, forPersonAt: other))
+        XCTAssertNil(document.applyOneTouch(strength: 0.5, forFace: 1, of: twoFaces))
         XCTAssertEqual(document.recipe.people.individuals.count, 2, "기록이 없으면 만든다")
         XCTAssertEqual(document.recipe.people.individuals[1].layer, OneTouchBundle.layer(for: nil, strength: 0.5), "미지정은 공통 표")
         XCTAssertEqual(document.applyOneTouch(strength: 1, in: .person(PersonID())), .unknownPerson)
@@ -422,7 +422,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         XCTAssertEqual(receiver.recipe.people.groups[.female]?.oneTouch, 0.6)
         XCTAssertEqual(SyncCategory.oneTouchCategories, [.skin, .features, .makeup])
         var person = EditDocument()
-        person.applyOneTouch(strength: 1, forPersonAt: faceAnchor)
+        person.applyOneTouch(strength: 1, forFace: 0, of: twoFaces)
         person.applyFromBatch(values, categories: [.skin])
         XCTAssertNil(person.recipe.people.individuals.first?.layer.oneTouch, "개인 층은 묶인 키가 빠지며 표시도 사라진다")
     }
@@ -490,11 +490,16 @@ Run: `cd apple && swift test --filter EditDocumentTests` → 컴파일 실패(`a
         return commit(updated, clearsStaleMarks: false)
     }
 
-    /// anchor의 사람에게. 기록이 없으면 만든다(체크포인트 하나).
+    /// faces[index]와 짝이 된 사람에게.
+    /// 기록이 없으면 그 얼굴 anchor로 만든다(체크포인트 하나).
+    /// 짝짓기는 set(_:forFace:of:)·렌더와 같은 PeopleAdjustments.personID(forFace:of:)다.
     @discardableResult
-    public mutating func applyOneTouch(strength: Double, forPersonAt anchor: PersonAnchor) -> Rejection? {
+    public mutating func applyOneTouch(strength: Double, forFace faceIndex: Int, of faces: [NormalizedRect]) -> Rejection? {
+        guard faces.indices.contains(faceIndex) else { return .unknownPerson }
         var updated = recipe
-        let id = updated.people.personID(at: anchor) ?? Self.appendPerson(at: anchor, to: &updated)
+        let id =
+            updated.people.personID(forFace: faceIndex, of: faces)
+            ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[faceIndex]), to: &updated)
         guard let index = updated.people.individuals.firstIndex(where: { $0.id == id }) else { return .unknownPerson }
         Self.writeOneTouch(
             gender: updated.people.individuals[index].gender, strength: OneTouchBundle.clampedStrength(strength),
@@ -926,6 +931,6 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ## 자체 검토 결과
 
 - **스펙 대조:** §3.1 키·스키마 → Task 1. §3.2 표·강도·상한 → Task 1(`Table`·`maximumStrength`·`layer`). §3.3 편집 규칙(세 층 쓰기, 몸 피부, 표시 해제, 프리셋, 동기화, 자동) → Task 2. §1.2·1.4 원터치 행 → Task 3. §7.1 G4-2 행 → Task 1~3. §8 "G4-2 3 Task"와 같다. 얼굴형·체형 제외(결정 표) → Task 1·2 단언.
-- **타입 일관성:** `OneTouchBundle.maximumStrength`·`keys`·`Values`·`Table`·`values(for:)`·`clampedStrength`·`layer(for:strength:)`·`bodySkin(strength:)`, `PortraitAdjustments.oneTouch`, `PortraitLayer.oneTouch`, `EditingPolicy.oneTouchDefaultStrength`, `SyncCategory.oneTouchCategories`, `EditDocument.applyOneTouch(strength:in:)`·`applyOneTouch(strength:forPersonAt:)`·`applyAuto(_:oneTouchStrength:)`·`commit(_:clearsStaleMarks:)`·`clearStaleOneTouchMarks`, `DisplayScale.changedFraction(weight:)`, `RealPortrait.outsideFaceChangedFraction`·`browMask`, `RealPeople.couple`을 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: Shared +3, Editing +5, Rendering +4.
+- **타입 일관성:** `OneTouchBundle.maximumStrength`·`keys`·`Values`·`Table`·`values(for:)`·`clampedStrength`·`layer(for:strength:)`·`bodySkin(strength:)`, `PortraitAdjustments.oneTouch`, `PortraitLayer.oneTouch`, `EditingPolicy.oneTouchDefaultStrength`, `SyncCategory.oneTouchCategories`, `EditDocument.applyOneTouch(strength:in:)`·`applyOneTouch(strength:forFace:of:)`·`applyAuto(_:oneTouchStrength:)`·`commit(_:clearsStaleMarks:)`·`clearStaleOneTouchMarks`, `DisplayScale.changedFraction(weight:)`, `RealPortrait.outsideFaceChangedFraction`·`browMask`, `RealPeople.couple`을 정의한 Task와 쓰는 Task에서 같게 썼다. 테스트 수: Shared +3, Editing +5, Rendering +4.
 - **Review Focus 매핑:** 1→Task 2, 2→Task 2, 3→Task 2, 4→Task 3, 5→Task 3, 6→Task 2. 모두 테스트 코드가 있다.
 - **플레이스홀더 점검:** 표 값은 스펙 3.2의 시작값이고 Task 3이 실측으로 고칠 수 있다고 적었다. "TBD/TODO/나중에" 없음.

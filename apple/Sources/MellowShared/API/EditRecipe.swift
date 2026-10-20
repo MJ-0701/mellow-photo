@@ -14,6 +14,9 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var body = BodyShapeAdjustments()
     public var makeup = MakeupAdjustments()
     public var effects = EffectAdjustments()
+    /// 성별 그룹 층과 개인 기록.
+    /// portrait·makeup이 전체 층이다.
+    public var people = PeopleAdjustments()
     public var operations: [LocalEdit] = []
 
     public init(
@@ -21,7 +24,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         look: LookSelection = .init(), geometry: GeometryAdjustments = .init(),
         background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
         body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(), effects: EffectAdjustments = .init(),
-        operations: [LocalEdit] = []
+        people: PeopleAdjustments = .init(), operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
@@ -33,6 +36,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         self.body = body
         self.makeup = makeup
         self.effects = effects
+        self.people = people
         self.operations = operations
     }
 
@@ -48,6 +52,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case body
         case makeup
         case effects
+        case people
         case operations
     }
 
@@ -63,7 +68,36 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
         effects = try container.decodeIfPresent(EffectAdjustments.self, forKey: .effects) ?? .init()
+        people = try container.decodeIfPresent(PeopleAdjustments.self, forKey: .people) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
+        // B0~G의 targetFace는 people이 없을 때만 개인 층으로 옮긴다.
+        let legacyTarget = try container.decodeIfPresent(LegacyPortraitProbe.self, forKey: .portrait)?.targetFace
+        if let legacyTarget, people.individuals.isEmpty {
+            migrateLegacyTargetFace(legacyTarget)
+        }
+    }
+
+    /// portrait 컨테이너의 옛 targetFace만 읽는다.
+    private struct LegacyPortraitProbe: Decodable {
+        var targetFace: Int?
+    }
+
+    /// B0~G의 portrait.targetFace("이 값을 i번 얼굴에만")를 H의 모양으로 옮긴다.
+    /// 전체 층 값 전부를 i번 사람의 개인 층(legacyIndex)으로 옮기고 전체 층은 비운다.
+    /// 렌더 결과는 같다.
+    /// id는 인덱스에서 결정적이라 같은 파일을 두 번 읽어도 같다.
+    /// 옮길 값이 없으면 기록을 만들지 않는다.
+    /// 음수·거대한 인덱스(손상 파일)는 범위의 마지막 값으로 모은다.
+    /// 어느 얼굴과도 짝이 되지 않아 옛 결과(빈 대상)와 같다.
+    /// 사람 기록이 이미 있으면 아무것도 하지 않는다(디코더와 같은 조건, 기존 기록을 덮어쓰지 않는다).
+    public mutating func migrateLegacyTargetFace(_ index: Int) {
+        guard people.individuals.isEmpty else { return }
+        let layer = PortraitLayer.difference(portrait: portrait, makeup: makeup)
+        portrait = PortraitAdjustments()
+        makeup = MakeupAdjustments()
+        guard !layer.isEmpty else { return }
+        let safe = PersonID.legacyIndexRange.contains(index) ? index : PersonID.legacyIndexRange.upperBound
+        people.individuals = [PersonRecord(id: .legacy(index: safe), legacyIndex: safe, layer: layer)]
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -79,6 +113,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(body, forKey: .body)
         try container.encode(makeup, forKey: .makeup)
         try container.encode(effects, forKey: .effects)
+        try container.encode(people, forKey: .people)
         try container.encode(operations, forKey: .operations)
     }
 
@@ -98,7 +133,8 @@ public struct EditRecipe: Codable, Equatable, Sendable {
 
     public var hasLocalEdits: Bool { !operations.isEmpty }
     /// 피부·얼굴형·눈·입·메이크업 중 하나라도 렌더를 바꾸면 얼굴 분석이 필요하다.
-    public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect }
+    /// 성별 그룹·개인 층의 값도 같다.
+    public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect || people.hasEffect }
     /// 배경 흐림과 몸 피부는 인물 마스크가 필요하다.
     public var dependsOnPerson: Bool { background.hasEffect || bodySkin.hasEffect }
     /// 체형은 관절점이 필요하다.
@@ -108,9 +144,16 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     /// 렌더 전 검증용. 비유한수가 하나라도 있으면 false.
     public var allValuesFinite: Bool {
         let scalars = [color.exposure, color.contrast, color.saturation, color.warmth, look.intensity]
-        let groups =
-            portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
-            + bodySkin.numericValues + body.numericValues + makeup.numericValues + effects.numericValues
+        // 타입 검사 시간을 줄이려 묶음마다 따로 붙인다.
+        var groups: [Double] = portrait.numericValues
+        groups += detail.numericValues
+        groups += geometry.numericValues
+        groups += background.numericValues
+        groups += bodySkin.numericValues
+        groups += body.numericValues
+        groups += makeup.numericValues
+        groups += effects.numericValues
+        groups += people.numericValues
         let locals = operations.flatMap(\.numericValues)
         return (scalars + groups + locals).allSatisfy(\.isFinite)
     }

@@ -22,7 +22,8 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "targetFace": { "type": ["integer", "null"], "default": null, "description": "왼쪽부터 센 얼굴 인덱스. null이면 모든 얼굴." },
+        "oneTouch": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "default": null, "description": "원터치 표시(G4). 전체 층의 묶인 항목(skin 9종·features 3종·makeup.blush·makeup.lip)이 OneTouchBundle 공통 표 × 이 강도와 같고 bodySkin.brightness가 몸 피부 표 × 이 강도와 같다는 뜻이다. 렌더는 읽지 않는다. 없으면 표시 없음." },
+        "targetFace": { "type": ["integer", "null"], "default": null, "deprecated": true, "description": "B0~G의 읽기 전용 키. people.individuals가 없을 때만 전체 층 값을 그 인덱스 사람의 개인 층(legacyIndex)으로 옮겨 읽는다. 쓰지 않는다." },
         "skin": {
           "type": "object", "additionalProperties": false,
           "properties": {
@@ -167,6 +168,42 @@
         "glow": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 }
       }
     },
+    "people": {
+      "type": "object", "additionalProperties": false,
+      "description": "사람별·성별 그룹 보정. 전체(portrait·makeup) → 성별 그룹 → 개인 순서로 키 단위로 덮어쓴다. anchor는 정규화 얼굴 상자 중심과 폭이고 같은 사람 판정은 폭의 50% 거리·크기 비 2배 이내.",
+      "properties": {
+        "groups": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "male": { "$ref": "#/$defs/portraitLayer" },
+            "female": { "$ref": "#/$defs/portraitLayer" }
+          }
+        },
+        "individuals": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "layer"],
+            "anyOf": [{ "required": ["anchor"] }, { "required": ["legacyIndex"] }],
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "anchor": {
+                "type": "object", "additionalProperties": false,
+                "required": ["x", "y", "width"],
+                "properties": {
+                  "x": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "y": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "width": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+                }
+              },
+              "legacyIndex": { "type": "integer", "minimum": 0, "description": "옛 targetFace에서 이행한 기록만. anchor가 채워지면 사라진다." },
+              "gender": { "enum": ["male", "female"], "description": "수동 지정. 자동 추정은 저장하지 않는다." },
+              "layer": { "$ref": "#/$defs/portraitLayer" }
+            }
+          }
+        }
+      }
+    },
     "operations": {
       "type": "array",
       "description": "사용자가 기록한 순서대로 재생한다.",
@@ -193,6 +230,88 @@
             }
           }
         ]
+      }
+    }
+  },
+  "$defs": {
+    "portraitLayer": {
+      "type": "object", "additionalProperties": false,
+      "description": "성긴 층. 있는 키만 아래 층을 덮어쓰고 없는 키는 상속한다.",
+      "properties": {
+        "oneTouch": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "default": null, "description": "원터치 표시(G4). 이 층의 묶인 항목이 OneTouchBundle 표(그룹은 그 성별, 개인은 수동 성별, 미지정은 공통) × 이 강도와 같다는 뜻이다. 렌더는 읽지 않고 덮어쓰는 키도 아니다. 없으면 표시 없음." },
+        "skin": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "smoothing": { "type": "number", "minimum": 0, "maximum": 1 },
+            "autoBlemish": { "type": "boolean" },
+            "darkCircles": { "type": "number", "minimum": 0, "maximum": 1 },
+            "nasolabial": { "type": "number", "minimum": 0, "maximum": 1 },
+            "marionette": { "type": "number", "minimum": 0, "maximum": 1 },
+            "glabella": { "type": "number", "minimum": 0, "maximum": 1 },
+            "toneEvening": { "type": "number", "minimum": 0, "maximum": 1 },
+            "redness": { "type": "number", "minimum": -1, "maximum": 1 },
+            "shine": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "face": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "width": { "type": "number", "minimum": -1, "maximum": 1 },
+            "jaw": { "type": "number", "minimum": -1, "maximum": 1 },
+            "cheekbone": { "type": "number", "minimum": -1, "maximum": 1 },
+            "eyeSize": { "type": "number", "minimum": -1, "maximum": 1 },
+            "eyeDistance": { "type": "number", "minimum": -1, "maximum": 1 },
+            "noseWidth": { "type": "number", "minimum": -1, "maximum": 1 },
+            "mouthSize": { "type": "number", "minimum": -1, "maximum": 1 },
+            "smile": { "type": "number", "minimum": 0, "maximum": 1 },
+            "forehead": { "type": "number", "minimum": -1, "maximum": 1 },
+            "chinLength": { "type": "number", "minimum": -1, "maximum": 1 }
+          }
+        },
+        "features": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "eyeBrighten": { "type": "number", "minimum": 0, "maximum": 1 },
+            "teethWhiten": { "type": "number", "minimum": 0, "maximum": 1 },
+            "lipVitality": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "makeup": {
+          "type": "object", "additionalProperties": false,
+          "description": "부위 단위로 덮어쓴다. 부위 객체가 있으면 색과 강도를 함께 덮어쓰고 colorID가 없거나 null이면 색 없음이다.",
+          "properties": {
+            "lookID": { "type": ["string", "null"], "description": "이 층에서 마지막으로 적용한 룩 id." },
+            "lip": {
+              "type": "object", "additionalProperties": false,
+              "properties": {
+                "colorID": { "type": ["string", "null"] },
+                "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "blush": {
+              "type": "object", "additionalProperties": false,
+              "properties": {
+                "colorID": { "type": ["string", "null"] },
+                "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "eyeshadow": {
+              "type": "object", "additionalProperties": false,
+              "properties": {
+                "colorID": { "type": ["string", "null"] },
+                "intensity": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "brow": {
+              "type": "object", "additionalProperties": false,
+              "properties": { "intensity": { "type": "number", "minimum": 0, "maximum": 1 } }
+            },
+            "contour": {
+              "type": "object", "additionalProperties": false,
+              "properties": { "intensity": { "type": "number", "minimum": 0, "maximum": 1 } }
+            }
+          }
+        }
       }
     }
   }

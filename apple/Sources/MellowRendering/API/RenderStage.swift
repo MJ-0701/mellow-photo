@@ -1,21 +1,51 @@
 import CoreImage
 import MellowShared
 
+/// 렌더할 얼굴 하나와 그 얼굴에 해석한 값(전체 → 성별 그룹 → 개인).
+/// 네 얼굴 단계(피부·특징·메이크업·얼굴형)가 이 목록을 돈다.
+public struct FaceTarget: Sendable {
+    /// analysis.faces 안 인덱스.
+    public let index: Int
+    public let face: FaceGeometry
+    /// 짝이 된 사람 기록.
+    /// 없으면 nil이다.
+    public let personID: PersonID?
+    /// 유효 성별(수동 지정 ?? 추정).
+    /// 없으면 그룹 층을 받지 않는다.
+    public let gender: Gender?
+    public let portrait: PortraitAdjustments
+    public let makeup: MakeupAdjustments
+    /// 이 얼굴의 자동 잡티.
+    public let blemishes: [BlemishSpot]
+
+    public init(
+        index: Int, face: FaceGeometry, personID: PersonID?, gender: Gender?, portrait: PortraitAdjustments,
+        makeup: MakeupAdjustments, blemishes: [BlemishSpot]
+    ) {
+        self.index = index
+        self.face = face
+        self.personID = personID
+        self.gender = gender
+        self.portrait = portrait
+        self.makeup = makeup
+        self.blemishes = blemishes
+    }
+}
+
 public struct RenderContext: Sendable {
     public let extent: CGRect
     public let recipe: EditRecipe
     /// 사진 준비 때 계산한 분석 결과. 단계는 faces·blemishes 같은 접근자로 읽는다.
     public let analysis: PhotoAnalysis
-    /// recipe.portrait.targetFace를 적용한 결과. 범위 밖 인덱스면 비어 있다.
-    public let targetFaces: [FaceGeometry]
+    /// 얼굴마다 해석한 값.
+    /// 짝이 없는 사람 기록은 어느 얼굴에도 들어가지 않는다.
+    public let faceTargets: [FaceTarget]
     public let tuning: RenderTuning
     public let lookCatalog: LookCatalog
     /// 메이크업 팔레트. 비어 있으면 색을 고르는 부위(립·블러셔·아이섀도)만 빠진다.
     public let makeupCatalog: MakeupCatalog
     /// 자르기 도구 화면용. 기하 단계가 자르기만 건너뛴다.
     public let skipsCrop: Bool
-    /// recipe.portrait.targetFace를 적용한 잡티.
-    public let targetBlemishes: [BlemishSpot]
 
     public init(
         extent: CGRect, recipe: EditRecipe, analysis: PhotoAnalysis, tuning: RenderTuning,
@@ -28,14 +58,23 @@ public struct RenderContext: Sendable {
         self.lookCatalog = lookCatalog
         self.makeupCatalog = makeupCatalog
         self.skipsCrop = skipsCrop
+        faceTargets = Self.makeTargets(recipe: recipe, analysis: analysis)
+    }
+
+    /// 사람 기록을 얼굴에 짝짓고 얼굴마다 층을 겹친다.
+    /// 짝짓기는 편집·앱과 같은 PeopleAdjustments.peopleByFace(전역 PersonMatcher.match)다.
+    /// 성별은 기록의 수동 지정이 먼저이고 준비 때 받아들인 추정이 그다음이다.
+    static func makeTargets(recipe: EditRecipe, analysis: PhotoAnalysis) -> [FaceTarget] {
         let faces = analysis.faces
-        let blemishes = analysis.blemishes
-        if let index = recipe.portrait.targetFace {
-            targetFaces = faces.indices.contains(index) ? [faces[index]] : []
-            targetBlemishes = blemishes.filter { $0.faceIndex == index }
-        } else {
-            targetFaces = faces
-            targetBlemishes = blemishes
+        let personByFace = recipe.people.peopleByFace(faces.map(\.boundingBox))
+        return faces.indices.map { index in
+            let person = personByFace[index]
+            let estimate = analysis.genderEstimates.indices.contains(index) ? analysis.genderEstimates[index] : nil
+            let gender = PortraitResolver.effectiveGender(person: person, estimate: estimate?.gender)
+            let resolved = PortraitResolver.resolve(recipe, person: person, gender: gender)
+            return FaceTarget(
+                index: index, face: faces[index], personID: person?.id, gender: gender, portrait: resolved.portrait,
+                makeup: resolved.makeup, blemishes: analysis.blemishes.filter { $0.faceIndex == index })
         }
     }
 

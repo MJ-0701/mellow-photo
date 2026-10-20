@@ -38,8 +38,8 @@
 | 강도 슬라이더(0…1)는 표의 모든 값에 선형으로 곱한다(자동 잡티는 강도 > 0이면 켬). **기본 강도 0.6**이 Evoto 크기, **1은 표 값 그대로이며 그것이 상한**이다(슬라이더가 표를 넘는 값을 만들지 않음). 강도 0은 묶인 항목을 그 층에서 지운다(전체 층은 기본값, 그룹·개인은 상속) | 끝까지 올려도 성형 느낌이 나지 않아야 한다. 상한은 표 값이고 상한 테스트가 지킨다 | 작음 |
 | 몸 피부 밝기·톤은 사진 단위라 대상이 "전체"일 때만 원터치가 쓴다(그룹·사람 대상에서는 건너뜀) | H 결정(체형·몸 피부는 사진 단위) 유지 | 작음 |
 | 세부 슬라이더는 뷰티 패널의 "세부 조정" 접기 안으로 들어간다(기본 접힘, 펼침 상태는 세션 기억). 접기 안은 지금의 탭 4개(피부·얼굴·눈·입·피부톤) 그대로 | 첫 화면은 "대상 칩 → 원터치 버튼 + 강도" 한 줄이어야 Evoto와 같다 | 작음 |
-| 기존 "자동" 버튼은 지금처럼 색감·디테일 + 피부 보정·자동 잡티·눈 또렷하게다. 자동은 원터치를 포함한다(질문 2) (판정: 권고 채택) | 두 버튼이 겹치면 사용자가 헷갈리지만, 자동이 성별 표까지 쓰면 색감만 맞추고 싶은 사용자가 놀란다 | 작음 |
-| 프리셋은 원터치가 쓴 값(전체 층·그룹 층)과 `oneTouch` 표시를 함께 나른다(지금 규칙 그대로). 동기화는 피부·눈입·메이크업 세 항목을 모두 복사할 때만 표시를 복사하고 일부만 복사하면 받는 사진의 표시를 지운다 | 표시는 "이 층의 묶인 항목이 표와 같다"는 뜻이라 일부만 바뀌면 거짓이 된다 | 작음 |
+| **자동 = 색감·디테일 자동 + 얼굴이 있으면 원터치 강도 0.6(전체 대상: 전체 층 공통 표, 남성·여성 그룹 층 각 성별 표, 몸 피부 밝기)을 한 체크포인트로 쓴다.** 예전에 자동이 쓰던 피부 보정 0.3·자동 잡티·눈 0.2는 원터치 공통 표에 흡수된다. 얼굴이 없으면 색감·디테일만 (질문 2, 판정: 권고 채택) | 사용자가 기억한 Evoto는 "버튼 하나로 자동 보정"이었다. 대가: 색감만 맞추려던 사용자도 피부·눈입·블러셔·립이 바뀌고, 그룹 층에서 손으로 바꾼 묶인 키 값이 성별 표 값으로 덮인다(실행 취소 한 번으로 되돌림) | 작음 (`AppModel.Policy.autoIncludesOneTouch` 상수 하나로 분리로 돌아감) |
+| 프리셋은 원터치가 쓴 값(전체 층·그룹 층)과 `oneTouch` 표시를 함께 나른다(지금 규칙 그대로). 동기화는 피부·눈입·메이크업·몸 피부 네 항목을 모두 복사할 때만 표시를 복사하고(G4-2 구현 중 변경: 몸 피부 추가) 일부만 복사하면 받는 사진의 표시를 지운다 | 표시는 "이 층의 묶인 항목이 표와 같다"는 뜻이라 일부만 바뀌면 거짓이 된다 | 작음 |
 | 사람 영역을 못 찾았지만 얼굴이 있으면 몸 피부는 **가장 큰 얼굴 상자를 가로 3배·아래로 4배 늘린 부드러운 영역**을 사람 영역 대신 쓴다. 피부톤 탭 맨 위에 "사람 영역 · 기준 얼굴" 상태 한 줄을 보인다 | 조건이 안 맞아 조용히 빠지는 것이 "안 바뀐다"로 보였다. 얼굴 없음 규칙(G 결정, 건너뜀)은 그대로 | 작음 |
 | 붉은기 +1 가산 0.03 → 0.06, 붉은기 − 비율 0.7 → 1.0에 기준 Cr 여유 0.01, 번들거림 시작 0.12 → 0.08·폭 0.1 → 0.08, 몸 피부 톤 0.025 → 0.035(G4-1 구현 중 0.05에서 내림, 아래 행). 나머지 G 상수는 측정상 충분해 유지(2절 표) | 보이는 강도 원칙 | 작음 |
 | 기기 진단은 앱 정보 시트의 "진단" 절(앱 버전·빌드, 기기, 선택 사진·미리보기 크기, 얼굴·사람·관절 유무, 기본값이 아닌 레시피 키, 마지막 렌더 오류)과 "복사" 버튼만. 렌더 파이프라인은 바꾸지 않는다 | 기기 렌더 경로는 정상으로 확인됐다. 다음 기기 확인 때 스크린샷 한 장으로 전제 조건(사람 영역·얼굴)을 볼 수 있으면 충분하다 | 작음 |
@@ -51,6 +51,9 @@
 | **(G4-1 구현 중 변경)** 합성 반사광 도우미를 "빛 층 더하기"에서 "밝힌 사본을 가우시안 봉우리로 섞기"로 고침 | 알파 0 빛 층은 사전곱에서 사라져 반사광이 하나도 심어지지 않았다(고친 뒤 +28/255) | 작음 (테스트 도우미만) |
 | **(G4-1 구현 중 변경)** "띠 밖·마스크 밖 불변"은 바이트 완전 일치가 아니라 채널 차이 1바이트 이내 | 같은 이미지를 마스크로 자기 자신과 섞기만 해도 작업 색공간 반올림으로 1바이트가 바뀐다(G4 전에도 같음). 2바이트 이상 바뀐 픽셀은 없다 | 작음 |
 | **(G4-1 구현 중 변경)** 몸 피부 톤 상수 `bodySkinToneMax`는 0.05가 아니라 0.035. 1.4절에 상한 "피부 톤(몸) ±1: 피부 가중 \|ΔR − ΔB\| ≤ 30/255"를 더한다 | 최종 리뷰: 0.025도 이미 보임 하한(6/255)의 3.3배(19.8/255)였다. 0.05는 피부 전체에 R 약 +18·B 약 −23을 더해 얼굴 전체가 주황빛으로 뜰 위험이 있고 막을 상한 테스트가 없었다. 자연스러움 우선 원칙에 따라 하한의 약 4.7배(예상 약 28/255)에 멈추고 상한을 테스트로 묶는다 | 작음 (상수 한 줄. 기기에서 약하면 상한 30/255 안에서 올린다) |
+| **(G4-2 구현 중 변경)** 원터치 표의 몸 피부 밝기 0.2 → 0.15(기본 0.6에서 0.09) | 강도 1에서 몸 피부 밝기가 눈썹 가장자리를 밝혀 눈썹 마스크 changedFraction이 9.1%로 상한 5%를 넘었다(얼굴 항목만이면 0%). 0.16에서 3.9%, 0.14에서 1.9%라 두 방향 여유가 고른 0.15를 골랐다(눈썹 2.8%, 기본 0.6 남성 피부 평균 ΔY 1.79 ≥ 하한 1.275) | 작음 (표 상수 한 줄. 기기에서 약하면 눈썹 상한 안에서 올린다) |
+| **(G4-2 구현 중 변경)** 원터치 실사진 수용 테스트는 하한(얼굴 상자 보임·남녀 차이·커플)을 몸 피부 없이 얼굴만, 상한(1.4 원터치 행 전부)을 몸 피부를 포함한 전체 대상 결과로 잰다 | 1.4의 "위 항목들의 합"과 "사람 영역 밖"은 몸 피부 포함을 전제한다. 몸 피부 없이 재면 기본 0.6 피부 평균 ΔY가 0.24~0.81/255로 하한 1.275/255에 못 미치는데 이는 얼굴 표 값을 올려 맞출 성질이 아니다(매끄럽게·얼룩 고르기는 밝히지 않고 번들거림은 어둡게 한다). 하한은 얼굴만 재는 쪽이 더 엄격하고 상한은 몸 피부를 넣는 쪽이 더 엄격하다 | 작음 (테스트 설계만) |
+| **(G4-2 구현 중 변경)** 몸 피부 밝기는 전체 층 원터치 표시에 묶이고(손으로 바꾸면 표시 해제, 강도 0은 0으로), 몸 피부 톤은 표 값이 0인 동안 원터치가 쓰지 않는다 | 원터치 결정 행이 묶음을 "피부·주름·눈입·블러셔·몸 피부색"으로 정했으므로 표시도 몸 피부 밝기를 대변해야 한다. 톤 표 값 0을 매번 쓰면 사용자가 맞춘 몸 피부 톤이 조용히 지워진다 | 작음 |
 
 ### 범위
 
@@ -74,7 +77,7 @@
 - **문턱을 못 넘으면 테스트가 빨갛다.** 대응 규칙: 렌더 상수를 올려 넘긴다(2절 표의 "조정 후보"). 문턱을 내리는 것은 VALIDATION에 이유를 적고 사용자가 동의할 때만.
 - **주름 띠를 키우면 밝은 얼룩이 생길 수 있다.** 대응: 밝히는 양은 여전히 "주변 피부보다 어두운 만큼"이고 상한 1.6이다. 합성 결함 없는 데모 사진에서 띠 안 색차(Cb·Cr) 변화 ≤ 0.01을 테스트로 고정한다.
 - **그레인을 키우면 저장본에서 거칠 수 있다.** 대응: 알갱이는 짧은 변 비례라 저장본과 미리보기가 같은 비율이다. 기기 확인 항목으로 남긴다.
-- **원터치가 그룹 층을 쓰면 "전체" 슬라이더를 움직여도 성별 지정된 사람은 안 바뀐다**(그룹 값이 덮어씀). 대응: 그룹 칩에 점 표시와 "재설정"(H3)이 있고, 전체 대상의 강도 슬라이더는 세 층을 함께 다시 쓴다. 안내 문구 한 줄.
+- **원터치가 그룹 층을 쓰면 "전체" 슬라이더를 움직여도 성별 지정된 사람은 안 바뀐다**(그룹 값이 덮어씀). 블러셔·립도 그룹 층이 덮어써서 뒤에 "전체"에 건 메이크업 룩이 성별 지정된 사람에게는 안 보인다(G4-3 구현 중 추가). 대응: 그룹 칩에 점 표시와 "재설정"(H3)이 있고, 전체 대상의 강도 슬라이더는 세 층을 함께 다시 쓴다. 안내 문구 한 줄이 피부·눈입·메이크업을 함께 말한다.
 - **성별을 지정하지 않으면 남녀 차이가 없다.** 대응: 원터치 줄 아래 "성별을 지정하면 남녀가 다르게 보정돼요" 안내. 자동 추정은 질문 3.
 - **CI가 요금 한도로 막혀 있다.** 대응: 모든 계획은 로컬 패키지·Mac 테스트까지만 검증하고, iOS 시뮬레이터·실기기 검증은 CI 복구와 TestFlight 뒤 사용자 조치로 적는다.
 
@@ -144,6 +147,7 @@
 | 입술 생기 1 | 입술 마스크 가중 meanChromaDelta의 Cr ≥ 0.02 (G4-1 구현 중 변경: 입술 커널은 Cb·Cr만 바꾸고 휘도를 지키므로 휘도 지표로는 잴 수 없다) | 위 | 미측정 | `lipSaturationMax`, `lipRednessMax` |
 | 블러셔(복숭아) 1 | 블러셔 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `makeupBlushMaxOpacity` |
 | 원터치 여성 기본 0.6 | 얼굴 상자 changedFraction ≥ 0.05 | — | — | 표 값 |
+| 원터치 남성·공통 기본 0.6 (G4-2 구현 중 추가) | 얼굴 상자 changedFraction ≥ 0.05(몸 피부 없이 얼굴만) | — | — | 표 값 |
 | 원터치 여성 1 | 얼굴 상자 changedFraction ≥ 0.10 | — | — | 표 값 |
 | 원터치 남성 1 | 얼굴 상자 changedFraction ≥ 0.06, 입술 마스크 가중 meanChromaDelta ≤ 0.01(립 없음) | — | — | 표 값 |
 | 원터치 여성 vs 남성 | 두 결과 사이 얼굴 상자 changedFraction ≥ 0.02 | — | — | 표 값 |
@@ -163,12 +167,12 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 | 얼룩 고르기 1 | 피부 마스크 안 fine 분산 비 ≥ 0.85, 피부 평균 ΔY | ≤ +0.03 | 주파수 분리 +0.013, 비 0.91 |
 | 피부 밝기(몸) 1 | 피부 영역 평균 ΔY | ≤ +0.10 | 피부색 변경 +0.066 |
 | 피부 톤(몸) ±1 (G4-1 구현 중 추가) | 피부 가중 \|ΔR − ΔB\| | ≤ 30/255 | 피부색 변경 +0.066(약 17/255)의 두 배 안쪽. 얼굴 전체 주황·푸른 기 없음 |
-| 원터치 기본 강도 0.6(여성·남성·공통) | 얼굴 피부 마스크 평균 ΔY | +0.005 ≤ ΔY ≤ +0.05 | 위 항목들의 합이 피부색 변경보다 작아야 함 |
+| 원터치 기본 강도 0.6(여성·남성·공통) | 얼굴 피부 마스크 평균 ΔY(전체 대상 결과, 몸 피부 포함 — G4-2 구현 중 명시) | +0.005 ≤ ΔY ≤ +0.05 | 위 항목들의 합이 피부색 변경보다 작아야 함 |
 | 원터치 기본 강도 0.6 | 피부 마스크 fine 분산 비 | ≥ 0.9 | 질감 유지 |
 | 원터치 강도 1(상한) | 피부 마스크 fine 분산 비 | ≥ 0.85 | 끝까지 올려도 플라스틱 아님 |
 | 원터치 강도 1 | 얼굴 상자 안 |ΔY| 99백분위 | ≤ 60/255 | 국소 폭주 없음 |
 | 원터치 강도 1 | 피부 마스크(여성은 블러셔 띠 제외) meanChromaDelta | ≤ 0.015 | 색 기 없음 |
-| 원터치 강도 1 | 얼굴 다각형(이마 호 포함)을 얼굴 폭 5% 넓힌 영역 밖(몸 피부는 전체 대상에서 켜지므로 사람 영역 밖) changedFraction | ≤ 0.002 | 머리카락·배경 불변 |
+| 원터치 강도 1 | 얼굴 다각형(이마 호 포함)을 얼굴 폭 5% 넓힌 영역 밖(몸 피부는 전체 대상에서 켜지므로 몸 피부 영역 = 인물 마스크(없으면 대체 영역) × 몸 피부색 가중치가 0이 아닌 곳도 뺀다 — G4-2 구현 중 명시). 얼굴 항목(피부·눈입·메이크업)은 몸 피부 없는 결과에서 넓힌 얼굴 다각형 밖 전체(뺌 없음)로도 잰다(G4-2 구현 중 추가) changedFraction | ≤ 0.002 | 머리카락·배경 불변 |
 | 원터치 강도 1 | 눈썹 마스크 changedFraction | ≤ 0.05 | 눈썹 불변(보호 영역) |
 | 원터치 강도 1 | 남성·공통: 입술 마스크 meanChromaDelta ≤ 0.01. 여성: ≤ 0.03(입술 생기 0.2) | 위 | 립 없음 |
 | 원터치 강도 1 | 얼굴형·체형 키 전부 0 | = 0 | 변형은 묶음 밖 |
@@ -288,18 +292,18 @@ public enum OneTouchBundle {
 | makeup.blush | 없음 | `blush-peach` 0.15 | 없음 | 0.09 |
 | makeup.lip | 없음 | 없음 | 없음 | 없음 |
 | face.* · body.* (변형) | 없음 | 없음 | 없음 | — |
-| bodySkin.brightness (전체 대상만) | 0.2 | — | — | 0.12 |
-| bodySkin.tone (전체 대상만) | 0 | — | — | 0 |
+| bodySkin.brightness (전체 대상만) | 0.15 (G4-2 구현 중 0.2에서 내림) | — | — | 0.09 |
+| bodySkin.tone (전체 대상만) | 0 (0이면 쓰지 않음, G4-2 구현 중 변경) | — | — | 쓰지 않음 |
 
 - 강도 s: 숫자 × s(`AdjustmentRange`로 자름), `autoBlemish = s > 0`, 블러셔 강도 × s(색은 고정). 남성·공통의 블러셔·립은 층에 `MakeupTint(colorID: nil, intensity: 0)`으로 **덮어쓴다**(상속이 아님 — 전체 층에 블러셔가 있어도 남성은 받지 않게). 여성 층의 `lip`도 0으로 덮어쓴다(립은 묶음 밖이지만 "립 없음"을 보장).
 - 표는 `Table` 안 `static let` 상수다(매직 넘버 금지). 값은 취향 결정(사용자 조치)이되 1.4절 상한 테스트를 통과하는 범위 안에서만 고친다.
 - 남성 표가 자연스러운 이유: 매끄럽게 0.25는 중간 대역을 21%만 줄여 수염·모공 결이 남고, 얼룩 고르기 0.15는 거의 보이지 않으며, 색 변화는 붉은기 −0.2뿐이다. 여성 표도 매끄럽게 0.45(중간 대역 38%)에서 멈춰 모공 대역은 손대지 않는다. Evoto "부드러운 피부"의 고주파 비 1.02가 과녁이다.
-- `OneTouchBundle.maximumStrength = 1`과 `EditingPolicy.oneTouchDefaultStrength = 0.6`. 슬라이더 범위는 0…`maximumStrength`.
+- `OneTouchBundle.maximumStrength = 1`과 `OneTouchBundle.defaultStrength = 0.6`(G4-2 구현 중 변경: Shared에 두고 `EditingPolicy.oneTouchDefaultStrength`가 같은 값을 내보낸다. 렌더 테스트가 숫자를 따로 적지 않게). 슬라이더 범위는 0…`maximumStrength`.
 
 #### 3.3 편집 규칙 (`MellowEditing`)
 
 ```swift
-public enum EditingPolicy { public static let oneTouchDefaultStrength = 0.6 }
+public enum EditingPolicy { public static let oneTouchDefaultStrength = OneTouchBundle.defaultStrength }
 
 extension EditDocument {
     /// 대상 층에 표 × 강도를 쓴다. 체크포인트 하나(연속 변경 중이면 없음). 강도 0은 묶인 키를 지운다(전체 층은 기본값, 그 외 상속)와 표시 제거.
@@ -307,18 +311,21 @@ extension EditDocument {
     /// .gender(g): 그 그룹 층 ← g 표. .person(id): 그 기록 층 ← 기록의 수동 성별 표(없으면 공통). 모르는 사람은 .unknownPerson.
     /// 잠긴 사진에서도 허용(얼굴형 키는 묶음에 없음).
     @discardableResult public mutating func applyOneTouch(strength: Double, in scope: PortraitScope = .all) -> Rejection?
-    /// anchor의 사람에게. 기록이 없으면 만든다(H2의 set(_:forPersonAt:)와 같은 길).
-    @discardableResult public mutating func applyOneTouch(strength: Double, forPersonAt anchor: PersonAnchor) -> Rejection?
+    /// faces[index]와 짝이 된 사람에게. 기록이 없으면 그 얼굴 anchor로 만든다(H2의 set(_:forFace:of:)와 같은 길, 렌더와 같은 짝짓기).
+    /// index가 범위 밖이면 .unknownPerson (H2 구현 중 변경: forPersonAt anchor 대신).
+    @discardableResult public mutating func applyOneTouch(strength: Double, forFace index: Int, of faces: [NormalizedRect]) -> Rejection?
 }
 ```
 
 - `.all`에서 그룹 층에 쓸 때 그룹 층의 묶음 밖 키(얼굴형 등)는 보존한다. 개인 층은 건드리지 않는다(사람이 따로 조정한 값은 남고, 그 사람에게는 개인 값이 이긴다 — H 규칙).
-- 표시 해제: `set(_:in:)`·`set(_:forPersonAt:)`·`applyMakeupLook(_:in:)`·`applyAuto`·`resetOverrides`·`merged`(프리셋·동기화)가 어떤 층의 묶인 키(`OneTouchBundle.keys`)를 실제로 바꾸면 **그 층의** `oneTouch`를 nil로 둔다. 같은 값이면 유지. 구현은 `commit` 전에 `clearOneTouchMarks(where:)`가 이전 레시피와 비교한다.
+- 표시 해제: `set(_:in:)`·`set(_:forFace:of:)`·`applyMakeupLook(_:in:)`·`applyAuto`·`resetOverrides`·`merged`(프리셋·동기화)가 어떤 층의 묶인 키(`OneTouchBundle.keys`)를 실제로 바꾸면 **그 층의** `oneTouch`를 nil로 둔다. 같은 값이면 유지. 구현은 `commit` 전에 `clearOneTouchMarks(where:)`가 이전 레시피와 비교한다.
+- (G4-2 구현 중 변경) 몸 피부 밝기는 전체 층 표시의 묶인 항목이다. 손으로 몸 피부 밝기를 바꾸면(동기화의 몸 피부 항목 포함) 전체 층 표시를 지운다. 강도 0은 몸 피부 밝기를 0으로 둔다. 몸 피부 톤은 표 값이 0인 동안 원터치가 쓰지 않고(사용자 톤을 지우지 않음) 표시에도 들지 않는다. 그래서 동기화가 표시를 복사하는 조건에 몸 피부 항목이 든다(아래 동기화 줄).
+- (G4-2 구현 중 추가) 표시의 뜻에서 나오는 세 규칙: 개인 기록의 수동 성별을 바꾸면 그 사람 층의 표시를 지운다(표가 달라져 거짓이 됨, 값은 그대로). `resetOverrides(nil, in:)`(층 전체 재설정)는 표시도 지운다. 원터치가 쓰는 층의 룩 이름(`lookID`·`makeupLookID`)은 블러셔·립 값이 실제로 바뀔 때만 지운다(같은 값이면 룩 유지, 기존 룩 규칙과 같음).
 - `applyOneTouch`는 `face`·`body` 키를 절대 쓰지 않는다(변형은 묶음 밖, 1.4절 상한 테스트가 고정).
-- `applyAuto`: 질문 2가 "포함"이면 `applyAuto(_:oneTouch:)`가 색·디테일을 쓰고 얼굴이 있으면 `applyOneTouch(strength: oneTouchDefaultStrength, in: .all)`을 같은 체크포인트에서 한다(기존 피부 0.3·자동 잡티·눈 0.2 대입은 지움). "분리"면 지금 그대로이고 자동은 전체 층의 표시를 지운다(피부 보정이 바뀌므로).
+- `applyAuto`: 질문 2가 "포함"이면(판정: 포함) `applyAuto(_:oneTouchStrength:)`가 색·디테일을 쓰고 얼굴이 있으면 `applyOneTouch(strength: oneTouchDefaultStrength, in: .all)`을 같은 체크포인트에서 한다(기존 피부 0.3·자동 잡티·눈 0.2 대입은 지움). "분리"면 지금 그대로이고 자동은 전체 층의 표시를 지운다(피부 보정이 바뀌므로).
 - 프리셋: `PresetValues`는 `portrait.oneTouch`와 `people.groups[*].oneTouch`를 그대로 나른다(값과 함께). `apply(_:)`는 통째로 바꾸므로 표시도 프리셋 것이 된다.
-- 동기화(`merged(..., clearsIndividuals: true)`): `categories`가 `.skin`·`.features`·`.makeup`을 **모두** 포함하면 전체 층·그룹 층의 표시를 원본 것으로 복사하고, 하나라도 빠지면 받는 사진의 전체 층·그룹 층 표시를 nil로 둔다. 개인 층은 묶인 키가 지워지므로 표시도 nil.
-- `SyncCategory.oneTouchCategories = [.skin, .features, .makeup]` 상수.
+- 동기화(`merged(..., clearsIndividuals: true)`): `categories`가 `.skin`·`.features`·`.makeup`·`.bodySkin`을 **모두** 포함하면(G4-2 구현 중 변경: `.bodySkin` 추가, 전체 층 표시가 몸 피부 밝기를 대변하므로) 전체 층·그룹 층의 표시를 원본 것으로 복사하고, 하나라도 빠지면 받는 사진의 전체 층·그룹 층 표시를 nil로 둔다. 개인 층은 묶인 키가 지워지므로 표시도 nil.
+- `SyncCategory.oneTouchCategories = [.skin, .features, .makeup, .bodySkin]` 상수.
 
 #### 3.4 "자동"과의 관계 (질문 2)
 
@@ -335,12 +342,12 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 
 1. 얼굴 없음·분석 실패 안내(지금과 같음).
 2. `TargetChips`(H3) — 전체 · 남성 · 여성 · 사람 1…n.
-3. **원터치 줄** `OneTouchRow`(새 파일 `Features/Editor/OneTouchRow.swift`): 왼쪽 버튼 "원터치 보정"(`wand.and.sparkles`), 오른쪽 `AdjustmentSlider`와 같은 모양의 강도 슬라이더(0…1). 슬라이더 값은 현재 대상 층의 `oneTouch`(전체 대상이면 `portrait.oneTouch`)이고 nil이면 손잡이는 0에 두고 값 자리에 "—"를 보인다. 버튼은 nil이면 `oneTouchDefaultStrength`로 적용, 값이 있으면 그 값으로 다시 적용(사용자 조정을 표로 되돌림). 슬라이더 드래그는 `beginSliderEdit`/`applyOneTouch(strength:)`/`endSliderEdit`로 연속 변경 한 단계.
-4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요".
+3. **원터치 줄** `OneTouchRow`(새 파일 `Features/Editor/OneTouchRow.swift`): 왼쪽 버튼 "원터치 보정"(`wand.and.sparkles`), 오른쪽 `AdjustmentSlider`와 같은 모양의 강도 슬라이더(0…1). 슬라이더 값은 현재 대상 층의 `oneTouch`(전체 대상이면 `portrait.oneTouch`)이고 nil이면 손잡이는 0에 두고 값 자리에 "—"를 보인다. 버튼은 nil이면 `oneTouchDefaultStrength`로 적용, 값이 있으면 그 값으로 다시 적용(사용자 조정을 표로 되돌림). 슬라이더 드래그는 `beginSliderEdit`/`applyOneTouch(strength:)`/`endSliderEdit`로 연속 변경 한 단계. (G4-3 구현 중 변경) 줄은 `ViewThatFits` 없이 늘 한 줄(`HStack`, 버튼 `fixedSize`, 슬라이더가 남는 폭)이다. 드래그 중 값 글자가 "—"에서 숫자로 바뀌어 배치가 바뀌면 슬라이더가 다시 만들어져 드래그가 끊기기 때문이다. 기호 `wand.and.sparkles`는 iOS 18·macOS 15부터라 그 전(배포 대상 iOS 17·macOS 14)에는 `wand.and.stars`를 쓴다. 버튼은 `.borderedProminent`에 강조색 틴트, 글자색 `Theme.canvas`다.
+4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요". (G4-3 구현 중 변경) 전체 문구는 원터치 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)이 성별을 지정한 사람에게는 그룹 값에 가린다는 것을, 그룹·사람 문구는 몸 피부 밝기를 바꾸지 않는다는 것(전체 대상에서만)을 함께 말한다. 문구는 `UserMessage.oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`에 G4-3 Task 1이 둔다. (G4-3 리뷰 변경) iPhone 조절 영역(200pt)에서 칩·원터치 줄·"세부 조정" 머리가 스크롤 없이 보이도록 전체 문구는 두 줄, 그룹·사람 문구는 한 줄로 줄인다(뜻은 같음: 성별 표·공통 표, 그룹 값이 메이크업까지 전체보다 앞섬, 그룹·사람 원터치는 몸 피부를 바꾸지 않음). 뷰티 패널은 자체 세로 간격을 8로 좁힌다.
 5. `DisclosureGroup("세부 조정", isExpanded: $model.showsDetailAdjustments)` 안에 지금의 탭 피커와 네 탭 내용. `showsDetailAdjustments`는 세션 상태(기본 false, 파일에 저장 안 함). 세부 슬라이더가 묶인 키이고 그 층의 표시가 있으면 제목 옆에 작은 "원터치" 꼬리표(`Theme.oneTouchTagFont`)를 둔다 — 손으로 바꾸면 꼬리표와 표시가 사라진다.
 6. 피부톤 탭 맨 위 상태 줄(2.4절).
 
-`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forPersonAt:`, 그 외 `in: scope`), `oneTouchStrength: Double?`(현재 대상 층의 표시), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2에 따라 `autoEnhance()`가 `applyAuto(_:oneTouch:)`를 부름. `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
+`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forFace: i, of: 얼굴 상자들`, 그 외 `in: scope`, 강도 nil은 버튼이라 열린 드래그를 먼저 끝냄), `oneTouchStrength: Double?`(현재 대상 층의 표시, G4-3 구현 중 변경: 손상 파일 값도 0…`maximumStrength`로 잘라 슬라이더에 넘김), `isOneTouchTagged(_: PortraitKey)`·`isOneTouchTagged(_: BodySkinKey)`(몸 피부 밝기는 전체 층 표시가 있을 때), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2 판정(포함)에 따라 `autoEnhance()`가 부르는 `applyAutoSuggestion(_:)`이 `Policy.autoIncludesOneTouch`이고 얼굴이 있으면 `applyAuto(_:oneTouchStrength: oneTouchDefaultStrength)`를 부름(G4-3 구현 이름). `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
 
 메이크업 도구는 바꾸지 않는다(H3 칩만).
 
@@ -377,7 +384,7 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 | `apple/Tests/MellowSharedTests/OneTouchBundleTests.swift`, `EditRecipeCodingTests.swift`, `RecipeSchemaTests.swift` | 표·강도 곱·표시 키 왕복·스키마 | G4-2 |
 | `apple/Tests/MellowEditingTests/EditDocumentTests.swift` | `applyOneTouch` 대상별, 표시 해제, 강도 0, 프리셋·동기화 표시 규칙, 자동 | G4-2 |
 | `apple/Tests/MellowRenderingTests/RealPhotoAcceptanceTests.swift`(확장) | 원터치 기본·최대의 하한(1.2)과 상한(1.4): 여성·남성·공통·차이(데모), 커플 사진(`couple-01.jpg`): 라벨대로 성별 지정 → 전체 원터치 → 남성 얼굴 상자 변화 > 0, 여성 > 남성, 남성 입술 색차 ≤ 0.01 | G4-2 |
-| `apple/MellowPhotoTests/AppModelTests.swift`, `EditorScenarioTests.swift`, `OneTouchRowTests.swift` | 원터치 라우팅·강도 표시·세부 조정 접기·상태 줄·진단 줄·시나리오(데모: 원터치 → 강도 → 세부 슬라이더 변경으로 꼬리표 사라짐 → 저장) | G4-1(진단·상태 줄), G4-3 |
+| `apple/MellowPhotoTests/AppModelTests.swift`, `EditorScenarioTests.swift`, `OneTouchRowTests.swift` | 원터치 라우팅·강도 표시·세부 조정 접기·상태 줄·진단 줄·시나리오(데모: 원터치 → 강도 → 세부 슬라이더 변경으로 꼬리표 사라짐 → 저장). G4-3 테스트 이름: `testOneTouchRoutesToTheCurrentTargetAndRemembersStrength`, `testOneTouchButtonEndsAnOpenDragAndStrengthIsClampedForTheSlider`, `testAutoEnhanceIncludesOneTouchOnlyWhenFacesExist`, `testStrengthTextAndHintsFollowTheTarget`, `testOneTouchThenStrengthThenDetailOverrideThenExportSucceeds` | G4-1(진단·상태 줄), G4-3 |
 
 실행은 모두 `cd apple && swift test`(macOS)와 Mac 앱 테스트. iOS 시뮬레이터는 CI.
 
