@@ -560,7 +560,7 @@ final class SkinStageTests: XCTestCase {
         XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
     }
 
-    func testRefinementsReuseTheSkinRasterAndAddNoCacheEntries() throws {
+    func testRefinementsUseOneSkinRasterAndOneFoldRaster() throws {
         let synthetic = SyntheticFace.make()
         var recipe = EditRecipe()
         recipe.portrait.skin = SkinAdjustments(
@@ -571,7 +571,7 @@ final class SkinStageTests: XCTestCase {
             extent: synthetic.image.extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
         let first = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
-        XCTAssertEqual(analysis.regionMasks.count, 1, "주름 띠·대역 합성·붉은기 모두 피부 다각형 비트맵 하나를 쓴다")
+        XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
     }
 }

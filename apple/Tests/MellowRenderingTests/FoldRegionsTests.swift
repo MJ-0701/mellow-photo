@@ -28,6 +28,8 @@ final class FoldRegionsTests: XCTestCase {
             XCTAssertEqual(pixels.red(point), 0, "다크서클 밖 \(point)")
         }
         XCTAssertFalse(mask.bounds.contains(SyntheticFace.mouth), "입은 계산 영역 밖")
+        let lowerBand = CGPoint(x: 200, y: 280)
+        XCTAssertGreaterThan(pixels.red(lowerBand), 128, "눈 아래끝(286)에서 6px 아래도 띠 안이다")
     }
 
     func testNasolabialMaskRunsFromNoseWingToMouthCornerOnBothSides() throws {
@@ -41,11 +43,13 @@ final class FoldRegionsTests: XCTestCase {
             accuracy: 2, "좌우 대칭")
         let outside = [
             SyntheticFace.mouth, SyntheticFace.lipPoint, SyntheticFace.philtrum, SyntheticFace.cheek,
-            SyntheticFace.leftEye, SyntheticFace.leftMarionette, SyntheticFace.chinTip, SyntheticFace.outside,
+            SyntheticFace.leftEye, SyntheticFace.belowLeftNasolabial, SyntheticFace.chinTip, SyntheticFace.outside,
         ]
         for point in outside {
             XCTAssertEqual(pixels.red(point), 0, "팔자 띠 밖 \(point)")
         }
+        let corner = CGPoint(x: 202, y: 136)
+        XCTAssertGreaterThan(pixels.red(corner), 64, "띠가 입꼬리 옆까지 이어진다(보호 영역 넓힘 1.2%)")
     }
 
     func testMarionetteMaskDropsFromTheMouthCornersTowardTheChin() throws {

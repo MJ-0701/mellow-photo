@@ -515,20 +515,26 @@ extension SyntheticFace {
     static let chinTip = CGPoint(x: 256, y: 67)
 }
 
-/// 주름 띠 표본 점. 얼굴 좌표(원점 (256, 200), 얼굴 폭 280)에서 계산한 위치다. 계산은 G1 계획 Task 3 참고.
+/// 주름 띠 표본 점(G4). 얼굴 좌표(원점 (256, 200), 얼굴 폭 280). 계산은 G4-1 계획 Task 2 참고.
 extension SyntheticFace {
-    /// 다크서클 타원 안(중심 y 269.2, 세로 반지름 22.4). 눈 보호 영역(아래끝 286 − 14)보다 10px 아래.
+    /// 다크서클 타원 안(중심 v = 눈 아래끝 286 − 280 × 0.055 = 270.6, 세로 반지름 280 × 0.045 = 12.6).
     static let underLeftEye = CGPoint(x: 200, y: 262)
     static let underRightEye = CGPoint(x: 312, y: 262)
     /// 얼굴을 중심 둘레로 30° 돌렸을 때의 under*Eye 자리.
     static let rolledUnderLeftEye = CGPoint(x: 176.5, y: 225.7)
     static let rolledUnderRightEye = CGPoint(x: 273.5, y: 281.7)
-    /// 코 날개 → 입꼬리 띠 위(코 쪽 40% 지점을 바깥으로 민 자리).
-    static let leftNasolabial = CGPoint(x: 220, y: 173)
-    static let rightNasolabial = CGPoint(x: 292, y: 173)
-    /// 입꼬리에서 턱 쪽으로 내려간 마리오네트 타원 안. 마스크 격자에서 값이 가장 큰 자리(0.9)다.
+    /// 팔자 띠 안. 띠 중심은 코 날개 (236, 190) → 입꼬리 (208, 140)를 25% 연장한 끝 (201, 127.5)의 중점 (218.5, 158.75)을
+    /// 바깥으로 12.6 민 자리(약 (207.5, 165)다).
+    /// 격자를 찍어 띠 값 239·마리오네트 띠 0이고 피부 질감 얼룩이 작은 자리로 옮겼다.
+    /// 오른쪽은 픽셀 거울상(x → 511 − x)이다.
+    static let leftNasolabial = CGPoint(x: 202, y: 156)
+    static let rightNasolabial = CGPoint(x: 309, y: 156)
+    /// 연장된 팔자 띠 끝(약 (188, 130))에서 3 흐림 이상 떨어진 턱 쪽 피부. 팔자 띠 밖이어야 한다.
+    static let belowLeftNasolabial = CGPoint(x: 186, y: 100)
+    /// 마리오네트 타원 안(입꼬리에서 15° 바깥으로 19.6 내려간 중점을 바깥으로 8.4 민 자리 (194.8, 123.3)).
+    /// 오른쪽은 픽셀 거울상(x → 511 − x)이다.
     static let leftMarionette = CGPoint(x: 196, y: 120)
-    static let rightMarionette = CGPoint(x: 316, y: 120)
+    static let rightMarionette = CGPoint(x: 315, y: 120)
     /// 두 눈썹 안쪽 끝 사이.
     static let glabella = CGPoint(x: 256, y: 338)
 }
