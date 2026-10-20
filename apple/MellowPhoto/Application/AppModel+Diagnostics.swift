@@ -4,20 +4,29 @@ import MellowShared
 
 /// 레시피를 JSON으로 펼쳐 기본 레시피와 다른 잎만 "경로=값"으로 적는다.
 /// 키 경로는 영어 식별자(모듈 값 이름 그대로).
+/// 수동 편집(`operations`)은 점·획마다 잎이 여러 개라 개수 한 줄(`operations=N`)로 줄인다.
 enum RecipeSummary {
+    /// 레시피 JSON의 수동 편집 배열 키.
+    static let operationsKey = "operations"
+
     static func nonDefaultLines(_ recipe: EditRecipe) -> [String] {
         let current = leaves(of: recipe)
         let defaults = leaves(of: EditRecipe())
-        return current.filter { defaults[$0.key] != $0.value }.map { "\($0.key)=\($0.value)" }.sorted()
+        var lines = current.filter { defaults[$0.key] != $0.value }.map { "\($0.key)=\($0.value)" }
+        if !recipe.operations.isEmpty {
+            lines.append("\(operationsKey)=\(recipe.operations.count)")
+        }
+        return lines.sorted()
     }
 
     private static func leaves(of recipe: EditRecipe) -> [String: String] {
         guard let data = try? JSONEncoder().encode(recipe),
-            let object = try? JSONSerialization.jsonObject(with: data)
+            var object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return [:] }
+        object["schemaVersion"] = nil
+        object[operationsKey] = nil
         var result: [String: String] = [:]
         flatten(object, path: "", into: &result)
-        result["schemaVersion"] = nil
         return result
     }
 
@@ -54,6 +63,7 @@ enum RecipeSummary {
 /// macOS는 sysctl hw.model(예: Mac14,2)이다.
 enum DeviceModel {
     /// 식별자를 읽지 못했을 때.
+    /// 진단의 앱 버전·빌드를 읽지 못했을 때도 쓴다.
     static let unknown = "?"
 
     static var identifier: String {
@@ -94,9 +104,9 @@ extension AppModel {
     /// 정보 시트 "진단".
     /// 스크린샷 한 장으로 전제 조건(얼굴·사람·관절)과 적용 중인 값을 볼 수 있다.
     var diagnosticLines: [String] {
-        let bundle = Bundle.main
-        let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        let bundleInfo = Bundle.main.infoDictionary ?? [:]
+        let version = bundleInfo["CFBundleShortVersionString"] as? String ?? DeviceModel.unknown
+        let build = bundleInfo["CFBundleVersion"] as? String ?? DeviceModel.unknown
         var lines = [
             "\(UserMessage.diagnosticLabel(.build)) \(version) (\(build))",
             "\(UserMessage.diagnosticLabel(.device)) \(DeviceModel.identifier) · \(ProcessInfo.processInfo.operatingSystemVersionString)",

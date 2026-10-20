@@ -1258,6 +1258,16 @@ final class AppModelTests: XCTestCase {
             Set(RecipeSummary.nonDefaultLines(recipe)),
             ["portrait.skin.autoBlemish=true", "makeup.lip.colorID=lip-rose", "makeup.lip.intensity=0.40"])
     }
+
+    func testDiagnosticRecipeSummaryCollapsesLocalEditsIntoOneCountLine() {
+        var recipe = EditRecipe()
+        recipe.color.exposure = 0.5
+        let spot = RetouchSpot(x: 0.4, y: 0.4, sourceX: 0.5, sourceY: 0.5, radius: 0.02)
+        let stroke = WarpStroke(x: 0.3, y: 0.3, dx: 0.01, dy: 0.0, radius: 0.05)
+        recipe.operations = [.spot(spot), .spot(spot), .warp(stroke)]
+        let lines = RecipeSummary.nonDefaultLines(recipe)
+        XCTAssertEqual(lines, ["color.exposure=0.50", "operations=3"], "수동 편집은 점·획마다 줄을 만들지 않고 개수 한 줄이다")
+    }
 }
 
 /// 비교 화면 원본 다시 그리기를 붙잡아 두는 문. open() 전까지 기다리고, fails면 바로 실패한다.
