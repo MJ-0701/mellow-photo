@@ -567,4 +567,78 @@ final class EditDocumentTests: XCTestCase {
         third.applyFromBatch(PresetValues(effects: EffectAdjustments(glow: 0.4)))
         XCTAssertEqual(third.recipe.effects.glow, 0.4, "일괄 적용도 나른다")
     }
+
+    func testNoOpBatchAndRepeatedPresetAddNoUndoStep() {
+        var locked = EditDocument()
+        locked.set(.faceShape(.width, -0.2))
+        locked.appendLocalEdit(.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02)))
+        let lockedSteps = locked.undoStack.count
+        let faceOnly = PresetValues(portrait: PortraitAdjustments(face: FaceShapeAdjustments(width: -0.9)))
+        locked.applyFromBatch(faceOnly, categories: [.faceShape])
+        XCTAssertEqual(locked.undoStack.count, lockedSteps, "잠긴 사진에 얼굴형만 복사하면 단계를 만들지 않는다")
+        var document = EditDocument()
+        let values = PresetValues(color: ColorAdjustments(exposure: 0.3))
+        document.apply(values)
+        let presetSteps = document.undoStack.count
+        document.apply(values)
+        XCTAssertEqual(document.undoStack.count, presetSteps, "같은 프리셋을 다시 고르면 단계를 만들지 않는다")
+        document.undo()
+        document.apply(PresetValues())
+        XCTAssertTrue(document.canRedo, "바뀐 것이 없는 프리셋은 다시 실행 기록도 지우지 않는다")
+    }
+
+    /// 모든 그룹을 기본값이 아닌 값으로 채운 프리셋. 대상 얼굴은 일괄 적용이 전체로 되돌리므로 nil이다.
+    private func filledPresetValues() -> PresetValues {
+        var values = PresetValues(
+            color: ColorAdjustments(exposure: 0.3, contrast: 1.2, saturation: 0.8, warmth: 0.1),
+            detail: DetailAdjustments(highlights: -0.2, shadows: 0.3, sharpness: 0.4, vignette: 0.5),
+            background: BackgroundAdjustments(blur: 0.4))
+        values.portrait.skin.smoothing = 0.6
+        values.portrait.skin.autoBlemish = true
+        for key in SkinRefinementKey.allCases {
+            values.portrait.skin[key] = 0.3
+        }
+        for key in FaceShapeKey.allCases {
+            values.portrait.face[key] = -0.3
+        }
+        for key in FeatureKey.allCases {
+            values.portrait.features[key] = 0.5
+        }
+        for part in MakeupPart.allCases {
+            values.makeup.setIntensity(0.4, of: part)
+            if part.hasColor {
+                values.makeup.setColorID("\(part.rawValue)-test", of: part)
+            }
+        }
+        values.makeup.lookID = "look-test"
+        for key in BodySkinKey.allCases {
+            values.bodySkin[key] = 0.2
+        }
+        for key in BodyShapeKey.allCases {
+            values.body[key] = -0.2
+        }
+        for key in EffectKey.allCases {
+            values.effects[key] = 0.3
+        }
+        return values
+    }
+
+    func testBatchWithAllCategoriesCopiesEveryPresetGroup() {
+        let values = filledPresetValues()
+        let defaults = PresetValues()
+        for (filled, empty) in zip(Mirror(reflecting: values).children, Mirror(reflecting: defaults).children) {
+            XCTAssertNotEqual(
+                String(describing: filled.value), String(describing: empty.value), "\(filled.label ?? "") 그룹을 채운다")
+        }
+        let portraits = zip(
+            Mirror(reflecting: values.portrait).children, Mirror(reflecting: defaults.portrait).children)
+        for (filled, empty) in portraits where filled.label != "targetFace" {
+            XCTAssertNotEqual(
+                String(describing: filled.value), String(describing: empty.value), "\(filled.label ?? "") 묶음을 채운다")
+        }
+        var document = EditDocument()
+        document.set(.targetFace(1))
+        document.applyFromBatch(values, categories: SyncCategory.all)
+        XCTAssertEqual(PresetValues(of: document.recipe), values, "전부를 고르면 프리셋의 모든 그룹을 복사한다")
+    }
 }

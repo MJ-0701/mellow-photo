@@ -98,14 +98,22 @@ public final class ProjectSession {
     }
 
     /// 고른 사진의 설정을 나머지 사진에 일괄 복사. 고른 항목만 복사한다(기본은 전부).
+    /// 빈 선택이거나 바뀐 사진이 없으면 저장하지 않는다.
     public func applyToAll(from id: PhotoID, categories: Set<SyncCategory> = SyncCategory.all) {
-        guard let source = photos.first(where: { $0.id == id }) else { return }
+        guard !categories.isEmpty, let source = photos.first(where: { $0.id == id }) else { return }
         let recipe = source.document.recipe
         let values = PresetValues(of: recipe)
+        var changed = false
         for index in photos.indices where photos[index].id != id {
+            let before = photos[index].document
             photos[index].document.applyFromBatch(values, categories: categories)
+            if photos[index].document != before {
+                changed = true
+            }
         }
-        persistQuietly()
+        if changed {
+            persistQuietly()
+        }
     }
 
     public func addPreset(named rawName: String, values: PresetValues) {

@@ -218,4 +218,25 @@ final class ProjectSessionTests: XCTestCase {
         session.applyToAll(from: source.id)
         XCTAssertEqual(session.photos[1].document.recipe.detail.vignette, 0.4)
     }
+
+    func testApplyToAllSkipsSavingWhenNothingChanged() throws {
+        let store = MemorySessionStore()
+        let session = ProjectSession(store: store, maxPhotos: 40)
+        let source = entry("A")
+        let other = entry("B")
+        try session.add(source)
+        try session.add(other)
+        session.edit(source.id) { $0.set(.exposure(0.3)) }
+        session.applyToAll(from: source.id, categories: [.color])
+        let saves = store.saveCount
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(store.saveCount, saves, "다시 복사해도 바뀐 사진이 없으면 저장하지 않는다")
+        session.applyToAll(from: source.id, categories: [])
+        XCTAssertEqual(store.saveCount, saves, "빈 선택은 저장하지 않는다")
+        XCTAssertEqual(session.photos[1].document.undoStack.count, 1, "바뀐 것이 없는 복사는 단계를 만들지 않는다")
+        session.edit(source.id) { $0.set(.exposure(0.5)) }
+        let edited = store.saveCount
+        session.applyToAll(from: source.id, categories: [.color])
+        XCTAssertEqual(store.saveCount, edited + 1, "바뀐 사진이 있으면 한 번 저장한다")
+    }
 }

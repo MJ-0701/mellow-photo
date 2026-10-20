@@ -107,19 +107,25 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사용자가 고른 프리셋. 프리셋은 얼굴을 고르지 않으므로 대상 얼굴은 늘 사진의 값을 유지한다.
-    /// 잠긴 사진은 얼굴형·체형도 유지한다.
+    /// 잠긴 사진은 얼굴형·체형도 유지한다. 바뀌는 값이 없으면 실행 취소 단계를 만들지 않는다.
     public mutating func apply(_ values: PresetValues) {
+        let updated = merged(values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all)
+        guard updated != recipe else { return }
         checkpoint()
-        recipe = merged(values, targetFace: recipe.portrait.targetFace, categories: SyncCategory.all)
+        recipe = updated
     }
 
     /// 다른 사진의 설정을 일괄 복사. 고른 항목만 덮어쓴다(기본은 전부). 빈 선택은 아무것도 하지 않는다.
     /// 잠기지 않은 사진은 얼굴 의존 항목을 복사할 때만 대상 얼굴을 전체로 되돌린다.
+    /// 바뀌는 값이 없으면(잠긴 사진에 얼굴형만 복사하는 경우 등) 실행 취소 단계를 만들지 않는다.
     public mutating func applyFromBatch(_ values: PresetValues, categories: Set<SyncCategory> = SyncCategory.all) {
         guard !categories.isEmpty else { return }
         let resetsTarget = !isGeometryLocked && categories.contains { $0.dependsOnFaces }
+        let updated = merged(
+            values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories)
+        guard updated != recipe else { return }
         checkpoint()
-        recipe = merged(values, targetFace: resetsTarget ? nil : recipe.portrait.targetFace, categories: categories)
+        recipe = updated
     }
 
     /// 자동 보정 제안을 한 번의 체크포인트로 적용한다. 색·디테일·피부 보정·자동 잡티·눈 또렷하게만 바꾸고
