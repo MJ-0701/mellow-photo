@@ -135,6 +135,8 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 
 코 날개 "그 쪽"은 `eyeMidline` 기준으로 u 부호가 같은 쪽이다. 한쪽이라도 점이 없으면 그 쪽 타원만 뺀다.
 
+G4-1에서 변경: 띠 위치·크기와 주름용 피부 비트맵, 새 값은 [G4 스펙](2026-10-21-beauty-g4-one-touch-design.md) 2.1·1.3.
+
 #### 1.6 알고리즘과 `RenderTuning` 상수
 
 모든 피부 정밀은 `SkinStage.apply` 안에서 대상 얼굴마다 다음 순서로 돈다: 자동 잡티(기존) → 주름 밝히기 4종(다크서클 → 팔자 → 마리오네트 → 미간) → 대역 합성(피부 보정·얼룩 고르기·번들거림 한 번) → 붉은기. 값은 `AdjustmentRange`로 먼저 자른다. 피부 마스크는 `FaceRegions.skinMask(strength: 1)`을 한 번 만들고(`unitMask`), 합성용은 `MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)`다.
@@ -148,6 +150,8 @@ skin → bodySkin → feature → makeup → background → shapeWarp → localE
 | `foldLiftMax` | 0.9 | 값 1에서 어두운 휘도 차이의 90%를 올림 |
 | `foldLiftMaxGain` | 1.6 | 밝히기 배율 상한. 선형 휘도를 40% 잃은 그늘을 0.9로 올리는 배율(1 + 0.9 × 0.4 / 0.6). 눈가처럼 국소 휘도가 아주 낮은 곳에서 배율이 튀지 않음 |
 | `foldLumaFloor` | 0.01 | 배율 분모(국소 선형 휘도)의 하한 |
+
+G4-1에서 변경: 주변 기준(피부 마스크 × (1 − 띠) 가중 평균)과 `foldSurroundFraction`, 새 값은 G4 스펙 2.2·1.3.
 
 **대역 합성** (`FrequencySeparation.refined`): 기존 `low + mid × keep + fine`에서 `low`를 바꾼다. `wideNum = blur(image × unitMask, r_tone)`, `wideDen = blur(unitMask, r_tone)`, `wide = wideNum / max(wideDen, ε)`(마스크 가중 평균이라 경계에서 머리카락·배경이 섞이지 않음), `r_tone = max(bandRadii.mid, faceWidth × toneBandFraction)`(넓은 평균이 얼룩 대역보다 좁아지지 않게). 커널 `toneMix`:
 
@@ -169,12 +173,16 @@ out  = low + mid × keep + (image − fineBlur)
 | `shineLumaRamp` | 0.1 | 시작점에서 이만큼 더 밝으면 가중치 1 |
 | `shineReductionMax` | 0.85 | 값 1에서 번들거림 저주파를 평균 쪽으로 85% 당기고 중간 대역을 85% 줄임 |
 
+G4-1에서 변경: 번들거림 시작·폭, 새 값은 G4 스펙 2.3·1.3.
+
 **붉은기** (`SkinRefinement.adjustRedness`): sRGB 감마 값으로 바꿔 커널 `redness`를 적용하고 되돌린다(`FeatureKernels.shifted`와 같은 틀). `cr_ref`는 볼 기준 평균(감마)의 Cr. 값 v < 0: `cr' = cr − max(cr − cr_ref, 0) × |v| × rednessClearMax`. v > 0: `cr' = cr + v × rednessFlushMax`. Y·Cb는 그대로, RGB로 되돌려 0…1로 자른다. 피부 마스크(합성용)로 원본 위에 합성.
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
 | `rednessClearMax` | 0.7 | −1에서 기준보다 붉은 양의 70%를 줄임 |
 | `rednessFlushMax` | 0.03 | +1에서 감마 Cr에 더하는 값 |
+
+G4-1에서 변경: 붉은기 상수와 기준 Cr 여유, 새 값은 G4 스펙 2.3·1.3.
 
 **몸 피부** (`BodySkinStage`): `personMask`가 없거나 `faces`가 비면 입력 그대로(오류 아님). 기준 얼굴 = 가장 넓은 얼굴. `encoded = image(sRGB 감마)`, `(left, right) = FaceRegions.cheekAverages(of: encoded, face:, extent:)`(볼 상자가 하나도 없으면 건너뜀). `person = BackgroundStage.personMask(personMask, extent:, feather: shortSide × bodySkinMaskFeather)`(배경 마스크를 만들던 확대·흐림을 반전 없이 돌려주는 새 정적 함수, `backgroundMask`는 이것을 반전). `chroma = SkinKernels.chromaWeight(encoded, left, right, sigma: bodySkinChromaSigma, extent)`. 모든 얼굴의 보호 영역(눈·눈썹·바깥 입술, 눈·입 특징점이 없으면 상자 비율 대체 타원)을 한 비트맵으로 그린 `features = FaceRegions.featureMask(faces:extent:tuning:cache:)`를 반전해 곱한다(사진당 해상도마다 캐시 항목 1개 → `entriesPerFacePerResolution` 9). `toneMask = person × chroma × (1 − features)`. `smoothMask = toneMask × (1 − FaceRegions.wholeFaceMask(...))`: 모든 얼굴의 피부 다각형(윤곽 + 이마 호)을 눈·입을 잘라내지 않고 채워 얼굴 피부 마스크와 같은 반지름으로 흐린 마스크다. (G2 구현 중 변경: 처음 식은 눈썹을 빼지 않고 잘라낸 피부 다각형만 빼서 눈가·입가 고리가 두 번 매끄럽게 되고 눈썹이 하얗게 들렸다.)
 - 밝기·톤: `FeatureKernels.shifted(image, by: ToneShift(lift: brightness × bodySkinLiftMax, blueness: −tone × bodySkinToneMax, redness: tone × bodySkinToneMax), extent)`를 `toneMask`로 합성. `ToneShift`에 `blueness`(Cb 가산)를 더하고 커널 인자를 하나 늘린다(기본 0이라 기존 호출 결과 불변).
@@ -190,6 +198,8 @@ out  = low + mid × keep + (image − fineBlur)
 | `bodySkinFineBandFraction` | 0.002 | 몸 모공 대역 반지름(짧은 변 비율) |
 | `bodySkinMidBandFraction` | 0.012 | 몸 얼룩 대역 반지름 |
 
+G4-1에서 변경: `bodySkinToneMax`와 사람 영역이 없을 때의 대체 영역, 새 값은 G4 스펙 2.4·1.3.
+
 **효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 0…1로 자름(1을 넘는 밝은 입력에서 스크린 합성이 원본을 어둡게 하지 않게) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤(확대는 `samplingNearest()`로 가장 가까운 화소를 뽑아 미리보기·저장 배율 모두 알갱이 경계가 번지지 않음) sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
 
 | 상수 | 시작값 | 뜻 |
@@ -198,6 +208,8 @@ out  = low + mid × keep + (image − fineBlur)
 | `grainSizeFraction` | 0.0012 | 알갱이 한 변(짧은 변 비율, 1200px에서 1.4px) |
 | `glowRadiusFraction` | 0.02 | 글로우 반지름(짧은 변 비율) |
 | `glowMaxIntensity` | 0.6 | 글로우 1에서 스크린 합성하는 빛의 배율 |
+
+G4-1에서 변경: 그레인 두 상수, 새 값은 G4 스펙 1.3.
 
 #### 1.7 선택 동기화
 

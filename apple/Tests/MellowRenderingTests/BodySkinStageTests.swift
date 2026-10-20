@@ -35,7 +35,6 @@ final class BodySkinStageTests: XCTestCase {
         let input = try Support.bytes(synthetic.image)
         let full = BodySkinAdjustments(brightness: 1, tone: 1, smoothing: 1)
         XCTAssertTrue(try Support.bytes(output(synthetic, BodySkinAdjustments())) == input, "값 0")
-        XCTAssertTrue(try Support.bytes(output(synthetic, full, personMask: nil)) == input, "인물 마스크 없음")
         XCTAssertTrue(try Support.bytes(output(synthetic, full, faces: [])) == input, "얼굴 없음(기준색 없음)")
         XCTAssertEqual(BodySkinStage().name, "bodySkin")
     }
@@ -145,5 +144,26 @@ final class BodySkinStageTests: XCTestCase {
             synthetic.image,
             in: RenderContext(extent: extent, recipe: recipe, analysis: twoFaces, tuning: RenderTuning()))
         XCTAssertEqual(twoFaces.regionMasks.count, 2, "얼굴 수와 관계없이 사진마다 둘")
+    }
+
+    /// 인물 마스크가 없어도 얼굴이 있으면 얼굴 상자를 가로 3배·아래로 4배 늘린 영역을 사람 대신 쓴다(스펙 G4 2.4).
+    func testBodySkinFallsBackToTheFaceNeighbourhoodWithoutAPersonMask() throws {
+        let synthetic = try SyntheticFace.makeWithBody()
+        let before = try Support.grid(synthetic.image)
+        let after = try Support.grid(output(synthetic, BodySkinAdjustments(brightness: 1), personMask: nil))
+        for point in [SyntheticFace.bodySkinPoint, SyntheticFace.cheek] {
+            XCTAssertGreaterThanOrEqual(
+                Int(after.red(point)), Int(before.red(point)) + Self.liftMinimum, "대체 영역 안 피부 \(point)")
+        }
+        for point in [
+            SyntheticFace.shirtPoint, SyntheticFace.backgroundBesideBody, SyntheticFace.backgroundAboveHead,
+            SyntheticFace.leftEye, SyntheticFace.outside,
+        ] {
+            XCTAssertEqual(after.rgba(point), before.rgba(point), "피부색이 아니거나 영역 밖 \(point)")
+        }
+        let region = BodySkinStage.fallbackPersonRegion(face: synthetic.face, extent: extent, tuning: RenderTuning())
+        let grid = try Support.grid(region)
+        XCTAssertGreaterThan(grid.red(SyntheticFace.bodySkinPoint), 200, "얼굴 아래는 영역 안")
+        XCTAssertEqual(grid.red(SyntheticFace.backgroundAboveHead), 0, "얼굴 위는 영역 밖")
     }
 }

@@ -107,6 +107,19 @@ enum FaceRegions {
             cache: cache)
     }
 
+    /// 주름 띠용 피부 비트맵.
+    /// skinPolygonRaster와 같되 보호 영역 넓힘이 foldFeatureFeather다.
+    /// 캐시 항목이 따로 든다.
+    static func foldSkinRaster(face: FaceGeometry, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache?)
+        -> CIImage
+    {
+        let cutWidth = faceWidth(face, extent: extent) * CGFloat(tuning.foldFeatureFeather) * 2
+        return polygonMask(
+            fill: [skinPolygon(face: face, extent: extent, tuning: tuning)],
+            cut: protectedPolygons(face: face, extent: extent), cutWidth: cutWidth, extent: extent, tuning: tuning,
+            cache: cache)
+    }
+
     /// 마스크가 0이 아닐 수 있는 영역. 이 밖은 계산하지 않아도 된다.
     static func maskBounds(face: FaceGeometry, extent: CGRect, tuning: RenderTuning) -> CGRect {
         let polygon = skinPolygon(face: face, extent: extent, tuning: tuning)

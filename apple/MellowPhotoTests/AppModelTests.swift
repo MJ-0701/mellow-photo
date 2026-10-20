@@ -696,7 +696,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.beautyTab, .skinTone, "탭은 도구를 바꿔도 유지")
     }
 
-    func testSkinToneSlidersFollowPersonAvailabilityAndPresetValues() async throws {
+    func testSkinToneStatusLineReflectsPersonAndFaceConditions() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
         let model = TestSupport.makeModel(
@@ -704,17 +704,52 @@ final class AppModelTests: XCTestCase {
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
         XCTAssertEqual(model.backgroundAvailability, .noPerson)
-        XCTAssertFalse(model.canAdjustBodySkin(.brightness), "사람이 없으면 끈다")
-        model.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
-        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
-        XCTAssertFalse(model.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
-        try await waitUntil { !model.isRendering }
-        XCTAssertNil(model.presentedError, "사람이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        XCTAssertEqual(model.bodySkinStatus, .fallback, "사람 영역이 없어도 얼굴이 있으면 대체 영역")
+        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "대체 영역에서도 켠다")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.fallback), "사람 영역 없음 → 얼굴 둘레로 대신 적용해요")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.ready), "사람 영역 ✓ · 기준 얼굴 ✓")
+        XCTAssertEqual(UserMessage.bodySkinStatus(.noFace), "기준 얼굴이 없어 피부 밝기·톤·매끄럽게가 적용되지 않아요")
         model.beginSliderEdit()
-        model.edit(.bodySkin(.brightness, 0))
-        XCTAssertTrue(model.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        model.edit(.bodySkin(.brightness, 0.4))
         model.endSliderEdit()
-        XCTAssertFalse(model.canAdjustBodySkin(.brightness))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        let failingRoot = root.appendingPathComponent("person-failure")
+        try FileManager.default.createDirectory(at: failingRoot, withIntermediateDirectories: true)
+        let failingStaged = try TestSupport.solidPNG(in: failingRoot)
+        let personFailure = MellowError.personAnalysisUnavailable(reason: "stub")
+        let failing = TestSupport.makeModel(
+            root: failingRoot, analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .failure(personFailure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: failingStaged, displayName: nil))]))
+        try await importOne(failing, failingStaged)
+        XCTAssertEqual(failing.bodySkinStatus, .personAnalysisUnavailable(personFailure))
+        XCTAssertTrue(failing.canAdjustBodySkin(.brightness), "인물 분석이 실패해도 얼굴 둘레 대체 영역으로 렌더하므로 켠다")
+        XCTAssertEqual(UserMessage.bodySkinStatus(failing.bodySkinStatus), "인물 영역 분석 실패 → 얼굴 둘레로 대신 적용해요")
+        failing.beginSliderEdit()
+        failing.edit(.bodySkin(.brightness, 0.4))
+        failing.endSliderEdit()
+        try await waitUntil { !failing.isRendering }
+        XCTAssertNil(failing.presentedError, "인물 분석이 실패한 사진도 대체 영역으로 몸 피부를 렌더한다")
+        let facelessRoot = root.appendingPathComponent("faceless")
+        try FileManager.default.createDirectory(at: facelessRoot, withIntermediateDirectories: true)
+        let facelessStaged = try TestSupport.solidPNG(in: facelessRoot)
+        let faceless = TestSupport.makeModel(
+            root: facelessRoot,
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: facelessStaged, displayName: nil))]))
+        try await importOne(faceless, facelessStaged)
+        XCTAssertEqual(faceless.bodySkinStatus, .noFace)
+        XCTAssertFalse(faceless.canAdjustBodySkin(.brightness), "얼굴이 없으면 끈다")
+        faceless.applyPreset(PresetValues(bodySkin: BodySkinAdjustments(brightness: 0.4)))
+        XCTAssertTrue(faceless.canAdjustBodySkin(.brightness), "프리셋으로 들어온 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(faceless.canAdjustBodySkin(.tone), "0인 항목은 계속 끈다")
+        try await waitUntil { !faceless.isRendering }
+        XCTAssertNil(faceless.presentedError, "얼굴이 없으면 몸 피부만 건너뛰고 오류를 띄우지 않는다")
+        faceless.beginSliderEdit()
+        faceless.edit(.bodySkin(.brightness, 0))
+        XCTAssertTrue(faceless.canAdjustBodySkin(.brightness), "드래그 중에는 0에 닿아도 끄지 않는다")
+        faceless.endSliderEdit()
+        XCTAssertFalse(faceless.canAdjustBodySkin(.brightness), "드래그가 끝나고 0이면 끈다")
     }
 
     func testBackgroundToolEditsBlurOneUndoStepWhenPersonFound() async throws {
@@ -1173,6 +1208,65 @@ final class AppModelTests: XCTestCase {
         model.edit(.exposure(0.3))
         try await waitUntil { model.splitCompareOriginal != nil }
         XCTAssertNil(model.presentedError, "원본 실패는 알림을 띄우지 않는다")
+    }
+
+    func testLastRenderFailureClearsWhenTheSelectedPhotoChanges() async throws {
+        let first = try TestSupport.solidPNG(in: root, name: "A")
+        let second = try TestSupport.solidPNG(in: root, name: "B")
+        let importer = FakeImporter(staged: [
+            .success(StagedPhoto(url: first, displayName: "A")), .success(StagedPhoto(url: second, displayName: "B")),
+        ])
+        let model = TestSupport.makeModel(root: root, importer: importer)
+        await model.importFromFiles([first, second])
+        try await waitUntil { model.isReady }
+        model.lastRenderFailure = UserMessage.text(for: MellowError.renderFailed)
+        XCTAssertTrue(model.diagnosticLines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.failure)) })
+        let other = try XCTUnwrap(model.session.photos.first { $0.id != model.session.selectedPhotoID }).id
+        model.select(other)
+        XCTAssertNil(model.lastRenderFailure, "다른 사진을 고르면 이전 사진의 렌더 오류를 지운다")
+        XCTAssertFalse(model.diagnosticLines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.failure)) })
+    }
+
+    func testDiagnosticLinesListBuildPhotoAnalysisAndNonDefaultRecipeKeys() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let face = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.edit(.effect(.grain, 1))
+        model.edit(.skinRefinement(.darkCircles, 0.5))
+        try await waitUntil { !model.isRendering }
+        let lines = model.diagnosticLines
+        XCTAssertTrue(lines.contains { $0.hasPrefix(UserMessage.diagnosticLabel(.build)) })
+        XCTAssertNotEqual(DeviceModel.identifier, DeviceModel.unknown, "기기 모델을 읽는다")
+        XCTAssertTrue(
+            lines.contains {
+                $0.hasPrefix(UserMessage.diagnosticLabel(.device)) && $0.contains(DeviceModel.identifier)
+            },
+            "기기 줄에 모델 식별자가 있다")
+        XCTAssertTrue(lines.contains { $0.contains("faces=1") })
+        XCTAssertTrue(lines.contains { $0.contains("preview=") })
+        XCTAssertTrue(lines.contains("effects.grain=1.00"))
+        XCTAssertTrue(lines.contains("portrait.skin.darkCircles=0.50"))
+        XCTAssertFalse(lines.contains { $0.hasPrefix("color.") }, "기본값인 키는 없다")
+        XCTAssertEqual(RecipeSummary.nonDefaultLines(EditRecipe()), [])
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        recipe.makeup.lip = MakeupTint(colorID: "lip-rose", intensity: 0.4)
+        XCTAssertEqual(
+            Set(RecipeSummary.nonDefaultLines(recipe)),
+            ["portrait.skin.autoBlemish=true", "makeup.lip.colorID=lip-rose", "makeup.lip.intensity=0.40"])
+    }
+
+    func testDiagnosticRecipeSummaryCollapsesLocalEditsIntoOneCountLine() {
+        var recipe = EditRecipe()
+        recipe.color.exposure = 0.5
+        let spot = RetouchSpot(x: 0.4, y: 0.4, sourceX: 0.5, sourceY: 0.5, radius: 0.02)
+        let stroke = WarpStroke(x: 0.3, y: 0.3, dx: 0.01, dy: 0.0, radius: 0.05)
+        recipe.operations = [.spot(spot), .spot(spot), .warp(stroke)]
+        let lines = RecipeSummary.nonDefaultLines(recipe)
+        XCTAssertEqual(lines, ["color.exposure=0.50", "operations=3"], "수동 편집은 점·획마다 줄을 만들지 않고 개수 한 줄이다")
     }
 }
 

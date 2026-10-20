@@ -308,27 +308,58 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
-    /// 그늘 없는 피부에서 주름 밝히기가 띠 표본 점의 채널마다 바꿔도 되는 최대 바이트. 피부 질감 얼룩의 작은 밝힘만 허용한다.
-    private static let unshadowedFoldTolerance = 3
+    /// 그늘 없는 피부에서 띠 안 색차(|ΔCb|·|ΔCr|, 0…1) 상한.
+    /// 세 채널에 같은 배율을 곱하므로 색이 번지지 않는다.
+    private static let unshadowedFoldMaximumChroma = 0.01
+    /// 그늘 없는 피부에서 띠 가중 평균 ΔY(8비트) 상한.
+    /// 스펙 G4 1.4의 주름 상한 +0.08이다.
+    private static let unshadowedFoldMaximumMeanLift = 0.08 * byteRange
 
+    /// 그늘 없는 피부에서 주름 밝히기는 색 번짐이 없고 띠 평균 밝힘이 상한 안이며 띠 밖은 그대로다(스펙 G4 2.2).
+    /// 피부 전용 기준은 띠 안의 어두운 결 얼룩도 주변 피부 수준으로 고르므로 얼룩 픽셀은 6~10바이트 오른다(설계대로).
+    /// 그래서 표본 점마다의 바이트 허용치 대신 띠 가중 평균과 색차로 단언한다.
     func testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast() throws {
         let synthetic = SyntheticFace.make()
+        let extent = synthetic.image.extent
+        let tuning = RenderTuning()
         let before = try Support.grid(synthetic.image)
-        let cases: [(SkinAdjustments, [CGPoint])] = [
-            (SkinAdjustments(darkCircles: 1), [SyntheticFace.underLeftEye, SyntheticFace.underRightEye]),
-            (SkinAdjustments(nasolabial: 1), [SyntheticFace.leftNasolabial, SyntheticFace.rightNasolabial]),
-            (SkinAdjustments(marionette: 1), [SyntheticFace.leftMarionette, SyntheticFace.rightMarionette]),
-            (SkinAdjustments(glabella: 1), [SyntheticFace.glabella]),
+        let cases: [(String, SkinAdjustments, FaceRegions.RegionMask?)] = [
+            (
+                "darkCircles", SkinAdjustments(darkCircles: 1),
+                FaceRegions.darkCircleMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "nasolabial", SkinAdjustments(nasolabial: 1),
+                FaceRegions.nasolabialMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "marionette", SkinAdjustments(marionette: 1),
+                FaceRegions.marionetteMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "glabella", SkinAdjustments(glabella: 1),
+                FaceRegions.glabellaMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
         ]
-        for (skin, points) in cases {
+        for (name, skin, region) in cases {
+            let band = try Support.grid(XCTUnwrap(region, "\(name) 띠").image)
             let after = try Support.grid(render(synthetic, skin: skin))
-            for point in points {
-                for channel in 0..<3 {
-                    XCTAssertEqual(
-                        Int(after.rgba(point)[channel]), Int(before.rgba(point)[channel]),
-                        accuracy: Self.unshadowedFoldTolerance, "그늘 없는 \(point) 채널 \(channel)은 밝은 얼룩·색 번짐이 없다")
+            let chroma = DisplayScale.chromaDelta(before, after, weight: band)
+            XCTAssertLessThanOrEqual(max(chroma.cb, chroma.cr), Self.unshadowedFoldMaximumChroma, "\(name) 색 번짐 없음")
+            XCTAssertLessThanOrEqual(
+                DisplayScale.lumaDelta(before, after, weight: band).mean, Self.unshadowedFoldMaximumMeanLift,
+                "\(name) 띠 평균 밝힘 상한")
+            var outsideDifference = 0
+            for y in 0..<before.height {
+                for x in 0..<before.width {
+                    let point = CGPoint(x: x, y: y)
+                    guard band.red(point) == 0 else { continue }
+                    let a = before.rgba(point)
+                    let b = after.rgba(point)
+                    outsideDifference = max(outsideDifference, (0..<3).map { abs(Int(a[$0]) - Int(b[$0])) }.max() ?? 0)
                 }
             }
+            XCTAssertLessThanOrEqual(outsideDifference, Self.blendRoundingTolerance, "\(name) 띠 밖은 그대로(섞기 반올림만)")
         }
     }
 
@@ -354,8 +385,8 @@ final class SkinStageTests: XCTestCase {
         }
         XCTAssertThrowsError(
             try SkinKernels.shared.foldLift(
-                image: image, low: image, surround: image, amount: 1, maxGain: Self.darkeningGain,
-                lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
+                image: image, low: image, wideNumerator: image, wideDenominator: image, amount: 1,
+                maxGain: Self.darkeningGain, lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
             "배율 상한이 1보다 작으면 그늘을 어둡게 하므로 렌더 실패")
     }
 
@@ -465,12 +496,30 @@ final class SkinStageTests: XCTestCase {
     /// 오른볼 위 반점 자리. 잡티·특징·분산 측정 패치에서 떨어져 있다.
     private static let blotchPoint = CGPoint(x: 320, y: 210)
 
+    /// 기준(볼 평균 − rednessReferenceOffset)보다 덜 붉은 창백한 피부 조각의 색과 자리.
+    /// 피부보다 감마 Cr이 약 0.03 낮고 피부색 가중치(σ 0.04) 안이다.
+    /// 이마 오른쪽이라 볼 기준 상자·반점·주름 띠에서 떨어져 있다.
+    private static let paleColor = CIColor(red: 0.80, green: 0.68, blue: 0.60)
+    private static let palePoint = CGPoint(x: 300, y: 372)
+    private static let paleRadius: CGFloat = 8
+
+    /// BT.601 역변환에서 Cr 1이 바꾸는 R·G·B(감마 값).
+    private static let crToRGB = [1.402, -0.714136, 0]
+    /// 감마 값 1을 8비트 바이트로.
+    private static let byteRange = 255.0
+
     func testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly() throws {
         let base = SyntheticFace.make()
         let blotch = Support.hardEllipse(
             center: Self.blotchPoint, radii: CGSize(width: 10, height: 10), extent: SyntheticFace.extent)
-        let image = CIImage(color: Self.blotchColor).applyingFilter(
+        let blotched = CIImage(color: Self.blotchColor).applyingFilter(
             "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: blotch]
+        ).cropped(to: SyntheticFace.extent)
+        let pale = Support.hardEllipse(
+            center: Self.palePoint, radii: CGSize(width: Self.paleRadius, height: Self.paleRadius),
+            extent: SyntheticFace.extent)
+        let image = CIImage(color: Self.paleColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: blotched, kCIInputMaskImageKey: pale]
         ).cropped(to: SyntheticFace.extent)
         let synthetic = SyntheticFace(image: image, face: base.face)
         func gap(_ pixel: [UInt8]) -> Int { Int(pixel[0]) - Int(pixel[1]) }
@@ -478,13 +527,25 @@ final class SkinStageTests: XCTestCase {
         let clear = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: -1)))
         XCTAssertLessThanOrEqual(
             gap(clear.rgba(Self.blotchPoint)), gap(before.rgba(Self.blotchPoint)) - 10, "반점의 붉은기가 준다")
+        // 기준이 볼 평균보다 rednessReferenceOffset 낮아 볼과 같은 붉기의 피부도 그만큼만 맑아진다(G4).
+        let tuning = RenderTuning()
+        let referenceShift = -tuning.rednessReferenceOffset * tuning.skinMaskMaxStrength
+        for channel in 0..<3 {
+            let expected =
+                Double(before.rgba(SyntheticFace.cheek)[channel]) + referenceShift * Self.crToRGB[channel]
+                * Self.byteRange
+            XCTAssertEqual(
+                Double(clear.rgba(SyntheticFace.cheek)[channel]), expected, accuracy: 2,
+                "볼과 같은 붉기의 피부는 기준 여유만큼만 맑아진다")
+        }
         for channel in 0..<3 {
             XCTAssertEqual(
-                Int(clear.rgba(SyntheticFace.cheek)[channel]), Int(before.rgba(SyntheticFace.cheek)[channel]),
-                accuracy: 2, "기준보다 붉지 않은 피부는 거의 그대로")
+                Int(clear.rgba(Self.palePoint)[channel]), Int(before.rgba(Self.palePoint)[channel]),
+                accuracy: Self.blendRoundingTolerance, "기준 − 여유보다 덜 붉은 피부는 그대로")
         }
         let flush = try Support.grid(render(synthetic, skin: SkinAdjustments(redness: 1)))
-        for point in [SyntheticFace.cheek, Self.blotchPoint, SyntheticFace.forehead] {
+        // 창백한 조각도 혈색이 오르므로 피부 마스크 안이다(위 "그대로"가 마스크 밖이라서 통과한 것이 아니다).
+        for point in [SyntheticFace.cheek, Self.blotchPoint, SyntheticFace.forehead, Self.palePoint] {
             XCTAssertGreaterThanOrEqual(gap(flush.rgba(point)), gap(before.rgba(point)) + 5, "혈색은 피부 전체에 고르게 \(point)")
         }
         for point in [
@@ -560,7 +621,7 @@ final class SkinStageTests: XCTestCase {
         XCTAssertEqual(rightChanged, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
     }
 
-    func testRefinementsReuseTheSkinRasterAndAddNoCacheEntries() throws {
+    func testRefinementsUseOneSkinRasterAndOneFoldRaster() throws {
         let synthetic = SyntheticFace.make()
         var recipe = EditRecipe()
         recipe.portrait.skin = SkinAdjustments(
@@ -571,7 +632,57 @@ final class SkinStageTests: XCTestCase {
             extent: synthetic.image.extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
         let first = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
-        XCTAssertEqual(analysis.regionMasks.count, 1, "주름 띠·대역 합성·붉은기 모두 피부 다각형 비트맵 하나를 쓴다")
+        XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+    }
+
+    /// 띠 둘레 피부 가중치 합이 SkinKernels.foldMinimumCoverage보다 작으면 기준이 없어 배율 1이어야 한다.
+    /// 옅게 만든 피부 마스크는 평균 색(분자 ÷ 분모)이 그대로라 커버리지 문턱만 밝힘을 막는다.
+    /// 같은 그늘을 세기 1 피부 마스크로 밝히는 대조가 있어 문턱이 없으면 이 테스트가 실패한다.
+    func testFoldLiftWithTooLittleSurroundSkinLeavesTheBandUnchanged() throws {
+        let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let tuning = RenderTuning()
+        let image = darkened(
+            base.image, at: SyntheticFace.underLeftEye, radii: CGSize(width: 40, height: 14), factor: Self.shadowFactor)
+        let region = try XCTUnwrap(FaceRegions.darkCircleMask(face: base.face, extent: extent, tuning: tuning))
+        let skin = try FaceRegions.skinMask(face: base.face, image: image, extent: extent, tuning: tuning)
+        func lifted(_ mask: CIImage) throws -> [UInt8] {
+            try Support.bytes(
+                SkinRefinement.liftFold(
+                    image, region: region, skinMask: mask, faceWidth: SyntheticFace.box.width, amount: 1,
+                    tuning: tuning, extent: extent))
+        }
+        let input = try Support.bytes(image)
+        let full = try lifted(skin)
+        XCTAssertGreaterThanOrEqual(
+            zip(full, input).map { Int($0) - Int($1) }.max() ?? 0, Self.liftMinimum, "피부 기준이 있으면 그늘을 밝힌다(대조)")
+        let faint = try lifted(MaskBuilder.scaled(skin, by: Self.faintSkinWeight))
+        let difference = zip(faint, input).map { abs(Int($0) - Int($1)) }.max() ?? 0
+        XCTAssertLessThanOrEqual(difference, Self.blendRoundingTolerance, "피부 가중치 합이 문턱 아래면 바꾸지 않는다")
+    }
+
+    /// 피부 마스크에 곱하는 옅은 가중치.
+    /// 커버리지 문턱(foldMinimumCoverage)의 절반이다.
+    private static let faintSkinWeight = SkinKernels.foldMinimumCoverage / 2
+
+    /// 배율 1로 띠를 섞어도 남는 채널 차이(바이트).
+    /// 같은 이미지를 마스크로 섞기만 해도 작업 색공간 반올림으로 1바이트가 달라진다.
+    /// 실측은 6144픽셀이 1바이트이고 2바이트 이상은 없다.
+    /// 밝힘 폭주나 검정 번짐은 이보다 훨씬 크다.
+    private static let blendRoundingTolerance = 1
+
+    /// 둘레에 어두운 눈·눈썹이 있어도 기준은 피부만 본다: 눈 아래 그늘을 심으면 밝아져야 한다(실사진 실패의 재현).
+    func testFoldLiftIgnoresDarkFeaturesInTheSurround() throws {
+        let synthetic = SyntheticFace.make()
+        let center = SyntheticFace.underLeftEye
+        let shadowed = darkened(
+            synthetic.image, at: center, radii: CGSize(width: 40, height: 14), factor: Self.shadowFactor)
+        let before = try Support.grid(shadowed)
+        let after = try Support.grid(
+            render(SyntheticFace(image: shadowed, face: synthetic.face), skin: SkinAdjustments(darkCircles: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(center)), Int(before.red(center)) + Self.liftMinimum, "눈 옆 그늘도 피부 기준으로 밝힌다")
+        XCTAssertEqual(after.rgba(SyntheticFace.leftEye), before.rgba(SyntheticFace.leftEye), "눈 안은 그대로")
     }
 }

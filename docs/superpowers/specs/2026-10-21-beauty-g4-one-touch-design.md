@@ -15,7 +15,7 @@
 | 다크서클·팔자·마리오네트·미간이 안 바뀜 | 0.05% · 0.06% · 0% · 0% | (1) 띠가 눈·입 보호 영역(얼굴 폭 5%)에 잘려 조각만 남음 (2) 둘레 평균이 눈·눈썹·속눈썹을 포함해 "주변 − 국소" 차이가 0 또는 음수 | 띠 위치·크기와 밝히기 기준을 피부 전용으로 재설계(2절) |
 | 피부 밝기(몸 피부) 변화 없음(추정) | 52%, 최대 48 | 사람 영역 + 기준 얼굴이 둘 다 있어야 동작. 조건이 안 맞으면 조용히 빠짐 | 조건을 화면에 보이고, 사람 영역이 없어도 얼굴이 있으면 대체 영역으로 동작(2절) |
 | 붉은기 +1 | 10.9%, 최대 9 | 가산량 0.03이 작음 | 상수 2배 |
-| 피부 톤 ±1(몸) | 51%, 최대 11 | 가산량 0.025가 작음 | 상수 2배 |
+| 피부 톤 ±1(몸) | 51%, 최대 11 | 가산량 0.025가 작음 | 상수 1.4배(처음 2배, G4-1 구현 중 0.035로 내림) |
 
 기기와 Mac의 렌더 경로 차이는 아니다(글로우가 기기에서 바뀜). 그래서 기기 전용 진단은 최소(앱 정보 시트의 "진단" 줄)만 둔다.
 
@@ -41,9 +41,16 @@
 | 기존 "자동" 버튼은 지금처럼 색감·디테일 + 피부 보정·자동 잡티·눈 또렷하게다. 자동은 원터치를 포함한다(질문 2) (판정: 권고 채택) | 두 버튼이 겹치면 사용자가 헷갈리지만, 자동이 성별 표까지 쓰면 색감만 맞추고 싶은 사용자가 놀란다 | 작음 |
 | 프리셋은 원터치가 쓴 값(전체 층·그룹 층)과 `oneTouch` 표시를 함께 나른다(지금 규칙 그대로). 동기화는 피부·눈입·메이크업 세 항목을 모두 복사할 때만 표시를 복사하고 일부만 복사하면 받는 사진의 표시를 지운다 | 표시는 "이 층의 묶인 항목이 표와 같다"는 뜻이라 일부만 바뀌면 거짓이 된다 | 작음 |
 | 사람 영역을 못 찾았지만 얼굴이 있으면 몸 피부는 **가장 큰 얼굴 상자를 가로 3배·아래로 4배 늘린 부드러운 영역**을 사람 영역 대신 쓴다. 피부톤 탭 맨 위에 "사람 영역 · 기준 얼굴" 상태 한 줄을 보인다 | 조건이 안 맞아 조용히 빠지는 것이 "안 바뀐다"로 보였다. 얼굴 없음 규칙(G 결정, 건너뜀)은 그대로 | 작음 |
-| 붉은기 +1 가산 0.03 → 0.06, 붉은기 − 비율 0.7 → 1.0에 기준 Cr 여유 0.01, 번들거림 시작 0.12 → 0.08·폭 0.1 → 0.08, 몸 피부 톤 0.025 → 0.05. 나머지 G 상수는 측정상 충분해 유지(2절 표) | 보이는 강도 원칙 | 작음 |
+| 붉은기 +1 가산 0.03 → 0.06, 붉은기 − 비율 0.7 → 1.0에 기준 Cr 여유 0.01, 번들거림 시작 0.12 → 0.08·폭 0.1 → 0.08, 몸 피부 톤 0.025 → 0.035(G4-1 구현 중 0.05에서 내림, 아래 행). 나머지 G 상수는 측정상 충분해 유지(2절 표) | 보이는 강도 원칙 | 작음 |
 | 기기 진단은 앱 정보 시트의 "진단" 절(앱 버전·빌드, 기기, 선택 사진·미리보기 크기, 얼굴·사람·관절 유무, 기본값이 아닌 레시피 키, 마지막 렌더 오류)과 "복사" 버튼만. 렌더 파이프라인은 바꾸지 않는다 | 기기 렌더 경로는 정상으로 확인됐다. 다음 기기 확인 때 스크린샷 한 장으로 전제 조건(사람 영역·얼굴)을 볼 수 있으면 충분하다 | 작음 |
 | H 계획은 유지하되 **H3 Task 1(생성 사진 세트)을 H1 앞으로 당기고**, 모든 H 계획에서 로컬 iOS 시뮬레이터 실행을 없애며(CI만), 기준 브랜치·커밋을 main `74fb2df` 기준으로 고친다. H4는 선택 그대로 | 원터치 성별 수용 테스트가 커플 사진을 쓴다. 시뮬레이터 창이 사용자를 방해한다 | 작음 |
+| **(G4-1 구현 중 변경)** 눈 또렷하게 상수 `eyeWhiteLift` 0.2 → 0.3, `eyeIrisSharpen` 0.8 → 1.0 | 눈 마스크 평균 |ΔY|가 2.41로 하한 3에 못 미쳤다. 1.2절 조정 후보 안에서 눈이 어두워지지 않는 조합이 이것이었다(3.20, 평균 ΔY +0.01) | 작음 (여유 0.20뿐이라 기기·CI에서 흔들릴 수 있음) |
+| **(G4-1 구현 중 변경)** 입술 생기 하한은 휘도가 아니라 입술 마스크 가중 \|ΔCr\| ≥ 0.02 | 입술 커널은 Cb·Cr만 바꾸고 휘도를 지킨다. 휘도 지표는 상수를 올려도 넘을 수 없는 테스트 설계 오류였다(실측 \|ΔCr\| 0.047) | 작음 |
+| **(G4-1 구현 중 변경)** G1 단위 테스트 "그늘 없는 피부에 얼룩·색 번짐 없음"을 "띠 안 색차 ≤ 0.01, 띠 안 평균 ΔY ≤ +0.08, 띠 밖 1바이트 이내"로 다시 정의 | 피부 전용 기준은 띠 안의 어두운 결 얼룩도 주변 피부 수준으로 고른다(합성 얼굴에서 6~10바이트). 실사진 자연스러움 상한은 모두 통과한다 | 작음 (값 1에서 깨끗한 피부가 조금 밝아질 수 있음) |
+| **(G4-1 구현 중 변경)** 사람 분석이 실패해도 얼굴이 있으면 몸 피부 슬라이더를 켠다 | 렌더가 대체 영역으로 실제 적용하므로 슬라이더를 끄면 상태 줄과 어긋난다 | 작음 |
+| **(G4-1 구현 중 변경)** 합성 반사광 도우미를 "빛 층 더하기"에서 "밝힌 사본을 가우시안 봉우리로 섞기"로 고침 | 알파 0 빛 층은 사전곱에서 사라져 반사광이 하나도 심어지지 않았다(고친 뒤 +28/255) | 작음 (테스트 도우미만) |
+| **(G4-1 구현 중 변경)** "띠 밖·마스크 밖 불변"은 바이트 완전 일치가 아니라 채널 차이 1바이트 이내 | 같은 이미지를 마스크로 자기 자신과 섞기만 해도 작업 색공간 반올림으로 1바이트가 바뀐다(G4 전에도 같음). 2바이트 이상 바뀐 픽셀은 없다 | 작음 |
+| **(G4-1 구현 중 변경)** 몸 피부 톤 상수 `bodySkinToneMax`는 0.05가 아니라 0.035. 1.4절에 상한 "피부 톤(몸) ±1: 피부 가중 \|ΔR − ΔB\| ≤ 30/255"를 더한다 | 최종 리뷰: 0.025도 이미 보임 하한(6/255)의 3.3배(19.8/255)였다. 0.05는 피부 전체에 R 약 +18·B 약 −23을 더해 얼굴 전체가 주황빛으로 뜰 위험이 있고 막을 상한 테스트가 없었다. 자연스러움 우선 원칙에 따라 하한의 약 4.7배(예상 약 28/255)에 멈추고 상한을 테스트로 묶는다 | 작음 (상수 한 줄. 기기에서 약하면 상한 30/255 안에서 올린다) |
 
 ### 범위
 
@@ -112,14 +119,14 @@
   - `lumaDeltaStandardDeviation(before, after, in rect)`: ΔY의 표준편차(그레인).
   - `recovery(original, defective, repaired, weight:)` = (Y_repaired − Y_defective) / (Y_original − Y_defective), 가중 평균 휘도 기준.
   - `fineBandVarianceRatio(before, after, in rect, radius:)`: 기존 `bandVariances`의 fine 분산 비(질감 보존).
-- 합성 결함(실사진 위에, 실제 특징점 마스크로): 그늘 = `image × (1 − depth × mask)`(선형, depth 0.25), 붉은 반점 = 볼 상자 안 지름 얼굴 폭 8% 원에 감마 Cr +0.05, 반사광 = 이마(얼굴 좌표 눈 높이 위 얼굴 폭 25%) 지름 얼굴 폭 12% 가우시안 선형 휘도 +0.3(피부 마스크 안에서만).
+- 합성 결함(실사진 위에, 실제 특징점 마스크로): 그늘 = `image × (1 − depth × mask)`(선형, depth 0.25), 붉은 반점 = 볼 상자 안 지름 얼굴 폭 8% 원에 감마 Cr +0.05, 반사광 = 이마(얼굴 좌표 눈 높이 위 얼굴 폭 25%) 지름 얼굴 폭 12% 가우시안 선형 휘도 +0.3(피부 마스크 안에서만). 반사광은 휘도를 더한 사본을 가우시안 봉우리 마스크로 원본 위에 섞어 `image + lift × 봉우리`로 만든다(G4-1 구현 중 변경: 알파 0 빛 층을 더하는 처음 방식은 사전곱에서 RGB가 0이 되어 아무것도 심지 못했다).
 
 #### 1.2 항목별 문턱 (값 1 또는 끝값, 화면 배율, 시작값)
 
 | 항목 | 측정 | 문턱 | Mac 1.3.0 측정(원본 배율, Δ>2) | 조정 후보(문턱 미달 시 올릴 상수) |
 |---|---|---|---|---|
 | 피부 보정 1 | 얼굴 상자 changedFraction | ≥ 0.04 | 8.45% | `midReductionMax` |
-| 다크서클 1 | 자연: 얼굴 상자 changedFraction ≥ 0.010, 띠 가중 meanLumaDelta ≥ +3/255. 합성(depth 0.25): recovery ≥ 0.5. 띠 가중 meanChromaDelta ≤ 0.01, fine 분산 비 ≥ 0.8 | 위 | 0.05%, 최대 4 | `foldLiftMax`, `foldSurroundFraction`, `FoldShape.darkCircle*` |
+| 다크서클 1 | 자연: 얼굴 상자 changedFraction ≥ 0.010, 띠 가중 meanLumaDelta ≥ +3/255. 합성(depth 0.25): recovery ≥ 0.5. 띠 가중 meanChromaDelta ≤ 0.01, fine 분산 비 ≥ 0.85 | 위 | 0.05%, 최대 4 | `foldLiftMax`, `foldSurroundFraction`, `FoldShape.darkCircle*` |
 | 팔자 1 | 자연: changedFraction ≥ 0.005. 합성 recovery ≥ 0.5 | 위 | 0.06% | 같음 + `FoldShape.nasolabial*` |
 | 마리오네트 1 | 합성 recovery ≥ 0.5 | 위 | 0% | `FoldShape.marionette*` |
 | 미간 1 | 합성 recovery ≥ 0.5 | 위 | 0% | `FoldShape.glabella*` |
@@ -128,13 +135,13 @@
 | 붉은기 +1 | 피부 마스크 가중 평균 ΔR ≥ +5/255 | 위 | 10.9%, 최대 9 | `rednessFlushMax`(0.06) |
 | 번들거림 1 | 합성 반사광: 반사광 안 휘도 초과분 감소율 ≥ 0.4 | 위 | 0.33%, 최대 28 | `shineLumaOffset`(0.08), `shineLumaRamp`(0.08), `shineReductionMax` |
 | 피부 밝기(몸) 1 | 전체 changedFraction ≥ 0.15 | 위 | 52%, 최대 48 | `bodySkinLiftMax` |
-| 피부 톤(몸) +1 | 피부 영역 가중 평균 (ΔR − ΔB) ≥ 6/255 | 위 | 51%, 최대 11 | `bodySkinToneMax`(0.05) |
+| 피부 톤(몸) +1 | 피부 영역 가중 평균 (ΔR − ΔB) ≥ 6/255 | 위 | 51%, 최대 11 | `bodySkinToneMax`(0.035, G4-1 구현 중 0.05에서 내림) |
 | 바디 매끄럽게 1 | 전체 changedFraction ≥ 0.10 | 위 | 23%, 최대 115 | `bodySkinMidBandFraction` |
 | 그레인 1 | 전체 lumaDeltaStandardDeviation ≥ 5/255, 알갱이 한 변 ≥ 2.5px(화면 배율) | 위 | 73%, 최대 15, 1.4px | `grainMaxAmplitude`(0.30), `grainSizeFraction`(0.0025) |
 | 글로우 1 | 전체 changedFraction ≥ 0.40 | 위 | 93%, 최대 75 | `glowMaxIntensity` |
-| 눈 또렷하게 1 | 눈 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `eyeWhiteLift`, `eyeIrisSharpen` |
+| 눈 또렷하게 1 | 눈 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `eyeWhiteLift`(0.3), `eyeIrisSharpen`(1.0) (G4-1 구현 중 0.2·0.8에서 올림) |
 | 치아 미백 1 | 치아가 보이는 사진에서만(데모는 다문 입 → 건너뜀, XCTSkip) | — | — | `teethLift` |
-| 입술 생기 1 | 입술 마스크 가중 meanAbsoluteDelta ≥ 4/255 | 위 | 미측정 | `lipSaturationMax`, `lipRednessMax` |
+| 입술 생기 1 | 입술 마스크 가중 meanChromaDelta의 Cr ≥ 0.02 (G4-1 구현 중 변경: 입술 커널은 Cb·Cr만 바꾸고 휘도를 지키므로 휘도 지표로는 잴 수 없다) | 위 | 미측정 | `lipSaturationMax`, `lipRednessMax` |
 | 블러셔(복숭아) 1 | 블러셔 마스크 가중 meanAbsoluteDelta ≥ 3/255 | 위 | 미측정 | `makeupBlushMaxOpacity` |
 | 원터치 여성 기본 0.6 | 얼굴 상자 changedFraction ≥ 0.05 | — | — | 표 값 |
 | 원터치 여성 1 | 얼굴 상자 changedFraction ≥ 0.10 | — | — | 표 값 |
@@ -155,6 +162,7 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 | 피부 보정 1 | 피부 마스크 안 fine(모공) 분산 비 | ≥ 0.85 | 부드러운 피부 고주파 비 1.02 |
 | 얼룩 고르기 1 | 피부 마스크 안 fine 분산 비 ≥ 0.85, 피부 평균 ΔY | ≤ +0.03 | 주파수 분리 +0.013, 비 0.91 |
 | 피부 밝기(몸) 1 | 피부 영역 평균 ΔY | ≤ +0.10 | 피부색 변경 +0.066 |
+| 피부 톤(몸) ±1 (G4-1 구현 중 추가) | 피부 가중 \|ΔR − ΔB\| | ≤ 30/255 | 피부색 변경 +0.066(약 17/255)의 두 배 안쪽. 얼굴 전체 주황·푸른 기 없음 |
 | 원터치 기본 강도 0.6(여성·남성·공통) | 얼굴 피부 마스크 평균 ΔY | +0.005 ≤ ΔY ≤ +0.05 | 위 항목들의 합이 피부색 변경보다 작아야 함 |
 | 원터치 기본 강도 0.6 | 피부 마스크 fine 분산 비 | ≥ 0.9 | 질감 유지 |
 | 원터치 강도 1(상한) | 피부 마스크 fine 분산 비 | ≥ 0.85 | 끝까지 올려도 플라스틱 아님 |
@@ -178,13 +186,15 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 | `rednessReferenceOffset` (신설) | — | 0.01 | 볼 평균보다 이만큼 낮은 Cr을 기준으로 삼아 고르게 붉은 피부도 맑게 |
 | `shineLumaOffset` | 0.12 | 0.08 | 부드러운 조명의 번들거림도 잡음 |
 | `shineLumaRamp` | 0.1 | 0.08 | 같음 |
-| `bodySkinToneMax` | 0.025 | 0.05 | (ΔR − ΔB) ≥ 6/255 |
+| `bodySkinToneMax` (G4-1 구현 중 변경) | 0.025 | 0.035 | (ΔR − ΔB) ≥ 6/255, 1.4절 \|ΔR − ΔB\| ≤ 30/255. 처음 정한 0.05는 하한의 약 7배라 얼굴 전체 주황빛 위험이 있어 내렸다(최종 리뷰) |
 | `foldSurroundFraction` | 0.12 | 0.18 | 피부 가중 평균이라 넓혀도 눈·입이 안 섞이고 띠 자신의 비중이 줄어듦 |
 | `foldFeatureFeather` (신설) | — | 0.012 | 주름용 피부 비트맵의 보호 영역 넓힘(얼굴 폭 비율). 흐림 반지름 0.015와 비슷해 눈·입 안은 0 유지 |
 | `bodySkinFallbackWidthScale` (신설) | — | 3 | 사람 영역 없을 때 얼굴 상자 가로 배수 |
 | `bodySkinFallbackHeightScale` (신설) | — | 4 | 얼굴 상자 위끝에서 아래로의 높이 배수 |
 | `bodySkinFallbackFeather` (신설) | — | 0.05 | 대체 영역 가장자리 흐림(짧은 변 비율) |
-| 유지 | `midReductionMax`, `toneEveningMax`, `toneBandFraction`, `foldLiftMax`, `foldLiftMaxGain`, `foldLumaFloor`, `bodySkinLiftMax`, `glow*`, 눈·입·메이크업 상수 | — | 측정상 충분. 테스트가 미달이면 위 표의 후보를 올린다 |
+| `eyeWhiteLift` (G4-1 구현 중 변경) | 0.2 | 0.3 | 눈 마스크 평균 \|ΔY\| ≥ 3/255(0.2에서 2.41) |
+| `eyeIrisSharpen` (G4-1 구현 중 변경) | 0.8 | 1.0 | 같음. 흰자만 올리면 평균이 모자라고 홍채만 올리면 눈이 어두워진다 |
+| 유지 | `midReductionMax`, `toneEveningMax`, `toneBandFraction`, `foldLiftMax`, `foldLiftMaxGain`, `foldLumaFloor`, `bodySkinLiftMax`, `glow*`, 입·메이크업 상수와 위 둘을 뺀 눈 상수 | — | 측정상 충분. 테스트가 미달이면 위 표의 후보를 올린다 |
 
 `FoldShape`(`FaceRegions+Folds.swift`) 변경: 2.1절.
 
@@ -203,12 +213,19 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 
 `FoldShape` 새 이름: `darkCircleDropFraction` 0.055, `darkCircleRadiusU` 0.65(눈 폭 배수, 이름 유지), `darkCircleRadiusVFraction` 0.045, `nasolabialOverrun` 0.25, `nasolabialHalfWidth` 0.03, `nasolabialOutset` 0.045, `marionetteLength` 0.14, `marionetteRadiusU` 0.08, `marionetteOutset` 0.03. `darkCircleDrop`·`darkCircleRadiusV`(눈 높이 배수)는 지운다. `bandOval`에 `outset` 인자를 더해 팔자·마리오네트가 다른 값을 쓴다.
 
-합성 얼굴 표본 점(`SyntheticFace`, 얼굴 폭 280, 계산은 G4-1 계획 Task 2): `underLeftEye`·`underRightEye`(200·312, 262)는 새 띠(중심 v 270.6, 반지름 12.6) 안이라 유지. `leftNasolabial`·`rightNasolabial`은 (206, 162)·(306, 162)로 옮긴다(새 띠 중심). `leftMarionette`·`rightMarionette`(196·316, 120)는 유지. 팔자 "밖" 목록에서 `leftMarionette`를 빼고 `CGPoint(x: 186, y: 100)`를 넣는다(연장된 띠 끝에서 3 흐림 이상 떨어진 곳). 표본이 어긋나면 G1 규칙대로 격자를 찍어 옮기고 문턱(128·0)은 낮추지 않는다.
+합성 얼굴 표본 점(`SyntheticFace`, 얼굴 폭 280, 계산은 G4-1 계획 Task 2, G4-1 구현 중 격자를 찍어 확정한 값):
+- `underLeftEye`·`underRightEye`(200·312, 262)는 새 띠(중심 v 270.6, 반지름 12.6) 안이라 유지한다.
+- `leftNasolabial`·`rightNasolabial`은 (202, 156)·(309, 156)이다. 계획의 (206, 162)·(306, 162)는 그늘 없는 피부 상승이 4바이트였고 오른쪽이 픽셀 거울상이 아니어서 대칭(127 vs 118)이 깨졌다. 확정 점은 띠 값 239, 마리오네트 띠 0이다.
+- `leftMarionette`·`rightMarionette`는 (196, 120)·(315, 120)이다. 512px 이미지의 픽셀 거울상은 x → 511 − x라 196의 거울은 315다(316에서는 대칭 차이가 4였다).
+- 팔자 "밖" 목록에서 `leftMarionette`를 빼고 `CGPoint(x: 186, y: 100)`를 넣는다(연장된 띠 끝에서 3 흐림 이상 떨어진 곳).
+- 팔자 띠가 입꼬리 옆까지 이어지는지 보는 점은 (202, 136)이다(값 86, 문턱 64). 계획의 (204, 136)은 값이 정확히 64였다.
+- 표본이 어긋나면 G1 규칙대로 격자를 찍어 옮기고 문턱(128·64·0)은 낮추지 않는다.
 
 #### 2.2 밝히기 (`SkinRefinement.liftFold`, `SkinKernels.foldLift`)
 
 - `SkinStage.refine`는 **피부 마스크(`unitMask`)를 주름보다 먼저** 만든다(캐시된 비트맵이라 비용 없음).
 - 주변 기준: `surround = FrequencySeparation.maskedMean(image, mask: unitMask × (1 − region.image), radius: W × foldSurroundFraction)` → 분자·분모 두 이미지. 커널 `foldLift`는 `surround` 대신 `wideNumerator`·`wideDenominator`를 받아 `surroundLuma = dot(num.rgb / max(den.r, 0.001), luma601)`로 계산한다. 나머지(`gap = max(surroundLuma − lowLuma, 0)`, `gain = min(1 + amount × gap / max(lowLuma, floor), maxGain)`, `rgb × gain`)는 그대로.
+- G1 단위 테스트 `testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast`(그늘 없는 합성 피부, 허용 3바이트)는 G4-1 구현 중 바뀐다. 피부 전용 기준은 띠 안의 어두운 결 얼룩도 주변 피부 수준으로 고르므로 6~10바이트 오른다. 이 테스트는 "색 번짐 없음(띠 안 Cb·Cr 변화 ≤ 0.01)"과 "띠 안 평균 ΔY ≤ +0.08(1.4절 상한)"과 "띠 밖 채널 차이 1바이트 이내"를 단언한다. 띠 밖의 1바이트는 마스크 섞기의 작업 색공간 반올림이고 G4 전에도 있었다(2바이트 이상 바뀐 픽셀 없음). 주변 피부가 없는 띠를 보는 테스트도 같은 이유로 바이트 완전 일치가 아니라 1바이트 이내를 단언하고, 가중치 합이 `foldMinimumCoverage` 아래인 경우(피부 마스크 × 0.01)를 잰다.
 - 왜 고쳐지나: 측정된 gap(다크 0.025, 팔자 0.002, 미간 −0.058)은 가중치 없는 반지름 12% 흐림에 눈·눈썹·속눈썹·콧구멍·입술이 들어가 주변이 그늘보다 어둡게 잡힌 값이다. 피부 마스크는 보호 영역과 피부색 가중치로 그것들을 0으로 두고, (1 − 띠)가 그늘 자신을 빼므로 기준이 "띠 둘레의 피부 밝기"가 된다. 반지름을 18%로 넓혀도 피부만 평균되므로 안전하다.
 - 질감·색: 곱셈 배율이라 모공 상대 대비와 색조·채도는 그대로다(G1 결정 유지). 합성 결함 없는 띠에서 Cb·Cr 평균 변화 ≤ 0.01을 테스트로 고정한다.
 - 마스크 가중 평균의 분모가 0에 가까운 곳(띠 둘레가 전부 보호 영역)은 커널의 `max(den, 0.001)`로 폭주를 막고, 그 경우 `gap`이 음수가 되어 배율 1이다.
@@ -221,7 +238,7 @@ Evoto 측정치(연구 문서 측정값 표)를 과녁으로 한 상한이다. �
 #### 2.4 몸 피부 조건 (`BodySkinStage`, 앱 피부톤 탭)
 
 - `personMask`가 nil이고 `faces`가 비어 있지 않으면 `BackgroundStage.personMask(...)` 대신 `BodySkinStage.fallbackPersonRegion(face: widest, extent:, tuning:)`을 쓴다: 가장 넓은 얼굴 상자를 중심 x 기준 가로 `bodySkinFallbackWidthScale`배, 상자 위끝에서 아래로 상자 높이 × `bodySkinFallbackHeightScale`만큼의 직사각형을 `MaskBuilder.ellipse`가 아니라 모서리가 둥근 부드러운 사각형(직사각형을 `shortSide × bodySkinFallbackFeather`로 흐림)으로 만든 마스크. 피부색 가중치와 눈·입 제외는 그대로 곱하므로 옷·배경은 가중치가 뺀다. 얼굴이 없으면 지금처럼 건너뛴다(G 결정).
-- `PreparedPhoto`·`PhotoInfo`는 바뀌지 않는다. 앱 `AppModel.bodySkinStatus: BodySkinStatus { ready, fallback(noPersonMask), noFace, faceAnalysisUnavailable, personAnalysisUnavailable }`를 계산해 피부톤 탭 맨 위에 한 줄로 보인다(`UserMessage.bodySkinStatus(_:)`: "사람 영역 ✓ · 기준 얼굴 ✓", "사람 영역 없음 → 얼굴 둘레로 대신 적용해요", …). `canAdjustBodySkin`은 `.ready`·`.fallback`에서 켠다.
+- `PreparedPhoto`·`PhotoInfo`는 바뀌지 않는다. 앱 `AppModel.bodySkinStatus: BodySkinStatus { ready, fallback(noPersonMask), noFace, faceAnalysisUnavailable, personAnalysisUnavailable }`를 계산해 피부톤 탭 맨 위에 한 줄로 보인다(`UserMessage.bodySkinStatus(_:)`: "사람 영역 ✓ · 기준 얼굴 ✓", "사람 영역 없음 → 얼굴 둘레로 대신 적용해요", …). `canAdjustBodySkin`은 `.ready`·`.fallback`·`.personAnalysisUnavailable`에서 켠다(G4-1 구현 중 변경: 사람 분석이 실패해도 얼굴이 있으면 렌더가 대체 영역을 쓰므로 슬라이더를 막지 않는다).
 
 ### 3. 원터치 묶음
 
@@ -345,7 +362,7 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 
 ### 6. 진단 (최소)
 
-- `AppModel.diagnosticLines: [String]`: 앱 버전·빌드(`Bundle.main`), 기기 모델·OS(`ProcessInfo`), 선택 사진 픽셀 크기와 미리보기 크기(`preview`), 얼굴 수·사람 영역·관절(`PhotoInfo`), `RecipeSummary.nonDefaultLines(currentRecipe)`(JSON을 펼쳐 기본 레시피와 다른 잎만 `effects.grain=1.00` 형식), 마지막 오류(`presentedError`가 아닌 `lastRenderFailure: String?`, `scheduleRender` 실패 때 기록). 한국어 라벨은 `UserMessage`, 키 경로는 영어 식별자.
+- `AppModel.diagnosticLines: [String]`: 앱 버전·빌드(`Bundle.main`), 기기 모델(`DeviceModel.identifier`: macOS `hw.model`, iOS `uname`, 시뮬레이터 `SIMULATOR_MODEL_IDENTIFIER`)·OS(`ProcessInfo`), 선택 사진 픽셀 크기와 미리보기 크기(`preview`), 얼굴 수·사람 영역·관절(`PhotoInfo`), `RecipeSummary.nonDefaultLines(currentRecipe)`(JSON을 펼쳐 기본 레시피와 다른 잎만 `effects.grain=1.00` 형식, 수동 편집 배열은 점·획마다 적지 않고 `operations=N` 한 줄 — G4-1 구현 중 변경), 마지막 오류(`presentedError`가 아닌 `lastRenderFailure: String?`, `scheduleRender` 실패 때 기록). 한국어 라벨은 `UserMessage`, 키 경로는 영어 식별자.
 - `InfoSheet`에 `Section(UserMessage.diagnosticsTitle)`과 "복사" 버튼(`UIPasteboard`/`NSPasteboard`, `#if os`). 렌더 파이프라인·모듈 변경 없음.
 
 ### 7. 실사진 수용 테스트와 VALIDATION

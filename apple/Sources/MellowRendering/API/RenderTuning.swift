@@ -49,8 +49,16 @@ public struct RenderTuning: Sendable {
     /// 주름 밝히기가 보는 국소 저주파 반지름. 얼굴 폭 비율.
     /// 가장 좁은 띠 반지름(마리오네트 3%)의 절반이라 주름 그늘을 잡고, 모공 대역(fineBandFraction 0.6%)보다 커서 모공은 뺀다.
     public var foldLowBandFraction: Double = 0.015
-    /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3.5~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
-    public var foldSurroundFraction: Double = 0.12
+    /// 주름 둘레 피부 평균을 재는 반지름.
+    /// 얼굴 폭 비율.
+    /// 띠 폭(3~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
+    /// 피부 가중 평균이라 넓혀도 눈·입이 섞이지 않고 띠 자신의 비중이 준다.
+    public var foldSurroundFraction: Double = 0.18
+    /// 주름용 피부 비트맵이 눈·눈썹·입술 보호 영역을 넓히는 폭.
+    /// 얼굴 폭 비율.
+    /// 피부 보정용(skinFeatureFeather 5%)보다 좁아 띠가 눈 아래·입꼬리 옆까지 닿는다.
+    /// 마스크 흐림(skinMaskFeather 1.5%)과 비슷해 눈·입 안은 0에 머문다.
+    public var foldFeatureFeather: Double = 0.012
     /// 주름 밝히기 1에서 국소 휘도에 대한 휘도 차이("주변 평균 − 국소 저주파"의 양수 부분)를 배율에 반영하는 비율.
     /// 배율 = 1 + foldLiftMax × 휘도 차이 ÷ 국소 휘도라 1이면 그늘이 주변 평균까지 올라 평평해 보인다.
     public var foldLiftMax: Double = 0.9
@@ -65,15 +73,21 @@ public struct RenderTuning: Sendable {
     /// 얼룩 고르기 1에서 저주파를 넓은 평균 쪽으로 당기는 비율.
     public var toneEveningMax: Double = 0.8
     /// 선형 휘도가 볼 기준보다 이만큼 밝으면 번들거림으로 보기 시작한다. 피부 질감 잡음(±10%)은 걸리지 않는다.
-    public var shineLumaOffset: Double = 0.12
+    /// G4: 0.12에서 내려 부드러운 조명의 번들거림도 잡는다.
+    public var shineLumaOffset: Double = 0.08
     /// 시작점에서 이만큼 더 밝으면 번들거림 가중치 1.
-    public var shineLumaRamp: Double = 0.1
+    public var shineLumaRamp: Double = 0.08
     /// 번들거림 1에서 반사광의 저주파를 넓은 평균 쪽으로 당기고 중간 대역을 줄이는 비율. 모공 대역은 그대로다.
     public var shineReductionMax: Double = 0.85
-    /// 붉은기 −1에서 볼 기준 Cr을 넘는 붉은 양을 줄이는 비율.
-    public var rednessClearMax: Double = 0.7
-    /// 붉은기 +1에서 감마 Cr에 고르게 더하는 값. 입술 생기(0.02)보다 조금 크다.
-    public var rednessFlushMax: Double = 0.03
+    /// 붉은기 −1에서 기준 Cr(볼 평균 − rednessReferenceOffset)을 넘는 붉은 양을 줄이는 비율.
+    /// 1이면 기준까지 맑아진다.
+    public var rednessClearMax: Double = 1.0
+    /// 붉은기 +1에서 감마 Cr에 고르게 더하는 값.
+    /// 1.3.0의 0.03은 폰 화면에서 혈색이 보이지 않았다.
+    public var rednessFlushMax: Double = 0.06
+    /// 붉은기 −의 기준을 볼 평균 Cr보다 이만큼 낮게 잡는다(감마 Cr).
+    /// 고르게 붉은 피부도 −1에서 맑아진다.
+    public var rednessReferenceOffset: Double = 0.01
 
     public var warpMaxRadiusFraction: Double = 0.5
     public var warpDisplacementLimit: Double = 0.25
@@ -139,10 +153,14 @@ public struct RenderTuning: Sendable {
     /// 치아로 보는 붉은기(감마 Cr) 상한과 0이 되는 폭. 누런 치아는 0.04 안팎, 잇몸·혀·입술은 0.15 이상이다.
     public var teethRednessMax: Double = 0.08
     public var teethRednessRamp: Double = 0.04
-    /// 눈 또렷하게 1에서 흰자를 흰색 쪽으로 섞는 비율(sRGB 감마 값). sRGB 199 회색 흰자가 약 210이 된다.
-    public var eyeWhiteLift: Double = 0.2
-    /// 눈 또렷하게 1에서 홍채의 CISharpenLuminance 선명도. 필터 기본값 0.4의 두 배.
-    public var eyeIrisSharpen: Double = 0.8
+    /// 눈 또렷하게 1에서 흰자를 흰색 쪽으로 섞는 비율(sRGB 감마 값).
+    /// sRGB 199 회색 흰자가 약 216이 된다.
+    /// G4: 0.2에서는 폰 화면 배율 눈 마스크 평균 |ΔY|가 2.4/255로 하한 3에 못 미쳤다.
+    public var eyeWhiteLift: Double = 0.3
+    /// 눈 또렷하게 1에서 홍채의 CISharpenLuminance 선명도.
+    /// 필터 기본값 0.4의 2.5배.
+    /// G4: 0.8에서 올렸다(흰자 0.3과 함께 눈 마스크 평균 |ΔY| 3.2/255).
+    public var eyeIrisSharpen: Double = 1.0
     /// 홍채 선명하게의 반지름. 눈동자 반지름 비율. 미리보기 눈동자 15px에서 1.5px, 원본에서는 비례해 커진다.
     public var eyeIrisSharpenRadiusFraction: Double = 0.1
     /// 치아 미백 1에서 노란기(음의 감마 Cb)를 0 쪽으로 옮기는 비율.
@@ -163,8 +181,17 @@ public struct RenderTuning: Sendable {
     public var bodySkinMaskFeather: Double = 0.004
     /// 피부 밝기 1에서 흰색 쪽으로 섞는 비율(sRGB 감마 값). Evoto 전후 측정(+0.066)에 가깝다.
     public var bodySkinLiftMax: Double = 0.2
-    /// 피부 톤 ±1에서 감마 Cr에 더하고 Cb에서 빼는 값(따뜻). 음수는 반대.
-    public var bodySkinToneMax: Double = 0.025
+    /// 피부 톤 ±1에서 감마 Cr에 더하고 Cb에서 빼는 값(따뜻).
+    /// 음수는 반대.
+    /// 1.3.0의 0.025는 폰 화면에서 약했다.
+    /// 0.05는 얼굴 전체가 주황빛으로 뜰 수 있어 자연스러움 상한(피부 가중 |ΔR − ΔB| ≤ 30/255) 안쪽에 둔다(스펙 G4 1.3·1.4).
+    public var bodySkinToneMax: Double = 0.035
+    /// 인물 마스크가 없을 때 몸 피부가 쓰는 대체 영역: 가장 큰 얼굴 상자의 가로 배수와 상자 위끝에서 아래로의 높이 배수.
+    public var bodySkinFallbackWidthScale: Double = 3
+    public var bodySkinFallbackHeightScale: Double = 4
+    /// 대체 영역 가장자리 흐림.
+    /// 짧은 변 비율.
+    public var bodySkinFallbackFeather: Double = 0.05
     /// 몸 모공 대역의 위쪽 경계 반지름. 짧은 변 비율(1200px에서 2.4px).
     public var bodySkinFineBandFraction: Double = 0.002
     /// 몸 얼룩 대역의 위쪽 경계 반지름. 짧은 변 비율(1200px에서 14px).
@@ -233,10 +260,17 @@ public struct RenderTuning: Sendable {
     public var vignetteRadius: Double = 1.5
     /// 룩 tint ±1이 CITemperatureAndTint 목표 중립 y ±이 값이 된다.
     public var lookTintRange: Double = 60
-    /// 그레인 1에서 오버레이 층의 잡음 진폭(sRGB 감마 값, 전체 폭). 0.5 ± 0.06.
-    public var grainMaxAmplitude: Double = 0.12
-    /// 알갱이 한 변. 짧은 변 비율(1200px에서 1.44px). 1px 아래로는 내려가지 않는다.
-    public var grainSizeFraction: Double = 0.0012
+    /// 그레인 1에서 오버레이 층의 잡음 진폭(sRGB 감마 값, 전체 폭).
+    /// 0.5 ± 0.15.
+    /// 폰 화면에서 보이는 진폭이다.
+    /// 1.3.0의 0.12는 축소에 평균돼 보이지 않았다.
+    public var grainMaxAmplitude: Double = 0.30
+    /// 알갱이 한 변.
+    /// 짧은 변 비율(1200px에서 3px).
+    /// 1px 아래로는 내려가지 않는다.
+    /// 폰 화면 배율에서 2.5px 이상이다.
+    /// 1.3.0의 0.0012는 축소에 평균돼 보이지 않았다.
+    public var grainSizeFraction: Double = 0.0025
     /// 글로우 반지름. 짧은 변 비율(1200px에서 24px).
     public var glowRadiusFraction: Double = 0.02
     /// 글로우 1에서 빛 층(흐린 이미지의 제곱)에 곱하는 세기.
