@@ -2,6 +2,7 @@ import CoreImage
 import Foundation
 import ImageIO
 import MellowShared
+import XCTest
 
 @testable import MellowRendering
 
@@ -944,5 +945,46 @@ extension RenderingTestSupport {
         guard total > 0, fine.count == weights.count else { throw MellowError.renderFailed }
         let mean = zip(fine, weights).reduce(0) { $0 + $1.0 * $1.1 } / total
         return zip(fine, weights).reduce(0) { $0 + $1.1 * ($1.0 - mean) * ($1.0 - mean) } / total
+    }
+}
+
+/// 생성 사진 세트의 정답 라벨(shared/fixtures/people/labels.json).
+/// people은 왼쪽부터다.
+struct PeopleLabels: Decodable {
+    struct Person: Decodable {
+        var gender: String
+        var ageBand: String
+        var glasses: Bool
+        var pose: String
+        var occlusion: String
+        var ambiguous: Bool
+    }
+
+    struct Photo: Decodable {
+        var file: String
+        var people: [Person]
+    }
+
+    var version: Int
+    var photos: [Photo]
+}
+
+/// 테스트 타깃에 복사한 생성 사진(couple-01·group-01)과 라벨.
+enum PeopleFixtures {
+    static func url(_ name: String) throws -> URL {
+        try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: nil, subdirectory: "Fixtures/people"))
+    }
+
+    static func labels() throws -> PeopleLabels {
+        try JSONDecoder().decode(PeopleLabels.self, from: Data(contentsOf: url("labels.json")))
+    }
+
+    /// 저장소 원본 폴더.
+    /// apple/Tests/MellowRenderingTests/RenderingTestSupport.swift에서 네 단계 위가 저장소 루트다.
+    static var sharedFolder: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("shared/fixtures/people")
     }
 }
