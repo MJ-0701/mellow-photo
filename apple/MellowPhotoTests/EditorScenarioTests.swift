@@ -1,5 +1,6 @@
 import CoreImage
 import ImageIO
+import MellowEditing
 import MellowExport
 import MellowRendering
 import MellowShared
@@ -46,8 +47,8 @@ final class EditorScenarioTests: XCTestCase {
     }
 
     /// 가져오기는 받은 파일을 옮기므로 공용 픽스처를 임시 폴더에 복사해서 넘긴다.
-    private func demoPortraitCopy() throws -> URL {
-        let copy = root.appendingPathComponent("demo-portrait.png")
+    private func demoPortraitCopy(named name: String = "demo-portrait") throws -> URL {
+        let copy = root.appendingPathComponent("\(name).png")
         try FileManager.default.copyItem(at: demoPortraitURL, to: copy)
         return copy
     }
@@ -211,6 +212,21 @@ final class EditorScenarioTests: XCTestCase {
         try await waitUntil { !model.isRendering && self.previewBytes(model) != refined }
         let toned = previewBytes(model)
 
+        model.selectTool(.adjust)
+        model.beginSliderEdit()
+        model.edit(.effect(.grain, 0.5))
+        model.endSliderEdit()
+        // 그레인만 바꿔도 미리보기가 바뀌어야 한다.
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != toned }
+        let grained = previewBytes(model)
+        model.isComparing = true
+        XCTAssertTrue(model.displayImage === model.original, "전체 토글은 원본을 보인다")
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .split)
+        model.toggleSplitCompare()
+        XCTAssertEqual(model.compareMode, .off)
+
+        model.selectTool(.beauty)
         model.beautyTab = .face
         let faceEdits: [(FaceShapeKey, Double)] = [(.width, -0.5), (.eyeSize, 0.3), (.smile, 0.4)]
         for (key, value) in faceEdits {
@@ -219,7 +235,7 @@ final class EditorScenarioTests: XCTestCase {
             model.endSliderEdit()
         }
         // 얼굴형만 바꿔도 미리보기가 바뀌어야 한다(바뀌지 않으면 시간 초과로 실패).
-        try await waitUntil { !model.isRendering && self.previewBytes(model) != toned }
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != grained }
 
         model.beautyTab = .features
         model.beginSliderEdit()
@@ -250,8 +266,15 @@ final class EditorScenarioTests: XCTestCase {
         model.applyMakeupLook(id: "daily")
         // 메이크업 룩만 골라도 미리보기가 바뀌어야 한다.
         try await waitUntil { !model.isRendering && self.previewBytes(model) != bodied }
+        // 선택 동기화가 색감을 실제로 옮기는지 보려고 색감 하나를 바꿔 둔다.
+        model.selectTool(.adjust)
+        model.beginSliderEdit()
+        model.edit(.warmth(0.3))
+        model.endSliderEdit()
 
         let recipe = model.currentRecipe
+        XCTAssertEqual(recipe.color.warmth, 0.3, accuracy: 1e-9)
+        XCTAssertEqual(recipe.effects, EffectAdjustments(grain: 0.5))
         XCTAssertEqual(
             recipe.portrait.skin,
             SkinAdjustments(smoothing: 0.5, autoBlemish: true, darkCircles: 0.6, toneEvening: 0.5))
@@ -261,6 +284,23 @@ final class EditorScenarioTests: XCTestCase {
         XCTAssertEqual(recipe.background.blur, 0.5, accuracy: 1e-9)
         XCTAssertEqual(recipe.body, BodyShapeAdjustments(legLength: 0.5))
         XCTAssertEqual(recipe.makeup, try XCTUnwrap(model.makeupCatalog.look(id: "daily")).adjustments)
+
+        // 선택 동기화: 두 번째 사진은 색감만 받아야 한다.
+        await model.importFromFiles([try demoPortraitCopy(named: "demo-second")])
+        try await waitUntil { model.session.photos.count == 2 && !model.isImporting }
+        let firstID = model.session.photos[0].id
+        model.select(firstID)
+        try await waitUntil { model.isReady && model.preview != nil }
+        for category in SyncCategory.allCases where category != .color {
+            model.setSyncCategory(category, enabled: false)
+        }
+        model.applyToAll()
+        let second = model.session.photos[1].document.recipe
+        XCTAssertEqual(second.color, recipe.color, "색감만 복사")
+        XCTAssertEqual(second.portrait.skin, SkinAdjustments(), "피부는 복사하지 않음")
+        XCTAssertEqual(second.effects, EffectAdjustments(), "효과도 복사하지 않음")
+        XCTAssertEqual(model.currentRecipe, recipe, "보낸 사진의 레시피는 그대로")
+
         let size = try await exportedPixelSize(model)
         XCTAssertEqual(size.width, size.height, "다리를 늘리고 메이크업을 해도 정사각형 원본 크기 그대로 저장된다")
     }

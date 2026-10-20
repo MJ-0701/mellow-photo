@@ -176,7 +176,7 @@ out  = low + mid × keep + (image − fineBlur)
 | `rednessClearMax` | 0.7 | −1에서 기준보다 붉은 양의 70%를 줄임 |
 | `rednessFlushMax` | 0.03 | +1에서 감마 Cr에 더하는 값 |
 
-**몸 피부** (`BodySkinStage`): `personMask`가 없거나 `faces`가 비면 입력 그대로(오류 아님). 기준 얼굴 = 가장 넓은 얼굴. `encoded = image(sRGB 감마)`, `(left, right) = FaceRegions.cheekAverages(of: encoded, face:, extent:)`(볼 상자가 하나도 없으면 건너뜀). `person = BackgroundStage.personMask(personMask, extent:, feather: shortSide × bodySkinMaskFeather)`(배경 마스크를 만들던 확대·흐림을 반전 없이 돌려주는 새 정적 함수, `backgroundMask`는 이것을 반전). `chroma = SkinKernels.chromaWeight(encoded, left, right, sigma: bodySkinChromaSigma, extent)`. 모든 얼굴의 눈·바깥 입술 다각형을 한 비트맵으로 그린 `features = FaceRegions.featheredPolygonMask(fill: eyes + [outerLips], cut: [], ...)`를 반전해 곱한다(사진당 해상도마다 캐시 항목 1개 → `entriesPerFacePerResolution` 9). `toneMask = person × chroma × (1 − features)`. `smoothMask = toneMask × (1 − skinPolygonRaster(모든 얼굴의 최대))`.
+**몸 피부** (`BodySkinStage`): `personMask`가 없거나 `faces`가 비면 입력 그대로(오류 아님). 기준 얼굴 = 가장 넓은 얼굴. `encoded = image(sRGB 감마)`, `(left, right) = FaceRegions.cheekAverages(of: encoded, face:, extent:)`(볼 상자가 하나도 없으면 건너뜀). `person = BackgroundStage.personMask(personMask, extent:, feather: shortSide × bodySkinMaskFeather)`(배경 마스크를 만들던 확대·흐림을 반전 없이 돌려주는 새 정적 함수, `backgroundMask`는 이것을 반전). `chroma = SkinKernels.chromaWeight(encoded, left, right, sigma: bodySkinChromaSigma, extent)`. 모든 얼굴의 보호 영역(눈·눈썹·바깥 입술, 눈·입 특징점이 없으면 상자 비율 대체 타원)을 한 비트맵으로 그린 `features = FaceRegions.featureMask(faces:extent:tuning:cache:)`를 반전해 곱한다(사진당 해상도마다 캐시 항목 1개 → `entriesPerFacePerResolution` 9). `toneMask = person × chroma × (1 − features)`. `smoothMask = toneMask × (1 − FaceRegions.wholeFaceMask(...))`: 모든 얼굴의 피부 다각형(윤곽 + 이마 호)을 눈·입을 잘라내지 않고 채워 얼굴 피부 마스크와 같은 반지름으로 흐린 마스크다. (G2 구현 중 변경: 처음 식은 눈썹을 빼지 않고 잘라낸 피부 다각형만 빼서 눈가·입가 고리가 두 번 매끄럽게 되고 눈썹이 하얗게 들렸다.)
 - 밝기·톤: `FeatureKernels.shifted(image, by: ToneShift(lift: brightness × bodySkinLiftMax, blueness: −tone × bodySkinToneMax, redness: tone × bodySkinToneMax), extent)`를 `toneMask`로 합성. `ToneShift`에 `blueness`(Cb 가산)를 더하고 커널 인자를 하나 늘린다(기본 0이라 기존 호출 결과 불변).
 - 매끄럽게: `FrequencySeparation.smoothed(image, bounds: extent, faceWidth: shortSide × bodySkinBandScale, smoothing:, tuning:)`를 `smoothMask`로 합성. 반지름은 `fine = max(0.5, shortSide × bodySkinFineBandFraction)`, `mid = shortSide × bodySkinMidBandFraction`이 되도록 `faceWidth` 인자 대신 반지름을 직접 받는 오버로드 `smoothed(_:bounds:radii:smoothing:tuning:)`를 추가한다.
 - 적용 순서: 매끄럽게 → 밝기·톤(밝기 뒤에 매끄럽게 하면 밝기 경계가 번짐).
@@ -190,7 +190,7 @@ out  = low + mid × keep + (image − fineBlur)
 | `bodySkinFineBandFraction` | 0.002 | 몸 모공 대역 반지름(짧은 변 비율) |
 | `bodySkinMidBandFraction` | 0.012 | 몸 얼룩 대역 반지름 |
 
-**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤 sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
+**효과** (`EffectStage`): 값은 `AdjustmentRange.unit`으로 자른다. `glow > 0`이면 흐림(반지름 shortSide × glowRadiusFraction, 가장자리 늘림) → 0…1로 자름(1을 넘는 밝은 입력에서 스크린 합성이 원본을 어둡게 하지 않게) → 자기 자신과 곱해 하이라이트에 빛을 모음 → glow × glowMaxIntensity 배 → 원본 위에 스크린 합성 뒤 현재 extent로 자른다. `grain > 0`이면 `CIRandomGenerator` 출력의 알파 채널(0…1 균등)을 회색으로 만들어(`RenderingTestSupport.skinTexture`와 같은 `CIColorMatrix` 방식) `0.5 + (gray − 0.5) × grain × grainMaxAmplitude`로 옮기고, 픽셀 크기 `max(1, shortSide × grainSizeFraction)`로 확대한 뒤 sRGB 감마 공간에서 `CIOverlayBlendMode`로 얹고 선형으로 되돌린다(`MakeupStage.blended`와 같은 틀). 회색 0.5 오버레이는 항등이라 `grain = 0`이면 바이트가 같다. 짧은 변은 현재 이미지(기하 뒤) 기준.
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
@@ -268,7 +268,7 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
 
 ### 3. VALIDATION.md 항목 (G3 마지막 Task가 씀)
 
-`## 인물 보정 G (2026-10-20)` 절: 자동 검증(명령·종료 코드·테스트 수), 자동 테스트가 확인하는 것(위 표 요약), 구현 중 측정(몸 피부 매끄럽게 48MP 저장 시간), 스펙과 다르게 한 것, 미검증(실사진 7종 품질·몸 피부 번짐·주름 띠 위치(특히 마리오네트)·뒷모습 사진에서 몸 피부가 빠지는 것·분할 비교 손잡이·동기화 메뉴 폭·실기기). 수행하지 않은 검증을 통과로 쓰지 않는다. 배포는 하지 않았다고 적는다.
+`## 인물 보정 G 피부 정밀·몸 피부·효과·작업 흐름 (2026-10-20)` 절: 자동 검증(명령·종료 코드·테스트 수), 자동 테스트가 확인하는 것(위 표 요약), 구현 중 측정(몸 피부 매끄럽게 큰 사진 저장 시간, 그레인 평균 밝기 차), 스펙과 다르게 한 것, 미검증(실사진 7종 품질·몸 피부 번짐·주름 띠 위치(특히 마리오네트)·뒷모습 사진에서 몸 피부가 빠지는 것·분할 비교 손잡이·동기화 메뉴 폭·실기기). 수행하지 않은 검증을 통과로 쓰지 않는다. 배포는 하지 않았다고 적는다.
 
 ### 4. 계획 분할
 

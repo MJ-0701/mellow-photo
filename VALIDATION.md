@@ -472,3 +472,70 @@
 ## TestFlight 전용 배포 경로 (2026-10-15)
 
 - fastlane `beta` 레인(TestFlight 전용)과 배포 모드 변수 `IOS_RELEASE_MODE=testflight`는 2026-10-15 태그 `apple-v0.3.1`로 처음 실행해 통과했습니다(GitHub Actions run 38671616792, 0.3.1 빌드 1.1을 App Store Connect에 업로드). App Store 버전은 건드리지 않았습니다. 내부 테스터 기기에서 빌드가 보이는지는 확인하지 않았습니다.
+
+## 인물 보정 G 피부 정밀·몸 피부·효과·작업 흐름 (2026-10-20)
+
+2026-10-20, 브랜치 `beauty-g-evoto` 커밋 `909e156` 기준(분할 전후 비교 직후, 이 절을 쓰는 문서 커밋 바로 앞, 시나리오 테스트 확장은 이 문서 커밋에 함께 들어감). Apple M5 Pro / macOS 26.6.2 / Xcode 27.1 / iOS 27.0 시뮬레이터(iPhone 18 Pro, iPad Pro 13-inch (M5)). 이 절의 검증은 모두 자동 테스트이며, 앱을 띄워 화면을 보거나 조작한 검증은 없습니다. Release 빌드(`build-apple.sh`)는 이번에 돌리지 않았습니다.
+
+### 자동 검증
+
+- `MELLOW_IOS_TESTS=1 ./scripts/test-apple.sh` 종료 코드 **0**(시나리오 테스트 확장을 넣은 작업 트리에서 한 번 실행, 다시 돌리지 않음). 모듈 의존성·import 검사, `swift format lint --strict`(UI 테스트 폴더 포함), XcodeGen 재생성 후 xcodeproj 차이 없음, 패키지 테스트, iPhone·iPad 시뮬레이터 앱 테스트(병렬 테스트 끔), Mac 앱 테스트, iPhone UI 테스트까지 한 번에 통과했습니다.
+- 패키지 `swift test` 380개 통과: MellowShared 49, MellowRendering 261, MellowLibrary 31, MellowExport 4, MellowEditing 35. G3 시작(G2 끝) 370개(Shared 47 · Rendering 256 · Library 30 · Export 4 · Editing 33)에서 효과 레시피 2, 효과 단계 5(글로우가 1 넘는 입력을 어둡게 하지 않는지 확인하는 수정 테스트 1 포함), 효과 편집 1, 선택 동기화 편집 1·라이브러리 1이 늘었습니다. G3 계획의 예상(377개, Rendering 257 · Editing 36)과 다른 것은 G2에서 렌더 테스트가 계획보다 3개 많았고(Rendering 256), G3에서 글로우 수정 테스트가 1개 늘었으며, 선택 동기화 편집 테스트가 계획의 2개가 아니라 1개로 들어갔기 때문입니다.
+- 앱 XCTest(모두 위 실행 안에서): iPhone 18 Pro 시뮬레이터 77개, iPad Pro 13-inch (M5) 시뮬레이터 77개, macOS 78개 모두 통과(G3 시작 74개에서 효과 슬라이더 1, 동기화 메뉴 1, 분할 비교 1, 분할선 클램프 1이 늘어 계획과 같음). iPhone UI 테스트(`MellowPhotoUITests`) 2개 통과.
+- 이 문서 커밋 전 Mac 앱 테스트를 따로 한 번 더 돌려 78개 통과를 확인했습니다(시나리오 확장 직후).
+- 실행 전 켜진 시뮬레이터는 없었습니다. 실행 뒤 테스트에 쓴 두 시뮬레이터(iPhone 18 Pro, iPad Pro 13-inch (M5))는 꺼진 상태였고, 다른 시뮬레이터(iPhone 17e 등)는 건드리지 않았습니다. 실행 전후 SpringBoard 오류 보고서는 생기지 않았습니다.
+- Mac 앱 테스트 로그에 `com.apple.linkd.autoShortcut` 연결 실패 줄이 찍히지만 테스트 결과와 무관합니다(테스트 호스트 앱의 시스템 서비스 연결 기록).
+
+### 자동 테스트가 확인하는 것
+
+- 레시피: 피부 정밀 7종·몸 피부 3종·효과 2종 키 왕복, 키가 없는 G 이전 세션·프리셋은 0으로 읽혀 결과가 같음, `hasEffect`·`dependsOnFaces`·`dependsOnPerson`(몸 피부는 인물만, 효과는 분석 불필요), 유한성 검사, 프리셋이 새 그룹을 나름, 스키마 키 집합(`testSkinRefinementKeysRoundTripAndDefaultToIdentity`, `testSkinRefinementScalarsAreCheckedForFinitenessAndCarriedByPresets`, `testBodySkinRoundTripsDefaultsAndDependsOnPerson`, `testBodySkinScalarsAreCheckedForFinitenessAndCarriedByPresets`, `testEffectsRoundTripDefaultsAndNeedNoAnalysis`, `testEffectScalarsAreCheckedForFinitenessAndCarriedByPresets`).
+- 편집: 새 변경의 범위 클램프·잠기지 않음·실행 취소 한 단계, 자동 보정이 피부 정밀·몸 피부·효과를 지우지 않음, 선택 동기화가 고른 항목만 복사하고 얼굴 의존 항목이 없으면 대상 얼굴 유지·잠긴 사진의 얼굴형·체형 보존·빈 선택은 아무것도 안 함(`testSkinRefinementChangesClampAreNotLockedAndUndoOneStepEach`, `testApplyAutoKeepsSkinRefinements`, `testBodySkinChangesClampAreNotLockedAndAreCopiedByPresetsAndBatch`, `testApplyAutoKeepsBodySkin`, `testEffectChangesClampAreNotLockedAndAreCopiedButNotByAuto`, `testBatchCopiesOnlyChosenCategoriesAndKeepsTargetFaceWithoutFaceCategories`).
+- 라이브러리: `applyToAll(from:categories:)`가 고른 항목만 다른 사진에 복사(`testApplyToAllWithCategoriesCopiesOnlyThose`).
+- 주름 띠 마스크: 다크서클·팔자·마리오네트·미간 띠 위치, 기울어진 얼굴을 따라감, 특징점이 없는 띠만 빠짐(`testDarkCircleMaskSitsUnderBothEyesAndLeavesEyesAndCheeks`, `testNasolabialMaskRunsFromNoseWingToMouthCornerOnBothSides`, `testMarionetteMaskDropsFromTheMouthCornersTowardTheChin`, `testGlabellaMaskSitsBetweenTheBrows`, `testFoldMasksFollowARolledFace`, `testFoldMasksNeedTheirLandmarks`).
+- 피부 정밀 렌더: 주름 4종이 자기 띠의 그늘만 올리고 그늘 없는 피부에 얼룩·색 기를 더하지 않으며 그늘의 채도를 지킴, 특징점 누락은 그 띠만 건너뜀, 얼룩 고르기는 얼룩을 펴고 모공을 남김, 번들거림은 밝은 피부 반점만 줄임, 붉은기는 볼보다 붉은 곳만 맑게 하고 혈색은 고르게 더함, 값 0은 같은 바이트이고 범위 밖 값은 자른 값과 같음, 상자만 있는 얼굴은 주름을 건너뛰고 얼룩 고르기는 동작, 고른 얼굴만 바뀜, `smoothing`만 있는 레시피는 G 이전 경로와 같은 바이트, 새 캐시 항목 없음(`testDarkCirclesLiftOnlyTheShadowUnderTheEyes`, `testNasolabialAndMarionetteLiftTheirOwnFoldOnly`, `testGlabellaLiftsBetweenTheBrowsOnly`, `testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast`, `testFoldLiftKeepsShadowChroma`, `testMissingLandmarksSkipOnlyThatFold`, `testToneEveningFlattensBlotchesAndKeepsPores`, `testShineMattifiesOnlyBrightSkinSpots`, `testRednessClearsOnlyRedderThanCheeksAndFlushAddsEvenly`, `testZeroRefinementsAreIdentityAndOutOfRangeValuesRenderClamped`, `testBoxOnlyFaceSkipsFoldsButStillEvensTone`, `testTargetFaceRefinesOnlyThatFace`, `testSmoothingOnlyUsesTheLegacyBandMixPath`, `testRefinementsReuseTheSkinRasterAndAddNoCacheEntries`, `testScaledUnitSkinMaskMatchesStrengthMask`).
+- 몸 피부 렌더: 값 0·사람 없음·얼굴 없음은 같은 바이트, 밝기는 보이는 피부만 올리고 셔츠·배경·눈은 그대로, 톤은 피부만 따뜻하게·차갑게, 매끄럽게는 얼굴을 빼고 몸 피부만, 범위 밖 값 클램프, 대상 얼굴과 무관하게 가장 큰 얼굴 기준, 눈·눈썹·입과 얼굴 전체 마스크가 사진당 캐시 항목 둘, `ToneShift.blueness`가 색차만 움직임(`testZeroValuesNoPersonOrNoFaceReturnInputBytes`, `testBrightnessLiftsVisibleSkinAndLeavesShirtBackgroundAndEyes`, `testToneWarmsOrCoolsSkinOnly`, `testSmoothingSkipsTheFaceAndSmoothsBodySkin`, `testOutOfRangeValuesRenderClamped`, `testBodySkinIgnoresTargetFaceAndUsesTheLargestFace`, `testBodySkinMasksAddTwoEntriesPerPhoto`, `testFeatureMaskCoversEyesBrowsAndLipsOfEveryFaceInOneRaster`, `testWholeFaceMaskCoversEveryFaceWithFeatureRingsInOneRaster`, `testToneShiftBluenessMovesOnlyChromaAndDefaultsToIdentity`).
+- 효과 렌더: 값 0은 같은 바이트이고 범위 밖 값은 자른 값과 같음, 그레인은 두 번 렌더해도 같은 바이트이고 평균 밝기를 1바이트 안에서 유지, 글로우는 밝은 영역을 어두운 영역보다 더 올리고 1을 넘는 입력을 어둡게 하지 않음, 자르기·회전 뒤 extent를 따름(`testZeroEffectsReturnInputBytesAndOutOfRangeValuesClamp`, `testGrainIsDeterministicAndKeepsMeanBrightness`, `testGlowBrightensHighlightsMoreThanShadows`, `testGlowNeverDarkensValuesAboveOne`, `testEffectsFollowTheCurrentExtentAfterGeometry`). 단계 이름 배열과 캐시 상한은 `RenderPipelineTests`·`RegionMaskCacheTests`가 확인합니다.
+- 앱: 뷰티 피부 탭 7개와 피부톤 탭 3개, 조정 패널 효과 2개가 각각 실행 취소 한 단계, 피부톤 슬라이더가 인물 분석 상태와 프리셋 값을 따름, 동기화 메뉴 선택과 적용, 분할 비교가 기존 전체 토글 옆의 모드이고 사진을 바꾸면 꺼짐, 분할선 위치 클램프(`testSkinTabEditsEveryRefinementKeyOneUndoStepEach`, `testSkinToneTabEditsEveryKeyOneUndoStepEachWhenPersonFound`, `testSkinToneSlidersFollowPersonAvailabilityAndPresetValues`, `testAdjustToolEditsEffectsOneUndoStepEach`, `testApplyToAllCopiesOnlyChosenCategories`, `testSplitCompareIsAModeBesideTheFullToggleAndResetsOnSelect`, `testFractionClampsToCanvasAndDefaultsWhenWidthIsZero`).
+- 시나리오(화면 없이 앱 모델로, `testBeautySkinFaceFeaturesBackgroundBodyThenMakeupThenExportSucceeds`): 데모 사진 → 피부 보정 → 다크서클·얼룩 고르기 → 피부 밝기 → 그레인 0.5로 미리보기가 바뀜 → 전체 토글이 원본을 보임 → 분할 비교 켜고 끄기 → 얼굴형·눈·배경·다리·메이크업 → 색 온도 → 두 번째 사진을 가져와 색감만 동기화(두 번째 사진의 색감은 같고 피부·효과는 기본값) → 저장 파일이 정사각형. 얼굴·인물 마스크·관절점은 스텁입니다. 그레인을 켠 채 저장이 성공합니다.
+
+이 테스트는 합성 얼굴·스텁 분석과 데모 사진으로 돌며, 실제 사람 사진에서 결과가 자연스러운지는 판단하지 않습니다.
+
+### 구현 중 측정
+
+- 몸 피부 매끄럽게 저장 시간(이 절을 쓰면서 잼, Mac): 데모 사진을 `sips -Z 8000`으로 키운 임시 8000×8000 PNG(64MP, 저장소에 넣지 않음)에 실제 Vision 얼굴·인물 분석으로 준비한 뒤 `PhotoPipeline.renderOriginal` + `makeCGImage`를 매끄럽게 1과 0으로 각각 3회 재어 중앙값을 냈습니다(데우기 1회 뒤, 커밋하지 않은 임시 XCTest). 두 번 돌린 결과는 0일 때 0.508초·0.502초, 1일 때 0.503초·0.542초로 차이가 0~0.04초이며 회차 간 흔들림과 같은 크기입니다. 매끄럽게 1은 바이트 27%를 바꿔 실제로 적용됐습니다. 시간은 PNG 읽기와 전체 렌더가 대부분입니다. iPhone·iPad 실기기, 48MP HEIC, 메모리 최고치는 재지 않았습니다.
+- G2 구현 때(4000×3000 합성 피부 질감, 따뜻한 상태): 매끄럽게 1이 약 24ms 늘림(약 1.8배). 이번 절을 쓰면서 다시 재지 않았습니다.
+- 그레인 평균 밝기: 중간 회색 단색에 그레인 1을 걸면 8비트 평균이 127.0 → 127.53(차이 0.53바이트, 문턱 ±1). G3 구현 때 잰 값이며 다시 재지 않았습니다.
+- 주름 밝히기 판정 여유(G1 구현 때, 문턱 +12): 다크서클 +33·+19, 팔자 +18, 마리오네트 +16(표본 y 120), 미간 +25. 붉은기 맑게는 붉은 반점의 R−G 차이 −12(문턱 −10)로 여유가 얇습니다.
+- 번들거림이 중주파도 줄인 뒤 반사광 감소량(G1 구현 때): 반지름 12px 반점 −29, 28px 반점 −16. 피부색에서 먼 흰 반사광 중심은 가중치 밖이라 거의 줄지 않습니다.
+
+### 스펙과 다르게 한 것
+
+모두 스펙 결정 표에 "(G1·G2·G3 구현 중 변경)"으로 적었고, 이 문서 커밋에서 몸 피부·글로우의 에이전트 참조 절을 결정 표에 맞췄습니다.
+
+- 주름 국소 저주파 반지름 `foldLowBandFraction`을 0.04에서 0.015로 줄였습니다(0.04는 좁은 주름 그림자를 거의 지워 밝힘이 생기지 않음).
+- 주름 밝히기를 채널별 차이 덧셈에서 BT.601 휘도 비율 곱셈으로 바꾸고 배율 상한 1.6(`foldLiftMaxGain`)과 휘도 분모 하한 0.01(`foldLumaFloor`)을 더했습니다(채널별 차이는 배경 옆 띠에 파란 기를 더했고, 같은 양을 더하면 다크서클이 회색으로 뜸).
+- 번들거림은 저주파만이 아니라 번들거림 가중치만큼 중주파도 줄입니다(작은 반사광은 대부분 중주파에 있음).
+- 몸 피부의 밝기·톤 제외 영역에 눈썹을 더했고(눈·입은 특징점이 없으면 대체 타원), 매끄럽게 제외 영역을 잘라내지 않은 얼굴 다각형 전체로 넓혔습니다(눈가·입가 고리가 두 번 매끄럽게 되고 눈썹이 하얗게 들리던 문제). 얼굴이 없으면 몸 피부는 그대로입니다(사용자 결정).
+- 글로우는 `CIBloom` 대신 흐림 → 0…1로 자름 → 제곱 → 스크린 합성입니다(`CIBloom`은 고르게 밝은 영역을 밝히지 않았고, 자르지 않으면 1을 넘는 밝은 영역이 어두워짐).
+- 선택 동기화는 9개 항목이고 선택은 저장하지 않습니다(스펙 그대로, 사용자 결정).
+- 분할 비교는 기존 전체 토글을 그대로 둔 채 그 옆의 비교 모드로 더했습니다(스펙 그대로). 구현 중 자르기·회전을 바꾼 직후 원본과 미리보기의 비율이 잠시 다를 때 원본을 겹치지 않는 임시 방어 `AppModel.Policy.compareAspectTolerance`(0.01)를 더했습니다. 같은 비율의 기하 변경(좌우 반전, 180° 회전, 같은 비율 자르기)은 막지 못하므로 기하 일치 비교로 바꿀 후보입니다.
+
+### 미검증 (사용자 확인 필요)
+
+이번 작업에서 새로 생긴 항목:
+
+- 실제 인물 사진에서 피부 정밀 7종(다크서클·팔자·마리오네트·미간·얼룩 고르기·붉은기·번들거림)의 느낌과 최대값이 과하거나 약한지.
+- 주름 띠 위치, 특히 마리오네트(입꼬리 아래에 특징점이 없어 고정 각도)와 옆으로 돌린 얼굴.
+- 하얗게 날아간 반사광(이마·코)에서 번들거림이 거의 줄지 않는 정도와 넓은 번들거림이 덜 줄어드는 정도.
+- 몸 피부가 옷·배경·머리카락·다른 사람에게 번지는지, 얼굴과 몸에 조명이 다르게 떨어진 사진, 피부색이 다른 사람이 함께 있는 사진.
+- 뒷모습·팔만 나온 사진에서 피부톤 탭이 얼굴 없음 안내만 보이는 것이 혼란스러운지.
+- 그레인이 미리보기와 저장본에서 같은 모양으로 보이는지, 글로우의 느낌.
+- iPhone 화면: 뷰티 › 피부 탭의 슬라이더 7개 배치, 뷰티 탭 4개(피부·얼굴·눈·입·피부톤) 글자가 잘리지 않는지, 동기화 항목 메뉴의 글자 폭.
+- iOS에서 동기화 항목 메뉴가 항목을 하나 켜고 끌 때마다 닫히는지(여러 항목을 바꾸기 번거로움).
+- 분할선 표시·손잡이 드래그 조작감(1×와 4× 확대, 자르기·회전한 사진), VoiceOver로 분할선 조절.
+- 48MP 원본 저장 속도와 메모리(몸 피부 매끄럽게·글로우 포함).
+- iPhone·iPad 실기기에서 위 항목 전부.
+
+이전 절(F, E, D, C, B, B0, 구조 리팩토링 A)의 미검증 항목은 그대로 승계합니다.
+
+배포(릴리스 노트·태그·TestFlight)는 G 범위가 아니며 실행하지 않았습니다.
