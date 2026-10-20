@@ -674,7 +674,8 @@ final class AppModel {
         renderScheduler.schedule { [weak self] in
             // 다른 사진을 가져오는 동안 미리보기 캐시에서 밀려났을 수 있다.
             try await self?.reprepareIfEvicted(id, at: url)
-            return try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
+        } render: {
+            try await pipeline.preview(id, recipe: recipe, showsUncropped: showsUncropped)
         } completion: { [weak self] result in
             guard let self, session.selectedPhotoID == id else { return }
             isRendering = false

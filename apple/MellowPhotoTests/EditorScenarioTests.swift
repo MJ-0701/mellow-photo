@@ -291,6 +291,9 @@ final class EditorScenarioTests: XCTestCase {
         let firstID = model.session.photos[0].id
         model.select(firstID)
         try await waitUntil { model.isReady && model.preview != nil }
+        // 기다림이 실패했을 때 느린 렌더와 렌더 실패를 구분한다.
+        XCTAssertNil(model.selectionFailure)
+        XCTAssertNil(model.lastRenderFailure)
         for category in SyncCategory.allCases where category != .color {
             model.setSyncCategory(category, enabled: false)
         }
