@@ -2,9 +2,11 @@ import MellowEditing
 import MellowShared
 import SwiftUI
 
-/// 뷰티 도구.
-/// 대상 칩은 맨 위에 두고, 탭마다 대상 층까지 겹친 값을 슬라이더로 보여준다.
+/// 뷰티 도구(G4 스펙 4절).
+/// 위에서 아래로 대상 칩 → 원터치 버튼 + 강도 → 안내 → 세부 조정(접기, 기본 접힘).
+/// 세부 조정은 탭마다 대상 층까지 겹친 값을 슬라이더로 보여준다.
 /// 현재 대상 층이 덮어쓴 항목은 점과 재설정 메뉴를 단다(전체 대상에는 없다).
+/// 원터치가 쓴 항목은 제목 옆에 "원터치" 꼬리표를 단다.
 struct BeautyPanel: View {
     @Environment(AppModel.self) private var model
 
@@ -21,19 +23,26 @@ struct BeautyPanel: View {
             Label(UserMessage.noFaceDetected, systemImage: "person.crop.rectangle.badge.questionmark")
             Text(UserMessage.noFaceHint).font(.caption).foregroundStyle(.secondary)
         case .ready, .noLandmarks:
-            TargetChips()
+            // 성별 지정 안내는 원터치 줄이 한다.
+            TargetChips(showsGenderHint: false)
+            OneTouchRow()
             if availability == .noLandmarks {
                 Text(UserMessage.noLandmarksHint).font(.caption).foregroundStyle(.secondary)
             }
-            Picker(UserMessage.beautyTabsLabel, selection: $model.beautyTab) {
-                ForEach(BeautyTab.allCases) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            switch model.beautyTab {
-            case .skin: skinControls(portrait.skin)
-            case .face: faceControls(portrait.face)
-            case .features: featureControls(portrait.features)
-            case .skinTone: skinToneControls(recipe.bodySkin)
+            DisclosureGroup(UserMessage.detailAdjustments, isExpanded: $model.showsDetailAdjustments) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Picker(UserMessage.beautyTabsLabel, selection: $model.beautyTab) {
+                        ForEach(BeautyTab.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    switch model.beautyTab {
+                    case .skin: skinControls(portrait.skin)
+                    case .face: faceControls(portrait.face)
+                    case .features: featureControls(portrait.features)
+                    case .skinTone: skinToneControls(recipe.bodySkin)
+                    }
+                }
+                .padding(.top, 8)
             }
         }
     }
@@ -44,7 +53,8 @@ struct BeautyPanel: View {
         let overridden = model.overriddenKeys
         AdjustmentSlider(
             title: UserMessage.skinSmoothing, value: skin.smoothing, range: EditingPolicy.unitRange,
-            isOverridden: overridden.contains(.skinSmoothing), onReset: reset(.skinSmoothing)
+            isOverridden: overridden.contains(.skinSmoothing), onReset: reset(.skinSmoothing),
+            tag: tag(.skinSmoothing)
         ) { .skinSmoothing($0) }
         Toggle(isOn: Binding(get: { skin.autoBlemish }, set: { model.edit(.autoBlemish($0)) })) {
             HStack(spacing: 4) {
@@ -52,6 +62,9 @@ struct BeautyPanel: View {
                     OverrideDot()
                 }
                 Text(UserMessage.autoBlemish)
+                if let tag = tag(.autoBlemish) {
+                    TagLabel(text: tag)
+                }
             }
         }
         .font(.caption)
@@ -63,7 +76,7 @@ struct BeautyPanel: View {
             AdjustmentSlider(
                 title: UserMessage.skinRefinementTitle(key), value: skin[key], range: range,
                 snapsToZero: range.lowerBound < 0, isOverridden: overridden.contains(.skinRefinement(key)),
-                onReset: reset(.skinRefinement(key))
+                onReset: reset(.skinRefinement(key)), tag: tag(.skinRefinement(key))
             ) { .skinRefinement(key, $0) }
         }
         Text(UserMessage.skinRefinementHint).font(.caption).foregroundStyle(.secondary)
@@ -93,7 +106,8 @@ struct BeautyPanel: View {
         ForEach(FeatureKey.allCases, id: \.self) { key in
             AdjustmentSlider(
                 title: UserMessage.featureTitle(key), value: features[key], range: EditingPolicy.unitRange,
-                isOverridden: overridden.contains(.feature(key)), onReset: reset(.feature(key))
+                isOverridden: overridden.contains(.feature(key)), onReset: reset(.feature(key)),
+                tag: tag(.feature(key))
             ) { .feature(key, $0) }
         }
         Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
@@ -109,11 +123,17 @@ struct BeautyPanel: View {
             let range = EditingPolicy.bodySkinRange(key)
             AdjustmentSlider(
                 title: UserMessage.bodySkinTitle(key), value: bodySkin[key], range: range,
-                snapsToZero: range.lowerBound < 0
+                snapsToZero: range.lowerBound < 0,
+                tag: model.isOneTouchTagged(key) ? UserMessage.oneTouchTag : nil
             ) { .bodySkin(key, $0) }
             .disabled(!model.canAdjustBodySkin(key))
         }
         Text(UserMessage.bodySkinHint).font(.caption).foregroundStyle(.secondary)
+    }
+
+    /// 원터치가 쓴 묶인 키이고 현재 대상 층에 표시가 있으면 "원터치".
+    private func tag(_ key: PortraitKey) -> String? {
+        model.isOneTouchTagged(key) ? UserMessage.oneTouchTag : nil
     }
 
     /// 현재 대상 층에서 그 키만 상속으로 되돌린다.

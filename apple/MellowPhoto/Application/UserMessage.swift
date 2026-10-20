@@ -85,6 +85,14 @@ enum UserMessage {
     static let scopeHintGroup = "전체 값을 바탕으로 이 그룹에서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
     static let scopeHintPerson = "전체·그룹 값을 바탕으로 이 사람에게서 바꾼 항목만 저장돼요. 점이 있는 항목이 바꾼 것이에요."
     static let assignGenderHint = "성별을 지정하면 그 그룹의 값이 함께 적용돼요. 자동 추정이 틀리면 여기서 고칠 수 있어요."
+    static let oneTouch = "원터치 보정"
+    static let oneTouchStrength = "강도"
+    /// 원터치가 쓴 세부 슬라이더 꼬리표.
+    static let oneTouchTag = "원터치"
+    /// 원터치 표시가 없을 때 강도 값 자리.
+    static let strengthUnset = "—"
+    static let detailAdjustments = "세부 조정"
+    static let assignGenderForOneTouch = "성별을 지정하면 남녀가 다르게 보정돼요"
     /// 원터치 줄 아래 안내(G4 스펙 4절).
     static let oneTouchHintAll =
         "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 그 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)은 성별을 지정한 사람에게는 그룹 값에 가려요. 성별은 사람 칩에서 지정해요."

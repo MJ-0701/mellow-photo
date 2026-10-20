@@ -13,6 +13,8 @@ struct AdjustmentSlider: View {
     /// 덮어쓴 값을 상속으로 되돌린다.
     /// 덮어썼을 때만 컨텍스트 메뉴(Mac은 제목 옆 단추)로 보인다.
     var onReset: (() -> Void)? = nil
+    /// 제목 옆 꼬리표(원터치가 쓴 값이면 "원터치").
+    var tag: String? = nil
     let change: (Double) -> EditChange
 
     var body: some View {
@@ -22,6 +24,9 @@ struct AdjustmentSlider: View {
                     OverrideDot()
                 }
                 Text(title)
+                if let tag {
+                    TagLabel(text: tag)
+                }
                 #if os(macOS)
                     if isOverridden, let onReset {
                         Button(action: onReset) {
@@ -52,6 +57,17 @@ struct AdjustmentSlider: View {
     /// 양방향 슬라이더는 0 근처에서 0으로 붙는다.
     private func snapped(_ newValue: Double) -> Double {
         snapsToZero && abs(newValue) < Theme.bipolarSnapWidth ? 0 : newValue
+    }
+}
+
+/// 제목 옆 작은 꼬리표.
+struct TagLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text).font(Theme.oneTouchTagFont)
+            .padding(.horizontal, Theme.oneTouchTagPadding)
+            .background(Theme.accent.opacity(Theme.accentFillOpacity), in: Capsule())
     }
 }
 

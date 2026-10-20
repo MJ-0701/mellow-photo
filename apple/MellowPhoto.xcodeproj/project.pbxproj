@@ -17,6 +17,7 @@
 		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
 		1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F465BA3A1339352022E907AA /* AppModel+Live.swift */; };
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
+		25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */; };
 		281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */; };
 		2986031DF20FD411A4677470 /* EditorScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0C781535D14BC45ED308E3C /* EditorScene.swift */; };
 		2A655FCF4910A8E8A22BEA34 /* CompareDividerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */; };
@@ -26,6 +27,7 @@
 		3767C6140008302C2C497B32 /* CropOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */; };
 		3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */; };
 		3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AFA6571D26629D5ED075E50 /* ToolStrip.swift */; };
+		3BF956860D2433E83A0582EB /* OneTouchRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */; };
 		3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */; };
 		3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */ = {isa = PBXBuildFile; productRef = 213FE2825489D6DA1E427B12 /* MellowRendering */; };
 		48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0604580F74993079C348EBA /* MellowPhotoApp.swift */; };
@@ -101,6 +103,7 @@
 
 /* Begin PBXFileReference section */
 		022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoCanvasView.swift; sourceTree = "<group>"; };
+		0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchRow.swift; sourceTree = "<group>"; };
 		0AFA6571D26629D5ED075E50 /* ToolStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolStrip.swift; sourceTree = "<group>"; };
 		0CC7503240254DB929DE6204 /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotosTests.swift; sourceTree = "<group>"; };
@@ -151,6 +154,7 @@
 		C329A06E195C3E422C0EFF76 /* SyncMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncMenu.swift; sourceTree = "<group>"; };
 		C4711AEF3097752E578444CB /* ImportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotos.swift; sourceTree = "<group>"; };
 		CDC8069CC675408C9A682CA6 /* apple */ = {isa = PBXFileReference; lastKnownFileType = folder; name = apple; path = .; sourceTree = SOURCE_ROOT; };
+		CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchRowTests.swift; sourceTree = "<group>"; };
 		CFF07EEFB46B18358E9A09D9 /* CropOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlayTests.swift; sourceTree = "<group>"; };
 		D0604580F74993079C348EBA /* MellowPhotoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MellowPhotoApp.swift; sourceTree = "<group>"; };
 		D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorTool.swift; sourceTree = "<group>"; };
@@ -275,6 +279,7 @@
 				C0C781535D14BC45ED308E3C /* EditorScene.swift */,
 				3FB3268705F4B92286899B4B /* LookPanel.swift */,
 				119D17BD418BDE81F1E2622E /* MakeupPanel.swift */,
+				0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
 				C329A06E195C3E422C0EFF76 /* SyncMenu.swift */,
 				BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */,
@@ -317,6 +322,7 @@
 				5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */,
 				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
 				FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */,
+				CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */,
 				6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */,
 				BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */,
 				2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */,
@@ -555,6 +561,7 @@
 				E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */,
 				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
 				5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */,
+				25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */,
 				102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */,
 				865DD46860E65C891D8D186C /* SystemPhotoImporterTests.swift in Sources */,
 				7BA8C67978B43E2CE303C831 /* TargetChipsTests.swift in Sources */,
@@ -598,6 +605,7 @@
 				61873CD9B42105AA437C882A /* LookPanel.swift in Sources */,
 				F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */,
 				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
+				3BF956860D2433E83A0582EB /* OneTouchRow.swift in Sources */,
 				CF26FC52CE99423A4017446D /* PhotoCanvasView.swift in Sources */,
 				BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */,
 				3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */,

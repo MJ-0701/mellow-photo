@@ -24,6 +24,13 @@ enum Theme {
     static let targetChipPadding: CGFloat = 10
     /// 덮어쓴 슬라이더·사람 칩의 점 지름.
     static let overrideDotSize: CGFloat = 6
+    /// 원터치 보정 단추의 최소 폭.
+    static let oneTouchButtonMinWidth: CGFloat = 96
+    /// 세부 슬라이더 제목 옆 "원터치" 꼬리표 글꼴과 좌우 여백.
+    static let oneTouchTagFont = Font.caption2
+    static let oneTouchTagPadding: CGFloat = 4
+    /// 강조색 배경(선택된 칩·꼬리표)의 불투명도.
+    static let accentFillOpacity = 0.2
     /// 작은 아이콘 단추(사람 메뉴)를 누를 수 있는 최소 크기.
     static let iconButtonHitSize: CGFloat = 44
     /// 메이크업 색 칩 지름.

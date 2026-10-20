@@ -81,7 +81,10 @@ struct TargetChips: View {
             .font(.caption)
             .padding(.horizontal, Theme.targetChipPadding)
             .frame(minHeight: Theme.targetChipHeight)
-            .background(selected ? Theme.accent.opacity(0.2) : Color.secondary.opacity(0.15), in: Capsule())
+            .background(
+                selected ? Theme.accent.opacity(Theme.accentFillOpacity) : Color.secondary.opacity(0.15),
+                in: Capsule()
+            )
             .overlay(Capsule().stroke(selected ? Theme.accent : .clear, lineWidth: 2))
             .foregroundStyle(selected ? Theme.accent : .primary)
             .contentShape(Capsule())
