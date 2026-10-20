@@ -227,7 +227,7 @@ enum TestSupport {
     /// makeupCatalog가 nil이면 공용 파일을 읽는다. 카탈로그가 없는 경우는 .empty를 넘긴다.
     @MainActor
     static func makeModel(
-        root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
+        root: URL, maxPhotos: Int = 40, analyzer: any FaceAnalyzer = StubFaceAnalyzer(),
         personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), bodyAnalyzer: StubBodyAnalyzer = StubBodyAnalyzer(),
         genderEstimator: StubGenderEstimator? = nil, makeupCatalog: MakeupCatalog? = nil,
         importer: FakeImporter = FakeImporter(),

@@ -73,9 +73,9 @@
 | 새 타입·변경 | 모듈·폴더 | 설명 |
 |---|---|---|
 | `Gender`, `PersonID`, `PersonAnchor`, `PortraitKey`, `PortraitLayer`, `PersonRecord`, `PeopleAdjustments` | MellowShared/API (`PeopleAdjustments.swift`) | 층 값·사람 기록 |
-| `PortraitResolver`, `PersonMatcher`, `PersonMatching` | MellowShared/API (`PortraitResolver.swift`, `PersonMatcher.swift`) | 순수 계산. 렌더·편집·앱이 같은 함수를 쓴다 |
+| `PortraitScope`, `PortraitResolver`, `PersonMatcher`, `PersonMatching` | MellowShared/API (`PortraitResolver.swift`, `PersonMatcher.swift`) | 순수 계산. 렌더·편집·앱이 같은 함수를 쓴다. (H1 구현 중 변경) `PortraitScope`는 해석(`PortraitResolver`)도 받으므로 Shared에 둔다 |
 | `EditRecipe.people`, `targetFace` 읽기 이행, `PresetValues.people` | MellowShared/API | 레시피 확장 |
-| `PortraitScope`, `EditChange.gender`, `EditDocument.set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`overriddenKeys` | MellowEditing/API | 층을 지정하는 편집 규칙 |
+| `EditChange.gender`, `EditDocument.set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides`·`rebindPerson`·`removePerson`·`bindLegacyPeople`·`applyMakeupLook(_:forFace:of:)` | MellowEditing/API | 층을 지정하는 편집 규칙 |
 | `FaceTarget`, `RenderContext.faceTargets`, `PhotoAnalysis.genderEstimates`, `GenderEstimator`·`GenderEstimate`, `PreparedPhoto.genders`, `RenderTuning` 상수 3개 | MellowRendering/API | 얼굴별 값과 추정 포트 |
 | `SkinStage`·`FeatureStage`·`MakeupStage`·`ShapeWarpStage` 반복문 | MellowRendering/Domain | `targetFaces` 대신 `faceTargets` |
 | `CoreMLGenderEstimator` (H4만) | MellowRendering/Infrastructure | H4에서 모듈 표의 Rendering 행에 CoreML을 더하고 `verify-modules.sh`도 같은 커밋에서 고친다 |
@@ -298,7 +298,7 @@ public struct FaceTarget: Sendable {
 - (H3 구현 중 변경) 찾은 얼굴에 기록이 없을 때 룩을 적용하면 `EditDocument.applyMakeupLook(_:forFace:of:)`가 기록을 만들며 적용한다(체크포인트 한 번). 그래서 "먼저 슬라이더를 움직이라"는 임시 안내(`pickASliderFirst`)는 지운다.
 - 패널 값은 `AppModel.scopedValues`(얼굴 대상은 추정 성별까지 넣어 해석)이고 H2의 `beautyValues`(추정 무시)를 대신한다.
 - 캔버스: `tool`이 `.beauty`·`.makeup`일 때 탭을 `touch(from:to:)`에서 받아 `outputTransform.toOriginal`로 바꾼 점이 들어 있는 가장 작은 얼굴 상자를 고르고 그 사람을 scope로 한다(얼굴 밖이면 `.all`). 비교 모드·자르기 화면에서는 지금처럼 막는다. (H3 리뷰 변경) 뷰티·메이크업 캔버스는 드래그 층이 아니라 탭 제스처만 받아 확대한 사진의 한 손가락 이동을 스크롤 뷰에 남긴다. 모델은 누른 점과 뗀 점이 `AppModel.Policy.targetTapTolerance`(캔버스 정규화 0.02)보다 멀면 탭이 아니라 이동으로 보고 대상을 바꾸지 않는다. 대상 고르기는 편집이 아니므로 렌더 중에도 받는다.
-- `UserMessage`: `targetLabel`("대상"), `targetAll`("전체"), `genderMale`("남성"), `genderFemale`("여성"), `genderUnset`("미지정"), `personOrdinal(n)`("사람 n"), `genderEstimated`("추정"), `genderManual`("지정"), `overrideReset`("재설정"), `resetScope`("이 대상 초기화"), `personUnmatched`("사진에서 찾지 못함"), `rebindPerson`("이 얼굴에 연결"), `removePerson`("삭제"), `scopeHintGroup`, `scopeHintPerson`, `assignGenderHint`("성별을 지정하면 그룹 값이 적용돼요"). `faceCount`·`faceOrdinal`·`allFaces`는 쓰는 곳이 없어지면 지운다.
+- `UserMessage`: `targetLabel`("대상"), `targetAll`("전체"), `genderMale`("남성"), `genderFemale`("여성"), `genderUnset`("미지정"), `personOrdinal(n)`("사람 n"), `genderEstimated`("추정"), `genderManual`("지정"), `overrideReset`("재설정"), `resetScope`("이 대상 초기화"), `personUnmatched`("사진에서 찾지 못함"), `rebindPerson`("이 얼굴에 연결"), `removePerson`("삭제"), `scopeHintGroup`, `scopeHintPerson`, `assignGenderHint`("성별을 지정하면 그 그룹 값이 함께 적용돼요. 위의 성별 단추에서 지정해요."). `faceCount`·`faceOrdinal`·`allFaces`는 쓰는 곳이 없어지면 지운다.
 - `Theme`: 칩 높이·점 크기.
 
 ### 2. 테스트 전략

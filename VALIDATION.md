@@ -706,6 +706,105 @@
 
 이전 절(G 이전)의 미검증 항목은 그대로 승계한다.
 
+## 인물 보정 H 사람별·성별 그룹 보정 (2026-10-20)
+
+- 브랜치 `beauty-g4`, H 커밋은 `5895ba8`(생성 사진 테스트 지원)부터 이 절의 문서 커밋까지다.
+- H1·H2·H3은 G4-2·G4-3과 같은 브랜치에서 섞여 진행됐다(실행 순서는 G4 스펙 5절).
+- 검증 작업 트리는 `4e08045`에 두 시나리오 테스트와 `TestSupport.makeModel`의 얼굴 분석기 인자 타입 변경만 더한 상태다(문서 변경 전).
+- 환경: macOS 26.6.2, Xcode 27.1, Mac17,9. CI는 Xcode 26.3이다.
+- 이 절의 검증은 모두 자동 테스트이며, 앱을 띄워 화면을 보거나 조작한 검증은 없다.
+- iOS 시뮬레이터 테스트와 실기기 검증은 하지 않았다(로컬 시뮬레이터 금지 규칙). iOS는 CI 몫이고 실기기는 사용자 조치다.
+- 배포(릴리스 노트·태그·TestFlight)는 H 범위가 아니며 실행하지 않았다.
+
+### 자동 검증
+
+- `./scripts/test-apple.sh` 종료 코드 **0**(2026-10-20, 위 작업 트리, 재시도 없이 한 번).
+- 모듈 검사, `swift format lint --strict`, XcodeGen 재생성 뒤 xcodeproj 차이 없음, 패키지, Mac 앱 테스트가 통과했다.
+- iOS 시뮬레이터 앱 테스트와 iPhone UI 테스트는 스크립트가 로컬에서 건너뛰었다(`MELLOW_IOS_TESTS`를 켜지 않음).
+- 패키지 **454**: MellowShared 69, MellowRendering 292(1 건너뜀: 치아 미백, 데모 사진이 다문 입), MellowLibrary 34, MellowExport 4, MellowEditing 55.
+- Mac 앱 **99**(`TEST SUCCEEDED`).
+- H 시작 기준(`0cd2380`)은 패키지 401(Shared 49, Rendering 279, Library 32, Export 4, Editing 37), Mac 83이었다.
+- 늘어난 패키지 53 중 H가 39(H1 16, H2 20, H3 3)이고 G4-2·G4-3이 14다.
+- 늘어난 Mac 16 중 H가 11(H3 Task 2 5, Task 3 2, 리뷰 반영 3, Task 4 시나리오 1)이고 G4-3이 5다.
+- 이 문서 커밋 전에 iOS 시뮬레이터용 빌드만 한 번 했다(`generic/platform=iOS Simulator`, 기기 부팅 없음, `BUILD SUCCEEDED`).
+- CI(Xcode 26.3)는 컨트롤러가 확인하고 결과는 머지 기록에 남긴다. 이 절을 쓸 때 확인한 상태는 아래 G4 절의 "CI 상태"에 함께 적었다.
+
+### 자동 테스트가 확인하는 것
+
+- 레시피 층: 성긴 층은 덮어쓴 키만 쓰고 왕복, 사람 기록의 관대한 읽기(빠진 층은 빈 층, 모르는 성별은 미지정, 깨진 기록만 버림), 빈 그룹 층 정리, 유한성 검사, 프리셋은 그룹 층만, 스키마(`testLayerEncodesOnlyOverriddenKeysAndRoundTrips`, `testLayerAppliesRemovesAndDiffs`, `testPeopleRoundTripAndDefaultToEmpty`, `testPeopleScalarsAreCheckedForFinitenessAndPresetsCarryGroupsOnly`, `testPruneDropsEmptyGroupLayersSoTheRecipeStaysDefault`, `testPersonRecordsDecodeLenientlyAndOnlyBrokenRecordsAreDropped`, `testPeopleSchemaDescribesLayersGroupsAndRecords`, `testPresetPeopleGroupsPersistAndIndividualsAreDropped`).
+- 옛 세션 이행: `targetFace`가 개인 층(`legacyIndex`)으로 옮겨지고 범위 밖·손상 인덱스는 짝이 없으며 `PortraitAdjustments`에는 더 없음(`testLegacyTargetFaceMigratesIntoAPersonRecord`, `testPortraitAdjustmentsNoLongerCarryATargetFace`, `testLegacyIDNeverCrashesOnOutOfRangeIndices`).
+- 해석: 전체 → 그룹 → 개인을 키 단위로 겹침, 미지정은 그룹을 건너뜀, 수동 성별이 추정을 이김, 겹친 값의 룩 이름(`testLayersOverlayKeyByKeyAndUndeterminedGenderSkipsGroups`, `testScopeResolutionEffectiveGenderAndOverriddenKeys`, `testLookIDComesFromTheTopLayerThatOverridesMakeup`).
+- 짝짓기: 인덱스가 밀려도 같은 사람, 멀거나 크기가 다른 얼굴은 짝 없음, 1:1·결정적·`legacyIndex` 폴백, 겹친 얼굴에서 편집과 렌더가 같은 사람을 고름, 같은 id 기록은 앞의 것만(`testAnchorsSurviveIndexShiftsAndRejectFarOrOddSizedFaces`, `testMatchingIsOneToOneDeterministicAndFallsBackToLegacyIndex`, `testPersonForFaceFollowsTheGlobalMatchForOverlappingFaces`, `testDuplicateIDsKeepOnlyTheFirstRecord`).
+- 층 편집: 대상 층에만 쓰고 클램프, 얼굴을 처음 만지면 기록을 만들고 빈 기록은 지움, 성별 지정은 잠금 대상이고 사람이 필요, 상속으로 재설정과 잠금, 잠긴 사진의 연결·삭제는 그 사람의 수동 성별 그룹 얼굴형까지 봄, 연결·삭제·legacy 연결·대상 룩이 실행 취소 한 단계, 겹친 얼굴 편집이 렌더 짝짓기를 따름, 기록 없는 얼굴의 룩, legacy 연결은 대체 짝인 기록만(`testScopedSetWritesOnlyThatLayerAndClamps`, `testFirstTouchOfAFaceCreatesTheRecordAndEmptyRecordsArePruned`, `testGenderAssignmentIsLockedByLocalEditsAndNeedsAPerson`, `testLocalEditLocksFaceShapeAndGender`, `testResetOverridesRestoresInheritanceAndRespectsLock`, `testRebindAndRemoveOnALockedPhotoRespectTheGenderGroupFaceShape`, `testRebindRemoveBindLegacyAndScopedLookAreOneUndoStep`, `testFaceEditsFollowTheRenderPairingForOverlappingFaces`, `testLookForAFaceWithoutARecordCreatesItInOneStep`, `testBindLegacyPeopleFillsOnlyRecordsPairedThroughTheirIndex`).
+- 프리셋·동기화: 프리셋은 개인 층·성별을 두고 그룹 층을 바꿈, 동기화는 그룹 층을 복사하고 받는 사진에서 그 항목의 개인 키를 지움, 얼굴 의존 항목이 없으면 개인 층 유지, 라이브러리 전체 적용(`testPresetKeepsIndividualsAndGenderButReplacesGroups`, `testBatchSyncCopiesGroupsAndClearsIndividualKeysOfSyncedCategories`, `testBatchCopiesOnlyChosenCategoriesAndKeepsIndividualsWithoutFaceCategories`, `testApplyToAllCarriesGroupLayersNotIndividuals`, `testSavedPresetCarriesGroupLayersNotIndividuals`).
+- 렌더(합성 얼굴): 얼굴마다 해석한 값, 개인 층은 그 얼굴만, 그룹 층은 그 성별 얼굴만(피부·메이크업), 개인 얼굴형은 그 얼굴의 원소만, 겹친 얼굴의 짝짓기가 편집과 같음, 옛 `targetFace` 렌더가 그 얼굴만(`testFaceTargetsResolvePeopleLayersPerFace`, `testIndividualLayerSmoothsOnlyThatFace`, `testGenderGroupPaintsOnlyFacesOfThatGender`, `testIndividualFaceShapeMakesPrimitivesOnlyForThatFace`, `testOverlappingFacesUseTheSameGlobalPairingAsEditing`, `testTargetFaceLimitsPortraitStagesToOneFace`).
+- 성별 추정 포트(구현 없음): 신뢰도 0.75·얼굴 폭 5%·yaw 0.6rad 임계값, 실패·길이 불일치는 조용히 미지정, 추정이 그룹 층을 고르되 수동 지정이 이김(`testGenderEstimatesAreThresholdedAndFailuresAreSilent`, `testEstimatedGenderSelectsGroupLayerUnlessManuallyAssigned`).
+- 앱: 칩 목록(추정·지정·미지정·찾지 못함·덮어쓴 수), 성별·재설정의 대상 라우팅과 실행 취소 한 단계, 캔버스 탭(겹친 얼굴은 작은 상자, 얼굴 밖은 전체, 드래그는 무시, 렌더 중에도 대상 선택), 준비 때 legacy 기록 연결(체크포인트 없음), 찾지 못한 기록의 연결·삭제와 기록 없는 얼굴의 룩, 잠긴 사진에서 얼굴형을 다른 얼굴로 옮기는 편집 거절, 대상별 패널 값과 덮어쓴 키, 사라진 대상은 전체로 읽음, 성별 바꾸기·대상 기억·원터치 드래그·연결 가드, 칩 제목·기호(`testPersonChipsReflectEstimatesManualGenderAndOverrides`, `testGenderAndResetAreRoutedToTheCurrentTargetAndUndoOneStep`, `testCanvasTapSelectsTheFaceAndLegacyPeopleAreBoundOnPrepare`, `testUnmatchedPersonCanBeReboundOrRemovedAndLookAppliesToAFace`, `testLockedPhotoRefusesEditsThatMoveFaceShapeOntoAnotherFace`, `testScopedPanelValuesShowInheritedAndOverriddenKeysPerTarget`, `testTargetTapIgnoresDragsAndIsNotBlockedByRendering`, `testStaleTargetFallsBackToAll`, `testGenderChangesTargetMemoryOneTouchDragUndoAndRebindGuard`, `testChipTitlesAndSymbolsFollowGenderSourceAndMatching`).
+- 생성 사진 세트: 테스트 타깃 사본이 공유 원본과 같은 바이트이고 라벨이 모든 사진을 기술, Vision 얼굴 수가 라벨 인원과 같음(`couple-01`·`group-01`만, `testPeopleFixturesMatchSharedCopiesAndLabelsDescribeEveryPhoto`, `testVisionFindsTheLabelledNumberOfFaces`).
+- 시나리오(`testCoupleFixtureManualGenderGroupAndIndividualThenSyncAndExport`, 실제 Vision): `couple-01`·`group-01`을 가져와 커플 얼굴 2개를 라벨대로 남·여로 지정 → 칩 성별이 라벨과 같음 → 여성 그룹 피부 보정 0.8로 미리보기가 바뀜 → 남성 얼굴은 그 값을 받지 않고 여성 얼굴은 받음 → 여성 얼굴 폭 −0.3이 그 사람 층의 덮어쓴 키 하나 → 피부만 동기화하면 단체 사진은 여성 그룹 층만 받고 개인 기록·성별 지정은 받지 않음 → 단체 사진 얼굴 5개가 모두 미지정 → 커플 사진 저장 성공.
+- 이 시나리오 테스트는 처음 실행부터 통과했다. 이미 구현된 동작을 묶는 테스트라 실패하는 모습을 따로 보지 않았다.
+
+이 테스트들은 합성 얼굴·스텁 분석·생성 사진으로 돌며, 실제 사람 사진에서 결과가 자연스러운지는 판단하지 않는다.
+
+### 옛 세션 이행
+
+- `targetFace`가 있던 사진은 읽을 때 전체 층이 비고 그 인덱스 사람의 개인 층(`legacyIndex`)으로 값이 옮겨진다. 그래서 "전체" 칩에서는 값이 0으로 보이고 "사람 i" 칩에서 값이 보인다. 레시피 단위는 `testLegacyTargetFaceMigratesIntoAPersonRecord`가 확인한다. 화면에서 칩 값을 보는 확인은 하지 않았다.
+- 렌더 바이트: H2 Task 5 구현 때 이행 전 커밋(`bd17370`)과 이행 뒤 트리에서 같은 임시 테스트로 옛 레시피 네 개(`targetFace 0` 피부 0.5, `targetFace 1`에 피부·자동 잡티·다크서클·얼굴 폭·눈·입술·립·눈썹·노출, 범위 밖 `targetFace 7`, B0 옛 키 `skinSmoothing`·`faceSlim`)를 렌더해 이어 붙인 4 MB가 `cmp`로 같았다. 임시 테스트는 커밋하지 않았고 이 절을 쓰면서 다시 재지 않았다.
+- 커밋된 테스트 `testTargetFaceLimitsPortraitStagesToOneFace`는 옛 JSON(`targetFace 1`)을 디코드한 렌더가 그 얼굴에만 건 렌더와 같은 바이트이고 모든 얼굴에 건 렌더와 다른지 매번 확인한다.
+- 준비 뒤 legacy 기록에는 anchor가 채워지고 실행 취소 단계는 생기지 않는다(`testCanvasTapSelectsTheFaceAndLegacyPeopleAreBoundOnPrepare`).
+
+### 생성 사진 세트
+
+- 다섯 장, 모두 1024×1024 JPEG, 합계 1 823 297바이트(약 1.8 MB, 한도 5 MB), 장당 최대 466 KB(한도 600 KB).
+- 위치는 `shared/fixtures/people/`이고 출처·생성 도구·사용 조건은 같은 폴더 `README.md`에 있다. 사용 조건(OpenAI 이용 약관) 최종 확인은 사용자 조치다.
+- 테스트 타깃 사본은 `apple/Tests/MellowRenderingTests/Fixtures/people/`의 `couple-01`·`group-01`과 `labels.json`이다.
+- 눈 확인(H3 Task 1, 생성 때): 다섯 장 모두 인원·성별이 라벨과 같고 손·얼굴 왜곡·글자·워터마크가 없었다. 재생성은 0회였다.
+- Vision 얼굴 수는 이 절을 쓰면서 macOS `VNDetectFaceLandmarksRequest`(앱의 `VisionFaceAnalyzer`와 같은 요청)로 다섯 장 모두 다시 셌다(임시 스크립트, 커밋하지 않음). 자동 테스트는 두 장만 단언한다.
+
+| 사진 | 크기 | 라벨 인원(왼쪽부터) | Vision 얼굴 수 | 특이점 |
+|---|---|---|---|---|
+| `couple-01.jpg` | 380 KB | 2(남·여) | 2 | 정면 성인, 실내. 자동 테스트 |
+| `couple-02.jpg` | 313 KB | 2(남·여) | 2 | 남 안경, 여 약 45° 돌림, 역광 |
+| `group-01.jpg` | 306 KB | 5(여·남·여·남·여) | 5 | 피부톤 다양, 노년 1, 모두 정면. 자동 테스트 |
+| `group-02.jpg` | 466 KB | 6(남·여·남·여·남·여) | 6 | 손으로 볼 가림 1, 옆얼굴 1 |
+| `group-03.jpg` | 315 KB | 4(여·남·여·남) | 4 | 안경 1, 다른 사람 뒤 일부 가림 1 |
+
+### 스펙과 다르게 한 것
+
+H 스펙 결정 표와 본문에 "(H1·H2·H3 구현 중 변경)"으로 먼저 적고 고쳤다.
+
+- 얼굴 → 사람은 anchor 하나에 가장 가까운 기록이 아니라 렌더와 같은 전역 1:1 짝짓기로 정한다. 그래서 `set(_:forPersonAt:)` 대신 `set(_:forFace:of:)`, `applyMakeupLook(_:forFace:of:)`이고 `personID(at:)`는 없다(`peopleByFace`·`personID(forFace:of:)`).
+- `prune()`은 빈 기록과 함께 빈 그룹 층도 지운다(기본 레시피 판정과 체크포인트 비교가 흔들리지 않게).
+- 사람 기록은 관대하게 읽고 같은 id는 앞의 것만 남긴다. 옛 인덱스는 `PersonID.legacyIndexRange` 안으로 모은다.
+- `PortraitResolver.resolve`는 `gender:` 대신 `estimate:`를 받고 수동 지정 우선을 안에서 정한다.
+- `PortraitScope`는 MellowEditing이 아니라 MellowShared에 있다(해석·편집·앱이 함께 쓴다).
+- 전체 층 재설정의 잠금은 "얼굴형 키가 들어 있으면"이 아니라 "0이 아닌 얼굴형을 실제로 되돌릴 때"다. 사람 삭제·연결의 잠금은 그 기록 층과 기록의 수동 성별 그룹 층의 얼굴형을 함께 본다.
+- 잠긴 사진에서 기록을 지우거나 옮기는 편집이 짝을 바꿔 어느 얼굴의 얼굴형 값이라도 달라지게 하면 앱이 거절한다. 이 가드는 `AppModel`에 있고 다른 사진으로의 동기화는 검사하지 않는다.
+- legacy 기록의 anchor는 지금 짝짓기에서 그 인덱스로 짝이 된 기록에만 채운다.
+- 겹친 값의 메이크업 룩 이름은 메이크업 부위를 덮어쓴 가장 위 층의 것이다.
+- 자동 보정은 얼굴이 있으면 원터치를 포함해 그룹 층도 다시 쓴다(G4 질문 2 판정, 결정 표 "(G4 변경)" 행).
+- 캔버스 대상 탭은 뷰티·메이크업 도구에서 탭만 받는 제스처이고(확대한 사진의 한 손가락 이동은 스크롤 뷰가 받음), 누른 점과 뗀 점이 `AppModel.Policy.targetTapTolerance`(0.02)보다 멀면 무시하며, 렌더 중에도 대상을 고른다.
+- 성별 메뉴는 칩의 컨텍스트 메뉴와 함께 선택된 사람 칩 아래 "성별: 미지정 ⌄" 글자 단추로 연다(처음 계획의 "…" 단추 대신).
+- 뷰티 패널의 대상 안내(점 설명)는 "세부 조정" 안 맨 위에 있다.
+- 시나리오 테스트는 계획의 `FakeImporter(staged:)` 대신 받은 파일 그대로 가져오기(`passesThroughFileURLs`)를 쓰고, 실제 Vision을 넘기려고 `TestSupport.makeModel`의 얼굴 분석기 인자를 `any FaceAnalyzer`로 넓혔다. 여성 그룹 피부 보정은 0.8, 얼굴 폭은 여성 얼굴이다(스펙 2절의 "0.5·사람 1"과 값만 다름).
+
+### 미검증 (사용자 확인 필요)
+
+- 실제 커플·단체 사진에서 사람 칩, 성별 지정, 그룹 값, 개인 값, 재설정, 동기화 결과.
+- iPhone 폭에서 칩 줄의 가로 스크롤과 사람 칩 컨텍스트 메뉴(길게 누르기), "성별: … ⌄" 글자 단추.
+- 성별 단추의 44pt 누름 영역(음수 여백으로 줄 높이에 넣지 않음)이 iOS에서 실제로 위아래 14pt까지 먹는지.
+- 빈 컨텍스트 메뉴가 붙은 슬라이더 제목 줄을 길게 누를 때 들림·햅틱이 생기는지.
+- 대상 칩 높이 30pt가 44pt 권고보다 작아 누르기 어려운지(계획 결정).
+- 캔버스 탭 정확도(겹친 얼굴, 작은 얼굴), 확대한 뷰티·메이크업 캔버스에서 한 손가락 이동이 그대로 되는지.
+- 렌더 중 캔버스 탭: 미리보기 기하가 레시피보다 늦은 순간(자르기 실행 취소 직후 등)의 탭이 다른 얼굴을 고르지 않는지.
+- 원터치 뒤 그룹 층이 이긴다는 것: "전체"에서 바꾼 피부·눈입과 나중에 "전체"에 건 메이크업 룩이 성별을 지정한 사람에게는 안 보이는 것이 혼란스러운지.
+- 자동 성별 추정은 H4 전까지 "없음"이다. 모든 사람이 미지정으로 시작한다. 추정 배지는 만들었지만 보일 일이 없다.
+- 옛 세션을 연 사진에서 "전체" 칩 값이 0으로 보이는 것이 혼란스러운지.
+- CI의 iOS 시뮬레이터 앱 테스트·UI 테스트(Xcode 26.3).
+- iPhone·iPad 실기기에서 위 항목 전부.
+
+이전 절의 미검증 항목은 그대로 승계한다.
+
 ## 인물 보정 G4 원터치 (2026-10-20)
 
 - 브랜치 `beauty-g4`, G4-2(`c2def19`부터)와 G4-3(`2646cf6`부터)의 커밋과 이 절의 문서 커밋까지다.
@@ -811,5 +910,8 @@ G4 스펙 결정 표와 본문에 "(G4-2·G4-3 구현 중 변경)"으로 먼저 
 ### CI 상태
 
 - 컨트롤러가 CI로 확인하고 결과는 머지 기록에 남긴다. 이 절은 CI 통과를 주장하지 않는다.
+- 이 절을 쓰며 한 번 확인한 상태(2026-10-20 13:02 UTC, `gh run view`): GitHub Actions "Apple checks" 실행 `39425146910`(`4e08045`, 수동 실행)은 **진행 중**이었고 결과(conclusion)는 아직 없었다.
+- 그 실행은 이 절의 두 시나리오 테스트와 문서 커밋을 포함하지 않는다. 그 뒤 커밋은 다음 CI 실행이 확인한다.
+- 바로 앞 실행 `39422792756`(`bd573ce`)은 Xcode 26.3 타입 검사 시간 초과로 실패했고 `807f874`가 고쳤다.
 
 이전 절의 미검증 항목은 그대로 승계한다.
