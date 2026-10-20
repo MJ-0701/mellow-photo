@@ -144,10 +144,16 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     /// 렌더 전 검증용. 비유한수가 하나라도 있으면 false.
     public var allValuesFinite: Bool {
         let scalars = [color.exposure, color.contrast, color.saturation, color.warmth, look.intensity]
-        let groups =
-            portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
-            + bodySkin.numericValues + body.numericValues + makeup.numericValues + effects.numericValues
-            + people.numericValues
+        // 타입 검사 시간을 줄이려 묶음마다 따로 붙인다.
+        var groups: [Double] = portrait.numericValues
+        groups += detail.numericValues
+        groups += geometry.numericValues
+        groups += background.numericValues
+        groups += bodySkin.numericValues
+        groups += body.numericValues
+        groups += makeup.numericValues
+        groups += effects.numericValues
+        groups += people.numericValues
         let locals = operations.flatMap(\.numericValues)
         return (scalars + groups + locals).allSatisfy(\.isFinite)
     }

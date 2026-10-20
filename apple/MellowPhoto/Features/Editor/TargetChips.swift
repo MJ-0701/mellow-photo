@@ -113,7 +113,8 @@ struct TargetChips: View {
 
     /// "사람 n, 성별, 출처, 바꾼 항목 k개". 미지정은 출처가 없고 바꾼 항목이 없으면 그 부분을 뺀다.
     static func accessibilityLabel(for chip: AppModel.PersonChip) -> String {
-        var parts = [chip.faceIndex.map { UserMessage.personOrdinal($0 + 1) } ?? UserMessage.personUnmatched]
+        let person: String = chip.faceIndex.map { UserMessage.personOrdinal($0 + 1) } ?? UserMessage.personUnmatched
+        var parts: [String] = [person]
         parts.append(UserMessage.genderTitle(chip.gender))
         switch chip.source {
         case .manual: parts.append(UserMessage.genderManual)

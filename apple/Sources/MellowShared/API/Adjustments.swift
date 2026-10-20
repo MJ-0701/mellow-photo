@@ -85,6 +85,11 @@ public struct PortraitAdjustments: Codable, Equatable, Sendable {
     public var dependsOnFaces: Bool { skin.hasEffect || face.hasEffect || features.hasEffect }
     /// 유한성 검사에는 원터치 표시도 넣는다.
     public var numericValues: [Double] {
-        skin.numericValues + face.numericValues + features.numericValues + [oneTouch ?? 0]
+        let marker: Double = oneTouch ?? 0
+        var values: [Double] = skin.numericValues
+        values += face.numericValues
+        values += features.numericValues
+        values.append(marker)
+        return values
     }
 }

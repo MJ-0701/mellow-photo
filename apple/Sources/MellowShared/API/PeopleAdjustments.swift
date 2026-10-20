@@ -89,8 +89,11 @@ public enum PortraitKey: Hashable, Sendable {
     }
 
     /// 피부 보정·자동 잡티·정밀 7종.
-    public static let skin = Set(
-        [PortraitKey.skinSmoothing, .autoBlemish] + SkinRefinementKey.allCases.map(PortraitKey.skinRefinement))
+    public static let skin: Set<PortraitKey> = {
+        var keys: [PortraitKey] = [.skinSmoothing, .autoBlemish]
+        keys += SkinRefinementKey.allCases.map(PortraitKey.skinRefinement)
+        return Set(keys)
+    }()
     public static let faceShape = Set(FaceShapeKey.allCases.map(PortraitKey.faceShape))
     public static let features = Set(FeatureKey.allCases.map(PortraitKey.feature))
     public static let makeup = Set(MakeupPart.allCases.map(PortraitKey.makeupPart))
@@ -174,9 +177,16 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
 
     /// 이 층의 모든 숫자(유한성 검사용).
     /// 원터치 표시도 넣는다.
+    /// 타입 검사 시간을 줄이려 한 줄에 한 묶음씩 붙인다(Xcode 26.3이 긴 섞인 사슬을 포기함).
     public var numericValues: [Double] {
-        [skinSmoothing ?? 0, oneTouch ?? 0] + Array(skinRefinement.values) + Array(face.values)
-            + Array(features.values) + makeup.values.map(\.intensity)
+        let smoothing: Double = skinSmoothing ?? 0
+        let marker: Double = oneTouch ?? 0
+        var values: [Double] = [smoothing, marker]
+        values += skinRefinement.values
+        values += face.values
+        values += features.values
+        values += makeup.values.map(\.intensity)
+        return values
     }
 
     /// 이 층의 키로 아래 층 값을 덮어쓴다.
