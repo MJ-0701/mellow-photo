@@ -80,6 +80,25 @@ enum RenderingTestSupport {
         PixelGrid(try renderer.makeCGImage(image))
     }
 
+    /// 두 격자가 다른 픽셀 수를 왼쪽 절반·오른쪽 절반으로 나눠 센다.
+    /// 격자 크기는 같아야 한다.
+    static func changedPixelsByHalf(_ before: PixelGrid, _ after: PixelGrid) -> (left: Int, right: Int) {
+        var left = 0
+        var right = 0
+        for y in 0..<before.height {
+            for x in 0..<before.width {
+                let point = CGPoint(x: x, y: y)
+                guard after.rgba(point) != before.rgba(point) else { continue }
+                if x < before.width / 2 {
+                    left += 1
+                } else {
+                    right += 1
+                }
+            }
+        }
+        return (left, right)
+    }
+
     /// rect 안 휘도(선형 sRGB)의 대역별 분산. fine = 원본 − blur(r1), mid = blur(r1) − blur(r2).
     static func bandVariances(_ image: CIImage, in rect: CGRect, fineRadius: Double, midRadius: Double) throws
         -> (fine: Double, mid: Double)
@@ -569,6 +588,25 @@ extension SyntheticFace {
         image = CIImage(color: shirtColor).cropped(to: leftShirtRect).composited(over: image)
         let baked = CIImage(cgImage: try RenderingTestSupport.renderer.makeCGImage(image.cropped(to: extent)))
         return SyntheticFace(image: baked, face: base.face)
+    }
+}
+
+extension SyntheticFace {
+    /// 반 크기 합성 얼굴 둘을 좌우에 놓고 비트맵으로 굳힌다.
+    /// faces[0]이 왼쪽(x 0…0.5), faces[1]이 오른쪽이다.
+    static func pair(_ synthetic: SyntheticFace, renderer: Renderer) throws -> (image: CIImage, faces: [FaceGeometry]) {
+        let half = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        let side = CGFloat(size)
+        let left = synthetic.image.transformed(by: half.concatenating(CGAffineTransform(translationX: 0, y: side / 4)))
+        let right = synthetic.image.transformed(
+            by: half.concatenating(CGAffineTransform(translationX: side / 2, y: side / 4)))
+        let composed = left.composited(over: right).composited(over: CIImage(color: .gray)).cropped(to: extent)
+        let image = CIImage(cgImage: try renderer.makeCGImage(composed))
+        let faces = [
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25)),
+            synthetic.face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25)),
+        ]
+        return (image, faces)
     }
 }
 

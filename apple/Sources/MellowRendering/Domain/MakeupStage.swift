@@ -14,10 +14,10 @@ struct MakeupStage: RenderStage {
     static let screen = "CIScreenBlendMode"
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let makeup = Self.clamped(context.recipe.makeup)
-        guard makeup.hasEffect, !context.targetFaces.isEmpty else { return image }
+        let targets = context.faceTargets.map { ($0.face, Self.clamped($0.makeup)) }.filter { $0.1.hasEffect }
+        guard !targets.isEmpty else { return image }
         var result = image
-        for face in context.targetFaces {
+        for (face, makeup) in targets {
             result = sculpt(result, face: face, strength: makeup.contour, context: context)
             result = paintBlush(result, face: face, tint: makeup.blush, context: context)
             result = shadeEyelids(result, face: face, tint: makeup.eyeshadow, context: context)

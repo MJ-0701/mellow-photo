@@ -288,4 +288,29 @@ final class MakeupStageTests: XCTestCase {
         XCTAssertLessThanOrEqual(
             hueDistance(hue(foreheadAfter), hue(foreheadBefore)), maximumHueShift, "하이라이터 색상각")
     }
+
+    func testGenderGroupPaintsOnlyFacesOfThatGender() throws {
+        let pair = try SyntheticFace.pair(SyntheticFace.makeFeatures(), renderer: Support.renderer)
+        let catalog = try Support.sharedMakeupCatalog()
+        func rendered(genders: [Gender?]) throws -> CIImage {
+            var recipe = EditRecipe()
+            recipe.people.groups[.female] = PortraitLayer(makeup: [.lip: MakeupTint(colorID: "lip-red", intensity: 1)])
+            recipe.people.individuals = zip(pair.faces, genders).compactMap { face, gender in
+                gender.map { PersonRecord(anchor: PersonAnchor(faceBox: face.boundingBox), gender: $0) }
+            }
+            let context = RenderContext(
+                extent: pair.image.extent, recipe: recipe, faces: pair.faces, tuning: RenderTuning(),
+                makeupCatalog: catalog)
+            return try MakeupStage().apply(pair.image, in: context)
+        }
+        let before = try Support.grid(pair.image)
+        let rightOnly = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [nil, .female])))
+        XCTAssertEqual(rightOnly.left, 0, "미지정인 사람은 그룹 값을 받지 않는다")
+        XCTAssertGreaterThan(rightOnly.right, 0)
+        let both = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [.female, .female])))
+        XCTAssertGreaterThan(both.left, 0)
+        XCTAssertGreaterThan(both.right, 0)
+        let male = Support.changedPixelsByHalf(before, try Support.grid(rendered(genders: [.male, nil])))
+        XCTAssertEqual(male.left + male.right, 0, "다른 그룹은 받지 않는다")
+    }
 }

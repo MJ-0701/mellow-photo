@@ -7,19 +7,20 @@ import MellowShared
 struct SkinStage: RenderStage {
     let name = "skin"
 
+    /// 켜진 얼굴의 잡티를 모두 지운 뒤 얼굴마다 다듬는다.
+    /// 잡티 복구가 다른 얼굴의 다듬기 뒤에 오면 복제 원본이 이미 바뀐 픽셀이 된다.
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
-        let skin = Self.clamped(context.recipe.portrait.skin)
-        guard skin.hasEffect, !context.targetFaces.isEmpty else { return image }
+        let targets = context.faceTargets.map { ($0, Self.clamped($0.portrait.skin)) }.filter { $0.1.hasEffect }
+        guard !targets.isEmpty else { return image }
         let extent = context.extent
         var result = image
-        if skin.autoBlemish {
-            for heal in Self.healSpots(in: context) {
+        for (target, skin) in targets where skin.autoBlemish {
+            for heal in Self.healSpots(for: target, in: context) {
                 result = LocalEditStage.applySpot(heal, to: result, context: context)
             }
         }
-        guard skin.smoothing > 0 || skin.hasRefinement else { return result.cropped(to: extent) }
-        for face in context.targetFaces {
-            result = try refine(result, face: face, skin: skin, context: context)
+        for (target, skin) in targets where skin.smoothing > 0 || skin.hasRefinement {
+            result = try refine(result, face: target.face, skin: skin, context: context)
         }
         return result.cropped(to: extent)
     }
@@ -113,22 +114,23 @@ struct SkinStage: RenderStage {
         }
     }
 
-    /// 대상 잡티의 복제 원. 쓸 만한 원본이 없는 잡티는 건너뛴다.
-    /// 원본 조건은 얼굴마다 한 번 만든다. 제외 영역 넓힘은 그 얼굴 잡티 중 가장 큰 복제 반지름이다(작은 잡티에는 보수적).
-    /// 얼굴 인덱스가 범위 밖인 잡티는 피부 다각형이 없어 건너뛴다.
+    /// 자동 잡티가 켜진 대상의 복제 원 전부.
     static func healSpots(in context: RenderContext) -> [RetouchSpot] {
-        let blemishes = context.targetBlemishes
-        var rules: [Int: SourceRules] = [:]
-        for (faceIndex, members) in Dictionary(grouping: blemishes, by: \.faceIndex) {
-            guard context.faces.indices.contains(faceIndex) else { continue }
-            rules[faceIndex] = SourceRules(face: context.faces[faceIndex], members: members, in: context)
-        }
+        context.faceTargets.filter { clamped($0.portrait.skin).autoBlemish }.flatMap { healSpots(for: $0, in: context) }
+    }
+
+    /// 한 대상의 잡티를 덮는 복제 원.
+    /// 쓸 만한 원본이 없는 잡티는 건너뛴다.
+    /// 원본 조건은 얼굴마다 한 번 만든다.
+    /// 제외 영역 넓힘은 그 얼굴 잡티 중 가장 큰 복제 반지름이다(작은 잡티에는 보수적).
+    /// 얼굴 인덱스가 범위 밖이면 피부 다각형이 없어 빈 배열이다.
+    static func healSpots(for target: FaceTarget, in context: RenderContext) -> [RetouchSpot] {
+        let blemishes = target.blemishes
+        guard context.faces.indices.contains(target.index), !blemishes.isEmpty else { return [] }
+        let rules = SourceRules(face: target.face, members: blemishes, in: context)
         return blemishes.indices.compactMap { index in
-            let blemish = blemishes[index]
-            guard let faceRules = rules[blemish.faceIndex] else { return nil }
-            let others = blemishes.indices.filter { $0 != index && blemishes[$0].faceIndex == blemish.faceIndex }
-                .map { blemishes[$0] }
-            return healSpot(for: blemish, in: context, rules: faceRules, others: others)
+            let others = blemishes.indices.filter { $0 != index }.map { blemishes[$0] }
+            return healSpot(for: blemishes[index], in: context, rules: rules, others: others)
         }
     }
 

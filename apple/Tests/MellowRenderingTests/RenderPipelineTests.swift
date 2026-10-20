@@ -173,4 +173,45 @@ final class RenderPipelineTests: XCTestCase {
         XCTAssertEqual(bundled.targetFaces, [right])
         XCTAssertEqual(bundled.targetBlemishes, [spots[1]])
     }
+
+    func testFaceTargetsResolvePeopleLayersPerFace() {
+        let left = FaceGeometry(boundingBox: NormalizedRect(x: 0.05, y: 0.1, width: 0.35, height: 0.8))
+        let right = FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.1, width: 0.35, height: 0.8))
+        let spots = [
+            BlemishSpot(x: 0.2, y: 0.2, radius: 0.01, faceIndex: 0),
+            BlemishSpot(x: 0.7, y: 0.2, radius: 0.01, faceIndex: 1),
+        ]
+        var recipe = EditRecipe()
+        recipe.portrait.skin.smoothing = 0.2
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, features: [.eyeBrighten: 0.3])
+        let id = PersonID()
+        recipe.people.individuals = [
+            PersonRecord(
+                id: id, anchor: PersonAnchor(faceBox: right.boundingBox), gender: .female,
+                layer: PortraitLayer(skinSmoothing: 0.9, face: [.jaw: 0.4])),
+            PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.98, width: 0.01), layer: PortraitLayer(skinSmoothing: 1)),
+        ]
+        let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
+        let context = RenderContext(
+            extent: extent, recipe: recipe, faces: [left, right], tuning: RenderTuning(), blemishes: spots)
+        XCTAssertEqual(context.faceTargets.map(\.index), [0, 1])
+        let first = context.faceTargets[0]
+        XCTAssertNil(first.personID)
+        XCTAssertNil(first.gender)
+        XCTAssertEqual(first.portrait.skin.smoothing, 0.2, "짝이 없는 얼굴은 전체 값")
+        XCTAssertEqual(first.blemishes, [spots[0]])
+        let second = context.faceTargets[1]
+        XCTAssertEqual(second.personID, id)
+        XCTAssertEqual(second.gender, .female)
+        XCTAssertEqual(second.portrait.skin.smoothing, 0.9)
+        XCTAssertEqual(second.portrait.features.eyeBrighten, 0.3, "그룹 값은 상속")
+        XCTAssertEqual(second.portrait.face.jaw, 0.4)
+        XCTAssertEqual(second.blemishes, [spots[1]])
+        XCTAssertEqual(context.targetFaces, [left, right])
+        XCTAssertEqual(context.targetBlemishes, spots)
+        var legacy = recipe
+        legacy.portrait.targetFace = 0
+        let restricted = RenderContext(extent: extent, recipe: legacy, faces: [left, right], tuning: RenderTuning())
+        XCTAssertEqual(restricted.faceTargets.map(\.index), [0], "Task 5 전까지 옛 targetFace는 그 얼굴만 남긴다")
+    }
 }

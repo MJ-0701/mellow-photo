@@ -685,4 +685,42 @@ final class SkinStageTests: XCTestCase {
             Int(after.red(center)), Int(before.red(center)) + Self.liftMinimum, "눈 옆 그늘도 피부 기준으로 밝힌다")
         XCTAssertEqual(after.rgba(SyntheticFace.leftEye), before.rgba(SyntheticFace.leftEye), "눈 안은 그대로")
     }
+
+    func testIndividualLayerSmoothsOnlyThatFace() throws {
+        let pair = try SyntheticFace.pair(SyntheticFace.make(), renderer: Support.renderer)
+        var recipe = EditRecipe()
+        recipe.people.individuals = [
+            PersonRecord(
+                anchor: PersonAnchor(faceBox: pair.faces[0].boundingBox), layer: PortraitLayer(skinSmoothing: 1))
+        ]
+        let context = RenderContext(
+            extent: pair.image.extent, recipe: recipe, faces: pair.faces, tuning: RenderTuning())
+        let before = try Support.grid(pair.image)
+        let after = try Support.grid(SkinStage().apply(pair.image, in: context))
+        let changed = Support.changedPixelsByHalf(before, after)
+        XCTAssertGreaterThan(changed.left, 0, "개인 층이 있는 왼쪽 얼굴만 바뀐다")
+        XCTAssertEqual(changed.right, 0, "다른 얼굴은 한 픽셀도 바뀌지 않는다")
+        var unmatched = EditRecipe()
+        unmatched.people.individuals = [
+            PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.98, width: 0.02), layer: PortraitLayer(skinSmoothing: 1))
+        ]
+        let idle = RenderContext(
+            extent: pair.image.extent, recipe: unmatched, faces: pair.faces, tuning: RenderTuning())
+        XCTAssertEqual(
+            try Support.bytes(SkinStage().apply(pair.image, in: idle)), try Support.bytes(pair.image),
+            "짝이 없는 기록은 아무 얼굴도 바꾸지 않는다")
+        var perFaceBlemish = EditRecipe()
+        perFaceBlemish.people.individuals = [
+            PersonRecord(
+                anchor: PersonAnchor(faceBox: pair.faces[1].boundingBox), layer: PortraitLayer(autoBlemish: true))
+        ]
+        let spots = [
+            BlemishSpot(x: 0.2, y: 0.5, radius: 0.004, faceIndex: 0),
+            BlemishSpot(x: 0.7, y: 0.5, radius: 0.004, faceIndex: 1),
+        ]
+        let healing = RenderContext(
+            extent: pair.image.extent, recipe: perFaceBlemish, faces: pair.faces, tuning: RenderTuning(),
+            blemishes: spots)
+        XCTAssertEqual(Set(SkinStage.healSpots(in: healing).map(\.x)), [0.7], "자동 잡티가 켜진 사람의 잡티만 지운다")
+    }
 }

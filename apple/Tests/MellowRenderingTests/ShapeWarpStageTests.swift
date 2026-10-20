@@ -289,4 +289,22 @@ final class ShapeWarpStageTests: XCTestCase {
             XCTAssertGreaterThan(abs(shift.dx), 3, "얼굴 \(target)을 골라도 허리가 움직인다")
         }
     }
+
+    func testIndividualFaceShapeMakesPrimitivesOnlyForThatFace() throws {
+        let leftFace = SyntheticFace.make().face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0, y: 0.25))
+        let rightFace = SyntheticFace.make().face.transformed(scale: 0.5, offset: NormalizedPoint(x: 0.5, y: 0.25))
+        var recipe = EditRecipe()
+        recipe.people.individuals = [
+            PersonRecord(anchor: PersonAnchor(faceBox: leftFace.boundingBox), layer: PortraitLayer(face: [.width: -1]))
+        ]
+        let individual = RenderContext(
+            extent: SyntheticFace.extent, recipe: recipe, faces: [leftFace, rightFace], tuning: RenderTuning())
+        let legacy = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace], targetFace: 0)
+        let stage = ShapeWarpStage()
+        let fromIndividual = stage.facePrimitives(in: individual)
+        XCTAssertGreaterThan(fromIndividual.count, 0)
+        XCTAssertEqual(fromIndividual.count, stage.facePrimitives(in: legacy).count, "옛 대상 얼굴과 같은 원소 수")
+        let everyone = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace])
+        XCTAssertEqual(stage.facePrimitives(in: everyone).count, fromIndividual.count * 2)
+    }
 }
