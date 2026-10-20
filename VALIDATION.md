@@ -705,3 +705,111 @@
 - 실사진 수용 문턱이 CI(Xcode 26.3)의 Vision에서도 넘는지, 특히 여유가 좁은 두 값.
 
 이전 절(G 이전)의 미검증 항목은 그대로 승계한다.
+
+## 인물 보정 G4 원터치 (2026-10-20)
+
+- 브랜치 `beauty-g4`, G4-2(`c2def19`부터)와 G4-3(`2646cf6`부터)의 커밋과 이 절의 문서 커밋까지다.
+- 검증 작업 트리는 `4e08045`에 시나리오 테스트(이 절의 원터치 시나리오와 H 커플 시나리오)와 `TestSupport.makeModel`의 얼굴 분석기 인자 타입 변경만 더한 상태다(문서 변경 전).
+- 환경: macOS 26.6.2, Xcode 27.1, Mac17,9. CI는 Xcode 26.3이다.
+- 이 절의 검증은 모두 자동 테스트이며, 앱을 띄워 화면을 보거나 조작한 검증은 없다.
+- iOS 시뮬레이터·실기기는 하지 않았다(로컬 시뮬레이터 금지 규칙, iOS는 CI 몫, 실기기는 사용자 조치).
+- 배포(릴리스 노트·태그·TestFlight)는 하지 않았다.
+
+### 자동 검증
+
+- `./scripts/test-apple.sh` 종료 코드 **0**. 패키지 **454**(MellowShared 69, MellowRendering 292(1 건너뜀: 치아 미백), MellowLibrary 34, MellowExport 4, MellowEditing 55), Mac 앱 **99**.
+- G4가 더한 테스트는 패키지 14(G4-2 13: Shared 3 · Editing 6 · Rendering 4, G4-3 리뷰 반영 Editing 1)와 Mac 5(G4-3 Task 1 3, Task 2 1, Task 3 시나리오 1)다. 나머지 증분은 H다.
+- iOS 시뮬레이터용 빌드만 성공했다(`generic/platform=iOS Simulator`, 부팅 없음).
+- Xcode 26.3 타입 검사 시간 초과(CI 실행 `39422792756`, `bd573ce`)는 `807f874`에서 긴 섞인 덧셈 사슬을 나눠 고쳤다. 로컬 Xcode는 27.1뿐이라 26.3 컴파일은 CI로만 확인된다.
+
+### 원터치 실측 (실제 Vision, 폰 화면 배율 가로 1170px)
+
+이번 실행의 `acceptance oneTouch-…` 출력 줄이다. G4-2 구현 보고의 값과 모두 같다.
+
+데모 사진(`demo-portrait.png`), 하한(얼굴만, 몸 피부 없음):
+
+| 항목 | 문턱 | 측정값 |
+|---|---|---|
+| 여성 0.6 얼굴 상자 바뀐 비율 | ≥ 0.05 | 0.1526 |
+| 남성 0.6 얼굴 상자 바뀐 비율 | ≥ 0.05 | 0.0825 |
+| 공통 0.6 얼굴 상자 바뀐 비율 | ≥ 0.05 | 0.1139 |
+| 여성 1 얼굴 상자 바뀐 비율 | ≥ 0.10 | 0.2717 |
+| 남성 1 얼굴 상자 바뀐 비율 | ≥ 0.06 | 0.1420 |
+| 여성 1 대 남성 1 차이 | ≥ 0.02 | 0.1012 |
+| 남성 1 입술 색차 | ≤ 0.01 | 0.0000 |
+
+데모 사진, 상한(몸 피부를 포함한 전체 대상 결과, 몸 피부 밝기 표 값 0.15):
+
+| 경우 | 피부 평균 ΔY(/255, 0.6만 1.275~12.75) | 질감(fine 분산) 비(0.6 ≥ 0.9, 1 ≥ 0.85) | 99백분위 \|ΔY\|(≤ 60) | 피부 색차(≤ 0.015) | 눈썹 바뀐 비율(≤ 0.05) | 얼굴·몸 피부 밖(≤ 0.002) | 얼굴만 렌더의 얼굴 밖, 뺌 없음(≤ 0.002) | 입술 색차(여 ≤ 0.03, 그 외 ≤ 0.01) |
+|---|---|---|---|---|---|---|---|---|
+| 여성 0.6 | 2.385 | 0.956 | 20.0 | 0.0020 | 0.0000 | 0.0000 | 0.0000 | 0.0053 |
+| 남성 0.6 | 1.794 | 0.965 | 12.8 | 0.0019 | 0.0000 | 0.0000 | 0.0000 | 0.0003 |
+| 공통 0.6 | 2.057 | 0.960 | 16.2 | 0.0021 | 0.0000 | 0.0000 | 0.0000 | 0.0003 |
+| 여성 1 | — | 0.930 | 30.7 | 0.0031 | 0.0280 | 0.0000 | 0.0000 | 0.0092 |
+| 남성 1 | — | 0.947 | 20.4 | 0.0031 | 0.0280 | 0.0000 | 0.0000 | 0.0004 |
+| 공통 1 | — | 0.939 | 25.4 | 0.0032 | 0.0280 | 0.0000 | 0.0000 | 0.0004 |
+
+커플 사진(`couple-01.jpg`, 라벨대로 남·여 지정, 전체 원터치 1, 몸 피부 없음):
+
+| 항목 | 문턱 | 측정값 |
+|---|---|---|
+| 남성 얼굴 상자 바뀐 비율 | ≥ 0.03 | 0.1868 |
+| 여성 얼굴 상자 바뀐 비율 | ≥ 0.03, 남성보다 큼 | 0.3895 |
+| 남성 입술 색차 | ≤ 0.01 | 0.0000 |
+| 미지정 두 얼굴(공통 표) | ≥ 0.03 | 0.2893 · 0.3165 |
+
+- 상한에 걸려 내린 표 값은 하나다: 몸 피부 밝기 0.2 → 0.15(강도 1에서 눈썹 바뀐 비율 9.1%가 상한 5%를 넘음). 눈썹 여유는 2.2%p다.
+- 남성 기본 0.6 얼굴 상자 바뀐 비율의 여유는 0.0325다.
+- 얼굴 표만으로는 기본 0.6 피부 평균 ΔY가 0.24~0.81/255라 하한 1.275/255에 못 미친다(G4-2 리뷰 측정). 하한 1.275는 전체 대상이 쓰는 몸 피부 밝기로 넘는다. 그래서 그룹·사람 대상 원터치(몸 피부를 쓰지 않음)는 같은 사람에게서 "전체"보다 흐리게 보인다.
+- 문턱 수치는 하나도 바꾸지 않았다.
+
+### 자동 버튼 결정 (질문 2)
+
+- 판정: 포함(`AppModel.Policy.autoIncludesOneTouch` = true).
+- 자동은 색감·디테일 자동과, 얼굴이 있으면 원터치 기본 강도 0.6(전체 대상: 전체 층 공통 표, 남성·여성 그룹 층 각 성별 표, 몸 피부 밝기)을 체크포인트 하나로 쓴다. 얼굴이 없으면 색감·디테일만이다.
+- 대가: 색감만 맞추려던 사용자도 피부·눈입·블러셔·립이 바뀌고, 그룹 층에서 손으로 바꾼 묶인 키가 성별 표 값으로 덮인다(실행 취소 한 번으로 되돌림).
+- 테스트: `testAutoEnhanceIncludesOneTouchOnlyWhenFacesExist`(앱), `testApplyAutoCanIncludeOneTouchInOneStep`(편집 규칙). 상수 하나를 끄면 분리로 돌아간다.
+
+### 자동 테스트가 확인하는 것
+
+- 표: 강도 선형 곱·0…1 자름·상한, 남성 블러셔·립 없음, 얼굴형 없음, 표시 키 왕복과 렌더 무관, 프리셋 표시 운반과 옛 파일 이행(`testTablesScaleLinearlyAndNeverTouchShapeOrLipColour`, `testOneTouchMarkRoundTripsAndIsNotARenderValue`, `testPresetValuesCarryOneTouchMarksAndLegacyMigrationDropsThem`).
+- 편집 규칙: 층별 표 쓰기와 강도, 그룹·사람은 그 성별 표만, 손으로 묶인 키를 바꾸면 그 층의 표시만 지움, 프리셋은 표시를 나르고 동기화는 네 항목을 모두 복사할 때만 표시를 복사, 자동에 원터치 포함, 몸 피부 밝기는 전체 층 표시에 묶이고 톤은 쓰지 않음, 메이크업이 그대로면 룩 이름 유지(`testOneTouchWritesTablesPerLayerAndStrengthScales`, `testOneTouchOnGroupAndPersonUsesThatGenderTableOnly`, `testManualChangeOfABundledKeyClearsOnlyThatLayerMark`, `testPresetsCarryMarksAndSyncCopiesThemOnlyWithAllThreeCategories`, `testApplyAutoCanIncludeOneTouchInOneStep`, `testOneTouchBundlesBodyBrightnessIntoTheAllMarkButLeavesBodyTone`, `testAllLayerOneTouchKeepsTheLookWhenMakeupIsUnchanged`).
+- 실사진 수용: 위 실측 표(`testOneTouchIsVisibleForEachGenderAndDiffersBetweenThem`, `testOneTouchStaysNaturalAtDefaultAndMaximum`, `testOneTouchNeverReshapesTheFaceOrBody`, `testOneTouchOnTheCouplePhotoTreatsMaleAndFemaleDifferently`).
+- 앱: 원터치가 현재 대상으로 가고 강도를 기억, 버튼이 열린 드래그를 끝내고 손상 표시는 슬라이더용으로 자름, 사람 대상은 몸 피부를 쓰지 않음, 자동은 얼굴이 있을 때만 원터치 포함, 강도 글자와 대상별 안내(`testOneTouchRoutesToTheCurrentTargetAndRemembersStrength`, `testOneTouchButtonEndsAnOpenDragAndStrengthIsClampedForTheSlider`, `testAutoEnhanceIncludesOneTouchOnlyWhenFacesExist`, `testStrengthTextAndHintsFollowTheTarget`).
+- 시나리오(`testOneTouchThenStrengthThenDetailOverrideThenExportSucceeds`, 데모 사진 + 스텁 얼굴): 원터치 버튼 → 강도 0.6 표시와 꼬리표 → 강도 슬라이더 1로 미리보기가 바뀜 → "세부 조정"에서 다크서클을 바꾸면 전체 층 표시·꼬리표가 사라지고 여성 그룹 표시는 남음 → 실행 취소 한 번에 표시 1이 돌아옴 → 저장 성공, 오류 없음. 처음 실행부터 통과했다(이미 구현된 동작을 묶는 테스트).
+
+### 스펙과 다르게 한 것
+
+G4 스펙 결정 표와 본문에 "(G4-2·G4-3 구현 중 변경)"으로 먼저 적고 고쳤다.
+
+- 몸 피부 밝기 표 값 0.2 → 0.15.
+- 실사진 수용은 하한을 얼굴만, 상한을 몸 피부를 포함한 전체 대상 결과로 잰다. 얼굴 밖 상한은 얼굴만 렌더에서 뺌 없이도 잰다.
+- 몸 피부 밝기는 전체 층 표시에 묶이고 몸 피부 톤은 표 값이 0인 동안 쓰지 않는다.
+- 표시 규칙 셋을 더했다: 수동 성별 변경은 그 사람 층 표시를 지움, 층 전체 재설정은 표시도 지움, 룩 이름은 블러셔·립이 실제로 바뀔 때만 지움.
+- 동기화는 피부·눈입·메이크업·몸 피부 네 항목을 모두 복사할 때만 표시를 복사한다(처음 계획은 세 항목).
+- 기본 강도 0.6은 `OneTouchBundle.defaultStrength`(Shared)에 두고 `EditingPolicy.oneTouchDefaultStrength`가 내보낸다.
+- 강도 슬라이더 값은 손상 파일의 표시도 0…1로 자른다.
+- 원터치 안내 문구는 그룹 값이 메이크업(립·블러셔)까지 "전체"보다 앞선다는 것과 그룹·사람 원터치가 몸 피부를 바꾸지 않는다는 것을 말하고, iPhone 조절 영역(200pt)에 맞게 전체 두 줄·그룹·사람 한 줄로 줄였다.
+- 원터치 줄은 `ViewThatFits` 없이 늘 한 줄이다(드래그 중 배치가 바뀌면 슬라이더가 다시 만들어짐). 버튼 기호는 iOS 18·macOS 15 전에는 `wand.and.stars`다.
+
+### 미검증 (사용자 확인 필요)
+
+- 실제 얼굴에서 원터치의 자연스러움: 남성은 절제되고(덜 매끄럽게, 블러셔·립 없음) 여성은 블러셔·입술 생기가 은은한지. 표 값 취향.
+- 성별 칩·사람 칩의 원터치는 몸 피부를 쓰지 않아 같은 사람에게서 "전체"보다 흐리게 보이는 것이 혼란스러운지.
+- 원터치 뒤 그룹 층 값(립·블러셔 포함)이 나중에 "전체"에 건 메이크업 룩과 피부·눈입 변경을 성별을 지정한 사람에게서 가리는 것.
+- 강도 슬라이더 드래그 감, "—" 표시, "세부 조정" 접기와 꼬리표.
+- iPhone 조절 영역(200pt)에서 칩·원터치 줄·"세부 조정" 머리가 스크롤 없이 보이는지. 미지정 사람 대상은 어림 약 193pt로 여유가 몇 pt뿐이다. 큰 글자 크기(Dynamic Type)와 iPhone SE 폭(전체 안내가 세 줄이 될 수 있음).
+- 손쉬운 사용 큰 글자 크기에서 고정 폭 원터치 버튼이 강도 슬라이더를 거의 없애는지.
+- `List` 밖 "세부 조정" 머리 글자를 눌러 접고 펴지는지(iOS).
+- 원터치 버튼(`.borderedProminent`, 강조색 위 `Theme.canvas` 글자)의 라이트·다크 대비, macOS가 글자색을 무시하는지.
+- 렌더 중 캔버스 탭으로 대상을 고르는 감(H 절의 같은 항목).
+- 원터치·자동을 쓴 저장본이 미리보기와 같은지.
+- 실측은 데모 한 장과 커플 한 장이다. 다른 피부톤·조명은 재지 않았다.
+- CI(Xcode 26.3)의 패키지·Mac·iOS 시뮬레이터 앱 테스트와 UI 테스트.
+- G4-1 절의 미검증 항목(그레인·주름 4종·몸 피부 밝기·톤·붉은기·진단 절 등)은 1.3.1이 TestFlight에 올라가 있으나 기기 확인 결과를 아직 받지 않았다.
+
+### CI 상태
+
+- 컨트롤러가 CI로 확인하고 결과는 머지 기록에 남긴다. 이 절은 CI 통과를 주장하지 않는다.
+
+이전 절의 미검증 항목은 그대로 승계한다.

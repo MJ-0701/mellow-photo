@@ -304,4 +304,38 @@ final class EditorScenarioTests: XCTestCase {
         let size = try await exportedPixelSize(model)
         XCTAssertEqual(size.width, size.height, "다리를 늘리고 메이크업을 해도 정사각형 원본 크기 그대로 저장된다")
     }
+
+    /// 원터치 → 강도 → 세부 조정에서 묶인 키 변경(꼬리표 해제) → 저장.
+    func testOneTouchThenStrengthThenDetailOverrideThenExportSucceeds() async throws {
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([Self.demoFace])),
+            importer: FakeImporter(passesThroughFileURLs: true))
+        await model.importFromFiles([try demoPortraitCopy()])
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.selectTool(.beauty)
+        let baseline = previewBytes(model)
+        model.applyOneTouch()
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != baseline }
+        XCTAssertEqual(model.oneTouchStrength, EditingPolicy.oneTouchDefaultStrength)
+        XCTAssertTrue(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        let defaultBytes = previewBytes(model)
+        model.beginSliderEdit()
+        model.applyOneTouch(strength: 1)
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering && self.previewBytes(model) != defaultBytes }
+        XCTAssertEqual(model.oneTouchStrength, 1)
+        model.showsDetailAdjustments = true
+        model.beginSliderEdit()
+        model.edit(.skinRefinement(.darkCircles, 0.1))
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.oneTouchStrength, "세부 조정이 표시를 지운다")
+        XCTAssertFalse(model.isOneTouchTagged(.skinRefinement(.darkCircles)))
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.oneTouch, 1, "그룹 표시는 남는다")
+        model.undo()
+        XCTAssertEqual(model.oneTouchStrength, 1, "실행 취소 한 번에 표시가 돌아온다")
+        let size = try await exportedPixelSize(model)
+        XCTAssertGreaterThan(size.width, 0)
+        XCTAssertNil(model.presentedError)
+    }
 }

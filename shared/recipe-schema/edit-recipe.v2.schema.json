@@ -22,7 +22,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "oneTouch": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "default": null, "description": "원터치 표시(G4). 전체 층의 묶인 항목(skin 9종·features 3종·makeup.blush·makeup.lip)이 OneTouchBundle 공통 표 × 이 강도와 같다는 뜻이다. 렌더는 읽지 않는다. 없으면 표시 없음." },
+        "oneTouch": { "type": ["number", "null"], "minimum": 0, "maximum": 1, "default": null, "description": "원터치 표시(G4). 전체 층의 묶인 항목(skin 9종·features 3종·makeup.blush·makeup.lip)이 OneTouchBundle 공통 표 × 이 강도와 같고 bodySkin.brightness가 몸 피부 표 × 이 강도와 같다는 뜻이다. 렌더는 읽지 않는다. 없으면 표시 없음." },
         "targetFace": { "type": ["integer", "null"], "default": null, "deprecated": true, "description": "B0~G의 읽기 전용 키. people.individuals가 없을 때만 전체 층 값을 그 인덱스 사람의 개인 층(legacyIndex)으로 옮겨 읽는다. 쓰지 않는다." },
         "skin": {
           "type": "object", "additionalProperties": false,
