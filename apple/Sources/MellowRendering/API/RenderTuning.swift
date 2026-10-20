@@ -233,6 +233,14 @@ public struct RenderTuning: Sendable {
     public var vignetteRadius: Double = 1.5
     /// 룩 tint ±1이 CITemperatureAndTint 목표 중립 y ±이 값이 된다.
     public var lookTintRange: Double = 60
+    /// 그레인 1에서 오버레이 층의 잡음 진폭(sRGB 감마 값, 전체 폭). 0.5 ± 0.06.
+    public var grainMaxAmplitude: Double = 0.12
+    /// 알갱이 한 변. 짧은 변 비율(1200px에서 1.44px). 1px 아래로는 내려가지 않는다.
+    public var grainSizeFraction: Double = 0.0012
+    /// 글로우 반지름. 짧은 변 비율(1200px에서 24px).
+    public var glowRadiusFraction: Double = 0.02
+    /// 글로우 1에서 빛 층(흐린 이미지의 제곱)에 곱하는 세기.
+    public var glowMaxIntensity: Double = 0.6
 
     /// 자동 보정이 노출로 맞추는 평균 휘도(sRGB 감마 값).
     public var autoTargetLuminance: Double = 0.45
