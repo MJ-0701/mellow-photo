@@ -308,27 +308,56 @@ final class SkinStageTests: XCTestCase {
         }
     }
 
-    /// 그늘 없는 피부에서 주름 밝히기가 띠 표본 점의 채널마다 바꿔도 되는 최대 바이트. 피부 질감 얼룩의 작은 밝힘만 허용한다.
-    private static let unshadowedFoldTolerance = 3
+    /// 그늘 없는 피부에서 띠 안 색차(|ΔCb|·|ΔCr|, 0…1) 상한. 세 채널에 같은 배율을 곱하므로 색이 번지지 않는다.
+    private static let unshadowedFoldMaximumChroma = 0.01
+    /// 그늘 없는 피부에서 띠 가중 평균 ΔY(8비트) 상한. 스펙 G4 1.4의 주름 상한 +0.08이다.
+    private static let unshadowedFoldMaximumMeanLift = 0.08 * byteRange
 
+    /// 그늘 없는 피부에서 주름 밝히기는 색 번짐이 없고 띠 평균 밝힘이 상한 안이며 띠 밖은 그대로다(스펙 G4 2.2).
+    /// 피부 전용 기준은 띠 안의 어두운 결 얼룩도 주변 피부 수준으로 고르므로 얼룩 픽셀은 6~10바이트 오른다(설계대로).
+    /// 그래서 표본 점마다의 바이트 허용치 대신 띠 가중 평균과 색차로 단언한다.
     func testFoldLiftOnUnshadowedSkinAddsNoBlotchOrColorCast() throws {
         let synthetic = SyntheticFace.make()
+        let extent = synthetic.image.extent
+        let tuning = RenderTuning()
         let before = try Support.grid(synthetic.image)
-        let cases: [(SkinAdjustments, [CGPoint])] = [
-            (SkinAdjustments(darkCircles: 1), [SyntheticFace.underLeftEye, SyntheticFace.underRightEye]),
-            (SkinAdjustments(nasolabial: 1), [SyntheticFace.leftNasolabial, SyntheticFace.rightNasolabial]),
-            (SkinAdjustments(marionette: 1), [SyntheticFace.leftMarionette, SyntheticFace.rightMarionette]),
-            (SkinAdjustments(glabella: 1), [SyntheticFace.glabella]),
+        let cases: [(String, SkinAdjustments, FaceRegions.RegionMask?)] = [
+            (
+                "darkCircles", SkinAdjustments(darkCircles: 1),
+                FaceRegions.darkCircleMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "nasolabial", SkinAdjustments(nasolabial: 1),
+                FaceRegions.nasolabialMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "marionette", SkinAdjustments(marionette: 1),
+                FaceRegions.marionetteMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
+            (
+                "glabella", SkinAdjustments(glabella: 1),
+                FaceRegions.glabellaMask(face: synthetic.face, extent: extent, tuning: tuning)
+            ),
         ]
-        for (skin, points) in cases {
+        for (name, skin, region) in cases {
+            let band = try Support.grid(XCTUnwrap(region, "\(name) 띠").image)
             let after = try Support.grid(render(synthetic, skin: skin))
-            for point in points {
-                for channel in 0..<3 {
-                    XCTAssertEqual(
-                        Int(after.rgba(point)[channel]), Int(before.rgba(point)[channel]),
-                        accuracy: Self.unshadowedFoldTolerance, "그늘 없는 \(point) 채널 \(channel)은 밝은 얼룩·색 번짐이 없다")
+            let chroma = DisplayScale.chromaDelta(before, after, weight: band)
+            XCTAssertLessThanOrEqual(max(chroma.cb, chroma.cr), Self.unshadowedFoldMaximumChroma, "\(name) 색 번짐 없음")
+            XCTAssertLessThanOrEqual(
+                DisplayScale.lumaDelta(before, after, weight: band).mean, Self.unshadowedFoldMaximumMeanLift,
+                "\(name) 띠 평균 밝힘 상한")
+            var outsideDifference = 0
+            for y in 0..<before.height {
+                for x in 0..<before.width {
+                    let point = CGPoint(x: x, y: y)
+                    guard band.red(point) == 0 else { continue }
+                    let a = before.rgba(point)
+                    let b = after.rgba(point)
+                    outsideDifference = max(outsideDifference, (0..<3).map { abs(Int(a[$0]) - Int(b[$0])) }.max() ?? 0)
                 }
             }
+            XCTAssertLessThanOrEqual(outsideDifference, Self.blendRoundingTolerance, "\(name) 띠 밖은 그대로(섞기 반올림만)")
         }
     }
 

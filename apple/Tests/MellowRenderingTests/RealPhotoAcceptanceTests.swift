@@ -28,7 +28,8 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let grainMinimumCell = 2.5
         static let glowChangedFraction = 0.40
         static let eyeMeanAbsolute = 3.0
-        static let lipMeanAbsolute = 4.0
+        /// 입술 생기는 Cb·Cr만 바꾸고 휘도를 지키므로 휘도가 아니라 입술 마스크 가중 |ΔCr|(0…1)로 잰다(스펙 G4 1.2).
+        static let lipChromaCr = 0.02
         static let blushMeanAbsolute = 3.0
         /// 합성 그늘 깊이·반점·반사광 크기.
         static let shadowDepth = 0.25
@@ -298,7 +299,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             FaceRegions.lipMask(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning))
         let vivid = try grid({ $0.portrait.features.lipVitality = 1 }, stage: FeatureStage())
         XCTAssertGreaterThanOrEqual(
-            DisplayScale.lumaDelta(before, vivid, weight: lips).meanAbsolute, Visibility.lipMeanAbsolute)
+            DisplayScale.chromaDelta(before, vivid, weight: lips).cr, Visibility.lipChromaCr, "입술 혈색이 보인다")
         let teeth = try FaceRegions.teethMask(
             face: portrait.face, image: portrait.image, extent: portrait.extent, tuning: portrait.tuning)
         try XCTSkipIf(teeth == nil, "다문 입이라 치아 미백은 데모 사진에서 재지 않는다")

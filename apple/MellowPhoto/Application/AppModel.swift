@@ -237,9 +237,14 @@ final class AppModel {
         return selectedInfo?.hasPerson == true ? .ready : .fallback
     }
     /// 피부톤 슬라이더를 움직일 수 있는지. 사람 영역이 있거나 얼굴 둘레 대체 영역을 쓸 때 켠다.
+    /// 인물 분석이 실패해도 얼굴이 있으면 렌더가 대체 영역을 쓰므로 켠다.
     /// 드래그 중이거나 0이 아닌 값(프리셋)도 되돌릴 수 있게 켠다.
     func canAdjustBodySkin(_ key: BodySkinKey) -> Bool {
-        let active = bodySkinStatus == .ready || bodySkinStatus == .fallback
+        let active: Bool
+        switch bodySkinStatus {
+        case .ready, .fallback, .personAnalysisUnavailable: active = true
+        case .noFace, .faceAnalysisUnavailable: active = false
+        }
         return isSliderEditActive || active || currentRecipe.bodySkin[key] != 0
     }
     /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.

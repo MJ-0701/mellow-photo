@@ -714,6 +714,18 @@ final class AppModelTests: XCTestCase {
         model.endSliderEdit()
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
+        let failingRoot = root.appendingPathComponent("person-failure")
+        try FileManager.default.createDirectory(at: failingRoot, withIntermediateDirectories: true)
+        let failingStaged = try TestSupport.solidPNG(in: failingRoot)
+        let personFailure = MellowError.personAnalysisUnavailable(reason: "stub")
+        let failing = TestSupport.makeModel(
+            root: failingRoot, analyzer: StubFaceAnalyzer(result: .success([face])),
+            personAnalyzer: StubPersonAnalyzer(result: .failure(personFailure)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: failingStaged, displayName: nil))]))
+        try await importOne(failing, failingStaged)
+        XCTAssertEqual(failing.bodySkinStatus, .personAnalysisUnavailable(personFailure))
+        XCTAssertTrue(failing.canAdjustBodySkin(.brightness), "인물 분석이 실패해도 얼굴 둘레 대체 영역으로 렌더하므로 켠다")
+        XCTAssertEqual(UserMessage.bodySkinStatus(failing.bodySkinStatus), "인물 영역 분석 실패 → 얼굴 둘레로 대신 적용해요")
         let facelessRoot = root.appendingPathComponent("faceless")
         try FileManager.default.createDirectory(at: facelessRoot, withIntermediateDirectories: true)
         let facelessStaged = try TestSupport.solidPNG(in: facelessRoot)
