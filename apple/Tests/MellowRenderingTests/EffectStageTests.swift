@@ -14,10 +14,11 @@ final class EffectStageTests: XCTestCase {
         return try EffectStage().apply(image, in: context)
     }
 
-    /// 선형 평균 휘도(바이트 환산 전 0…1).
-    private func meanLuma(_ image: CIImage) throws -> Double {
-        let values = try Support.luma(image)
-        return values.reduce(0, +) / Double(values.count)
+    /// 8비트 sRGB 출력의 RGB 평균(알파 제외).
+    private func meanByte(_ image: CIImage) throws -> Double {
+        let bytes = try Support.bytes(image)
+        let colors = bytes.enumerated().filter { $0.offset % 4 != 3 }.map { Double($0.element) }
+        return colors.reduce(0, +) / Double(colors.count)
     }
 
     func testZeroEffectsReturnInputBytesAndOutOfRangeValuesClamp() throws {
@@ -38,7 +39,7 @@ final class EffectStageTests: XCTestCase {
         let second = try output(input, EffectAdjustments(grain: 1))
         XCTAssertTrue(try Support.bytes(first) == Support.bytes(second), "같은 입력은 같은 바이트")
         XCTAssertFalse(try Support.bytes(first) == Support.bytes(input), "그레인이 보인다")
-        XCTAssertEqual(try meanLuma(first), try meanLuma(input), accuracy: 0.01, "평균 밝기는 거의 그대로")
+        XCTAssertEqual(try meanByte(first), try meanByte(input), accuracy: 1, "평균 밝기는 8비트 ±1 안")
         let flatVariance = Support.variance(try Support.luma(input))
         let grainVariance = Support.variance(try Support.luma(first))
         XCTAssertGreaterThan(grainVariance, flatVariance + 1e-5, "단색에 잡음이 생긴다")
@@ -59,6 +60,16 @@ final class EffectStageTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(brightGain, 8, "밝은 쪽이 환해진다")
         XCTAssertGreaterThan(brightGain, darkGain, "어두운 쪽보다 더")
         XCTAssertEqual(EffectStage.glowRadius(shortSide: 1200, tuning: RenderTuning()), 24, accuracy: 1e-9)
+    }
+
+    func testGlowNeverDarkensValuesAboveOne() throws {
+        let input = Support.gradient().applyingFilter("CIExposureAdjust", parameters: [kCIInputEVKey: 1.5])
+        let before = try Support.grid(input)
+        let after = try Support.grid(output(input, EffectAdjustments(glow: 1)))
+        for x in stride(from: 0, to: 128, by: 8) {
+            let point = CGPoint(x: x, y: 40)
+            XCTAssertGreaterThanOrEqual(after.red(point), before.red(point), "1을 넘는 밝은 영역이 어두워지지 않는다 \(point)")
+        }
     }
 
     func testEffectsFollowTheCurrentExtentAfterGeometry() throws {

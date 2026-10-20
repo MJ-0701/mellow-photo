@@ -194,7 +194,7 @@ out  = low + mid × keep + (image − fineBlur)
 
 | 상수 | 시작값 | 뜻 |
 |---|---|---|
-| `grainMaxAmplitude` | 0.12 | 그레인 1에서 오버레이 층의 ±진폭(감마) |
+| `grainMaxAmplitude` | 0.12 | 그레인 1에서 오버레이 층의 잡음 전체 폭(감마). 층은 0.5 ± 진폭/2 |
 | `grainSizeFraction` | 0.0012 | 알갱이 한 변(짧은 변 비율, 1200px에서 1.4px) |
 | `glowRadiusFraction` | 0.02 | 글로우 반지름(짧은 변 비율) |
 | `glowMaxIntensity` | 0.6 | 글로우 1에서 스크린 합성하는 빛의 배율 |
