@@ -36,6 +36,20 @@ final class FeatureStageTests: XCTestCase {
             try Support.bytes(FeatureStage().apply(synthetic.image, in: noFaces)), try Support.bytes(synthetic.image))
     }
 
+    func testToneShiftBluenessMovesOnlyChromaAndDefaultsToIdentity() throws {
+        let skin = Support.solid(CIColor(red: 0.84, green: 0.66, blue: 0.56), size: 8)
+        let before = try Support.grid(skin)
+        let cooler = try Support.grid(
+            FeatureKernels.shared.shifted(skin, by: ToneShift(blueness: 0.05), extent: skin.extent))
+        let point = CGPoint(x: 4, y: 4)
+        XCTAssertGreaterThanOrEqual(Int(cooler.rgba(point)[2]), Int(before.rgba(point)[2]) + 10, "Cb를 더하면 파랑이 오른다")
+        XCTAssertEqual(Int(cooler.rgba(point)[0]), Int(before.rgba(point)[0]), accuracy: 1, "빨강은 그대로")
+        let same = try Support.grid(FeatureKernels.shared.shifted(skin, by: ToneShift(), extent: skin.extent))
+        for channel in 0..<3 {
+            XCTAssertEqual(Int(same.rgba(point)[channel]), Int(before.rgba(point)[channel]), accuracy: 1, "기본값은 항등")
+        }
+    }
+
     func testEyeBrightenLiftsScleraSharpensIrisAndLeavesSkin() throws {
         let synthetic = SyntheticFace.makeFeatures()
         let before = try Support.grid(synthetic.image)

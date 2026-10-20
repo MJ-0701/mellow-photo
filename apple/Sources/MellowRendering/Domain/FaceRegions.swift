@@ -330,6 +330,36 @@ enum FaceRegions {
         return featheredPolygonMask(fill: [outer], cut: inner, face: face, extent: extent, tuning: tuning, cache: cache)
     }
 
+    /// 모든 얼굴의 눈 다각형과 바깥 입술을 한 비트맵에 그려 featureMaskFeather(가장 넓은 얼굴 기준)로 흐린 마스크.
+    /// 몸 피부가 눈·입(치아 포함)을 빼는 데 쓴다. 다각형이 하나도 없으면 nil. 얼굴 수와 관계없이 캐시 항목 하나다.
+    static func featureMask(faces: [FaceGeometry], extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil)
+        -> RegionMask?
+    {
+        var fill: [[CGPoint]] = []
+        for face in faces {
+            fill += eyePolygons(face: face, extent: extent)
+            if let lips = landmarkPolygon(face, .outerLips, extent) {
+                fill.append(lips)
+            }
+        }
+        guard !fill.isEmpty, let widest = faces.max(by: { $0.boundingBox.width < $1.boundingBox.width }) else {
+            return nil
+        }
+        return featheredPolygonMask(fill: fill, cut: [], face: widest, extent: extent, tuning: tuning, cache: cache)
+    }
+
+    /// 얼굴마다 피부 다각형 비트맵(skinMask와 같은 캐시 항목)을 최대로 합친 extent 크기 마스크. 얼굴이 없으면 검정.
+    static func skinPolygonUnion(
+        faces: [FaceGeometry], extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil
+    ) -> CIImage {
+        var union = CIImage(color: .black).cropped(to: extent)
+        for face in faces {
+            union = skinPolygonRaster(face: face, extent: extent, tuning: tuning, cache: cache)
+                .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: union])
+        }
+        return union.cropped(to: extent)
+    }
+
     /// 치아 = 안쪽 입술 다각형 × 밝기 × 낮은 붉은기(스펙 4). 다문 입(넓이 비율 < mouthOpenMinArea)이거나 안쪽 입술이 없으면 nil.
     static func teethMask(
         face: FaceGeometry, image: CIImage, extent: CGRect, tuning: RenderTuning, cache: RegionMaskCache? = nil

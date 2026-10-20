@@ -4,9 +4,9 @@ import Foundation
 /// 다각형 마스크 비트맵 캐시. 같은 사진을 다시 렌더할 때 CGContext 래스터를 다시 그리지 않는다.
 /// RenderContext가 Sendable이라 잠금으로 보호한다. 같은 키를 동시에 처음 물으면 둘 다 그릴 수 있지만 결과는 같다.
 final class RegionMaskCache: @unchecked Sendable {
-    /// 얼굴 하나가 한 해상도에서 쓰는 다각형 비트맵 수의 상한. 피부·눈·입술·치아·아이섀도·왼눈썹·오른눈썹 7개에 여유 1.
-    /// 블러셔·쉐딩·하이라이터는 피부 비트맵을, 립은 입술 비트맵을 함께 쓴다.
-    static let entriesPerFacePerResolution = 8
+    /// 얼굴 하나가 한 해상도에서 쓰는 다각형 비트맵 수의 상한. 피부·눈·입술·치아·아이섀도·왼눈썹·오른눈썹·눈입(몸 피부) 8개에 여유 1.
+    /// 블러셔·쉐딩·하이라이터·주름은 피부 비트맵을, 립은 입술 비트맵을 함께 쓴다. 눈입 비트맵은 사진마다 하나라 얼굴당으로는 넉넉하다.
+    static let entriesPerFacePerResolution = 9
     /// 미리보기와 원본 두 해상도.
     static let resolutions = 2
     /// 얼굴이 적어도 이만큼은 담는다(D의 고정 상한).

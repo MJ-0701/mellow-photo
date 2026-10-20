@@ -19,13 +19,20 @@ enum FrequencySeparation {
     static func smoothed(
         _ image: CIImage, bounds: CGRect, faceWidth: CGFloat, smoothing: Double, tuning: RenderTuning
     ) throws -> CIImage {
+        try smoothed(
+            image, bounds: bounds, radii: radii(faceWidth: faceWidth, tuning: tuning), smoothing: smoothing,
+            tuning: tuning)
+    }
+
+    /// 반지름을 직접 받는 형태. 몸 피부처럼 얼굴 폭이 없는 영역이 쓴다.
+    static func smoothed(
+        _ image: CIImage, bounds: CGRect, radii: (fine: Double, mid: Double), smoothing: Double, tuning: RenderTuning
+    ) throws -> CIImage {
         let amount = min(1, max(0, smoothing))
         guard amount > 0, !bounds.isEmpty else { return image }
-        // 지역 상수 이름을 radii로 하면 같은 이름의 정적 메서드를 가려 컴파일되지 않는다.
-        let bandRadii = Self.radii(faceWidth: faceWidth, tuning: tuning)
         return try SkinKernels.shared.bandMix(
-            image: image, fineBlur: blurred(image, radius: bandRadii.fine),
-            midBlur: blurred(image, radius: bandRadii.mid), keep: 1 - amount * tuning.midReductionMax, extent: bounds)
+            image: image, fineBlur: blurred(image, radius: radii.fine), midBlur: blurred(image, radius: radii.mid),
+            keep: 1 - amount * tuning.midReductionMax, extent: bounds)
     }
 
     /// 얼룩 고르기·번들거림이 들어간 대역 합성. mask는 세기 1 피부 마스크(넓은 평균의 가중치), reference는 볼 평균(선형, 무한 확장).
