@@ -2,7 +2,8 @@ import CoreImage
 import MellowShared
 
 /// 보이는 피부 전체(얼굴 포함)의 밝기·톤과 얼굴 밖 피부의 매끄럽게.
-/// 마스크 = 인물 마스크 × 가장 큰 얼굴의 볼 기준 피부색 가중치 × (1 − 모든 얼굴의 눈·입). 매끄럽게는 거기서 얼굴 피부 다각형을 뺀다.
+/// 마스크 = 인물 마스크 × 가장 큰 얼굴의 볼 기준 피부색 가중치 × (1 − 모든 얼굴의 눈·눈썹·입).
+/// 매끄럽게는 거기서 얼굴 피부 다각형 전체(눈가·입가 포함, 잘라내지 않음)를 뺀다.
 /// 인물 마스크나 얼굴이 없으면 입력 그대로다(오류 아님). 값은 AdjustmentRange로 직접 자른다. 대상 얼굴 선택과 무관하다.
 struct BodySkinStage: RenderStage {
     let name = "bodySkin"
@@ -15,6 +16,7 @@ struct BodySkinStage: RenderStage {
         let extent = context.extent
         let tuning = context.tuning
         let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        // 기준색은 skin 단계 뒤 입력에서 잰다. 마스크를 거는 얼굴 픽셀과 같은 이미지라야 얼굴 피부 가중치가 1에 머문다.
         guard let cheeks = FaceRegions.cheekAverages(of: encoded, face: reference, extent: extent) else { return image }
         let feather = max(
             CGFloat(tuning.skinBlurMinimumRadius), context.shortSide * CGFloat(tuning.bodySkinMaskFeather))
@@ -30,9 +32,12 @@ struct BodySkinStage: RenderStage {
         // 밝기 뒤에 매끄럽게 하면 밝기 경계가 번지므로 매끄럽게가 먼저다.
         var result = image
         if values.smoothing > 0 {
-            let faceSkin = FaceRegions.skinPolygonUnion(
+            var smoothMask = toneMask
+            if let face = FaceRegions.wholeFaceMask(
                 faces: context.faces, extent: extent, tuning: tuning, cache: context.regionMasks)
-            let smoothMask = Self.product(toneMask, Self.inverted(faceSkin, extent: extent), extent: extent)
+            {
+                smoothMask = Self.product(toneMask, Self.inverted(face.image, extent: extent), extent: extent)
+            }
             let smooth = try FrequencySeparation.smoothed(
                 result, bounds: extent, radii: Self.bodyRadii(shortSide: context.shortSide, tuning: tuning),
                 smoothing: values.smoothing, tuning: tuning)
@@ -59,7 +64,7 @@ struct BodySkinStage: RenderStage {
 
     /// 기준색을 재는 얼굴. 상자 폭이 가장 큰 얼굴이고 없으면 nil.
     static func referenceFace(_ faces: [FaceGeometry]) -> FaceGeometry? {
-        faces.max { $0.boundingBox.width < $1.boundingBox.width }
+        FaceRegions.widestFace(faces)
     }
 
     /// 몸 피부 대역 반지름. 얼굴 폭 대신 짧은 변에 비례한다.

@@ -11,6 +11,10 @@ final class BodySkinStageTests: XCTestCase {
     /// 밝기 1에서 기대하는 최소 빨강 증가와 톤 ±1에서 기대하는 최소 R−B 변화(바이트).
     private static let liftMinimum = 6
     private static let toneMinimum = 10
+    /// 피부 다각형 비트맵이 눈·입술을 넓혀 뺀 고리 안의 얼굴 피부. 눈 아래끝(y 286)에서 14px, 입술 위끝(y 160)에서 7px.
+    /// 입술 고리는 y 172 아래라 (256, 175)에서 고리 안 (256, 167)로 옮겼다.
+    private static let underEyeRing = CGPoint(x: 200, y: 272)
+    private static let lipRing = CGPoint(x: 256, y: 167)
 
     private func output(
         _ synthetic: SyntheticFace, _ values: BodySkinAdjustments, faces: [FaceGeometry]? = nil,
@@ -46,6 +50,7 @@ final class BodySkinStageTests: XCTestCase {
         let untouched = [
             SyntheticFace.shirtPoint, SyntheticFace.backgroundBesideBody, SyntheticFace.backgroundAboveHead,
             SyntheticFace.backgroundInsideContour, SyntheticFace.leftEye, SyntheticFace.mouth, SyntheticFace.outside,
+            SyntheticFace.leftBrowCenter,
         ]
         for point in untouched {
             XCTAssertEqual(after.rgba(point), before.rgba(point), "피부가 아닌 \(point)")
@@ -91,6 +96,9 @@ final class BodySkinStageTests: XCTestCase {
                 XCTAssertEqual(afterGrid.rgba(point), beforeGrid.rgba(point), "얼굴 피부 \(point)는 얼굴 슬라이더 몫")
             }
         }
+        for point in [Self.underEyeRing, Self.lipRing] {
+            XCTAssertEqual(afterGrid.rgba(point), beforeGrid.rgba(point), "눈가·입가 얼굴 피부 \(point)")
+        }
         for point in [SyntheticFace.shirtPoint, SyntheticFace.backgroundBesideBody, SyntheticFace.leftEye] {
             XCTAssertEqual(afterGrid.rgba(point), beforeGrid.rgba(point), "\(point)")
         }
@@ -121,7 +129,7 @@ final class BodySkinStageTests: XCTestCase {
         XCTAssertNil(BodySkinStage.referenceFace([]))
     }
 
-    func testBodySkinMasksShareFaceRastersAndAddOneEntry() throws {
+    func testBodySkinMasksAddTwoEntriesPerPhoto() throws {
         let synthetic = try SyntheticFace.makeWithBody()
         var recipe = EditRecipe()
         recipe.bodySkin = BodySkinAdjustments(brightness: 0.5, smoothing: 0.5)
@@ -129,7 +137,13 @@ final class BodySkinStageTests: XCTestCase {
         let context = RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: RenderTuning())
         let first = try Support.bytes(BodySkinStage().apply(synthetic.image, in: context))
         let second = try Support.bytes(BodySkinStage().apply(synthetic.image, in: context))
-        XCTAssertEqual(analysis.regionMasks.count, 2, "눈·입 비트맵 하나 + 피부 다각형(skinMask와 공유) 하나")
+        XCTAssertEqual(analysis.regionMasks.count, 2, "보호 영역 비트맵 하나 + 얼굴 다각형 비트맵 하나")
         XCTAssertTrue(first == second)
+        let small = synthetic.face.transformed(scale: 0.3, offset: NormalizedPoint(x: 0.65, y: 0.6))
+        let twoFaces = PhotoAnalysis(faces: [synthetic.face, small], personMask: SyntheticFace.bodyPersonMask)
+        _ = try BodySkinStage().apply(
+            synthetic.image,
+            in: RenderContext(extent: extent, recipe: recipe, analysis: twoFaces, tuning: RenderTuning()))
+        XCTAssertEqual(twoFaces.regionMasks.count, 2, "얼굴 수와 관계없이 사진마다 둘")
     }
 }
