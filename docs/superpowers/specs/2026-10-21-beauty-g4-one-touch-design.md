@@ -77,7 +77,7 @@
 - **문턱을 못 넘으면 테스트가 빨갛다.** 대응 규칙: 렌더 상수를 올려 넘긴다(2절 표의 "조정 후보"). 문턱을 내리는 것은 VALIDATION에 이유를 적고 사용자가 동의할 때만.
 - **주름 띠를 키우면 밝은 얼룩이 생길 수 있다.** 대응: 밝히는 양은 여전히 "주변 피부보다 어두운 만큼"이고 상한 1.6이다. 합성 결함 없는 데모 사진에서 띠 안 색차(Cb·Cr) 변화 ≤ 0.01을 테스트로 고정한다.
 - **그레인을 키우면 저장본에서 거칠 수 있다.** 대응: 알갱이는 짧은 변 비례라 저장본과 미리보기가 같은 비율이다. 기기 확인 항목으로 남긴다.
-- **원터치가 그룹 층을 쓰면 "전체" 슬라이더를 움직여도 성별 지정된 사람은 안 바뀐다**(그룹 값이 덮어씀). 대응: 그룹 칩에 점 표시와 "재설정"(H3)이 있고, 전체 대상의 강도 슬라이더는 세 층을 함께 다시 쓴다. 안내 문구 한 줄.
+- **원터치가 그룹 층을 쓰면 "전체" 슬라이더를 움직여도 성별 지정된 사람은 안 바뀐다**(그룹 값이 덮어씀). 블러셔·립도 그룹 층이 덮어써서 뒤에 "전체"에 건 메이크업 룩이 성별 지정된 사람에게는 안 보인다(G4-3 구현 중 추가). 대응: 그룹 칩에 점 표시와 "재설정"(H3)이 있고, 전체 대상의 강도 슬라이더는 세 층을 함께 다시 쓴다. 안내 문구 한 줄이 피부·눈입·메이크업을 함께 말한다.
 - **성별을 지정하지 않으면 남녀 차이가 없다.** 대응: 원터치 줄 아래 "성별을 지정하면 남녀가 다르게 보정돼요" 안내. 자동 추정은 질문 3.
 - **CI가 요금 한도로 막혀 있다.** 대응: 모든 계획은 로컬 패키지·Mac 테스트까지만 검증하고, iOS 시뮬레이터·실기기 검증은 CI 복구와 TestFlight 뒤 사용자 조치로 적는다.
 
@@ -343,11 +343,11 @@ G4-3 계획은 두 경우를 모두 적고 사용자의 답으로 하나를 고�
 1. 얼굴 없음·분석 실패 안내(지금과 같음).
 2. `TargetChips`(H3) — 전체 · 남성 · 여성 · 사람 1…n.
 3. **원터치 줄** `OneTouchRow`(새 파일 `Features/Editor/OneTouchRow.swift`): 왼쪽 버튼 "원터치 보정"(`wand.and.sparkles`), 오른쪽 `AdjustmentSlider`와 같은 모양의 강도 슬라이더(0…1). 슬라이더 값은 현재 대상 층의 `oneTouch`(전체 대상이면 `portrait.oneTouch`)이고 nil이면 손잡이는 0에 두고 값 자리에 "—"를 보인다. 버튼은 nil이면 `oneTouchDefaultStrength`로 적용, 값이 있으면 그 값으로 다시 적용(사용자 조정을 표로 되돌림). 슬라이더 드래그는 `beginSliderEdit`/`applyOneTouch(strength:)`/`endSliderEdit`로 연속 변경 한 단계.
-4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요".
+4. 안내 한 줄: 전체 대상이면 "남성·여성으로 지정한 사람은 각 성별 표로, 미지정은 공통 표로 보정돼요. 성별은 사람 칩에서 지정해요", 그룹이면 "이 그룹 표만 다시 써요", 사람이면 "이 사람의 성별 표를 써요". (G4-3 구현 중 변경) 전체 문구는 원터치 뒤 전체에서 바꾼 피부·눈입·블러셔·립(메이크업 룩 포함)이 성별을 지정한 사람에게는 그룹 값에 가린다는 것을, 그룹·사람 문구는 몸 피부 밝기를 바꾸지 않는다는 것(전체 대상에서만)을 함께 말한다. 문구는 `UserMessage.oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`에 G4-3 Task 1이 둔다.
 5. `DisclosureGroup("세부 조정", isExpanded: $model.showsDetailAdjustments)` 안에 지금의 탭 피커와 네 탭 내용. `showsDetailAdjustments`는 세션 상태(기본 false, 파일에 저장 안 함). 세부 슬라이더가 묶인 키이고 그 층의 표시가 있으면 제목 옆에 작은 "원터치" 꼬리표(`Theme.oneTouchTagFont`)를 둔다 — 손으로 바꾸면 꼬리표와 표시가 사라진다.
 6. 피부톤 탭 맨 위 상태 줄(2.4절).
 
-`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forFace: i, of: 얼굴 상자들`, 그 외 `in: scope`), `oneTouchStrength: Double?`(현재 대상 층의 표시), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2에 따라 `autoEnhance()`가 `applyAuto(_:oneTouch:)`를 부름. `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
+`AppModel`: `applyOneTouch(strength:)`(대상 라우팅: `.face(i)` → `forFace: i, of: 얼굴 상자들`, 그 외 `in: scope`, 강도 nil은 버튼이라 열린 드래그를 먼저 끝냄), `oneTouchStrength: Double?`(현재 대상 층의 표시, G4-3 구현 중 변경: 손상 파일 값도 0…`maximumStrength`로 잘라 슬라이더에 넘김), `isOneTouchTagged(_: PortraitKey)`·`isOneTouchTagged(_: BodySkinKey)`(몸 피부 밝기는 전체 층 표시가 있을 때), `showsDetailAdjustments: Bool`, `bodySkinStatus`, 질문 2에 따라 `autoEnhance()`가 `applyAuto(_:oneTouch:)`를 부름. `UserMessage`: `oneTouch`("원터치 보정"), `oneTouchStrength`("강도"), `oneTouchTag`("원터치"), `oneTouchHintAll`·`oneTouchHintGroup`·`oneTouchHintPerson`, `assignGenderForOneTouch`("성별을 지정하면 남녀가 다르게 보정돼요"), `detailAdjustments`("세부 조정"), `bodySkinStatus(_:)`, `diagnosticsTitle`("진단"), `copyDiagnostics`("복사"). `Theme.oneTouchButtonMinWidth` 96, `oneTouchTagFont` caption2.
 
 메이크업 도구는 바꾸지 않는다(H3 칩만).
 
