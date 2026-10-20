@@ -40,5 +40,12 @@ enum EditorTool: CaseIterable, Identifiable {
         }
     }
 
-    var usesCanvasTouch: Bool { self == .retouch || self == .warp }
+    /// 캔버스가 탭·드래그를 받는 도구.
+    /// 뷰티·메이크업은 얼굴을 탭해 대상을 고른다.
+    var usesCanvasTouch: Bool {
+        switch self {
+        case .retouch, .warp, .beauty, .makeup: return true
+        case .look, .crop, .adjust, .body, .background: return false
+        }
+    }
 }

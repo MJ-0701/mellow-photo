@@ -214,7 +214,7 @@ final class AppModelTests: XCTestCase {
         model.edit(.faceShape(.width, -0.4))
         XCTAssertEqual(model.currentRecipe.people.groups[.female], PortraitLayer(skinSmoothing: 0.5))
         XCTAssertEqual(model.currentRecipe.people.individuals.count, 1)
-        XCTAssertEqual(model.beautyValues.portrait.face.width, -0.4, "패널은 대상 층까지 겹친 값을 보인다")
+        XCTAssertEqual(model.scopedValues.portrait.face.width, -0.4, "패널은 대상 층까지 겹친 값을 보인다")
         model.savePreset(named: "남녀")
         let saved = try XCTUnwrap(model.session.presets.last)
         XCTAssertEqual(saved.values.people.groups[.female], PortraitLayer(skinSmoothing: 0.5))
@@ -1276,6 +1276,235 @@ final class AppModelTests: XCTestCase {
         recipe.operations = [.spot(spot), .spot(spot), .warp(stroke)]
         let lines = RecipeSummary.nonDefaultLines(recipe)
         XCTAssertEqual(lines, ["color.exposure=0.50", "operations=3"], "수동 편집은 점·획마다 줄을 만들지 않고 개수 한 줄이다")
+    }
+
+    private func twoFaces() -> [FaceGeometry] {
+        [
+            TestSupport.landmarkedFace(in: NormalizedRect(x: 0.05, y: 0.3, width: 0.35, height: 0.4)),
+            TestSupport.landmarkedFace(in: NormalizedRect(x: 0.55, y: 0.3, width: 0.35, height: 0.4)),
+        ]
+    }
+
+    /// 복제 샘플과 점 하나를 찍어 사진을 잠근다.
+    private func lockWithRetouch(_ model: AppModel) async throws {
+        let tool = model.tool
+        model.tool = .retouch
+        try await waitUntil { !model.isRendering }
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.1), to: NormalizedPoint(x: 0.5, y: 0.1))
+        model.touch(from: NormalizedPoint(x: 0.52, y: 0.1), to: NormalizedPoint(x: 0.52, y: 0.1))
+        try await waitUntil { !model.isRendering }
+        model.tool = tool
+        XCTAssertTrue(model.isGeometryLocked)
+    }
+
+    func testPersonChipsReflectEstimatesManualGenderAndOverrides() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let faces = twoFaces()
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(faces)),
+            genderEstimator: StubGenderEstimator(
+                result: .success([GenderEstimate(gender: .female, confidence: 0.9), nil])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        XCTAssertEqual(model.selectedInfo?.genders, [.female, nil])
+        var chips = model.personChips
+        XCTAssertEqual(chips.map(\.faceIndex), [0, 1])
+        XCTAssertEqual(chips.map(\.target), [.face(0), .face(1)])
+        XCTAssertEqual(chips[0].gender, .female)
+        XCTAssertEqual(chips[0].source, .estimated)
+        XCTAssertEqual(chips[1].source, .none)
+        XCTAssertEqual(chips.map(\.overriddenCount), [0, 0])
+        XCTAssertEqual(model.effectiveGender(forFace: 0), .female)
+        XCTAssertEqual(model.genderSource(forFace: 1), .none)
+        model.setBeautyTarget(.gender(.female))
+        model.edit(.skinSmoothing(0.4))
+        model.setBeautyTarget(.face(0))
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.4, "기록이 없어도 추정 성별의 그룹 값을 보인다")
+        model.setBeautyTarget(.face(1))
+        model.setGender(.male)
+        chips = model.personChips
+        XCTAssertEqual(chips[1].gender, .male)
+        XCTAssertEqual(chips[1].source, .manual)
+        XCTAssertNotNil(chips[1].personID)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 2)
+        model.setBeautyTarget(.face(0))
+        model.setGender(.male)
+        XCTAssertEqual(model.personChips[0].source, .manual, "추정 위에 수동 지정")
+        XCTAssertEqual(model.effectiveGender(forFace: 0), .male)
+        model.setBeautyTarget(.gender(.male))
+        model.beginSliderEdit()
+        model.edit(.skinSmoothing(0.6))
+        model.endSliderEdit()
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.6)
+        XCTAssertEqual(model.overriddenKeys, [.skinSmoothing])
+        model.setBeautyTarget(.face(1))
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.6, "남성 그룹 값을 상속한다")
+        XCTAssertEqual(model.overriddenKeys, [], "상속 중이라 덮어쓴 키가 없다")
+        model.edit(.faceShape(.width, -0.3))
+        XCTAssertEqual(model.overriddenKeys, [.faceShape(.width)])
+        XCTAssertEqual(model.personChips[1].overriddenCount, 1)
+        model.setBeautyTarget(.all)
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0, "전체 층은 그룹 값을 모른다")
+        XCTAssertEqual(model.overriddenKeys, [])
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+    }
+
+    func testGenderAndResetAreRoutedToTheCurrentTargetAndUndoOneStep() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.setBeautyTarget(.all)
+        model.setGender(.female)
+        XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty, "전체·그룹 대상에서는 성별 지정이 없다")
+        XCTAssertFalse(model.canUndo)
+        model.setBeautyTarget(.gender(.female))
+        model.edit(.skinSmoothing(0.5))
+        model.edit(.feature(.eyeBrighten, 0.4))
+        XCTAssertEqual(model.overriddenKeys, [.skinSmoothing, .feature(.eyeBrighten)])
+        model.resetOverrides([.skinSmoothing])
+        XCTAssertEqual(model.overriddenKeys, [.feature(.eyeBrighten)])
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3)
+        model.resetOverrides()
+        XCTAssertEqual(model.overriddenKeys, [])
+        XCTAssertNil(model.currentRecipe.people.groups[.female])
+        model.undo()
+        XCTAssertEqual(model.overriddenKeys, [.feature(.eyeBrighten)])
+        model.setBeautyTarget(.face(0))
+        model.resetOverrides()
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3, "기록이 없는 얼굴의 초기화는 아무것도 안 한다")
+        model.edit(.faceShape(.width, -0.2))
+        try await lockWithRetouch(model)
+        model.setGender(.male)
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked, "잠긴 사진의 성별 변경은 안내만")
+        XCTAssertNil(model.personChips[0].gender)
+    }
+
+    func testCanvasTapSelectsTheFaceAndLegacyPeopleAreBoundOnPrepare() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let big = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.1, y: 0.1, width: 0.6, height: 0.7))
+        let small = TestSupport.landmarkedFace(in: NormalizedRect(x: 0.4, y: 0.3, width: 0.2, height: 0.25))
+        let store = MemorySessionStore()
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([big, small])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]), store: store)
+        try await importOne(model, staged)
+        XCTAssertTrue(EditorTool.beauty.usesCanvasTouch)
+        XCTAssertTrue(EditorTool.makeup.usesCanvasTouch)
+        model.selectTool(.beauty)
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.4), to: NormalizedPoint(x: 0.5, y: 0.4))
+        XCTAssertEqual(model.beautyTarget, .face(1), "겹친 영역은 작은 상자(앞사람)")
+        model.touch(from: NormalizedPoint(x: 0.15, y: 0.15), to: NormalizedPoint(x: 0.15, y: 0.15))
+        XCTAssertEqual(model.beautyTarget, .face(0))
+        model.touch(from: NormalizedPoint(x: 0.95, y: 0.95), to: NormalizedPoint(x: 0.95, y: 0.95))
+        XCTAssertEqual(model.beautyTarget, .all, "얼굴 밖은 전체")
+        model.selectTool(.makeup)
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.4), to: NormalizedPoint(x: 0.5, y: 0.4))
+        XCTAssertEqual(model.beautyTarget, .face(1))
+        XCTAssertFalse(model.canUndo, "대상 선택은 편집이 아니다")
+        model.selectTool(.adjust)
+        model.touch(from: NormalizedPoint(x: 0.15, y: 0.15), to: NormalizedPoint(x: 0.15, y: 0.15))
+        XCTAssertEqual(model.beautyTarget, .face(1), "다른 도구에서는 바뀌지 않는다")
+
+        var legacy = EditRecipe()
+        legacy.people.individuals = [
+            PersonRecord(id: .legacy(index: 1), legacyIndex: 1, layer: PortraitLayer(skinSmoothing: 0.4))
+        ]
+        let id = model.session.photos[0].id
+        let filename = model.session.photos[0].filename
+        store.saved = SessionSnapshot(
+            photos: [PhotoEntry(id: id, filename: filename, displayName: "옛", document: EditDocument(recipe: legacy))],
+            selectedPhotoID: id, presets: [])
+        let reopened = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([big, small])), store: store)
+        await reopened.restore()
+        try await waitUntil { reopened.isReady && reopened.preview != nil }
+        let bound = try XCTUnwrap(reopened.currentRecipe.people.individuals.first)
+        XCTAssertEqual(bound.anchor, PersonAnchor(faceBox: small.boundingBox), "준비 뒤 legacy 기록에 anchor가 채워진다")
+        XCTAssertNil(bound.legacyIndex)
+        XCTAssertFalse(reopened.canUndo, "연결은 체크포인트가 아니다")
+        XCTAssertEqual(reopened.personChips[1].personID, bound.id)
+        XCTAssertEqual(reopened.personChips[1].overriddenCount, 1)
+    }
+
+    func testUnmatchedPersonCanBeReboundOrRemovedAndLookAppliesToAFace() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(twoFaces())),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.session.edit(model.session.photos[0].id) { document in
+            // 사진의 어느 얼굴과도 짝이 되지 않는 상자(중심 0.5·0.97, 폭 0.03)에 기록을 만든다.
+            let stray = NormalizedRect(x: 0.485, y: 0.955, width: 0.03, height: 0.03)
+            return document.set(.skinSmoothing(0.8), forFace: 0, of: [stray])
+        }
+        let stray = try XCTUnwrap(model.currentRecipe.people.individuals.first)
+        var chips = model.personChips
+        XCTAssertEqual(chips.count, 3)
+        XCTAssertTrue(chips[2].isUnmatched)
+        XCTAssertEqual(chips[2].personID, stray.id)
+        XCTAssertEqual(chips[2].target, .person(stray.id))
+        XCTAssertEqual(model.unpairedFaceIndices, [0, 1])
+        model.setBeautyTarget(.person(stray.id))
+        XCTAssertEqual(model.scopedValues.portrait.skin.smoothing, 0.8)
+        XCTAssertEqual(model.faceAvailability, .ready, "짝이 없는 사람은 얼굴이 없지만 분석 실패가 아니다")
+        model.rebindPerson(stray.id, toFace: 0)
+        chips = model.personChips
+        XCTAssertEqual(chips.count, 2)
+        XCTAssertEqual(chips[0].personID, stray.id)
+        XCTAssertEqual(model.unpairedFaceIndices, [1])
+        XCTAssertEqual(model.beautyTarget, .face(0), "연결한 얼굴이 대상이 된다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, 2)
+        model.removePerson(stray.id)
+        XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty)
+        XCTAssertEqual(model.beautyTarget, .all, "지운 사람이 대상이었으면 전체로")
+        model.setBeautyTarget(.face(1))
+        model.applyMakeupLook(id: "daily")
+        XCTAssertEqual(model.currentRecipe.people.individuals.count, 1, "기록이 없던 얼굴에 룩을 적용하면 기록이 생긴다")
+        XCTAssertEqual(model.scopedValues.makeup.lookID, "daily")
+        XCTAssertEqual(model.currentRecipe.makeup, MakeupAdjustments(), "전체 층은 그대로")
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty, "실행 취소 한 번에 기록이 사라진다")
+    }
+
+    func testLockedPhotoRefusesEditsThatMoveFaceShapeOntoAnotherFace() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let faces = twoFaces()
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(faces)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        let left = faces[0].boundingBox
+        // owner가 왼쪽 얼굴을 갖고, shaped는 같은 얼굴에 조금 덜 가까워 짝이 없다.
+        let owner = PersonRecord(anchor: PersonAnchor(faceBox: left), layer: PortraitLayer(skinSmoothing: 0.5))
+        let shaped = PersonRecord(
+            anchor: PersonAnchor(x: left.midX + 0.05, y: left.midY, width: left.width),
+            layer: PortraitLayer(face: [.width: -0.2]))
+        model.session.edit(model.session.photos[0].id) { document in
+            document = EditDocument(recipe: EditRecipe(people: PeopleAdjustments(individuals: [owner, shaped])))
+            return nil
+        }
+        XCTAssertEqual(model.personChips.map(\.personID), [owner.id, nil, shaped.id])
+        try await lockWithRetouch(model)
+        let locked = model.currentRecipe
+        model.statusMessage = ""
+        model.removePerson(owner.id)
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked, "지우면 shaped가 왼쪽 얼굴에 붙어 얼굴형이 옮겨 간다")
+        XCTAssertEqual(model.currentRecipe, locked)
+        model.setBeautyTarget(.face(0))
+        model.statusMessage = ""
+        model.resetOverrides()
+        XCTAssertEqual(model.statusMessage, UserMessage.geometryLocked, "층을 비워 기록이 지워지는 재설정도 같다")
+        XCTAssertEqual(model.currentRecipe, locked)
+        model.edit(.skinSmoothing(0.7))
+        XCTAssertEqual(model.currentRecipe.people.person(owner.id)?.layer.skinSmoothing, 0.7, "짝이 그대로인 편집은 된다")
+        model.undo()
+        model.undo()
+        XCTAssertFalse(model.isGeometryLocked, "실행 취소는 검사하지 않는다")
+        model.removePerson(owner.id)
+        XCTAssertNil(model.currentRecipe.people.person(owner.id), "잠기지 않은 사진은 지울 수 있다")
     }
 }
 

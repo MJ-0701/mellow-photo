@@ -77,6 +77,13 @@ struct StubBodyAnalyzer: BodyAnalyzer {
     func analyze(_ image: CIImage) throws -> [BodyGeometry] { try (queue?.next() ?? result).get() }
 }
 
+/// 성별 추정 스텁.
+/// 얼굴 수와 같은 길이의 결과를 넘기면 파이프라인이 임계값을 적용해 받아들인다.
+struct StubGenderEstimator: GenderEstimator {
+    var result: Result<[GenderEstimate?], MellowError> = .success([])
+    func estimate(_ image: CIImage, faces: [FaceGeometry]) throws -> [GenderEstimate?] { try result.get() }
+}
+
 /// 스테이징 호출 횟수. 값 타입인 FakeImporter가 복사돼도 같은 기록을 공유한다.
 final class StagingLog: @unchecked Sendable {
     var calls = 0
@@ -222,7 +229,8 @@ enum TestSupport {
     static func makeModel(
         root: URL, maxPhotos: Int = 40, analyzer: StubFaceAnalyzer = StubFaceAnalyzer(),
         personAnalyzer: StubPersonAnalyzer = StubPersonAnalyzer(), bodyAnalyzer: StubBodyAnalyzer = StubBodyAnalyzer(),
-        makeupCatalog: MakeupCatalog? = nil, importer: FakeImporter = FakeImporter(),
+        genderEstimator: StubGenderEstimator? = nil, makeupCatalog: MakeupCatalog? = nil,
+        importer: FakeImporter = FakeImporter(),
         store: MemorySessionStore = MemorySessionStore()
     ) -> AppModel {
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library"))
@@ -232,7 +240,8 @@ enum TestSupport {
         return AppModel(
             session: ProjectSession(store: store, maxPhotos: maxPhotos),
             pipeline: PhotoPipeline(
-                analyzer: analyzer, personAnalyzer: personAnalyzer, bodyAnalyzer: bodyAnalyzer, tuning: RenderTuning(),
+                analyzer: analyzer, personAnalyzer: personAnalyzer, bodyAnalyzer: bodyAnalyzer,
+                genderEstimator: genderEstimator, tuning: RenderTuning(),
                 lookCatalog: catalog, makeupCatalog: makeup),
             copies: copies,
             importer: importer,

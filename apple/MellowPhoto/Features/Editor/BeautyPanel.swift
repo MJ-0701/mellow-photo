@@ -10,7 +10,7 @@ struct BeautyPanel: View {
     var body: some View {
         @Bindable var model = model
         let recipe = model.currentRecipe
-        let portrait = model.beautyValues.portrait
+        let portrait = model.scopedValues.portrait
         let availability = model.faceAvailability
         switch availability {
         case .unavailable(let failure):

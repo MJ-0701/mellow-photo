@@ -235,15 +235,17 @@ public struct EditDocument: Equatable, Sendable {
         }
     }
 
-    /// legacyIndex만 있는 기록에 faces[legacyIndex]의 anchor를 채운다.
+    /// legacyIndex만 있는 기록 중 지금 짝짓기에서 faces[legacyIndex]와 짝이 된 기록에 그 anchor를 채운다.
+    /// 짝을 잃은 기록은 그대로 둔다(거리 0 anchor로 다른 기록의 얼굴을 빼앗지 않게).
+    /// 짝이 된 기록만 채우므로 짝짓기 결과는 그대로다.
     /// 사진을 준비한 뒤 부르는 연결이라 체크포인트를 만들지 않는다.
     /// 바뀐 것이 있으면 true.
     public mutating func bindLegacyPeople(faces: [NormalizedRect]) -> Bool {
+        let paired = recipe.people.peopleByFace(faces).mapValues(\.id)
         var changed = false
         for index in recipe.people.individuals.indices where recipe.people.individuals[index].anchor == nil {
-            guard let legacy = recipe.people.individuals[index].legacyIndex, faces.indices.contains(legacy) else {
-                continue
-            }
+            let record = recipe.people.individuals[index]
+            guard let legacy = record.legacyIndex, paired[legacy] == record.id else { continue }
             recipe.people.individuals[index].anchor = PersonAnchor(faceBox: faces[legacy])
             recipe.people.individuals[index].legacyIndex = nil
             changed = true
@@ -328,6 +330,24 @@ public struct EditDocument: Equatable, Sendable {
         }
         Self.clearStaleOneTouchMarks(previous: recipe, in: &updated)
         updated.people.prune()
+        guard updated != recipe else { return }
+        checkpoint()
+        recipe = updated
+    }
+
+    /// faces[index]와 짝이 된 사람에게 룩을 적용한다.
+    /// 기록이 없으면 그 얼굴 anchor로 만들며 적용한다(체크포인트 한 번).
+    /// 짝짓기는 set(_:forFace:of:)·렌더와 같은 PeopleAdjustments.personID(forFace:of:)다.
+    /// 층 규칙은 applyMakeupLook(_:in: .person)과 같다.
+    /// index가 범위 밖이거나 이미 같은 값이면 아무것도 하지 않는다.
+    public mutating func applyMakeupLook(_ look: MakeupLook?, forFace index: Int, of faces: [NormalizedRect]) {
+        guard faces.indices.contains(index) else { return }
+        var proposal = EditDocument(recipe: recipe)
+        let id =
+            proposal.recipe.people.personID(forFace: index, of: faces)
+            ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[index]), to: &proposal.recipe)
+        proposal.applyMakeupLook(look, in: .person(id))
+        let updated = proposal.recipe
         guard updated != recipe else { return }
         checkpoint()
         recipe = updated

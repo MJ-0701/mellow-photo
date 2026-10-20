@@ -69,7 +69,6 @@ enum UserMessage {
         "얼굴 특징점을 찾지 못해 얼굴형·눈·입·메이크업은 바뀌지 않아요. 피부 보정·얼룩 고르기·붉은기·번들거림과 잡티·변형 도구는 쓸 수 있고, 주름 밝히기 4종은 특징점이 있어야 바뀌어요."
     static let beautyTargetLabel = "대상"
     static let beautyTargetAll = "전체"
-    static let pickASliderFirst = "이 사람에게 룩을 적용하려면 먼저 슬라이더를 움직이거나 성별을 지정해 주세요."
     static let autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."
     static let lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."
 

@@ -1129,4 +1129,44 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.bodySkin.tone, 0.2, "톤은 그대로")
         XCTAssertEqual(EditingPolicy.oneTouchDefaultStrength, OneTouchBundle.defaultStrength)
     }
+
+    func testLookForAFaceWithoutARecordCreatesItInOneStep() {
+        let look = MakeupLook(
+            id: "daily", name: "데일리", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
+            blush: MakeupTint(colorID: "blush-peach", intensity: 0.3),
+            eyeshadow: MakeupTint(colorID: "shadow-brown", intensity: 0.2), brow: MakeupStrength(intensity: 0.4),
+            contour: MakeupStrength(intensity: 0.1))
+        var document = EditDocument()
+        document.applyMakeupLook(look, forFace: 0, of: twoFaces)
+        XCTAssertEqual(document.undoStack.count, 1)
+        XCTAssertEqual(document.recipe.people.individuals.count, 1)
+        XCTAssertEqual(document.recipe.people.individuals[0].anchor, faceAnchor)
+        XCTAssertEqual(document.recipe.people.individuals[0].layer.makeupLookID, "daily")
+        XCTAssertEqual(
+            document.recipe.people.individuals[0].layer.makeup[.lip], MakeupTint(colorID: "lip-coral", intensity: 0.5))
+        XCTAssertEqual(document.recipe.makeup, MakeupAdjustments(), "전체 층은 그대로")
+        document.applyMakeupLook(look, forFace: 0, of: twoFaces)
+        XCTAssertEqual(document.undoStack.count, 1, "같은 룩은 단계를 만들지 않는다")
+        document.applyMakeupLook(look, forFace: 5, of: twoFaces)
+        XCTAssertEqual(document.undoStack.count, 1, "범위 밖 얼굴은 아무것도 하지 않는다")
+        document.undo()
+        XCTAssertTrue(document.recipe.people.individuals.isEmpty)
+    }
+
+    func testBindLegacyPeopleFillsOnlyRecordsPairedThroughTheirIndex() {
+        let anchored = PersonRecord(
+            anchor: PersonAnchor(faceBox: twoFaces[1]), layer: PortraitLayer(skinSmoothing: 0.2))
+        let beaten = PersonRecord(id: .legacy(index: 1), legacyIndex: 1, layer: PortraitLayer(skinSmoothing: 0.3))
+        let paired = PersonRecord(id: .legacy(index: 0), legacyIndex: 0, layer: PortraitLayer(skinSmoothing: 0.4))
+        var document = EditDocument(
+            recipe: EditRecipe(people: PeopleAdjustments(individuals: [anchored, beaten, paired])))
+        let before = document.recipe.people.peopleByFace(twoFaces).mapValues(\.id)
+        XCTAssertTrue(document.bindLegacyPeople(faces: twoFaces))
+        XCTAssertEqual(document.recipe.people.person(paired.id)?.anchor, faceAnchor, "인덱스로 짝이 된 기록은 채운다")
+        XCTAssertNil(document.recipe.people.person(beaten.id)?.anchor, "짝을 잃은 기록은 그 얼굴을 빼앗지 않는다")
+        XCTAssertEqual(document.recipe.people.person(beaten.id)?.legacyIndex, 1)
+        XCTAssertEqual(document.recipe.people.peopleByFace(twoFaces).mapValues(\.id), before, "연결은 짝을 바꾸지 않는다")
+        XCTAssertFalse(document.canUndo)
+        XCTAssertFalse(document.bindLegacyPeople(faces: twoFaces))
+    }
 }
