@@ -10,6 +10,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var look = LookSelection()
     public var geometry = GeometryAdjustments()
     public var background = BackgroundAdjustments()
+    public var bodySkin = BodySkinAdjustments()
     public var body = BodyShapeAdjustments()
     public var makeup = MakeupAdjustments()
     public var operations: [LocalEdit] = []
@@ -17,8 +18,8 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
         look: LookSelection = .init(), geometry: GeometryAdjustments = .init(),
-        background: BackgroundAdjustments = .init(), body: BodyShapeAdjustments = .init(),
-        makeup: MakeupAdjustments = .init(), operations: [LocalEdit] = []
+        background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
+        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init(), operations: [LocalEdit] = []
     ) {
         self.color = color
         self.portrait = portrait
@@ -26,6 +27,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         self.look = look
         self.geometry = geometry
         self.background = background
+        self.bodySkin = bodySkin
         self.body = body
         self.makeup = makeup
         self.operations = operations
@@ -39,6 +41,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         case look
         case geometry
         case background
+        case bodySkin
         case body
         case makeup
         case operations
@@ -52,6 +55,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         look = try container.decodeIfPresent(LookSelection.self, forKey: .look) ?? .init()
         geometry = try container.decodeIfPresent(GeometryAdjustments.self, forKey: .geometry) ?? .init()
         background = try container.decodeIfPresent(BackgroundAdjustments.self, forKey: .background) ?? .init()
+        bodySkin = try container.decodeIfPresent(BodySkinAdjustments.self, forKey: .bodySkin) ?? .init()
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
         operations = try container.decodeIfPresent([LocalEdit].self, forKey: .operations) ?? []
@@ -66,6 +70,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         try container.encode(look, forKey: .look)
         try container.encode(geometry, forKey: .geometry)
         try container.encode(background, forKey: .background)
+        try container.encode(bodySkin, forKey: .bodySkin)
         try container.encode(body, forKey: .body)
         try container.encode(makeup, forKey: .makeup)
         try container.encode(operations, forKey: .operations)
@@ -88,8 +93,8 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     public var hasLocalEdits: Bool { !operations.isEmpty }
     /// 피부·얼굴형·눈·입·메이크업 중 하나라도 렌더를 바꾸면 얼굴 분석이 필요하다.
     public var dependsOnFaces: Bool { portrait.dependsOnFaces || makeup.hasEffect }
-    /// 배경 흐림은 인물 마스크가 필요하다.
-    public var dependsOnPerson: Bool { background.hasEffect }
+    /// 배경 흐림과 몸 피부는 인물 마스크가 필요하다.
+    public var dependsOnPerson: Bool { background.hasEffect || bodySkin.hasEffect }
     /// 체형은 관절점이 필요하다.
     public var dependsOnBody: Bool { body.hasEffect }
     public var isDefault: Bool { self == EditRecipe() }
@@ -99,7 +104,7 @@ public struct EditRecipe: Codable, Equatable, Sendable {
         let scalars = [color.exposure, color.contrast, color.saturation, color.warmth, look.intensity]
         let groups =
             portrait.numericValues + detail.numericValues + geometry.numericValues + background.numericValues
-            + body.numericValues + makeup.numericValues
+            + bodySkin.numericValues + body.numericValues + makeup.numericValues
         let locals = operations.flatMap(\.numericValues)
         return (scalars + groups + locals).allSatisfy(\.isFinite)
     }

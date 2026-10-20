@@ -102,6 +102,15 @@
       "type": "object", "additionalProperties": false,
       "properties": { "blur": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 } }
     },
+    "bodySkin": {
+      "type": "object", "additionalProperties": false,
+      "description": "보이는 피부 전체(인물 마스크 × 피부색). tone만 가운데 0인 양방향.",
+      "properties": {
+        "brightness": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
+        "tone": { "type": "number", "default": 0, "minimum": -1, "maximum": 1, "description": "양수는 따뜻하게, 음수는 차갑게." },
+        "smoothing": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "얼굴 피부 영역을 뺀 몸 피부만." }
+      }
+    },
     "body": {
       "type": "object", "additionalProperties": false,
       "description": "가운데 0인 양방향. legLength만 0~1.",

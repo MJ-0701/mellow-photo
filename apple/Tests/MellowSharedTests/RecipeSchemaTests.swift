@@ -38,6 +38,7 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.portrait.face.width = -0.2
         recipe.portrait.features.eyeBrighten = 0.1
         recipe.background.blur = 0.2
+        recipe.bodySkin.tone = -0.2
         recipe.body.legLength = 0.3
         recipe.makeup = MakeupAdjustments(
             lookID: "daily", lip: MakeupTint(colorID: "lip-coral", intensity: 0.5),
@@ -59,7 +60,7 @@ final class RecipeSchemaTests: XCTestCase {
         let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
         let encoded = try encodedSampleRecipe()
         XCTAssertEqual(Set(properties.keys), Set(encoded.keys))
-        for key in ["color", "portrait", "detail", "look", "geometry", "background", "body", "makeup"] {
+        for key in ["color", "portrait", "detail", "look", "geometry", "background", "bodySkin", "body", "makeup"] {
             let encodedSection = try XCTUnwrap(encoded[key] as? [String: Any], "\(key) 누락")
             XCTAssertEqual(try activeKeys(properties[key]), Set(encodedSection.keys), key)
         }

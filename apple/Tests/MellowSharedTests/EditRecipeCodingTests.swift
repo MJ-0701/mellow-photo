@@ -285,4 +285,41 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(values.portrait.skin.redness, -0.4)
         XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values)), values)
     }
+
+    func testBodySkinRoundTripsDefaultsAndDependsOnPerson() throws {
+        let legacy = #"{"schemaVersion":2,"background":{"blur":0.2}}"#
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
+        XCTAssertEqual(decoded.bodySkin, BodySkinAdjustments(), "G2 이전 파일은 몸 피부가 0")
+        var recipe = EditRecipe()
+        recipe.bodySkin = BodySkinAdjustments(brightness: 0.3, tone: -0.2, smoothing: 0.5)
+        XCTAssertEqual(recipe.bodySkin.numericValues, [0.3, -0.2, 0.5])
+        XCTAssertEqual(recipe.bodySkin[.tone], -0.2)
+        XCTAssertTrue(recipe.bodySkin.hasEffect)
+        XCTAssertTrue(recipe.dependsOnPerson, "몸 피부는 인물 마스크가 필요하다")
+        XCTAssertFalse(recipe.dependsOnFaces, "얼굴 분석이 실패한 사진의 저장을 막지 않는다")
+        XCTAssertFalse(recipe.isDefault)
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let bodySkin = try XCTUnwrap(json["bodySkin"] as? [String: Any])
+        XCTAssertEqual(Set(bodySkin.keys), Set(BodySkinKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
+        XCTAssertEqual(AdjustmentRange.bodySkin(.tone), AdjustmentRange.bipolar)
+        XCTAssertEqual(AdjustmentRange.bodySkin(.brightness), AdjustmentRange.unit)
+        XCTAssertEqual(AdjustmentRange.bodySkin(.smoothing), AdjustmentRange.unit)
+    }
+
+    func testBodySkinScalarsAreCheckedForFinitenessAndCarriedByPresets() throws {
+        for path in [\EditRecipe.bodySkin.brightness, \EditRecipe.bodySkin.tone, \EditRecipe.bodySkin.smoothing] {
+            var recipe = EditRecipe()
+            recipe[keyPath: path] = .nan
+            XCTAssertFalse(recipe.allValuesFinite, "\(path)")
+        }
+        var recipe = EditRecipe()
+        recipe.bodySkin.tone = 0.4
+        let values = PresetValues(of: recipe)
+        XCTAssertEqual(values.bodySkin.tone, 0.4)
+        XCTAssertEqual(try JSONDecoder().decode(PresetValues.self, from: JSONEncoder().encode(values)), values)
+        let legacy = try JSONDecoder().decode(PresetValues.self, from: Data(#"{"color":{},"portrait":{}}"#.utf8))
+        XCTAssertEqual(legacy.bodySkin, BodySkinAdjustments())
+    }
 }

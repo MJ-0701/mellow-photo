@@ -5,18 +5,20 @@ public struct PresetValues: Codable, Equatable, Sendable {
     public var portrait: PortraitAdjustments
     public var detail: DetailAdjustments
     public var background: BackgroundAdjustments
+    public var bodySkin: BodySkinAdjustments
     public var body: BodyShapeAdjustments
     public var makeup: MakeupAdjustments
 
     public init(
         color: ColorAdjustments = .init(), portrait: PortraitAdjustments = .init(), detail: DetailAdjustments = .init(),
-        background: BackgroundAdjustments = .init(), body: BodyShapeAdjustments = .init(),
-        makeup: MakeupAdjustments = .init()
+        background: BackgroundAdjustments = .init(), bodySkin: BodySkinAdjustments = .init(),
+        body: BodyShapeAdjustments = .init(), makeup: MakeupAdjustments = .init()
     ) {
         self.color = color
         self.portrait = portrait
         self.detail = detail
         self.background = background
+        self.bodySkin = bodySkin
         self.body = body
         self.makeup = makeup
     }
@@ -25,7 +27,7 @@ public struct PresetValues: Codable, Equatable, Sendable {
     public init(of recipe: EditRecipe) {
         self.init(
             color: recipe.color, portrait: recipe.portrait, detail: recipe.detail, background: recipe.background,
-            body: recipe.body, makeup: recipe.makeup)
+            bodySkin: recipe.bodySkin, body: recipe.body, makeup: recipe.makeup)
     }
 
     public init(from decoder: Decoder) throws {
@@ -34,6 +36,7 @@ public struct PresetValues: Codable, Equatable, Sendable {
         portrait = try container.decodeIfPresent(PortraitAdjustments.self, forKey: .portrait) ?? .init()
         detail = try container.decodeIfPresent(DetailAdjustments.self, forKey: .detail) ?? .init()
         background = try container.decodeIfPresent(BackgroundAdjustments.self, forKey: .background) ?? .init()
+        bodySkin = try container.decodeIfPresent(BodySkinAdjustments.self, forKey: .bodySkin) ?? .init()
         body = try container.decodeIfPresent(BodyShapeAdjustments.self, forKey: .body) ?? .init()
         makeup = try container.decodeIfPresent(MakeupAdjustments.self, forKey: .makeup) ?? .init()
     }
