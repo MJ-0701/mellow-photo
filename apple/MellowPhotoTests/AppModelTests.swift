@@ -299,6 +299,27 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.session.isPersistenceDeferred)
     }
 
+    func testAdjustToolEditsEffectsOneUndoStepEach() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.adjust)
+        for (offset, key) in EffectKey.allCases.enumerated() {
+            model.beginSliderEdit()
+            model.edit(.effect(key, 0.2))
+            model.edit(.effect(key, 0.6))
+            model.endSliderEdit()
+            XCTAssertEqual(model.session.selected?.document.undoStack.count, offset + 1, "\(key)")
+        }
+        XCTAssertEqual(model.currentRecipe.effects, EffectAdjustments(grain: 0.6, glow: 0.6))
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        XCTAssertEqual(EffectKey.allCases.map(UserMessage.effectTitle), ["그레인", "글로우"])
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.effects, EffectAdjustments(grain: 0.6))
+    }
+
     private func importOne(_ model: AppModel, _ url: URL) async throws {
         await model.importFromFiles([url])
         try await waitUntil { model.isReady && model.preview != nil }
