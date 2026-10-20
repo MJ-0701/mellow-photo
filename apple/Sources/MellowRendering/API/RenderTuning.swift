@@ -49,8 +49,9 @@ public struct RenderTuning: Sendable {
     /// 주름 밝히기가 보는 국소 저주파 반지름. 얼굴 폭 비율.
     /// 가장 좁은 띠 반지름(마리오네트 3%)의 절반이라 주름 그늘을 잡고, 모공 대역(fineBandFraction 0.6%)보다 커서 모공은 뺀다.
     public var foldLowBandFraction: Double = 0.015
-    /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3.5~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
-    public var foldSurroundFraction: Double = 0.12
+    /// 주름 둘레 피부 평균을 재는 반지름. 얼굴 폭 비율. 띠 폭(3~8%)보다 넓어야 주름 자신이 평균에 덜 들어간다.
+    /// 피부 가중 평균이라 넓혀도 눈·입이 섞이지 않고 띠 자신의 비중이 준다.
+    public var foldSurroundFraction: Double = 0.18
     /// 주름용 피부 비트맵이 눈·눈썹·입술 보호 영역을 넓히는 폭. 얼굴 폭 비율.
     /// 피부 보정용(skinFeatureFeather 5%)보다 좁아 띠가 눈 아래·입꼬리 옆까지 닿는다.
     /// 마스크 흐림(skinMaskFeather 1.5%)과 비슷해 눈·입 안은 0에 머문다.

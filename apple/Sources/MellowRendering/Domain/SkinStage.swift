@@ -44,15 +44,18 @@ struct SkinStage: RenderStage {
         let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(image.extent)
         guard !bounds.isEmpty else { return image }
         let faceWidth = FaceRegions.faceWidth(face, extent: extent)
+        // 피부 마스크는 주름 전 이미지에서 한 번 만든다. 주름 밝히기의 둘레 기준 가중치와 대역 합성·붉은기가 함께 쓴다.
+        // 캐시된 비트맵과 볼 평균만 쓰므로 주름만 켜도 비용이 거의 없다.
+        let unitMask = try FaceRegions.skinMask(
+            face: face, image: image, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)
         var result = image
         for fold in Self.folds(for: face, skin: skin, context: context) {
             result = try SkinRefinement.liftFold(
-                result, region: fold.region, faceWidth: faceWidth, amount: fold.amount, tuning: tuning, extent: extent)
+                result, region: fold.region, skinMask: unitMask, faceWidth: faceWidth, amount: fold.amount,
+                tuning: tuning, extent: extent)
         }
         let bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.shine > 0
         guard bandMix || skin.redness != 0 else { return result }
-        let unitMask = try FaceRegions.skinMask(
-            face: face, image: result, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)
         let blendMask = MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)
         if bandMix {
             // 볼 상자가 없으면 번들거림의 기준이 없어 번들거림만 건너뛴다.

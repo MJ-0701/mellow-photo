@@ -33,15 +33,19 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(midBlur.rgb + mid * keep + fine, image.a);
                 }
                 """)
-        // 휘도 계수는 BT.601이다. 차이를 휘도로 재 둘레의 배경·입술 색이 번지지 않는다.
+        // 휘도 계수는 BT.601이다. 주변은 피부 마스크 가중 평균(분자 ÷ 분모)이라 눈·눈썹·입술·머리카락이 섞이지 않는다.
+        // 분모 하한 0.001은 둘레가 전부 보호 영역일 때 0으로 나누지 않게 한다.
+        // 피부 가중치 합이 minimumCoverage보다 작으면 주변 휘도를 0으로 두어 gap이 0, 배율이 1이 된다.
         // 세 채널에 같은 배율을 곱해 그늘의 색조·채도를 지킨다(같은 값을 더하면 회색 쪽으로 간다).
         fold = CIColorKernel(
             source: """
-                kernel vec4 foldLift(__sample image, __sample low, __sample surround, float amount, float maxGain,
-                                     float lumaFloor) {
+                kernel vec4 foldLift(__sample image, __sample low, __sample wideNumerator, __sample wideDenominator,
+                                     float amount, float maxGain, float lumaFloor, float minimumCoverage) {
                     vec3 luma = vec3(0.299, 0.587, 0.114);
                     float lowLuma = dot(low.rgb, luma);
-                    float gap = max(dot(surround.rgb, luma) - lowLuma, 0.0);
+                    float coverage = max(wideDenominator.r, 0.001);
+                    float surroundLuma = dot(wideNumerator.rgb / coverage, luma) * step(minimumCoverage, wideDenominator.r);
+                    float gap = max(surroundLuma - lowLuma, 0.0);
                     float gain = min(1.0 + amount * gap / max(lowLuma, lumaFloor), maxGain);
                     return vec4(image.rgb * gain, image.a);
                 }
@@ -100,15 +104,21 @@ final class SkinKernels: @unchecked Sendable {
         return mixed
     }
 
-    /// 주변 평균(surround)이 국소 저주파(low)보다 밝은 휘도(BT.601) 비율만큼 세 채널에 같은 배율을 곱한다.
+    /// 주름 밝히기의 주변 피부 가중치 합 하한. 띠 둘레 피부 가중치 합(넓은 흐림의 분모)이 2%보다 작으면 기준이 없다고 보고 밝히지 않는다.
+    static let foldMinimumCoverage = 0.02
+
+    /// 주변 피부 평균(wideNumerator ÷ wideDenominator)이 국소 저주파(low)보다 밝은 휘도(BT.601) 비율만큼 세 채널에 같은 배율을 곱한다.
     /// 배율 = min(1 + amount × 휘도 차이 ÷ max(국소 휘도, lumaFloor), maxGain). 둘레가 어두우면 배율 1이다.
+    /// 피부 가중치 합이 foldMinimumCoverage보다 작으면 배율 1이다.
     /// lumaFloor가 0 이하이거나 maxGain이 1보다 작으면(어둡게 만드는 상한) 렌더 실패다.
     func foldLift(
-        image: CIImage, low: CIImage, surround: CIImage, amount: Double, maxGain: Double, lumaFloor: Double,
-        extent: CGRect
+        image: CIImage, low: CIImage, wideNumerator: CIImage, wideDenominator: CIImage, amount: Double,
+        maxGain: Double, lumaFloor: Double, extent: CGRect
     ) throws -> CIImage {
         guard let fold, lumaFloor > 0, maxGain >= 1 else { throw MellowError.renderFailed }
-        let arguments: [Any] = [image, low, surround, amount, maxGain, lumaFloor]
+        let arguments: [Any] = [
+            image, low, wideNumerator, wideDenominator, amount, maxGain, lumaFloor, Self.foldMinimumCoverage,
+        ]
         guard let lifted = fold.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return lifted
     }

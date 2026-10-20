@@ -354,8 +354,8 @@ final class SkinStageTests: XCTestCase {
         }
         XCTAssertThrowsError(
             try SkinKernels.shared.foldLift(
-                image: image, low: image, surround: image, amount: 1, maxGain: Self.darkeningGain,
-                lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
+                image: image, low: image, wideNumerator: image, wideDenominator: image, amount: 1,
+                maxGain: Self.darkeningGain, lumaFloor: RenderTuning().foldLumaFloor, extent: image.extent),
             "배율 상한이 1보다 작으면 그늘을 어둡게 하므로 렌더 실패")
     }
 
@@ -573,5 +573,38 @@ final class SkinStageTests: XCTestCase {
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+    }
+
+    /// 띠 둘레에 피부가 전혀 없으면(피부 마스크 0) 기준이 없어 배율 1이어야 한다. 폭주·검정 번짐 없음.
+    func testFoldLiftWithEmptySurroundLeavesTheBandUnchanged() throws {
+        let synthetic = SyntheticFace.make()
+        let region = try XCTUnwrap(
+            FaceRegions.darkCircleMask(face: synthetic.face, extent: synthetic.image.extent, tuning: RenderTuning()))
+        let black = CIImage(color: .black).cropped(to: synthetic.image.extent)
+        let output = try SkinRefinement.liftFold(
+            synthetic.image, region: region, skinMask: black, faceWidth: 280, amount: 1, tuning: RenderTuning(),
+            extent: synthetic.image.extent)
+        let difference =
+            zip(try Support.bytes(output), try Support.bytes(synthetic.image))
+            .map { abs(Int($0) - Int($1)) }.max() ?? 0
+        XCTAssertLessThanOrEqual(difference, Self.blendRoundingTolerance, "피부 기준이 없으면 바꾸지 않는다")
+    }
+
+    /// 배율 1로 띠를 섞어도 남는 채널 차이(바이트). 같은 이미지를 마스크로 섞기만 해도 작업 색공간 반올림으로 1바이트가 달라진다.
+    /// 실측은 6144픽셀이 1바이트이고 2바이트 이상은 없다. 밝힘 폭주나 검정 번짐은 이보다 훨씬 크다.
+    private static let blendRoundingTolerance = 1
+
+    /// 둘레에 어두운 눈·눈썹이 있어도 기준은 피부만 본다: 눈 아래 그늘을 심으면 밝아져야 한다(실사진 실패의 재현).
+    func testFoldLiftIgnoresDarkFeaturesInTheSurround() throws {
+        let synthetic = SyntheticFace.make()
+        let center = SyntheticFace.underLeftEye
+        let shadowed = darkened(
+            synthetic.image, at: center, radii: CGSize(width: 40, height: 14), factor: Self.shadowFactor)
+        let before = try Support.grid(shadowed)
+        let after = try Support.grid(
+            render(SyntheticFace(image: shadowed, face: synthetic.face), skin: SkinAdjustments(darkCircles: 1)))
+        XCTAssertGreaterThanOrEqual(
+            Int(after.red(center)), Int(before.red(center)) + Self.liftMinimum, "눈 옆 그늘도 피부 기준으로 밝힌다")
+        XCTAssertEqual(after.rgba(SyntheticFace.leftEye), before.rgba(SyntheticFace.leftEye), "눈 안은 그대로")
     }
 }
