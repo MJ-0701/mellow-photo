@@ -18,7 +18,7 @@
 
 | 결정 | 이유 | 바꾸면 비용 |
 |---|---|---|
-| 얼룩 색 고르기의 흐림 반지름 상수 이름은 `chromaBlotchFraction`(0.06), 최대 배율은 `chromaEveningMax`(1.0) | 스펙 6절 | 작음 |
+| 얼룩 색 고르기의 흐림 반지름 상수 이름은 `chromaBlotchFraction`(0.025, G5-3 구현 중 0.06에서 변경), 최대 배율은 `chromaEveningMax`(1.0) | 스펙 6절 | 작음 |
 | `chromaEvening`만 0이 아니고 `toneEvening`·`shine`이 0이면 `toneMix` 경로로 가되 `even`·`shine`은 0이다(`smoothed` 경로가 아님) | 커널 하나로 네 값을 다룬다. "셋 다 0이면 `smoothed`와 같은 바이트" 규칙은 유지된다 | 작음 |
 | 하네스 실측에서 `chromaEvening`이 Cr 표준편차 비 하한(0.6에서 ≥ 0.80)을 깨면 표 값을 0.5 → 0.3으로 내리고, 그래도 깨면 표 값 0으로 두고 키는 남긴다 | 스펙 판정 7의 되돌리기 규칙 | 작음 |
 | VALIDATION의 하네스 표는 묶음 네 개(retouch·spots·dark-circles·wrinkles)의 중앙값만 옮기고 쌍별 표는 스크래치패드에 둔다 | VALIDATION은 사람이 읽는 영역이다 | 작음 |
@@ -37,7 +37,7 @@ G5-1 계획의 Global Constraints를 그대로 따른다(브랜치·`DEVELOPER_D
 
 - 시작 조건: G5-2 머지(`SkinRefinementKey.spots`·`SpotRemoval` 존재). 기준 테스트 수는 **시작 전에 실측해 이 줄에 적는다**(G5-2 뒤 추정 패키지 472, Mac 99). 이 계획이 더하는 수: **Shared +1, Rendering +3**(Task 1 Shared +1, Task 2 Rendering +2, Task 3 Rendering +1).
 - 레시피 키 추가만(`portrait.skin.chromaEvening`, `$defs/portraitLayer.skin.chromaEvening`, 기본값 0, schemaVersion 2 유지). `SkinRefinementKey` 순서: `darkCircles, nasolabial, marionette, glabella, toneEvening, chromaEvening, redness, shine, spots`.
-- `RenderTuning` 추가: `chromaBlotchFraction` 0.06, `chromaEveningMax` 1.0.
+- `RenderTuning` 추가: `chromaBlotchFraction` 0.025(G5-3 구현 중 변경, 처음 0.06), `chromaEveningMax` 1.0. 커널의 색 이동은 감마 값에서 재고 뺀다(스펙 6절, G5-3 구현 중 변경).
 - 표 변경(스펙 2절 G5-3 몫): `chromaEvening` 0.5/0.5/0.35.
 - `SkinKernels` `toneMix` 인자 추가(커널 수는 8 그대로). `FrequencySeparation.refined` 시그니처에 `chromaEvening: Double` 추가.
 - 하네스 실행은 `MELLOW_EVOTO_DIR`이 있을 때만이고 이미지·출력은 저장소 밖.
@@ -60,7 +60,7 @@ OneTouchBundle.Values.chromaEvening: Double
 OneTouchBundle.Table.common.chromaEvening = 0.5, female = 0.5, male = 0.35
 
 // MellowRendering (Task 2)
-RenderTuning.chromaBlotchFraction = 0.06, chromaEveningMax = 1.0
+RenderTuning.chromaBlotchFraction = 0.025, chromaEveningMax = 1.0
 FrequencySeparation.refined(_:bounds:faceWidth:mask:reference:smoothing:toneEvening:chromaEvening:shine:tuning:) throws -> CIImage
 SkinKernels.toneMix(image:fineBlur:midBlur:blotchBlur:wideNumerator:wideDenominator:reference:keep:even:evenChroma:shine:shineOffset:shineRamp:extent:) throws -> CIImage
 
@@ -165,7 +165,7 @@ Run: `cd apple && swift test --filter SkinStageTests/testChromaEvening` → 첫 
 
 ```swift
     /// 얼룩 색 고르기가 보는 얼룩 크기 흐림 반지름. 얼굴 폭 비율. 볼의 보라·붉은 얼룩은 5~10%다(스펙 G5 6절).
-    public var chromaBlotchFraction: Double = 0.06
+    public var chromaBlotchFraction: Double = 0.025
     /// 얼룩 색 고르기 1에서 Cb·Cr 편차를 되돌리는 비율.
     public var chromaEveningMax: Double = 1.0
 ```
@@ -183,7 +183,7 @@ Run: `cd apple && swift test --filter SkinStageTests/testChromaEvening` → 첫 
     return vec4(low + mid * keep + fine - shift, image.a);
 ```
 
-`FrequencySeparation.refined`에 `chromaEvening: Double` 인자: `let chroma = min(1, max(0, chromaEvening)) * tuning.chromaEveningMax`, guard를 `even > 0 || gloss > 0 || chroma > 0`로, `blotchBlur = blurred(image, radius: max(bandRadii.mid, Double(faceWidth) * tuning.chromaBlotchFraction))`를 커널에 넘긴다. `SkinStage.refine`: `bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.chromaEvening > 0 || skin.shine > 0`, 호출에 `chromaEvening: skin.chromaEvening`.
+`FrequencySeparation.refined`에 `chromaEvening: Double` 인자: `let chroma = min(1, max(0, chromaEvening)) * tuning.chromaEveningMax`, guard를 `even > 0 || gloss > 0 || chroma > 0`로, `blotchBlur = blurred(image, radius: max(bandRadii.fine, Double(faceWidth) * tuning.chromaBlotchFraction))`를 커널에 넘긴다(G5-3 구현 중 변경: 하한 mid → fine, 색 이동은 감마 값에서, 스펙 6절). `SkinStage.refine`: `bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.chromaEvening > 0 || skin.shine > 0`, 호출에 `chromaEvening: skin.chromaEvening`.
 
 `modules.md`의 "대역 합성(피부 보정·얼룩 고르기·번들거림을 한 번에 …)" 문장에 "얼룩 색 고르기(얼굴 폭 6% 흐림의 Cb·Cr을 12% 평균 쪽으로, Y 유지)"를 더하고 "세 값이 모두 0이면" → "네 값이 모두 0이면"(Task 4에서 함께 커밋해도 된다).
 
