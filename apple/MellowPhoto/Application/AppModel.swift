@@ -533,16 +533,22 @@ final class AppModel {
     /// 다리 길게 띠를 받는 몸(가장 큰 몸).
     private static let legBandBodyIndex = 0
     /// "팔이 붙어 부유방이 바뀌지 않음" 안내를 보일지.
-    /// 부유방 슬라이더가 보이고, 대상 몸(사람 대상은 그 얼굴과 짝인 몸, 전체·그룹은 모든 몸) 중 옆선을 찾은 몸이 있고,
-    /// 그 몸 모두 부유방 높이 옆선 점이 양쪽 다 없을 때다(렌더가 부유방 원소를 만들지 않는다).
+    /// 부유방 슬라이더가 보이고, 대상 몸 중 옆선을 찾은 몸이 있고, 그 몸 모두 부유방 높이 옆선 점이 양쪽 다 없을 때다
+    /// (렌더가 부유방 원소를 만들지 않는다).
+    /// 대상 몸은 사람 대상이면 그 얼굴과 짝인 몸, 성별 그룹이면 짝 얼굴의 유효 성별이 그 그룹인 몸이다.
+    /// 전체 대상은 부유방 슬라이더가 없어 안내하지 않는다.
     var showsSideChestArmTouching: Bool {
         guard bodyAvailability == .ready, showsBodyShape(.sideChest) else { return false }
         let outlines = selectedInfo?.bodyOutlines ?? [:]
         let bodies: [Int]
-        if let faceIndices = targetedFaceIndices {
+        switch beautyTarget {
+        case .all:
+            return false
+        case .gender(let gender):
+            bodies = bodyFaceMatches.filter { effectiveGender(forFace: $0.value) == gender }.map(\.key)
+        case .face, .person:
+            let faceIndices = targetedFaceIndices ?? []
             bodies = bodyFaceMatches.filter { faceIndices.contains($0.value) }.map(\.key)
-        } else {
-            bodies = Array(outlines.keys)
         }
         let probed = bodies.compactMap { outlines[$0] }
         return !probed.isEmpty && probed.allSatisfy { !$0.hasSideChestPoint }
