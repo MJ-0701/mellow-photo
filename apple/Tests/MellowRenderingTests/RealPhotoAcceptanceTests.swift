@@ -700,6 +700,65 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         }
     }
 
+    // MARK: 얼룩 색 고르기
+
+    /// 얼룩 색 고르기 심은 보라 얼룩 경계(스펙 G5 1.2 "얼룩 색 고르기 1" 행).
+    enum ChromaBounds {
+        static let radiusFraction: CGFloat = 0.06
+        static let plantedCb = 0.04
+        static let plantedCr = 0.03
+        static let removal = 0.5
+        static let lumaMeanAbsolute = 1.5
+        static let fineRatio = 0.9
+        static let midLumaRatio = 0.95
+        /// 제거율은 원 반지름 × 이 값 안에서 잰다(심은 원 가장자리 계단 제외).
+        static let discFraction: CGFloat = 0.65
+    }
+
+    /// 얼룩 색 고르기 1이 볼의 보라 얼룩 색을 절반 이상 되돌리고 휘도 입체감은 둔다(스펙 G5 1.2).
+    /// 남은 색은 깨끗한 사진을 같은 레시피로 렌더한 결과와 비교한다(점 지우기 회복률과 같은 방식).
+    func testChromaEveningClearsAPlantedPurpleBlotchAndKeepsLumaRelief() throws {
+        let portrait = try self.portrait()
+        let cheek = try XCTUnwrap(FaceRegions.cheekRects(face: portrait.face, extent: portrait.extent).first)
+        let center = CGPoint(x: cheek.midX, y: cheek.midY)
+        let radius = portrait.faceWidth * ChromaBounds.radiusFraction
+        let tinted = SyntheticDefect.tinted(
+            portrait.image, center: center, radius: radius, cb: ChromaBounds.plantedCb, cr: ChromaBounds.plantedCr,
+            extent: portrait.extent)
+        let blotchy = try portrait.baked(tinted)
+        let discRadius = radius * ChromaBounds.discFraction
+        let disc = try DisplayScale.grid(
+            Support.hardEllipse(
+                center: center, radii: CGSize(width: discRadius, height: discRadius), extent: portrait.extent))
+        let original = try base().grid
+        let defective = try DisplayScale.grid(blotchy)
+        let evened: (inout EditRecipe) -> Void = { $0.portrait.skin.chromaEvening = 1 }
+        let repaired = try grid(evened, stage: SkinStage(), input: blotchy)
+        let cleanRepaired = try grid(evened, stage: SkinStage())
+        let planted = DisplayScale.chromaDelta(original, defective, weight: disc)
+        let remaining = DisplayScale.chromaDelta(cleanRepaired, repaired, weight: disc)
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "cbRemoval", 1 - remaining.cb / planted.cb), ChromaBounds.removal, "Cb 절반 이상")
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "crRemoval", 1 - remaining.cr / planted.cr), ChromaBounds.removal, "Cr 절반 이상")
+        let lumaShift = abs(DisplayScale.lumaDelta(defective, repaired, weight: disc).mean)
+        XCTAssertLessThanOrEqual(
+            record("chromaEvening", "lumaMeanAbs", lumaShift), ChromaBounds.lumaMeanAbsolute, "휘도는 그대로")
+        var recipe = EditRecipe()
+        recipe.portrait.skin.chromaEvening = 1
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "fineRatio", try skinFineVarianceRatio(recipe)), ChromaBounds.fineRatio, "모공 질감")
+        let interior = try portrait.interiorSkinMask()
+        let output = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
+        let skinBounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let midOuter = Double(portrait.faceWidth) * OneTouchNaturalness.midOuterFraction
+        let midRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: skinBounds, innerRadius: fineRadius(),
+            outerRadius: midOuter)
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "midLumaRatio", midRatio), ChromaBounds.midLumaRatio, "휘도 입체감은 둔다")
+    }
+
     // MARK: 점 지우기
 
     /// 점 지우기 심은 점 경계(스펙 G5 1.2 "점 지우기 1"·"원터치 0.6" 행).
