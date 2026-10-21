@@ -163,8 +163,8 @@ extension PortraitScope {
 
 #### 5.1 분석
 
-- 새 포트 `PersonInstanceAnalyzer`(`instanceMasks(CIImage) throws -> [CIImage]`)를 둔다. 결과는 사람마다 0…1 회색 마스크이고 extent는 입력 이미지 extent다.
-- 기본 구현 `VisionPersonInstanceAnalyzer`는 `VNGeneratePersonInstanceMaskRequest`를 쓴다. 인스턴스마다 `generateScaledMaskForImage(forInstances:from:)`가 아니라 저해상도 마스크(`generateMask(forInstances:)`)를 받아 입력 extent로 늘린다.
+- 새 포트 `PersonInstanceAnalyzer`(`instanceMasks(CIImage) throws -> [CIImage]`)를 둔다. 결과는 사람마다 0…1 회색 마스크이고 Vision 원래 해상도(원점 0)다. 쓰는 쪽이 `BackgroundStage.personMask`와 같은 배치로 extent에 늘린다.
+- 기본 구현 `VisionPersonInstanceAnalyzer`는 `VNGeneratePersonInstanceMaskRequest`를 쓴다. 인스턴스마다 저해상도 마스크(`generateMask(forInstances:)`)를 받는다. 몸·얼굴과 인스턴스의 짝은 사진 준비 때 정한다(I2 계획).
 - `PhotoPipeline.init`에 `instanceAnalyzer: (any PersonInstanceAnalyzer)? = nil`을 더한다. 앱은 Vision 구현을 넘긴다.
 - 실패는 조용히 빈 배열이다. `PhotoAnalysis.personInstances: [CIImage]`에 두고 영속화하지 않는다.
 - 인스턴스 분석은 레시피가 체형이나 얼굴형을 쓸 때만이 아니라 사진 준비 때 늘 돈다(인물 마스크와 같은 정책).
@@ -191,7 +191,7 @@ extension PortraitScope {
 - `ShapeGroup`은 원소 배열, 사람 마스크 `CIImage?`, 팔 보호 `[ShapeGuard]`를 가진다. `ShapeGuard.capsule(start:end:radius:feather:)`다.
 - `DisplacementWarp.apply(groups:to:extent:limit:)`가 그룹마다 이동량 지도를 그리고 가중치를 곱해 더한 뒤 한 번만 샘플링한다. 기존 `apply(_:to:extent:limit:region:)`는 보호 없는 그룹 하나로 남긴다.
 - 배경 가중치 w(p) = clamp(`shapeBackgroundGain`(4) × G(m)(p), 0, 1) × (1 − o(p))다.
-- m은 그 그룹의 사람 마스크이고 G는 표준편차 σ의 가우스 흐림이다. 흐림은 마스크 원래 해상도에서 한 뒤 늘린다.
+- m은 그 그룹의 사람 마스크이고 G는 표준편차 σ의 가우스 흐림이다. 흐림은 마스크를 extent로 늘린 뒤 그룹 영향 경계 + 3σ로 잘라 extent 해상도에서 한다.
 - σ = max(그룹 최대 이동 × `shapeBackgroundSigmaRatio`(1.5), 짧은 변 × `shapeBackgroundSigmaMinimum`(0.002))다. 이득 4는 Φ(−1/1.5) ≈ 0.25의 역수라 실루엣에서 최대 이동만큼 바깥까지 w = 1이다. 그래서 넓히기도 목표 이동을 다 낸다.
 - o(p)는 다른 사람 인스턴스 마스크의 최댓값이다(전체 마스크로 대체한 경우 0).
 - 팔 보호 가중치는 1 − Π(1 − c_i(p))이고 c_i는 캡슐 반지름 안 1, 반지름 + feather 밖 0인 smoothstep이다. 몸통 그룹의 지도에 (1 − 팔 보호)를 곱한다.
