@@ -224,6 +224,24 @@ enum TestSupport {
         return BodyGeometry(joints: joints, confidence: joints.mapValues { _ in 1 })
     }
 
+    /// 나란히 선 두 사람의 얼굴(왼쪽부터).
+    /// coupleBodies와 짝이 맞게 놓았다.
+    static func coupleFaces() -> [FaceGeometry] {
+        [
+            landmarkedFace(in: NormalizedRect(x: 0.12, y: 0.62, width: 0.2, height: 0.2)),
+            landmarkedFace(in: NormalizedRect(x: 0.62, y: 0.62, width: 0.2, height: 0.2)),
+        ]
+    }
+
+    /// 나란히 선 두 사람의 몸(큰 몸이 앞).
+    /// 몸마다 목이 coupleFaces 같은 인덱스 얼굴의 기대 목 위치에 있어 준비가 몸 0 → 얼굴 0, 몸 1 → 얼굴 1로 짝짓는다.
+    static func coupleBodies() -> [BodyGeometry] {
+        [
+            standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.44, height: 0.7)),
+            standingBody(in: NormalizedRect(x: 0.52, y: 0.05, width: 0.4, height: 0.635)),
+        ]
+    }
+
     /// makeupCatalog가 nil이면 공용 파일을 읽는다. 카탈로그가 없는 경우는 .empty를 넘긴다.
     @MainActor
     static func makeModel(

@@ -12,18 +12,26 @@ public struct PreparedPhoto: Sendable {
     public let hasPerson: Bool
     /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public let personAnalysisFailure: MellowError?
-    /// 가장 큰 사람의 두 어깨가 보이면 true. 체형 도구의 "전신 없음" 안내에 쓴다.
+    /// 쓸 수 있는 몸(두 어깨가 보여 BodySkeleton이 만들어지는 몸)이 하나라도 있으면 true.
+    /// 체형 도구의 "전신 없음" 안내에 쓴다.
     public let hasBody: Bool
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public let bodyAnalysisFailure: MellowError?
     /// 임계값을 통과한 추정 성별.
     /// 얼굴과 같은 길이이거나 빈 배열이다.
     public let genders: [Gender?]
+    /// 몸 인덱스 → 얼굴 인덱스.
+    /// 짝이 없는 몸은 키가 없다.
+    public let bodyFaceMatches: [Int: Int]
+    /// 몸 인덱스 → 준비 때 사람 마스크에서 찾은 몸통 옆선(렌더와 같다).
+    /// 사람 마스크가 없거나 두 엉덩이가 없는 몸은 키가 없다.
+    public let bodyOutlines: [Int: BodyOutline]
 
     public init(
         pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
         hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil, hasBody: Bool = false,
-        bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = []
+        bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = [], bodyFaceMatches: [Int: Int] = [:],
+        bodyOutlines: [Int: BodyOutline] = [:]
     ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
@@ -34,6 +42,8 @@ public struct PreparedPhoto: Sendable {
         self.hasBody = hasBody
         self.bodyAnalysisFailure = bodyAnalysisFailure
         self.genders = genders
+        self.bodyFaceMatches = bodyFaceMatches
+        self.bodyOutlines = bodyOutlines
     }
 }
 
@@ -55,6 +65,7 @@ public actor PhotoPipeline {
     private let analyzer: any FaceAnalyzer
     private let personAnalyzer: (any PersonAnalyzer)?
     private let bodyAnalyzer: (any BodyAnalyzer)?
+    private let instanceAnalyzer: (any PersonInstanceAnalyzer)?
     private let genderEstimator: (any GenderEstimator)?
     private let tuning: RenderTuning
     private let lookCatalog: LookCatalog
@@ -63,17 +74,19 @@ public actor PhotoPipeline {
     private var entries: [PhotoID: Entry] = [:]
     private var cache: PreviewCache
 
-    /// personAnalyzer·bodyAnalyzer가 nil이면 그 분석을 하지 않는다(사람 없음과 같다). 앱은 Vision 구현을 넘긴다.
+    /// personAnalyzer·bodyAnalyzer·instanceAnalyzer가 nil이면 그 분석을 하지 않는다(사람 없음과 같다). 앱은 Vision 구현을 넘긴다.
     /// genderEstimator가 nil이면 모든 얼굴의 추정 성별이 미지정이다.
     /// makeupCatalog가 비어 있으면 색을 고르는 메이크업 부위만 빠진다.
     public init(
         analyzer: any FaceAnalyzer, personAnalyzer: (any PersonAnalyzer)? = nil,
-        bodyAnalyzer: (any BodyAnalyzer)? = nil, genderEstimator: (any GenderEstimator)? = nil, tuning: RenderTuning,
-        lookCatalog: LookCatalog = .empty, makeupCatalog: MakeupCatalog = .empty
+        bodyAnalyzer: (any BodyAnalyzer)? = nil, instanceAnalyzer: (any PersonInstanceAnalyzer)? = nil,
+        genderEstimator: (any GenderEstimator)? = nil, tuning: RenderTuning, lookCatalog: LookCatalog = .empty,
+        makeupCatalog: MakeupCatalog = .empty
     ) {
         self.analyzer = analyzer
         self.personAnalyzer = personAnalyzer
         self.bodyAnalyzer = bodyAnalyzer
+        self.instanceAnalyzer = instanceAnalyzer
         self.genderEstimator = genderEstimator
         self.tuning = tuning
         self.lookCatalog = lookCatalog
@@ -108,21 +121,30 @@ public actor PhotoPipeline {
         }
         let person = analyzePerson(in: preview)
         let body = analyzeBodies(in: preview)
+        let instances = analyzeInstances(in: preview)
+        let people = assignInstances(instances, bodies: body.bodies, faces: faces, extent: preview.extent)
+        let outlines = probeOutlines(
+            bodies: body.bodies, personMask: person.mask, instances: instances, owners: people.bodies,
+            extent: preview.extent)
+        let matches = BodyFaceMatcher.match(bodies: body.bodies, faces: faces, extent: preview.extent, tuning: tuning)
         let genders = estimateGenders(in: preview, faces: faces)
         let analysis = PhotoAnalysis(
             faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces),
             personMask: person.mask, personAnalysisFailure: person.failure, bodies: body.bodies,
-            bodyAnalysisFailure: body.failure, genderEstimates: genders)
+            bodyAnalysisFailure: body.failure, genderEstimates: genders, personInstances: instances,
+            bodyFaceMatches: matches, bodyInstances: people.bodies, faceInstances: people.faces,
+            bodyOutlines: outlines)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
         entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
         releaseMasksOfEvictedPreviews()
         // 렌더(BodyShapeRig)와 같은 판정이라 앱 안내와 실제 동작이 어긋나지 않는다.
-        let usable = body.bodies.first.flatMap { BodySkeleton(body: $0, extent: preview.extent, tuning: tuning) }
+        let usable = body.bodies.contains { BodySkeleton(body: $0, extent: preview.extent, tuning: tuning) != nil }
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
-            hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable != nil,
-            bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender })
+            hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable,
+            bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender }, bodyFaceMatches: matches,
+            bodyOutlines: outlines)
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.
@@ -242,6 +264,69 @@ public actor PhotoPipeline {
             return ([], .bodyAnalysisUnavailable(reason: error.localizedDescription))
         }
     }
+
+    /// 인스턴스 분석이 실패해도 사진 준비는 막지 않는다.
+    /// 보조 정보라 실패 사유를 남기지 않고 빈 배열로 둔다(스펙 5.1).
+    private func analyzeInstances(in image: CIImage) -> [CIImage] {
+        guard let instanceAnalyzer else { return [] }
+        return (try? instanceAnalyzer.instanceMasks(image)) ?? []
+    }
+
+    /// 몸·얼굴마다 그 표본점이 든 인스턴스를 고른다.
+    /// 몸은 목·두 어깨·두 엉덩이, 얼굴은 상자 중심이다.
+    /// 쓸 수 있는 몸이 인스턴스보다 많으면 아무것도 배정하지 않는다(스펙 결정: 5명 이상이면 전체 마스크).
+    /// 인스턴스가 없는 사람의 이웃 보호가 빠져 그 사람이 옆 사람 인스턴스를 끌 수 있기 때문이다.
+    /// 사람 수는 쓸 수 있는 몸으로 센다. 몸과 짝인 얼굴은 짝이 1:1이라 쓸 수 있는 몸보다 많을 수 없다.
+    /// 몸이 없는 얼굴(작게 찍힌 행인, 몸이 잘린 얼굴)은 세지 않는다. 그 얼굴 때문에 커플 사진이 인스턴스를 잃지 않게 한다.
+    private func assignInstances(_ instances: [CIImage], bodies: [BodyGeometry], faces: [FaceGeometry], extent: CGRect)
+        -> (bodies: [Int: Int], faces: [Int: Int])
+    {
+        guard !instances.isEmpty else { return ([:], [:]) }
+        let usableBodies = bodies.filter { BodySkeleton(body: $0, extent: extent, tuning: tuning) != nil }.count
+        guard usableBodies <= instances.count else { return ([:], [:]) }
+        var bodyOwners: [Int: Int] = [:]
+        for (index, body) in bodies.enumerated() {
+            let points = InstanceAssignment.samplePoints(of: body, extent: extent, tuning: tuning)
+            bodyOwners[index] = InstanceAssignment.owner(
+                of: points, in: instances, extent: extent, renderer: renderer, tuning: tuning)
+        }
+        var faceOwners: [Int: Int] = [:]
+        for (index, face) in faces.enumerated() {
+            let points = InstanceAssignment.samplePoints(of: face, extent: extent)
+            faceOwners[index] = InstanceAssignment.owner(
+                of: points, in: instances, extent: extent, renderer: renderer, tuning: tuning)
+        }
+        return (bodyOwners, faceOwners)
+    }
+
+    /// 몸마다 그 사람 마스크에서 몸통 옆선을 찾는다(스펙 5.8).
+    /// 마스크는 배정된 인스턴스 ?? 전체 인물 마스크다(RenderContext.personMask(forBody:)의 own과 같은 규칙).
+    /// 두 엉덩이가 있는 쓸 수 있는 몸만 찾는다.
+    /// 마스크가 없거나 읽지 못하면 그 몸은 키가 없다.
+    /// 마스크마다 CPU 바이트로 한 번만 읽는다.
+    private func probeOutlines(
+        bodies: [BodyGeometry], personMask: CIImage?, instances: [CIImage], owners: [Int: Int], extent: CGRect
+    ) -> [Int: BodyOutline] {
+        var samplers: [Int: MaskSampler] = [:]
+        var result: [Int: BodyOutline] = [:]
+        for (index, body) in bodies.enumerated() {
+            guard let skeleton = BodySkeleton(body: body, extent: extent, tuning: tuning), skeleton.hipCenter != nil
+            else { continue }
+            let owner = owners[index].flatMap { instances.indices.contains($0) ? $0 : nil }
+            let key = owner ?? Self.combinedMaskKey
+            if samplers[key] == nil {
+                guard let mask = owner.map({ instances[$0] }) ?? personMask else { continue }
+                samplers[key] = MaskSampler(mask: mask, renderer: renderer)
+            }
+            guard let sampler = samplers[key] else { continue }
+            result[index] = BodyOutlineProbe.probe(
+                skeleton: skeleton, mask: sampler, extent: extent, levels: BodyShapeRig.outlineLevels, tuning: tuning)
+        }
+        return result
+    }
+
+    /// probeOutlines의 표본기 캐시에서 전체 인물 마스크의 열쇠. 인스턴스 인덱스는 0 이상이다.
+    private static let combinedMaskKey = -1
 
     /// 미리보기 캐시에 없는 사진의 마스크 비트맵을 놓는다. 메모리를 최근 사진 몇 장 몫으로 묶는다.
     private func releaseMasksOfEvictedPreviews() {

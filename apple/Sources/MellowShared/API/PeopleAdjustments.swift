@@ -80,12 +80,22 @@ public enum PortraitKey: Hashable, Sendable {
     case faceShape(FaceShapeKey)
     case feature(FeatureKey)
     case makeupPart(MakeupPart)
+    case bodyShape(BodyShapeKey)
 
     public var isFaceShape: Bool {
         if case .faceShape = self {
             return true
         }
         return false
+    }
+
+    /// 얼굴형·체형 키.
+    /// 손 편집이 있는 사진에서 잠기는 기하 키다.
+    public var isShape: Bool {
+        switch self {
+        case .faceShape, .bodyShape: return true
+        default: return false
+        }
     }
 
     /// 피부 보정·자동 잡티·정밀 7종.
@@ -97,13 +107,14 @@ public enum PortraitKey: Hashable, Sendable {
     public static let faceShape = Set(FaceShapeKey.allCases.map(PortraitKey.faceShape))
     public static let features = Set(FeatureKey.allCases.map(PortraitKey.feature))
     public static let makeup = Set(MakeupPart.allCases.map(PortraitKey.makeupPart))
-    public static let all = skin.union(faceShape).union(features).union(makeup)
+    public static let bodyShapes = Set(BodyShapeKey.allCases.map(PortraitKey.bodyShape))
+    public static let all = skin.union(faceShape).union(features).union(makeup).union(bodyShapes)
 }
 
 /// 성긴 층.
 /// 있는 키만 아래 층을 덮어쓰고 없는 키는 상속한다.
 /// 메이크업은 부위 단위다.
-/// JSON은 전체 층과 같은 중첩(skin·face·features·makeup)이되 모든 잎이 선택이다.
+/// JSON은 전체 층과 같은 중첩(skin·face·features·makeup·body)이되 모든 잎이 선택이다.
 public struct PortraitLayer: Codable, Equatable, Sendable {
     public var skinSmoothing: Double?
     public var autoBlemish: Bool?
@@ -112,6 +123,9 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
     public var features: [FeatureKey: Double]
     /// 색 없는 부위는 colorID가 nil이다.
     public var makeup: [MakeupPart: MakeupTint]
+    /// 체형.
+    /// 전체 층은 EditRecipe.body다.
+    public var body: [BodyShapeKey: Double]
     /// 이 층에서 마지막으로 적용한 룩.
     /// 부위를 바꾸면 지운다(전체 층과 같은 규칙).
     public var makeupLookID: String?
@@ -123,7 +137,8 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
     public init(
         skinSmoothing: Double? = nil, autoBlemish: Bool? = nil, skinRefinement: [SkinRefinementKey: Double] = [:],
         face: [FaceShapeKey: Double] = [:], features: [FeatureKey: Double] = [:],
-        makeup: [MakeupPart: MakeupTint] = [:], makeupLookID: String? = nil, oneTouch: Double? = nil
+        makeup: [MakeupPart: MakeupTint] = [:], makeupLookID: String? = nil, oneTouch: Double? = nil,
+        body: [BodyShapeKey: Double] = [:]
     ) {
         self.skinSmoothing = skinSmoothing
         self.autoBlemish = autoBlemish
@@ -133,6 +148,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         self.makeup = makeup
         self.makeupLookID = makeupLookID
         self.oneTouch = oneTouch
+        self.body = body
     }
 
     public var isEmpty: Bool { overriddenKeys.isEmpty && makeupLookID == nil && oneTouch == nil }
@@ -151,6 +167,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         keys.formUnion(face.keys.map(PortraitKey.faceShape))
         keys.formUnion(features.keys.map(PortraitKey.feature))
         keys.formUnion(makeup.keys.map(PortraitKey.makeupPart))
+        keys.formUnion(body.keys.map(PortraitKey.bodyShape))
         return keys
     }
 
@@ -172,6 +189,9 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         if features.values.contains(where: { $0 != 0 }) {
             return true
         }
+        if body.values.contains(where: { $0 != 0 }) {
+            return true
+        }
         return makeup.values.contains { $0.intensity != 0 }
     }
 
@@ -186,10 +206,26 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         values += face.values
         values += features.values
         values += makeup.values.map(\.intensity)
+        values += body.values
         return values
     }
 
     /// 이 층의 키로 아래 층 값을 덮어쓴다.
+    /// 체형 키의 허용 층 검사는 하지 않는다(층은 자기가 어느 scope인지 모른다).
+    /// 그룹 층의 허용 필터는 PortraitResolver가 사본을 걸러 넘긴다.
+    public func applied(
+        to portrait: inout PortraitAdjustments, makeup target: inout MakeupAdjustments,
+        body bodyTarget: inout BodyShapeAdjustments
+    ) {
+        applied(to: &portrait, makeup: &target)
+        for (key, value) in body {
+            bodyTarget[key] = value
+        }
+    }
+
+    /// 얼굴·메이크업 키만 덮어쓴다.
+    /// 체형 키는 버린다.
+    /// 원터치 묶음처럼 체형이 없는 층을 전체 층에 겹칠 때 쓴다.
     public func applied(to portrait: inout PortraitAdjustments, makeup target: inout MakeupAdjustments) {
         if let skinSmoothing {
             portrait.skin.smoothing = skinSmoothing
@@ -230,6 +266,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
             case .faceShape(let shape): face[shape] = nil
             case .feature(let feature): features[feature] = nil
             case .makeupPart(let part): makeup[part] = nil
+            case .bodyShape(let shape): body[shape] = nil
             }
         }
         if makeup.isEmpty {
@@ -278,6 +315,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         case face
         case features
         case makeup
+        case body
     }
 
     private struct RawKey: CodingKey {
@@ -316,6 +354,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
         }
         face = try Self.decodeNumbers(FaceShapeKey.self, in: container, forKey: .face)
         features = try Self.decodeNumbers(FeatureKey.self, in: container, forKey: .features)
+        body = try Self.decodeNumbers(BodyShapeKey.self, in: container, forKey: .body)
         if container.contains(.makeup) {
             let parts = try container.nestedContainer(keyedBy: RawKey.self, forKey: .makeup)
             makeupLookID = try parts.decodeIfPresent(String.self, forKey: Self.lookIDKey)
@@ -345,6 +384,7 @@ public struct PortraitLayer: Codable, Equatable, Sendable {
                 try parts.encodeIfPresent(makeup[part], forKey: RawKey(part.rawValue))
             }
         }
+        try Self.encodeNumbers(body, in: &container, forKey: .body)
     }
 
     private static func decodeNumbers<Key: RawRepresentable & CaseIterable & Hashable>(

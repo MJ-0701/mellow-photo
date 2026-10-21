@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "photos": [
+    { "file": "chin-01.jpg",
+      "notes": "이중턱이 턱선 아래에 부드럽게 보인다(약함). 얼굴 폭은 사진 폭의 약 38%다. 밝은 회색 무지 배경, 깃 셔츠.",
+      "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "torso-01.jpg",
+      "notes": "머리부터 허벅지 중간까지 정면이다. 두 손을 허리에 짚고 팔꿈치를 바깥으로 벌려 위팔과 옆가슴·허리 사이로 배경 삼각형이 보인다. 화면 오른쪽(사람의 왼쪽)은 겨드랑이 가까이에서 틈이 좁다. 두 어깨와 두 엉덩이가 사진 안에 있다. 검은 민소매 상의(높은 목 골지).",
+      "people": [
+        { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "couple-body-01.jpg",
+      "notes": "왼쪽 남자, 오른쪽 여자, 머리부터 무릎 아래까지 정면이다. 얼굴 폭은 사진 폭의 약 14%다. 두 사람 모두 손을 허리에 짚고 팔꿈치를 벌렸고 사진 가운데에서 남자의 왼쪽 팔꿈치(화면 오른쪽)가 여자의 오른쪽 팔꿈치에 닿는다. 위팔과 옆가슴 사이 틈은 네 쪽 중 세 쪽에 있다(여자 두 쪽, 남자 화면 왼쪽). 남자 화면 오른쪽(여자 쪽) 위팔은 몸통에 붙는다. 양쪽 엉덩이가 보인다. 몸에 맞는 티셔츠와 청바지, 밝은 회색 무지 배경.",
+      "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "lines-01.jpg",
+      "notes": "흰 타일 벽 앞 정면이다. 좌우 가장자리에 곧은 세로 문틀이 있고 가로 타일선이 고르다. 양팔과 몸통 사이에 작은 틈이 있다. 조명이 고르다.",
+      "people": [
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] }
+  ]
+}

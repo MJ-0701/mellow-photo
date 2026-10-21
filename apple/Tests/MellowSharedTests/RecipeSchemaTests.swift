@@ -52,11 +52,11 @@ final class RecipeSchemaTests: XCTestCase {
         recipe.look = LookSelection(id: "film", intensity: 0.5)
         recipe.geometry.crop = NormalizedRect(x: 0, y: 0, width: 1, height: 1)
         recipe.detail.sharpness = 0.2
-        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, oneTouch: 0.6)
+        recipe.people.groups[.female] = PortraitLayer(skinSmoothing: 0.5, oneTouch: 0.6, body: [.sideChest: 0.3])
         recipe.people.individuals = [
             PersonRecord(
                 id: PersonID(), anchor: PersonAnchor(x: 0.3, y: 0.6, width: 0.12), legacyIndex: 0, gender: .female,
-                layer: PortraitLayer(face: [.width: -0.3]))
+                layer: PortraitLayer(face: [.width: -0.3], body: [.waist: -0.2]))
         ]
         recipe.effects.grain = 0.1
         return try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(recipe)) as? [String: Any])
@@ -103,12 +103,13 @@ final class RecipeSchemaTests: XCTestCase {
         XCTAssertEqual(try propertyKeys(item), ["id", "anchor", "legacyIndex", "gender", "layer"])
         let layer = try XCTUnwrap((schema["$defs"] as? [String: Any])?["portraitLayer"])
         let layerProperties = try sectionProperties(layer)
-        XCTAssertEqual(Set(layerProperties.keys), ["oneTouch", "skin", "face", "features", "makeup"])
+        XCTAssertEqual(Set(layerProperties.keys), ["oneTouch", "skin", "face", "features", "makeup", "body"])
         XCTAssertEqual(
             try propertyKeys(layerProperties["skin"]),
             Set(["smoothing", "autoBlemish"] + SkinRefinementKey.allCases.map(\.rawValue)))
         XCTAssertEqual(try propertyKeys(layerProperties["face"]), Set(FaceShapeKey.allCases.map(\.rawValue)))
         XCTAssertEqual(try propertyKeys(layerProperties["features"]), Set(FeatureKey.allCases.map(\.rawValue)))
+        XCTAssertEqual(try propertyKeys(layerProperties["body"]), Set(BodyShapeKey.allCases.map(\.rawValue)), "층 체형")
         XCTAssertEqual(
             try propertyKeys(layerProperties["makeup"]), Set(["lookID"] + MakeupPart.allCases.map(\.rawValue)))
         let encodedPeople = try XCTUnwrap(try encodedSampleRecipe()["people"] as? [String: Any])
@@ -116,7 +117,29 @@ final class RecipeSchemaTests: XCTestCase {
         let encodedLayer = try XCTUnwrap(encodedRecord["layer"] as? [String: Any])
         XCTAssertTrue(Set(encodedLayer.keys).isSubset(of: Set(layerProperties.keys)))
         let encodedGroup = try XCTUnwrap((encodedPeople["groups"] as? [String: Any])?["female"] as? [String: Any])
-        XCTAssertEqual(Set(encodedGroup.keys), ["oneTouch", "skin"])
+        XCTAssertEqual(Set(encodedGroup.keys), ["oneTouch", "skin", "body"])
+        XCTAssertEqual(Set(encodedLayer.keys), ["face", "body"])
+    }
+
+    func testShapeKeysMatchSchemaInAllAndLayerObjects() throws {
+        let schema = try schema(named: "edit-recipe.v2.schema")
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        let portrait = try sectionProperties(properties["portrait"])
+        let faceKeys = Set(FaceShapeKey.allCases.map(\.rawValue))
+        let bodyKeys = Set(BodyShapeKey.allCases.map(\.rawValue))
+        XCTAssertEqual(try propertyKeys(portrait["face"]), faceKeys, "전체 층 얼굴형")
+        XCTAssertEqual(try propertyKeys(properties["body"]), bodyKeys, "전체 층 체형")
+        let layer = try sectionProperties((schema["$defs"] as? [String: Any])?["portraitLayer"])
+        XCTAssertEqual(try propertyKeys(layer["face"]), faceKeys, "층 얼굴형")
+        XCTAssertEqual(try propertyKeys(layer["body"]), bodyKeys, "층 체형")
+        let face = try sectionProperties(portrait["face"])
+        let body = try sectionProperties(properties["body"])
+        let layerBody = try sectionProperties(layer["body"])
+        for entry in [face["doubleChin"], body["sideChest"], layerBody["sideChest"]] {
+            let range = try XCTUnwrap(entry as? [String: Any])
+            XCTAssertEqual(range["minimum"] as? Double, AdjustmentRange.unit.lowerBound)
+            XCTAssertEqual(range["maximum"] as? Double, AdjustmentRange.unit.upperBound)
+        }
     }
 
     func testLegacyPortraitKeysStayInSchemaAsDeprecated() throws {

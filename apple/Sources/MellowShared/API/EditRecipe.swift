@@ -138,7 +138,15 @@ public struct EditRecipe: Codable, Equatable, Sendable {
     /// 배경 흐림과 몸 피부는 인물 마스크가 필요하다.
     public var dependsOnPerson: Bool { background.hasEffect || bodySkin.hasEffect }
     /// 체형은 관절점이 필요하다.
-    public var dependsOnBody: Bool { body.hasEffect }
+    /// 어느 층이든 렌더에 쓰이는 체형 값이 있는지.
+    /// 전체 층의 허용되지 않는 키(부유방)는 렌더가 무시하므로 세지 않는다.
+    /// 타입 검사 시간을 줄이려 한 줄에 한 묶음씩 따진다.
+    public var dependsOnBody: Bool {
+        let allLayer = PortraitResolver.allLayerBody(self).hasEffect
+        let groups = people.groups.values.contains { $0.body.values.contains { $0 != 0 } }
+        let individuals = people.individuals.contains { $0.layer.body.values.contains { $0 != 0 } }
+        return allLayer || groups || individuals
+    }
     public var isDefault: Bool { self == EditRecipe() }
 
     /// 렌더 전 검증용. 비유한수가 하나라도 있으면 false.

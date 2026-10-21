@@ -51,7 +51,7 @@ public struct VisionBodyAnalyzer: BodyAnalyzer {
         return BodyGeometry(joints: joints, confidence: confidence)
     }
 
-    /// 관절 상자 넓이가 큰 사람부터. 체형은 첫 사람만 바꾼다(스펙 5).
+    /// 관절 상자 넓이가 큰 사람부터. 다리 길게 띠는 첫 사람만 만든다(스펙 5.4).
     public static func orderedLargestFirst(_ bodies: [BodyGeometry]) -> [BodyGeometry] {
         bodies.sorted { $0.area > $1.area }
     }

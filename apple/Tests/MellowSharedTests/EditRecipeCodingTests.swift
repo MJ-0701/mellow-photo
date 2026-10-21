@@ -157,10 +157,10 @@ final class EditRecipeCodingTests: XCTestCase {
         let paths: [WritableKeyPath<EditRecipe, Double>] = [
             \.portrait.skin.smoothing, \.portrait.face.width, \.portrait.face.jaw, \.portrait.face.cheekbone,
             \.portrait.face.eyeSize, \.portrait.face.eyeDistance, \.portrait.face.noseWidth, \.portrait.face.mouthSize,
-            \.portrait.face.smile, \.portrait.face.forehead, \.portrait.face.chinLength,
+            \.portrait.face.smile, \.portrait.face.forehead, \.portrait.face.chinLength, \.portrait.face.doubleChin,
             \.portrait.features.eyeBrighten, \.portrait.features.teethWhiten, \.portrait.features.lipVitality,
             \.background.blur, \.body.legLength, \.body.waist, \.body.overall, \.body.arms, \.body.thighs,
-            \.body.shoulders, \.body.neck, \.makeup.lip.intensity, \.makeup.blush.intensity,
+            \.body.shoulders, \.body.neck, \.body.sideChest, \.makeup.lip.intensity, \.makeup.blush.intensity,
             \.makeup.eyeshadow.intensity, \.makeup.brow.intensity, \.makeup.contour.intensity,
         ]
         for path in paths {
@@ -224,20 +224,54 @@ final class EditRecipeCodingTests: XCTestCase {
         for (offset, key) in FaceShapeKey.allCases.enumerated() {
             face[key] = Double(offset + 1) / 10
         }
-        XCTAssertEqual(face.numericValues, (1...10).map { Double($0) / 10 })
+        XCTAssertEqual(face.numericValues, (1...11).map { Double($0) / 10 })
         XCTAssertEqual(face.width, Double(1) / 10)
         XCTAssertEqual(face.chinLength, Double(10) / 10)
         var body = BodyShapeAdjustments()
         for key in BodyShapeKey.allCases {
             body[key] = 0.5
         }
-        XCTAssertEqual(body.numericValues, Array(repeating: 0.5, count: 7))
+        XCTAssertEqual(body.numericValues, Array(repeating: 0.5, count: 8))
         var features = FeatureAdjustments()
         for key in FeatureKey.allCases {
             features[key] = 0.2
         }
         XCTAssertEqual(features.numericValues, [0.2, 0.2, 0.2])
         XCTAssertEqual(MakeupPart.allCases.filter(\.hasColor), [.lip, .blush, .eyeshadow])
+    }
+
+    func testDoubleChinAndSideChestDecodeAsZeroWhenMissing() throws {
+        let json = #"{"schemaVersion":2,"portrait":{"face":{"width":-0.2}},"body":{"waist":-0.4,"neck":0.1}}"#
+        let recipe = try JSONDecoder().decode(EditRecipe.self, from: Data(json.utf8))
+        XCTAssertEqual(recipe.portrait.face.doubleChin, 0, "I 이전 파일은 이중턱이 0")
+        XCTAssertEqual(recipe.body.sideChest, 0, "I 이전 파일은 부유방이 0")
+        XCTAssertEqual(recipe.portrait.face.width, -0.2)
+        XCTAssertEqual(recipe.body.waist, -0.4)
+    }
+
+    func testDoubleChinAndSideChestRoundTrip() throws {
+        var recipe = EditRecipe()
+        recipe.portrait.face.doubleChin = 0.4
+        recipe.body.sideChest = 0.7
+        let data = try JSONEncoder().encode(recipe)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let body = try XCTUnwrap(json["body"] as? [String: Any])
+        XCTAssertEqual(body["sideChest"] as? Double, 0.7)
+        let decoded = try JSONDecoder().decode(EditRecipe.self, from: data)
+        XCTAssertEqual(decoded, recipe)
+        XCTAssertEqual(decoded.portrait.face[.doubleChin], 0.4)
+        XCTAssertEqual(decoded.body[.sideChest], 0.7)
+    }
+
+    func testNewShapeKeysAreUnitRange() {
+        XCTAssertEqual(AdjustmentRange.faceShape(.doubleChin), 0...1)
+        XCTAssertEqual(AdjustmentRange.bodyShape(.sideChest), 0...1)
+        XCTAssertEqual(AdjustmentRange.faceShape(.smile), AdjustmentRange.unit)
+        XCTAssertEqual(AdjustmentRange.bodyShape(.legLength), AdjustmentRange.unit)
+        XCTAssertEqual(AdjustmentRange.faceShape(.chinLength), AdjustmentRange.bipolar)
+        XCTAssertEqual(AdjustmentRange.bodyShape(.neck), AdjustmentRange.bipolar)
+        XCTAssertEqual(FaceShapeKey.allCases.last, .doubleChin, "새 키는 마지막에 둔다")
+        XCTAssertEqual(BodyShapeKey.allCases.last, .sideChest, "새 키는 마지막에 둔다")
     }
 
     func testSkinRefinementKeysRoundTripAndDefaultToIdentity() throws {

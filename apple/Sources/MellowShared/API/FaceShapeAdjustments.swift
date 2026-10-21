@@ -12,9 +12,11 @@ public enum FaceShapeKey: String, CaseIterable, Codable, Sendable {
     case smile
     case forehead
     case chinLength
+    /// 이중턱. 0…1, 턱 아래 처진 살을 턱선 쪽으로 올린다.
+    case doubleChin
 }
 
-/// 얼굴형 −1…1(가운데 0). smile만 0…1. width가 음수면 좁게.
+/// 얼굴형 −1…1(가운데 0). smile·doubleChin만 0…1. width가 음수면 좁게.
 public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
     public var width: Double
     public var jaw: Double
@@ -26,10 +28,12 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
     public var smile: Double
     public var forehead: Double
     public var chinLength: Double
+    public var doubleChin: Double
 
     public init(
         width: Double = 0, jaw: Double = 0, cheekbone: Double = 0, eyeSize: Double = 0, eyeDistance: Double = 0,
-        noseWidth: Double = 0, mouthSize: Double = 0, smile: Double = 0, forehead: Double = 0, chinLength: Double = 0
+        noseWidth: Double = 0, mouthSize: Double = 0, smile: Double = 0, forehead: Double = 0, chinLength: Double = 0,
+        doubleChin: Double = 0
     ) {
         self.width = width
         self.jaw = jaw
@@ -41,6 +45,7 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
         self.smile = smile
         self.forehead = forehead
         self.chinLength = chinLength
+        self.doubleChin = doubleChin
     }
 
     /// B0까지의 faceSlim 값(0…1, 클수록 좁게)을 width로 옮긴다. 0은 −0이 아니라 0이다.
@@ -60,6 +65,7 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
         smile = try container.decodeIfPresent(Double.self, forKey: .smile) ?? 0
         forehead = try container.decodeIfPresent(Double.self, forKey: .forehead) ?? 0
         chinLength = try container.decodeIfPresent(Double.self, forKey: .chinLength) ?? 0
+        doubleChin = try container.decodeIfPresent(Double.self, forKey: .doubleChin) ?? 0
     }
 
     public subscript(key: FaceShapeKey) -> Double {
@@ -75,6 +81,7 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
             case .smile: return smile
             case .forehead: return forehead
             case .chinLength: return chinLength
+            case .doubleChin: return doubleChin
             }
         }
         set {
@@ -89,6 +96,7 @@ public struct FaceShapeAdjustments: Codable, Equatable, Sendable {
             case .smile: smile = newValue
             case .forehead: forehead = newValue
             case .chinLength: chinLength = newValue
+            case .doubleChin: doubleChin = newValue
             }
         }
     }

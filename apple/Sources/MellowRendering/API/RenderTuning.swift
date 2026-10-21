@@ -123,6 +123,8 @@ public struct RenderTuning: Sendable {
     public var faceForeheadMaxShift: Double = 0.05
     /// 턱 길이. 턱 끝을 아래·위로 얼굴 폭의 5%.
     public var faceChinLengthMaxShift: Double = 0.05
+    /// 이중턱. 턱 아래 살을 턱선 쪽으로 얼굴 폭의 3.5% 올린다.
+    public var faceDoubleChinMaxShift: Double = 0.035
 
     /// 얼굴형 항목별 최대 이동. eyeSize·mouthSize는 scale 배율, 나머지는 얼굴 폭 비율.
     public func faceShapeMaxShift(_ key: FaceShapeKey) -> Double {
@@ -137,6 +139,7 @@ public struct RenderTuning: Sendable {
         case .smile: return faceSmileMaxShift
         case .forehead: return faceForeheadMaxShift
         case .chinLength: return faceChinLengthMaxShift
+        case .doubleChin: return faceDoubleChinMaxShift
         }
     }
 
@@ -230,8 +233,9 @@ public struct RenderTuning: Sendable {
     public var bodyWaistMaxShift: Double = 0.06
     /// 몸 전체. 가슴·골반·허벅지 바깥 세 곳을 각각 어깨 폭의 3.5%(약 1.4cm).
     public var bodyOverallMaxShift: Double = 0.035
-    /// 팔. 위팔 양옆을 각각 어깨 폭의 2%(약 0.8cm, 위팔 폭 약 9.6cm의 17%). 아래팔은 그 75%.
-    public var bodyArmMaxShift: Double = 0.02
+    /// 팔. 위팔 양옆을 각각 어깨 폭의 3%(약 1.2cm, 위팔 폭 약 9.6cm의 25%). 아래팔은 그 75%.
+    /// I3 수용 테스트에서 2%는 배경 쪽 아래팔 원소 중심이 배경 보호로 0.9 폰 px만 움직여 하한(2 폰 px)에 못 미쳐 올렸다.
+    public var bodyArmMaxShift: Double = 0.03
     /// 허벅지. 양옆을 각각 어깨 폭의 3.5%(약 1.4cm, 허벅지 폭 약 16cm의 17%).
     public var bodyThighMaxShift: Double = 0.035
     /// 어깨. 각 어깨 관절을 어깨 폭의 4%(약 1.6cm)라 어깨 폭이 ±8% 바뀐다.
@@ -240,6 +244,8 @@ public struct RenderTuning: Sendable {
     public var bodyNeckMaxShift: Double = 0.03
     /// 다리 길게 1의 띠 늘림 비율(스펙 0.08). 골반~발목이 8% 길어지고 발 아래는 그만큼 사진 밖으로 밀린다.
     public var legLengthMaxStretch: Double = 0.08
+    /// 부유방. 겨드랑이 앞 살을 몸 안쪽으로 어깨 폭의 3%(약 1.2cm) 민다.
+    public var bodySideChestMaxShift: Double = 0.03
 
     /// 체형 항목별 최대. legLength는 띠 늘림 비율, 나머지는 어깨 폭 비율의 push 이동이다.
     public func bodyItemMaxShift(_ key: BodyShapeKey) -> Double {
@@ -251,8 +257,36 @@ public struct RenderTuning: Sendable {
         case .thighs: return bodyThighMaxShift
         case .shoulders: return bodyShoulderMaxShift
         case .neck: return bodyNeckMaxShift
+        case .sideChest: return bodySideChestMaxShift
         }
     }
+
+    /// 얼굴–몸 짝짓기의 목 기대점.
+    /// 얼굴 상자 아래 가운데에서 상자 높이의 이 비율만큼 아래다.
+    public var bodyFaceNeckDrop: Double = 0.25
+    /// 몸의 목(또는 어깨 중점)과 얼굴 기대점의 거리가 얼굴 폭의 이 배수 이하여야 짝 후보다.
+    public var bodyFaceMatchTolerance: Double = 1.0
+    /// 몸·얼굴의 표본점에서 읽은 인스턴스 마스크 평균이 이 값 이상이어야 그 사람으로 본다.
+    public var instanceMatchMinimum: Double = 0.5
+    /// 보호 워프의 배경 가중치 = clamp(이 값 × 흐린 사람 마스크, 0, 1).
+    /// Φ(−1 / 1.5) ≈ 0.25의 역수라 실루엣에서 최대 이동만큼 바깥까지 가중치가 1이다.
+    public var shapeBackgroundGain: Double = 4
+    /// 사람 마스크를 흐리는 표준편차.
+    /// 그 묶음의 최대 이동에 곱한다.
+    public var shapeBackgroundSigmaRatio: Double = 1.5
+    /// 사람 마스크 흐림 표준편차의 하한.
+    /// 짧은 변 비율이다.
+    public var shapeBackgroundSigmaMinimum: Double = 0.002
+    /// 팔 보호 캡슐 반지름.
+    /// 위팔·아래팔 반폭에 곱한다.
+    public var armGuardScale: Double = 1.0
+    /// 팔 보호 캡슐 가장자리 폭.
+    /// 어깨 폭 비율이다.
+    public var armGuardFeather: Double = 0.03
+    /// 이중턱 1에서 턱밑 그늘을 둘레 피부와의 휘도 차의 이 비율만큼 밝힌다.
+    public var chinShadeMaxGain: Double = 0.5
+    /// 턱밑 그늘 밝히기의 휘도 증가 상한(sRGB 감마 값).
+    public var chinShadeMaxLift: Double = 12.0 / 255.0
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000

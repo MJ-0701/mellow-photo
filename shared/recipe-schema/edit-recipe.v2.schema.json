@@ -40,7 +40,7 @@
         },
         "face": {
           "type": "object", "additionalProperties": false,
-          "description": "가운데 0인 양방향. width 음수는 좁게. smile만 0~1.",
+          "description": "가운데 0인 양방향. width 음수는 좁게. smile·doubleChin만 0~1.",
           "properties": {
             "width": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
             "jaw": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
@@ -51,7 +51,8 @@
             "mouthSize": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
             "smile": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
             "forehead": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
-            "chinLength": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 }
+            "chinLength": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+            "doubleChin": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "이중턱(턱 아래 살을 턱선 쪽으로). 없으면 0." }
           }
         },
         "features": {
@@ -114,7 +115,7 @@
     },
     "body": {
       "type": "object", "additionalProperties": false,
-      "description": "가운데 0인 양방향. legLength만 0~1.",
+      "description": "가운데 0인 양방향. legLength·sideChest만 0~1. 전체 층 체형은 사진의 모든 사람에게 걸린다(I2부터). sideChest는 전체 층에서 보존하되 렌더가 무시한다.",
       "properties": {
         "legLength": { "type": "number", "default": 0, "minimum": 0, "maximum": 1 },
         "waist": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
@@ -122,7 +123,8 @@
         "arms": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
         "thighs": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
         "shoulders": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
-        "neck": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 }
+        "neck": { "type": "number", "default": 0, "minimum": -1, "maximum": 1 },
+        "sideChest": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "부유방(겨드랑이 앞 살을 몸 안쪽으로). 여성 그룹·개인 층에서만 렌더에 쓰인다. 없으면 0." }
       }
     },
     "makeup": {
@@ -265,7 +267,8 @@
             "mouthSize": { "type": "number", "minimum": -1, "maximum": 1 },
             "smile": { "type": "number", "minimum": 0, "maximum": 1 },
             "forehead": { "type": "number", "minimum": -1, "maximum": 1 },
-            "chinLength": { "type": "number", "minimum": -1, "maximum": 1 }
+            "chinLength": { "type": "number", "minimum": -1, "maximum": 1 },
+            "doubleChin": { "type": "number", "minimum": 0, "maximum": 1 }
           }
         },
         "features": {
@@ -310,6 +313,20 @@
               "type": "object", "additionalProperties": false,
               "properties": { "intensity": { "type": "number", "minimum": 0, "maximum": 1 } }
             }
+          }
+        },
+        "body": {
+          "type": "object", "additionalProperties": false,
+          "description": "체형. 전체 층 body와 같은 키다. sideChest는 남성 그룹 층에서 보존하되 렌더가 무시한다.",
+          "properties": {
+            "legLength": { "type": "number", "minimum": 0, "maximum": 1 },
+            "waist": { "type": "number", "minimum": -1, "maximum": 1 },
+            "overall": { "type": "number", "minimum": -1, "maximum": 1 },
+            "arms": { "type": "number", "minimum": -1, "maximum": 1 },
+            "thighs": { "type": "number", "minimum": -1, "maximum": 1 },
+            "shoulders": { "type": "number", "minimum": -1, "maximum": 1 },
+            "neck": { "type": "number", "minimum": -1, "maximum": 1 },
+            "sideChest": { "type": "number", "minimum": 0, "maximum": 1 }
           }
         }
       }

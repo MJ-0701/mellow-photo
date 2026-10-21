@@ -619,8 +619,8 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(Set(titles).count, FaceShapeKey.allCases.count, "슬라이더 이름이 겹치지 않는다")
         XCTAssertEqual(titles.first, "얼굴 폭")
         model.undo()
-        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0, "실행 취소 한 번에 마지막 슬라이더만")
-        XCTAssertEqual(model.currentRecipe.portrait.face.forehead, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(model.currentRecipe.portrait.face.doubleChin, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0.4, accuracy: 1e-9)
     }
 
     func testGeometryLockRejectsEveryFaceShapeKey() async throws {
@@ -815,17 +815,26 @@ final class AppModelTests: XCTestCase {
         model.selectTool(.body)
         XCTAssertEqual(EditorTool.body.title, "체형")
         XCTAssertEqual(model.bodyAvailability, .ready)
-        for key in BodyShapeKey.allCases {
+        // 부유방은 전체 층에 둘 수 없어 따로 본다.
+        let allLayerKeys = BodyShapeKey.allCases.filter { PortraitScope.all.allows(.bodyShape($0)) }
+        for key in allLayerKeys {
             model.beginSliderEdit()
             model.edit(.bodyShape(key, 0.2))
             model.edit(.bodyShape(key, 0.4))
             model.endSliderEdit()
         }
-        for key in BodyShapeKey.allCases {
+        for key in allLayerKeys {
             XCTAssertEqual(model.currentRecipe.body[key], 0.4, accuracy: 1e-9, "\(key)")
         }
+        let steps = model.session.selected?.document.undoStack.count
+        let status = model.statusMessage
+        model.edit(.bodyShape(.sideChest, 0.4))
+        XCTAssertEqual(model.currentRecipe.body.sideChest, 0, "전체 층 부유방은 조용히 거절한다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, steps)
+        XCTAssertEqual(model.statusMessage, status, "화면이 숨기는 항목이라 안내를 띄우지 않는다")
         XCTAssertEqual(
-            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle), ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목"])
+            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle),
+            ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목", "부유방"])
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
         model.undo()
@@ -1799,6 +1808,213 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.beautyTarget, .face(0))
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
+    }
+
+    /// 얼굴 둘과 bodies를 스텁으로 준비한 모델.
+    private func coupleBodyModel(bodies: [BodyGeometry] = TestSupport.coupleBodies()) async throws -> AppModel {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(TestSupport.coupleFaces())),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.body)
+        return model
+    }
+
+    func testSideChestHiddenForAllAndMaleTargets() async throws {
+        let model = try await coupleBodyModel()
+        XCTAssertEqual(model.selectedInfo?.bodyFaceMatches, [0: 0, 1: 1], "준비의 몸–얼굴 짝을 사진 정보에 둔다")
+        let others = BodyShapeKey.allCases.filter { $0 != .sideChest }
+        for target in [AppModel.BeautyTarget.all, .gender(.male)] {
+            model.setBeautyTarget(target)
+            XCTAssertFalse(model.showsBodyShape(.sideChest), "\(target)")
+            XCTAssertTrue(model.showsSideChestScopeHint, "\(target)는 대상을 고르라고 안내한다")
+            XCTAssertTrue(others.allSatisfy(model.showsBodyShape), "\(target)의 다른 항목은 보인다")
+        }
+        for target in [AppModel.BeautyTarget.gender(.female), .face(0)] {
+            model.setBeautyTarget(target)
+            XCTAssertTrue(model.showsBodyShape(.sideChest), "\(target)")
+            XCTAssertFalse(model.showsSideChestScopeHint, "\(target)")
+        }
+        model.edit(.bodyShape(.waist, -0.2))
+        XCTAssertNotNil(model.scope(for: .face(0)), "첫 변경이 기록을 만든다")
+        XCTAssertTrue(model.showsBodyShape(.sideChest), "기록이 있는 사람도 보인다")
+        XCTAssertEqual(UserMessage.sideChestScopeHint, "부유방은 여성 그룹이나 사람을 골라 조정해요.")
+        XCTAssertEqual(UserMessage.bodyShapeTitle(.sideChest), "부유방")
+        XCTAssertEqual(UserMessage.faceShapeTitle(.doubleChin), "이중턱")
+        XCTAssertEqual(UserMessage.bodyHint, "선택한 대상의 관절점으로 몸매를 다듬어요. 배경과 팔은 움직이지 않게 보호해요. 다리 길게는 골반과 발목이 보여야 바뀌어요.")
+    }
+
+    func testBodySliderWritesToTheTargetLayer() async throws {
+        let model = try await coupleBodyModel()
+        model.setBeautyTarget(.gender(.female))
+        model.edit(.bodyShape(.waist, -0.5))
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.body[.waist], -0.5)
+        XCTAssertEqual(model.scopedValues.body.waist, -0.5)
+        XCTAssertEqual(model.overriddenKeys, [.bodyShape(.waist)], "그룹 층이 덮어쓴 항목")
+        model.setBeautyTarget(.all)
+        XCTAssertEqual(model.scopedValues.body.waist, 0)
+        XCTAssertEqual(model.currentRecipe.body.waist, 0, "전체 층은 그대로")
+        model.setBeautyTarget(.gender(.female))
+        model.resetOverrides([.bodyShape(.waist)])
+        XCTAssertEqual(model.scopedValues.body.waist, 0, "재설정은 그 층의 체형 키를 상속으로 되돌린다")
+        XCTAssertEqual(model.overriddenKeys, [])
+    }
+
+    func testNoBodyForTargetDisablesButAllowsReset() async throws {
+        // 몸 하나가 얼굴 1과만 짝이다.
+        let model = try await coupleBodyModel(bodies: [TestSupport.coupleBodies()[1]])
+        XCTAssertEqual(model.selectedInfo?.bodyFaceMatches, [0: 1])
+        XCTAssertEqual(model.bodyAvailability, .ready, "전체 대상은 몸이 있으면 준비됨")
+        model.setBeautyTarget(.face(1))
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        model.setBeautyTarget(.face(0))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget)
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        model.edit(.bodyShape(.waist, -0.3))
+        XCTAssertEqual(model.scopedValues.body.waist, -0.3, "값은 그 사람 층에 저장된다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist), "0이 아닌 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 계속 끈다")
+        let person = try XCTUnwrap(model.peopleByFace[0]?.id)
+        model.setBeautyTarget(.person(person))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "사람 대상도 짝 얼굴로 판정한다")
+        XCTAssertEqual(UserMessage.noBodyForTarget, "이 사람의 몸을 찾지 못했어요")
+    }
+
+    func testSideChestScopeHintHiddenWithoutFaces() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([TestSupport.coupleBodies()[0]])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.body)
+        XCTAssertEqual(model.bodyAvailability, .ready, "얼굴이 없어도 몸이 있으면 전체 대상으로 체형을 쓴다")
+        XCTAssertFalse(model.showsBodyShape(.sideChest), "전체 대상에는 부유방이 없다")
+        XCTAssertFalse(model.showsSideChestScopeHint, "고를 대상 칩이 없으면 대상을 고르라는 안내도 없다")
+    }
+
+    func testGenderGroupWithoutMatchingBodyDisablesButAllowsReset() async throws {
+        let model = try await coupleBodyModel()
+        XCTAssertEqual(model.selectedInfo?.bodyFaceMatches, [0: 0, 1: 1])
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "성별이 정해진 얼굴이 없으면 여성 그룹이 바꿀 몸이 없다")
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        model.edit(.bodyShape(.waist, -0.3))
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.body[.waist], -0.3, "값은 그룹 층에 저장된다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist), "그룹 층의 0이 아닌 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 계속 끈다")
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertEqual(model.bodyAvailability, .ready, "얼굴 1이 여성이면 짝인 몸 1을 받는다")
+        XCTAssertTrue(model.canAdjustBodyShape(.arms))
+        model.setBeautyTarget(.gender(.male))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "남성 얼굴이 없으면 남성 그룹도 몸이 없다")
+    }
+
+    func testSideChestArmTouchingHintFollowsTheTargetBodyOutline() async throws {
+        let model = try await coupleBodyModel()
+        let id = try XCTUnwrap(model.session.selectedPhotoID)
+        let info = try XCTUnwrap(model.selectedInfo)
+        let thumbnail = try XCTUnwrap(model.thumbnails[id])
+        // 부유방 높이(0.27)에 점이 없고 가슴 높이(0.3)에만 점이 있는 몸과, 부유방 높이에 한쪽 점이 있는 몸.
+        let touching = BodyOutline(points: [OutlineKey(level: 0.3, side: 1): NormalizedPoint(x: 0.4, y: 0.5)])
+        let clear = BodyOutline(points: [OutlineKey(level: 0.27, side: -1): NormalizedPoint(x: 0.6, y: 0.5)])
+        func prepare(_ outlines: [Int: BodyOutline]) {
+            model.remember(
+                id,
+                PreparedPhoto(
+                    pixelSize: info.pixelSize, thumbnail: thumbnail, faces: info.faces, faceAnalysisFailure: nil,
+                    hasPerson: true, hasBody: true, genders: info.genders, bodyFaceMatches: info.bodyFaceMatches,
+                    bodyOutlines: outlines))
+        }
+        prepare([0: touching, 1: clear])
+        XCTAssertEqual(model.selectedInfo?.bodyOutlines, [0: touching, 1: clear], "준비의 몸통 옆선을 사진 정보에 둔다")
+        model.setBeautyTarget(.face(0))
+        XCTAssertTrue(model.showsSideChestArmTouching, "대상 몸에 부유방 높이 옆선 점이 없으면 안내한다")
+        model.setBeautyTarget(.face(1))
+        XCTAssertFalse(model.showsSideChestArmTouching, "한쪽이라도 점이 있으면 안내하지 않는다")
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertFalse(model.showsSideChestArmTouching, "성별 지정이 없으면 여성 그룹이 받는 몸이 없다")
+        // 얼굴 0을 여성으로 지정하면 여성 그룹의 몸은 몸 0(팔이 붙음)뿐이다. 몸 1(점 있음)은 미지정이라 세지 않는다.
+        model.setBeautyTarget(.face(0))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertTrue(model.showsSideChestArmTouching, "그룹은 그 성별 얼굴과 짝인 몸만 본다")
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertFalse(model.showsSideChestArmTouching, "그 성별 몸 중 하나라도 점이 있으면 안내하지 않는다")
+        for target in [AppModel.BeautyTarget.all, .gender(.male)] {
+            model.setBeautyTarget(target)
+            XCTAssertFalse(model.showsSideChestArmTouching, "부유방 슬라이더가 없는 \(target)")
+        }
+        prepare([0: touching, 1: touching])
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertTrue(model.showsSideChestArmTouching, "여성 몸 모두 팔이 붙으면 그룹에도 안내한다")
+        prepare([:])
+        model.setBeautyTarget(.face(0))
+        XCTAssertFalse(model.showsSideChestArmTouching, "옆선을 찾지 않은 몸(마스크 없음)은 관절선으로 그려 안내하지 않는다")
+        XCTAssertEqual(UserMessage.sideChestArmTouching, "팔이 몸에 붙어 있으면 부유방은 바뀌지 않아요.")
+    }
+
+    func testLegLengthOnlyForLargestBodyTarget() async throws {
+        let model = try await coupleBodyModel()
+        model.setBeautyTarget(.face(1))
+        XCTAssertEqual(model.bodyAvailability, .ready)
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "가장 큰 몸이 아닌 사람은 다리 띠를 받지 않는다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist))
+        XCTAssertTrue(model.showsLegLengthLargestOnly)
+        // 남성 그룹이 몸을 받으려면 짝 얼굴이 남성이어야 한다(가장 큰 몸 0의 얼굴 0).
+        model.setBeautyTarget(.face(0))
+        model.setGender(.male)
+        for target in [AppModel.BeautyTarget.face(0), .all, .gender(.male)] {
+            model.setBeautyTarget(target)
+            XCTAssertTrue(model.canAdjustBodyShape(.legLength), "\(target)")
+            XCTAssertFalse(model.showsLegLengthLargestOnly, "\(target)")
+        }
+        XCTAssertEqual(
+            UserMessage.legLengthLargestOnly, "다리 길게는 사진에서 가장 큰 사람에게만 걸려요.")
+    }
+
+    func testInheritedLegLengthDoesNotEnableSliderForNonLargestBody() async throws {
+        let model = try await coupleBodyModel()
+        model.edit(.bodyShape(.legLength, 0.5))
+        XCTAssertTrue(model.canAdjustBodyShape(.legLength), "전체 대상은 전체 층 값")
+        model.setBeautyTarget(.face(1))
+        XCTAssertEqual(model.scopedValues.body.legLength, 0.5, "사람은 전체 값을 상속한다")
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "기록이 없는 얼굴은 자기 값이 없다")
+        model.edit(.bodyShape(.waist, -0.2))
+        XCTAssertNotNil(model.scope(for: .face(1)))
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "상속한 값은 슬라이더를 켜지 않는다")
+        model.setBeautyTarget(.gender(.male))
+        model.edit(.bodyShape(.legLength, 0.3))
+        model.setBeautyTarget(.face(1))
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "다른 층에 둔 값도 상속이다")
+        model.edit(.bodyShape(.legLength, 0.5))
+        XCTAssertEqual(model.overriddenKeys, [.bodyShape(.waist), .bodyShape(.legLength)])
+        XCTAssertTrue(model.canAdjustBodyShape(.legLength), "그 사람 층의 0이 아닌 값은 되돌릴 수 있다")
+        model.resetOverrides([.bodyShape(.legLength)])
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength))
+    }
+
+    func testLockedPhotoDisablesBodySliders() async throws {
+        let model = try await coupleBodyModel()
+        model.setBeautyTarget(.face(1))
+        model.edit(.bodyShape(.waist, -0.3))
+        try await lockWithRetouch(model)
+        let person = try XCTUnwrap(model.peopleByFace[1]?.id)
+        let targets: [AppModel.BeautyTarget] = [
+            .all, .gender(.male), .gender(.female), .face(0), .face(1), .person(person),
+        ]
+        for target in targets {
+            model.setBeautyTarget(target)
+            for key in BodyShapeKey.allCases {
+                XCTAssertFalse(model.canAdjustBodyShape(key), "\(target) \(key)")
+            }
+        }
     }
 }
 

@@ -25,23 +25,25 @@ public enum SyncCategory: String, CaseIterable, Codable, Sendable, Identifiable 
     public static let oneTouchCategories: Set<SyncCategory> = [.skin, .features, .makeup, .bodySkin]
 
     /// 얼굴에 의존하는 항목.
+    /// 체형은 사람별 층이 얼굴로 사람을 찾으므로 여기에 든다.
     /// 복사하면 받는 사진의 개인 층에서 그 항목의 키를 지운다.
     public var dependsOnFaces: Bool {
         switch self {
-        case .skin, .faceShape, .features, .makeup: return true
-        case .color, .effects, .background, .body, .bodySkin: return false
+        case .skin, .faceShape, .features, .makeup, .body: return true
+        case .color, .effects, .background, .bodySkin: return false
         }
     }
 
     /// 이 항목이 층에서 다루는 키.
-    /// 얼굴 의존 항목만 값이 있다.
+    /// 얼굴 의존 항목(체형 포함)만 값이 있다.
     public var portraitKeys: Set<PortraitKey>? {
         switch self {
         case .skin: return PortraitKey.skin
         case .faceShape: return PortraitKey.faceShape
         case .features: return PortraitKey.features
         case .makeup: return PortraitKey.makeup
-        case .color, .effects, .background, .body, .bodySkin: return nil
+        case .body: return PortraitKey.bodyShapes
+        case .color, .effects, .background, .bodySkin: return nil
         }
     }
 }

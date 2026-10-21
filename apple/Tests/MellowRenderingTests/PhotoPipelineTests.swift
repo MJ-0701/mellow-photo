@@ -19,6 +19,11 @@ struct StubBodyAnalyzer: BodyAnalyzer {
     func analyze(_ image: CIImage) throws -> [BodyGeometry] { try result.get() }
 }
 
+struct StubInstanceAnalyzer: PersonInstanceAnalyzer {
+    var result: Result<[CIImage], MellowError>
+    func instanceMasks(_ image: CIImage) throws -> [CIImage] { try result.get() }
+}
+
 struct StubGenderEstimator: GenderEstimator {
     var result: Result<[GenderEstimate?], MellowError>
     func estimate(_ image: CIImage, faces: [FaceGeometry]) throws -> [GenderEstimate?] { try result.get() }
@@ -393,6 +398,166 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(prepared.bodyAnalysisFailure)
         let analysis = await pipeline.preparedAnalysis(id)
         XCTAssertEqual(analysis?.bodies, [])
+    }
+
+    func testAnyUsableBodyReportsBody() async throws {
+        let url = try writeSolidPNG()
+        let unusable = Support.standingBody(in: Support.standingBox, omitting: [.leftShoulder])
+        let usable = Support.standingBody(in: NormalizedRect(x: 0.6, y: 0.3, width: 0.3, height: 0.5))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([unusable, usable])), tuning: RenderTuning())
+        let prepared = try await pipeline.prepare(PhotoID(), at: url)
+        XCTAssertTrue(prepared.hasBody, "가장 큰 몸이 아니어도 쓸 수 있는 몸이 있으면 체형 도구를 쓴다")
+    }
+
+    func testPrepareStoresBodyFaceMatchesAndInstances() async throws {
+        let url = try writeSolidPNG()
+        // 왼쪽 몸의 목(0.2, 0.492)은 얼굴 기대점(0.2, 0.5) 바로 아래이고 오른쪽 몸은 얼굴 폭의 2.5배 떨어져 있다.
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.55, width: 0.2, height: 0.2))
+        let left = Support.standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.4, height: 0.6))
+        let right = Support.standingBody(in: NormalizedRect(x: 0.5, y: 0, width: 0.4, height: 0.6))
+        // Vision처럼 사진과 비율이 다른 작은 마스크다. 인스턴스 0이 오른쪽 절반, 1이 왼쪽 절반이다.
+        let maskSize = CGSize(width: 64, height: 48)
+        let rightHalf = Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48))
+        let leftHalf = Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([face])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([left, right])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success([rightHalf, leftHalf])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertEqual(prepared.bodyFaceMatches, [0: 0], "얼굴 아래 몸만 짝이 된다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyFaceMatches, [0: 0])
+        XCTAssertEqual(analysis.personInstances.count, 2, "인스턴스 마스크는 받은 그대로 보관한다")
+        XCTAssertEqual(analysis.personInstances.first?.extent, rightHalf.extent, "Vision 원래 해상도")
+        XCTAssertEqual(analysis.bodyInstances, [0: 1, 1: 0], "두 몸이 서로 다른 인스턴스에 놓인다")
+        XCTAssertEqual(analysis.faceInstances, [0: 1], "얼굴은 상자 중심이 든 인스턴스")
+    }
+
+    func testMoreBodiesThanInstancesUsesTheCombinedMask() async throws {
+        let url = try writeSolidPNG()
+        // 쓸 수 있는 몸 다섯이 가로로 늘어서 있고 인스턴스는 넷뿐이다(Vision 인스턴스 상한).
+        let bodies = (0..<5).map { index in
+            Support.standingBody(in: NormalizedRect(x: 0.2 * Double(index), y: 0, width: 0.2, height: 0.6))
+        }
+        let maskSize = CGSize(width: 80, height: 48)
+        let instances = (0..<4).map { index in
+            Support.personMask(size: maskSize, person: CGRect(x: 16 * index, y: 0, width: 16, height: 48))
+        }
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyInstances, [:], "사람이 인스턴스보다 많으면 모든 몸이 전체 마스크를 쓴다")
+        XCTAssertEqual(analysis.faceInstances, [:])
+    }
+
+    func testFacesWithoutBodiesDoNotCountAgainstInstances() async throws {
+        let url = try writeSolidPNG()
+        // 커플(얼굴–몸 두 쌍)과 오른쪽 위에 작게 찍힌 행인 얼굴 하나. 행인은 몸이 없다.
+        let faces = [
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.55, width: 0.2, height: 0.2)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.55, width: 0.2, height: 0.2)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.92, y: 0.9, width: 0.04, height: 0.04)),
+        ]
+        let left = Support.standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.4, height: 0.6))
+        let right = Support.standingBody(in: NormalizedRect(x: 0.5, y: 0, width: 0.4, height: 0.6))
+        let maskSize = CGSize(width: 64, height: 48)
+        let rightHalf = Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48))
+        let leftHalf = Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([left, right])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success([rightHalf, leftHalf])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertEqual(prepared.bodyFaceMatches, [0: 0, 1: 1], "행인 얼굴은 몸과 짝이 되지 않는다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyInstances, [0: 1, 1: 0], "얼굴 셋·인스턴스 둘이어도 몸과 짝인 사람은 둘이라 배정한다")
+        XCTAssertEqual(analysis.faceInstances[0], 1)
+        XCTAssertEqual(analysis.faceInstances[1], 0)
+    }
+
+    func testFacesWithoutAnyBodyStillGetInstances() async throws {
+        let url = try writeSolidPNG()
+        let faces = (0..<3).map { index in
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.3 * Double(index), y: 0.6, width: 0.2, height: 0.2))
+        }
+        let maskSize = CGSize(width: 64, height: 48)
+        let instances = [
+            Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48)),
+            Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48)),
+        ]
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.faceInstances, [0: 0, 1: 0, 2: 1], "몸이 없는 얼굴은 사람 수에 들지 않고 상자 중심 인스턴스를 받는다")
+        XCTAssertEqual(analysis.bodyInstances, [:])
+    }
+
+    func testInstanceFailureIsSilent() async throws {
+        let url = try writeSolidPNG()
+        let body = Support.standingBody(in: Support.standingBox)
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])), bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .failure(.personAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertTrue(prepared.hasBody, "인스턴스 실패가 체형 분석에 영향을 주지 않는다")
+        XCTAssertNil(prepared.personAnalysisFailure, "인스턴스 실패는 사유를 남기지 않는다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertTrue(analysis.personInstances.isEmpty)
+        XCTAssertEqual(analysis.bodyInstances, [:])
+    }
+
+    /// 스펙 5.8: 몸통 옆선은 준비 때 그 몸의 사람 마스크(인스턴스 ?? 전체)에서 찾는다.
+    func testPrepareProbesBodyOutlinesFromEachBodysOwnMask() async throws {
+        let url = try writeSolidPNG()
+        let body = Support.standingBody(in: Support.standingBox)
+        let noHips = Support.standingBody(in: Support.standingBox, omitting: [.leftHip])
+        let everywhere = try OutlineTestSupport.mask(people: [CGRect(x: 0, y: 0, width: 512, height: 512)])
+        func outlines(person: CIImage?, instances: [CIImage], bodies: [BodyGeometry]) async throws -> [Int: BodyOutline]
+        {
+            let pipeline = PhotoPipeline(
+                analyzer: StubFaceAnalyzer(result: .success([])),
+                personAnalyzer: person.map { StubPersonAnalyzer(result: .success($0)) },
+                bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
+                instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
+            let id = PhotoID()
+            let prepared = try await pipeline.prepare(id, at: url)
+            let analysis = await pipeline.preparedAnalysis(id)
+            let stored = try XCTUnwrap(analysis).bodyOutlines
+            XCTAssertEqual(prepared.bodyOutlines, stored, "앱이 받는 옆선은 렌더 분석과 같다")
+            return stored
+        }
+        let combined = try await outlines(
+            person: try OutlineTestSupport.detachedMask(), instances: [], bodies: [body, noHips])
+        XCTAssertEqual(combined.keys.sorted(), [0], "두 엉덩이가 없는 몸은 찾지 않는다")
+        XCTAssertEqual(combined[0]?.points.count, 4, "27%·30% × 두 쪽")
+        XCTAssertEqual(combined[0]?.hasSideChestPoint, true)
+        // 쓸 수 있는 몸이 인스턴스보다 많으면 배정하지 않으므로 몸 하나로 본다.
+        let owned = try await outlines(
+            person: everywhere, instances: [try OutlineTestSupport.detachedMask()], bodies: [body])
+        XCTAssertEqual(owned[0]?.points.count, 4, "배정된 인스턴스 마스크를 쓴다(전체 마스크는 모두 사람이라 점이 없다)")
+        let whole = try await outlines(person: everywhere, instances: [], bodies: [body])
+        XCTAssertEqual(whole[0]?.points.count, 0, "마스크는 있는데 배경을 못 만나면 빈 옆선이다")
+        XCTAssertEqual(whole[0]?.hasSideChestPoint, false, "부유방 높이 점이 없다")
+        let none = try await outlines(person: nil, instances: [], bodies: [body])
+        XCTAssertTrue(none.isEmpty, "마스크가 없으면 옆선이 없다")
     }
 
     func testReprepareReturnsNothingWhilePreviewIsCached() async throws {

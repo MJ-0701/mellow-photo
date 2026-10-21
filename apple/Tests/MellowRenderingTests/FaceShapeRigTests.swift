@@ -31,7 +31,7 @@ final class FaceShapeRigTests: XCTestCase {
         FaceShapeRig.primitives(face: face, adjustments: adjustments, extent: extent, tuning: tuning)
     }
 
-    /// 열 항목 모두 0.6(미소 포함).
+    /// 모든 항목 0.6(미소 포함).
     private var allKeys: FaceShapeAdjustments {
         var adjustments = FaceShapeAdjustments()
         for key in FaceShapeKey.allCases {
@@ -299,7 +299,7 @@ final class FaceShapeRigTests: XCTestCase {
         var clamped = FaceShapeAdjustments()
         for key in FaceShapeKey.allCases {
             wild[key] = -4
-            clamped[key] = key == .smile ? 0 : -1
+            clamped[key] = AdjustmentRange.faceShape(key).lowerBound
         }
         XCTAssertEqual(primitives(wild), primitives(clamped))
     }
@@ -394,5 +394,85 @@ final class FaceShapeRigTests: XCTestCase {
             }
             XCTAssertTrue(hasMirror, "\(push.center)의 거울 원소가 없다")
         }
+    }
+
+    // MARK: - 이중턱
+
+    /// 합성 얼굴의 턱 끝(가장 낮은 윤곽점, 256, 50).
+    private var chinTip: CGPoint { CGPoint(x: midline, y: 50) }
+
+    /// limit를 적용한 CPU 참조 이동.
+    private func shift(at point: CGPoint, of list: [ShapePrimitive]) -> CGVector {
+        DisplacementWarp.displacement(at: point, of: list, limit: tuning.shapeDisplacementLimit)
+    }
+
+    func testDoubleChinLiftsUnderTheChinWithoutMovingTheJaw() throws {
+        let synthetic = SyntheticFace.make().face
+        let list = primitives(FaceShapeAdjustments(doubleChin: 1), face: synthetic)
+        XCTAssertFalse(list.isEmpty)
+        let target = faceWidth * 0.035
+        let under = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.14)
+        // rig가 정한 이동(limit 전)은 목표의 ±10% 안이다.
+        let requested = DisplacementWarp.displacement(at: under, of: list, limit: .infinity)
+        XCTAssertGreaterThan(requested.dy, 0, "위쪽")
+        XCTAssertEqual(requested.dy, target, accuracy: target * 0.1, "limit 전 턱 끝 아래 이동")
+        let lifted = shift(at: under, of: list)
+        XCTAssertGreaterThan(lifted.dy, 0, "위쪽")
+        XCTAssertEqual(lifted.dx, 0, accuracy: 1e-9)
+        XCTAssertEqual(lifted.dy, target, accuracy: target * 0.1, "턱 끝 아래 얼굴 폭 × 0.14 점이 얼굴 폭 × 0.035 오른다")
+        for primitive in list {
+            XCTAssertEqual(primitive.limited(to: tuning.shapeDisplacementLimit), primitive, "점마다 이동이 limit에 잘리지 않는다")
+        }
+    }
+
+    func testDoubleChinKeepsJawLipsAndLowerNeck() throws {
+        let synthetic = SyntheticFace.make().face
+        let list = primitives(FaceShapeAdjustments(doubleChin: 1), face: synthetic)
+        XCTAssertFalse(list.isEmpty)
+        for point in try XCTUnwrap(synthetic.landmarks[.faceContour]) {
+            let pixel = CGPoint(x: point.x * extent.width, y: point.y * extent.height)
+            let moved = shift(at: pixel, of: list)
+            XCTAssertLessThanOrEqual(hypot(moved.dx, moved.dy), faceWidth * 0.0035, "턱선은 움직이지 않는다 \(pixel)")
+        }
+        for point in try XCTUnwrap(synthetic.landmarks[.outerLips]) {
+            let pixel = CGPoint(x: point.x * extent.width, y: point.y * extent.height)
+            XCTAssertEqual(shift(at: pixel, of: list), .zero, "입술은 그대로 \(pixel)")
+        }
+        let neck = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.55)
+        XCTAssertEqual(shift(at: neck, of: list), .zero, "턱 끝 아래 얼굴 폭 × 0.55는 그대로")
+    }
+
+    func testDoubleChinFoldsWithoutFlipping() {
+        let list = primitives(FaceShapeAdjustments(doubleChin: 1))
+        let below = CGRect(x: 160, y: -100, width: 192, height: 160)
+        let worst = Support.minimumJacobian(of: list, limit: tuning.shapeDisplacementLimit, in: below)
+        XCTAssertGreaterThan(worst, 0.5, "턱 아래가 접히지 않는다(최소 야코비안 \(worst))")
+        XCTAssertLessThan(worst, 1, "실제로 줄어든다")
+    }
+
+    func testDoubleChinNeedsThreeLowerContourPoints() {
+        var face = SyntheticFace.make().face
+        // 입꼬리 사이 아래 윤곽점은 7·8·9번 셋이다. 가운데를 빼면 둘이 남는다.
+        face.landmarks[.faceContour]?.remove(at: 8)
+        XCTAssertTrue(primitives(FaceShapeAdjustments(doubleChin: 1), face: face).isEmpty)
+        XCTAssertFalse(primitives(FaceShapeAdjustments(width: -1), face: face).isEmpty, "다른 항목은 그대로")
+    }
+
+    func testDoubleChinFollowsYawAttenuation() {
+        var face = SyntheticFace.make().face
+        let straight = primitives(FaceShapeAdjustments(doubleChin: 1), face: face)
+        face.yaw = 0.8
+        let turned = primitives(FaceShapeAdjustments(doubleChin: 1), face: face)
+        // limit를 적용한 뒤의 최대 이동이다. 렌더가 실제로 옮기는 양이 yaw 비율을 따른다.
+        let limit = tuning.shapeDisplacementLimit
+        let largest = { (list: [ShapePrimitive]) in list.map { $0.limited(to: limit).maxDisplacement }.max() ?? 0 }
+        let ratio = CGFloat(FaceShapeRig.yawAttenuation(0.8, tuning: tuning))
+        XCTAssertLessThan(ratio, 1)
+        XCTAssertEqual(largest(turned), largest(straight) * ratio, accuracy: 1e-9)
+    }
+
+    func testDoubleChinIsUnitRange() {
+        XCTAssertTrue(primitives(FaceShapeAdjustments(doubleChin: -1)).isEmpty)
+        XCTAssertEqual(primitives(FaceShapeAdjustments(doubleChin: 2)), primitives(FaceShapeAdjustments(doubleChin: 1)))
     }
 }

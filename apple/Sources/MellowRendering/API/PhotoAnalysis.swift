@@ -14,7 +14,7 @@ public struct PhotoAnalysis: Sendable {
     public var personMask: CIImage?
     /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var personAnalysisFailure: MellowError?
-    /// 관절점. 상자 넓이가 큰 사람이 앞이고 체형은 첫 사람만 바꾼다. 사람이 없으면 빈 배열.
+    /// 관절점. 상자 넓이가 큰 사람이 앞이고 다리 길게 띠는 첫 사람만 만든다. 사람이 없으면 빈 배열.
     public var bodies: [BodyGeometry]
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var bodyAnalysisFailure: MellowError?
@@ -23,6 +23,25 @@ public struct PhotoAnalysis: Sendable {
     /// 임계값을 통과한 추정만 들어 있다.
     /// 영속화하지 않는다.
     public var genderEstimates: [GenderEstimate?]
+    /// 사람별 인스턴스 마스크(0…1).
+    /// PersonInstanceAnalyzer가 준 크기 그대로이고 렌더 단계가 extent로 늘린다.
+    /// 사람이 없거나 분석이 실패했으면 빈 배열이다.
+    /// 영속화하지 않는다.
+    public var personInstances: [CIImage]
+    /// 몸 인덱스 → 얼굴 인덱스(BodyFaceMatcher).
+    /// 짝이 없는 몸은 키가 없다.
+    public var bodyFaceMatches: [Int: Int]
+    /// 몸 인덱스 → personInstances 인덱스(InstanceAssignment).
+    /// 인스턴스를 고르지 못한 몸은 키가 없다.
+    public var bodyInstances: [Int: Int]
+    /// 얼굴 인덱스 → personInstances 인덱스.
+    /// 인스턴스를 고르지 못한 얼굴은 키가 없다.
+    public var faceInstances: [Int: Int]
+    /// 몸 인덱스 → 몸통 옆선(BodyOutlineProbe, 스펙 5.8).
+    /// 그 몸의 사람 마스크(배정된 인스턴스 ?? 전체 인물 마스크)에서 사진 준비 때 찾는다.
+    /// 두 엉덩이가 있는 쓸 수 있는 몸만 키가 있고 마스크가 없으면 비어 있다.
+    /// 영속화하지 않는다.
+    public var bodyOutlines: [Int: BodyOutline]
     /// 다각형 마스크 비트맵 캐시. 묶음을 복사해도 같은 캐시를 나눠 쓴다. 키에 다각형 점이 들어 있어 얼굴이 바뀌어도 낡은 값을 쓰지 않는다.
     /// 상한은 준비 때 찾은 얼굴 수에 비례한다(RegionMaskCache.capacity(forFaces:)).
     let regionMasks: RegionMaskCache
@@ -30,7 +49,9 @@ public struct PhotoAnalysis: Sendable {
     public init(
         faces: [FaceGeometry] = [], faceAnalysisFailure: MellowError? = nil, blemishes: [BlemishSpot] = [],
         personMask: CIImage? = nil, personAnalysisFailure: MellowError? = nil, bodies: [BodyGeometry] = [],
-        bodyAnalysisFailure: MellowError? = nil, genderEstimates: [GenderEstimate?] = []
+        bodyAnalysisFailure: MellowError? = nil, genderEstimates: [GenderEstimate?] = [],
+        personInstances: [CIImage] = [], bodyFaceMatches: [Int: Int] = [:], bodyInstances: [Int: Int] = [:],
+        faceInstances: [Int: Int] = [:], bodyOutlines: [Int: BodyOutline] = [:]
     ) {
         self.faces = faces
         self.faceAnalysisFailure = faceAnalysisFailure
@@ -40,6 +61,11 @@ public struct PhotoAnalysis: Sendable {
         self.bodies = bodies
         self.bodyAnalysisFailure = bodyAnalysisFailure
         self.genderEstimates = genderEstimates
+        self.personInstances = personInstances
+        self.bodyFaceMatches = bodyFaceMatches
+        self.bodyInstances = bodyInstances
+        self.faceInstances = faceInstances
+        self.bodyOutlines = bodyOutlines
         regionMasks = RegionMaskCache(maximumEntries: RegionMaskCache.capacity(forFaces: faces.count))
     }
 }

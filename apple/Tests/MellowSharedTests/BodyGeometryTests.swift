@@ -32,9 +32,10 @@ final class BodyGeometryTests: XCTestCase {
         XCTAssertEqual(BodyGeometry(joints: [:], confidence: [:], boundingBox: given).boundingBox, given)
     }
 
-    func testBodyShapeRangeIsUnitOnlyForLegLength() {
+    func testBodyShapeRangeIsUnitOnlyForLegLengthAndSideChest() {
+        let oneWay: Set<BodyShapeKey> = [.legLength, .sideChest]
         for key in BodyShapeKey.allCases {
-            let expected = key == .legLength ? AdjustmentRange.unit : AdjustmentRange.bipolar
+            let expected = oneWay.contains(key) ? AdjustmentRange.unit : AdjustmentRange.bipolar
             XCTAssertEqual(AdjustmentRange.bodyShape(key), expected, "\(key)")
         }
         XCTAssertEqual(BodyJoint.allCases.count, 14, "스펙 5의 관절 14개")

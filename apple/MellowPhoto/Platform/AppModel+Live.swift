@@ -20,8 +20,9 @@ extension AppModel {
             session: session,
             pipeline: PhotoPipeline(
                 analyzer: VisionFaceAnalyzer(), personAnalyzer: VisionPersonAnalyzer(),
-                bodyAnalyzer: VisionBodyAnalyzer(), tuning: RenderTuning.forCurrentDevice(),
-                lookCatalog: lookCatalog ?? .empty, makeupCatalog: makeupCatalog ?? .empty),
+                bodyAnalyzer: VisionBodyAnalyzer(), instanceAnalyzer: VisionPersonInstanceAnalyzer(),
+                tuning: RenderTuning.forCurrentDevice(), lookCatalog: lookCatalog ?? .empty,
+                makeupCatalog: makeupCatalog ?? .empty),
             copies: copies,
             importer: SystemPhotoImporter(),
             exporter: Exporter(renderer: Renderer()),

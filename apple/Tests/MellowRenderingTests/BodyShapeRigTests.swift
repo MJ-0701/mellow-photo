@@ -295,4 +295,131 @@ final class BodyShapeRigTests: XCTestCase {
             XCTAssertTrue(mirrored, "좌우 대칭인 사람은 중심선 반대편에 거울상 원소가 있다: \(push)")
         }
     }
+
+    func testSideChestPushesBothTorsoSidesInward() {
+        let result = pushes(primitives(BodyShapeAdjustments(sideChest: 1)))
+        XCTAssertEqual(result.count, 2)
+        let level: CGFloat = 0.27
+        for push in result {
+            let left = push.center.x < midline
+            let shoulderX: CGFloat = left ? 0.25 : 0.75
+            let hipX: CGFloat = left ? 0.38 : 0.62
+            let expectedX = (0.1 + 0.8 * (shoulderX + (hipX - shoulderX) * level)) * 512
+            XCTAssertEqual(push.center.x, expectedX, accuracy: 1e-6, "어깨~엉덩이 27% 점")
+            XCTAssertEqual(push.center.y, (0.8 + (0.5 - 0.8) * level) * 512, accuracy: 1e-6)
+            let towardMidline: CGFloat = left ? 1 : -1
+            XCTAssertEqual(push.vector.dx, towardMidline * 0.03 * torsoWidth, accuracy: 1e-6, "몸통 가로축 안쪽")
+            XCTAssertEqual(push.vector.dy, 0, accuracy: 1e-9)
+            XCTAssertGreaterThanOrEqual(push.radius, 0.14 * torsoWidth - 1e-9)
+        }
+    }
+
+    func testSideChestNeedsHips() {
+        let upperBody = Support.standingBody(in: Support.standingBox, omitting: [.leftHip, .rightHip])
+        XCTAssertTrue(primitives(BodyShapeAdjustments(sideChest: 1), body: upperBody).isEmpty)
+        let oneHip = Support.standingBody(in: Support.standingBox, omitting: [.leftHip])
+        XCTAssertTrue(primitives(BodyShapeAdjustments(sideChest: 1), body: oneHip).isEmpty, "두 엉덩이가 있어야 한다")
+    }
+
+    func testSideChestIsTorsoGroup() {
+        let parts = BodyShapeRig.groups(
+            body: Support.standingBody(in: Support.standingBox), adjustments: BodyShapeAdjustments(sideChest: 1),
+            extent: extent, tuning: tuning, includesLegBand: true)
+        XCTAssertEqual(parts.torso.count, 2)
+        XCTAssertTrue(parts.limbs.isEmpty)
+        XCTAssertEqual(parts.guards.count, 4, "몸통 묶음은 두 팔의 위팔·아래팔 캡슐을 받는다")
+    }
+
+    // MARK: 몸통 옆선(스펙 5.8)
+
+    /// 27%·30% 높이의 양쪽 옆선 점. 관절선 점(x 168·344)보다 바깥이다. sides에 없는 쪽은 뺀다.
+    private func outline(sides: Set<Int> = [-1, 1]) -> BodyOutline {
+        var points: [OutlineKey: NormalizedPoint] = [:]
+        for level in [0.27, 0.3] {
+            for side in sides {
+                let x = side < 0 ? 0.30 : 0.71
+                points[OutlineKey(level: level, side: side)] = NormalizedPoint(x: x, y: 0.72 - level * 0.1)
+            }
+        }
+        return BodyOutline(points: points)
+    }
+
+    private func outlined(
+        _ adjustments: BodyShapeAdjustments, outline: BodyOutline?, extent: CGRect? = nil
+    ) -> [ShapePrimitive] {
+        BodyShapeRig.primitives(
+            body: Support.standingBody(in: Support.standingBox), adjustments: adjustments,
+            extent: extent ?? self.extent, tuning: tuning, outline: outline)
+    }
+
+    private func pixel(_ point: NormalizedPoint, in extent: CGRect) -> CGPoint {
+        CGPoint(x: extent.minX + point.x * extent.width, y: extent.minY + point.y * extent.height)
+    }
+
+    func testSideChestCentersAreTheOutlinePoints() throws {
+        let given = outline()
+        let joint = pushes(primitives(BodyShapeAdjustments(sideChest: 1)))
+        let result = pushes(outlined(BodyShapeAdjustments(sideChest: 1), outline: given))
+        XCTAssertEqual(result.count, 2)
+        for (push, old) in zip(result, joint) {
+            let side = push.center.x < midline ? -1 : 1
+            let expected = pixel(try XCTUnwrap(given.points[OutlineKey(level: 0.27, side: side)]), in: extent)
+            XCTAssertEqual(push.center.x, expected.x, accuracy: 1e-9, "옆선 점이 원소 중심")
+            XCTAssertEqual(push.center.y, expected.y, accuracy: 1e-9)
+            XCTAssertEqual(push.vector.dx, old.vector.dx, accuracy: 1e-9, "방향·이동은 관절선 원소와 같다")
+            XCTAssertEqual(push.vector.dy, old.vector.dy, accuracy: 1e-9)
+            XCTAssertEqual(push.radius, old.radius, accuracy: 1e-9)
+        }
+    }
+
+    func testSideChestSkipsTheSideWithoutAnOutlinePoint() {
+        let result = pushes(outlined(BodyShapeAdjustments(sideChest: 1), outline: outline(sides: [1])))
+        XCTAssertEqual(result.count, 1, "팔이 붙은 쪽은 원소가 없다")
+        XCTAssertGreaterThan(result.first?.center.x ?? 0, midline, "남은 원소는 +1 쪽(화면 오른쪽)")
+        XCTAssertTrue(outlined(BodyShapeAdjustments(sideChest: 1), outline: BodyOutline(points: [:])).isEmpty)
+    }
+
+    func testWithoutOutlineSideChestAndOverallKeepTheJointLine() {
+        let all = BodyShapeAdjustments(
+            legLength: 1, waist: -1, overall: -1, arms: -1, thighs: -1, shoulders: 1, neck: 1, sideChest: 1)
+        XCTAssertEqual(outlined(all, outline: nil), primitives(all), "마스크가 없으면 이 Task 전과 같은 원소")
+    }
+
+    func testOverallChestUsesTheOutlineAndKeepsHipAndThigh() throws {
+        let given = outline(sides: [-1])
+        let joint = pushes(primitives(BodyShapeAdjustments(overall: -1)))
+        let result = pushes(outlined(BodyShapeAdjustments(overall: -1), outline: given))
+        let chestY = (0.8 + (0.5 - 0.8) * 0.3) * 512
+        let jointChest = joint.filter { abs($0.center.y - chestY) < 1e-6 }
+        XCTAssertEqual(jointChest.count, 2)
+        let lower = { (pushes: [Push]) in pushes.filter { abs($0.center.y - chestY) >= 1e-6 } }
+        let expected = pixel(try XCTUnwrap(given.points[OutlineKey(level: 0.3, side: -1)]), in: extent)
+        let chest = result.filter { abs($0.center.x - expected.x) < 1e-9 && abs($0.center.y - expected.y) < 1e-9 }
+        XCTAssertEqual(chest.count, 1, "가슴은 옆선 점 하나(+1 쪽은 점이 없어 빠짐)")
+        XCTAssertEqual(result.count, 5)
+        let jointLower = lower(joint)
+        let resultLower = result.filter {
+            abs($0.center.x - expected.x) >= 1e-9 || abs($0.center.y - expected.y) >= 1e-9
+        }
+        XCTAssertEqual(resultLower.count, jointLower.count, "골반·허벅지는 그대로")
+        for (pushed, old) in zip(resultLower, jointLower) {
+            XCTAssertEqual(pushed.center, old.center)
+            XCTAssertEqual(pushed.vector, old.vector)
+            XCTAssertEqual(pushed.radius, old.radius)
+        }
+        let waist = outlined(BodyShapeAdjustments(waist: -1), outline: given)
+        XCTAssertEqual(waist, primitives(BodyShapeAdjustments(waist: -1)), "허리는 옆선을 쓰지 않는다")
+    }
+
+    func testOutlinePointsScaleWithTheExtent() throws {
+        let given = outline()
+        let preview = pushes(outlined(BodyShapeAdjustments(sideChest: 1), outline: given))
+        let large = CGRect(x: 0, y: 0, width: 1024, height: 1024)
+        let original = pushes(outlined(BodyShapeAdjustments(sideChest: 1), outline: given, extent: large))
+        XCTAssertEqual(original.count, preview.count)
+        for (big, small) in zip(original, preview) {
+            XCTAssertEqual(big.center.x, small.center.x * 2, accuracy: 1e-9, "정규화 좌표라 원본 해상도에서도 같은 자리")
+            XCTAssertEqual(big.center.y, small.center.y * 2, accuracy: 1e-9)
+        }
+    }
 }

@@ -5,7 +5,7 @@ import MellowShared
 extension AppModel {
     /// 선택 사진에 편집을 적용한다.
     /// 거절되지 않았으면 true.
-    /// checksPairing이면 잠긴 사진에서 얼굴마다 해석한 얼굴형 값이 바뀌는 편집을 거절한다.
+    /// checksPairing이면 잠긴 사진에서 얼굴마다 해석한 얼굴형·체형 값이 바뀌는 편집을 거절한다.
     /// 기록을 지우거나 옮기면 전역 짝짓기가 다른 기록을 다른 얼굴에 붙일 수 있어서다.
     /// 실행 취소·다시 실행·초기화는 저장된 상태로 돌아가는 것이라 검사하지 않는다.
     @discardableResult
@@ -19,7 +19,7 @@ extension AppModel {
             if let rejection = body(&proposal) {
                 return rejection
             }
-            guard resolvedFaceShapes(of: proposal.recipe) == resolvedFaceShapes(of: document.recipe) else {
+            guard resolvedShapes(of: proposal.recipe) == resolvedShapes(of: document.recipe) else {
                 return .geometryLocked
             }
             document = proposal
@@ -31,6 +31,9 @@ extension AppModel {
             return false
         case .unknownPerson:
             // 대상 사람이 사라졌으면 조용히 끝낸다.
+            return false
+        case .scopeNotAllowed:
+            // 화면이 그 층에서 그 항목을 숨기므로 조용히 끝낸다.
             return false
         case nil:
             break

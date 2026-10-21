@@ -95,4 +95,67 @@ final class PortraitResolverTests: XCTestCase {
             makeup: [.lip: MakeupTint(colorID: "lip-coral", intensity: 0.4)], makeupLookID: "party")
         XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .female).makeup.lookID, "party")
     }
+
+    func testScopeAllowsSideChestOnlyInFemaleGroupAndPeople() {
+        let scopes: [PortraitScope] = [.all, .gender(.male), .gender(.female), .person(PersonID())]
+        XCTAssertFalse(PortraitScope.all.allows(.bodyShape(.sideChest)))
+        XCTAssertFalse(PortraitScope.gender(.male).allows(.bodyShape(.sideChest)))
+        XCTAssertTrue(PortraitScope.gender(.female).allows(.bodyShape(.sideChest)))
+        XCTAssertTrue(PortraitScope.person(PersonID()).allows(.bodyShape(.sideChest)))
+        for scope in scopes {
+            XCTAssertTrue(scope.allows(.bodyShape(.waist)), "\(scope)")
+            XCTAssertTrue(scope.allows(.faceShape(.doubleChin)), "\(scope)")
+        }
+    }
+
+    func testBodyResolvesAllGroupPersonByKey() {
+        var recipe = EditRecipe()
+        recipe.body.waist = -0.2
+        recipe.body.arms = -0.1
+        recipe.people.groups[.female] = PortraitLayer(body: [.waist: -0.5])
+        let record = PersonRecord(
+            anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), layer: PortraitLayer(body: [.arms: -0.8]))
+        recipe.people.individuals = [record]
+        let female = PortraitResolver.resolve(recipe, person: record, gender: .female).body
+        XCTAssertEqual(female.waist, -0.5, "그룹 층이 전체 층을 덮는다")
+        XCTAssertEqual(female.arms, -0.8, "개인 층이 전체 층을 덮는다")
+        let undetermined = PortraitResolver.resolve(recipe, person: record, gender: nil).body
+        XCTAssertEqual(undetermined.waist, -0.2, "성별 미지정은 그룹 층을 건너뛴다")
+        XCTAssertEqual(undetermined.arms, -0.8)
+        XCTAssertEqual(PortraitResolver.resolve(recipe, scope: .all, estimate: nil).body, recipe.body)
+    }
+
+    func testSideChestIgnoredInAllLayerAndMaleGroup() {
+        var recipe = EditRecipe()
+        recipe.body.sideChest = 0.9
+        recipe.people.groups[.male] = PortraitLayer(body: [.sideChest: 0.7])
+        recipe.people.groups[.female] = PortraitLayer(body: [.sideChest: 0.4])
+        let man = PersonRecord(
+            anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male,
+            layer: PortraitLayer(body: [.sideChest: 0.6]))
+        recipe.people.individuals = [man]
+        XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .male).body.sideChest, 0)
+        XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .female).body.sideChest, 0.4)
+        XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: nil).body.sideChest, 0)
+        XCTAssertEqual(PortraitResolver.resolve(recipe, person: man, gender: .male).body.sideChest, 0.6, "개인 층은 늘 허용")
+        XCTAssertEqual(PortraitResolver.resolve(recipe, scope: .all, estimate: nil).body.sideChest, 0)
+        XCTAssertEqual(PortraitResolver.allLayerBody(recipe).sideChest, 0)
+        XCTAssertEqual(recipe.body.sideChest, 0.9, "전체 층 값은 지우지 않고 무시만 한다")
+        XCTAssertEqual(recipe.people.groups[.male]?.body[.sideChest], 0.7, "남성 그룹 값도 보존한다")
+    }
+
+    func testDependsOnBodySeesLayers() {
+        var recipe = EditRecipe()
+        XCTAssertFalse(recipe.dependsOnBody)
+        recipe.people.individuals = [
+            PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), layer: PortraitLayer(body: [.waist: -0.3]))
+        ]
+        XCTAssertTrue(recipe.dependsOnBody, "개인 층 체형도 몸이 필요하다")
+        recipe = EditRecipe()
+        recipe.people.groups[.female] = PortraitLayer(body: [.arms: -0.2])
+        XCTAssertTrue(recipe.dependsOnBody, "그룹 층 체형도 몸이 필요하다")
+        recipe = EditRecipe()
+        recipe.body.sideChest = 0.5
+        XCTAssertFalse(recipe.dependsOnBody, "전체 층 부유방은 렌더가 무시한다")
+    }
 }

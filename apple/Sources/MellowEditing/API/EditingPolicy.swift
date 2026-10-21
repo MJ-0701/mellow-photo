@@ -15,12 +15,12 @@ public enum EditingPolicy {
     /// 강도 1은 OneTouchBundle 표 값 그대로이고 그것이 상한이다.
     public static let oneTouchDefaultStrength = OneTouchBundle.defaultStrength
 
-    /// 미소만 한 방향이다.
+    /// 미소·이중턱만 한 방향이다.
     public static func faceShapeRange(_ key: FaceShapeKey) -> ClosedRange<Double> {
         AdjustmentRange.faceShape(key)
     }
 
-    /// 다리 길게만 한 방향이다.
+    /// 다리 길게·부유방만 한 방향이다.
     public static func bodyShapeRange(_ key: BodyShapeKey) -> ClosedRange<Double> {
         AdjustmentRange.bodyShape(key)
     }
