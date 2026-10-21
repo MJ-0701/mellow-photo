@@ -1829,11 +1829,13 @@ final class AppModelTests: XCTestCase {
         for target in [AppModel.BeautyTarget.all, .gender(.male)] {
             model.setBeautyTarget(target)
             XCTAssertFalse(model.showsBodyShape(.sideChest), "\(target)")
+            XCTAssertTrue(model.showsSideChestScopeHint, "\(target)는 대상을 고르라고 안내한다")
             XCTAssertTrue(others.allSatisfy(model.showsBodyShape), "\(target)의 다른 항목은 보인다")
         }
         for target in [AppModel.BeautyTarget.gender(.female), .face(0)] {
             model.setBeautyTarget(target)
             XCTAssertTrue(model.showsBodyShape(.sideChest), "\(target)")
+            XCTAssertFalse(model.showsSideChestScopeHint, "\(target)")
         }
         model.edit(.bodyShape(.waist, -0.2))
         XCTAssertNotNil(model.scope(for: .face(0)), "첫 변경이 기록을 만든다")
@@ -1878,6 +1880,38 @@ final class AppModelTests: XCTestCase {
         model.setBeautyTarget(.person(person))
         XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "사람 대상도 짝 얼굴로 판정한다")
         XCTAssertEqual(UserMessage.noBodyForTarget, "이 사람의 몸을 찾지 못했어요")
+    }
+
+    func testSideChestScopeHintHiddenWithoutFaces() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([TestSupport.coupleBodies()[0]])),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        try await importOne(model, staged)
+        model.selectTool(.body)
+        XCTAssertEqual(model.bodyAvailability, .ready, "얼굴이 없어도 몸이 있으면 전체 대상으로 체형을 쓴다")
+        XCTAssertFalse(model.showsBodyShape(.sideChest), "전체 대상에는 부유방이 없다")
+        XCTAssertFalse(model.showsSideChestScopeHint, "고를 대상 칩이 없으면 대상을 고르라는 안내도 없다")
+    }
+
+    func testGenderGroupWithoutMatchingBodyDisablesButAllowsReset() async throws {
+        let model = try await coupleBodyModel()
+        XCTAssertEqual(model.selectedInfo?.bodyFaceMatches, [0: 0, 1: 1])
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "성별이 정해진 얼굴이 없으면 여성 그룹이 바꿀 몸이 없다")
+        XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        model.edit(.bodyShape(.waist, -0.3))
+        XCTAssertEqual(model.currentRecipe.people.groups[.female]?.body[.waist], -0.3, "값은 그룹 층에 저장된다")
+        XCTAssertTrue(model.canAdjustBodyShape(.waist), "그룹 층의 0이 아닌 값은 0으로 되돌릴 수 있다")
+        XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 계속 끈다")
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertEqual(model.bodyAvailability, .ready, "얼굴 1이 여성이면 짝인 몸 1을 받는다")
+        XCTAssertTrue(model.canAdjustBodyShape(.arms))
+        model.setBeautyTarget(.gender(.male))
+        XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "남성 얼굴이 없으면 남성 그룹도 몸이 없다")
     }
 
     func testSideChestArmTouchingHintFollowsTheTargetBodyOutline() async throws {
@@ -1933,6 +1967,9 @@ final class AppModelTests: XCTestCase {
         XCTAssertFalse(model.canAdjustBodyShape(.legLength), "가장 큰 몸이 아닌 사람은 다리 띠를 받지 않는다")
         XCTAssertTrue(model.canAdjustBodyShape(.waist))
         XCTAssertTrue(model.showsLegLengthLargestOnly)
+        // 남성 그룹이 몸을 받으려면 짝 얼굴이 남성이어야 한다(가장 큰 몸 0의 얼굴 0).
+        model.setBeautyTarget(.face(0))
+        model.setGender(.male)
         for target in [AppModel.BeautyTarget.face(0), .all, .gender(.male)] {
             model.setBeautyTarget(target)
             XCTAssertTrue(model.canAdjustBodyShape(.legLength), "\(target)")

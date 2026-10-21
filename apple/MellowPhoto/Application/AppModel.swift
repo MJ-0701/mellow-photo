@@ -88,10 +88,11 @@ final class AppModel {
 
     /// 체형 도구가 보여줄 상태. 분석 실패가 전신 없음보다 먼저다.
     /// 사람 대상은 전신이 있어도 그 얼굴과 짝인 몸이 없으면 noBodyForTarget이다.
+    /// 성별 그룹 대상은 짝 얼굴의 유효 성별이 그 그룹인 몸이 없으면 noBodyForTarget이다.
     enum BodyAvailability: Equatable {
         case ready
         case noBody
-        /// 대상 사람의 얼굴과 짝인 몸이 없다.
+        /// 대상(사람·성별 그룹)이 바꿀 몸이 없다.
         case noBodyForTarget
         case unavailable(MellowError)
     }
@@ -270,15 +271,23 @@ final class AppModel {
         return selectedInfo?.hasPerson == true ? .ready : .noPerson
     }
     /// 선택 사진의 체형 도구 상태.
-    /// 분석 실패 → 전신 없음 → 대상 사람의 몸 없음 순서로 판정한다.
+    /// 분석 실패 → 전신 없음 → 대상의 몸 없음 순서로 판정한다.
+    /// 대상의 몸은 렌더(BodyTarget)와 같다. 사람 대상은 그 얼굴과 짝인 몸, 성별 그룹은 짝 얼굴의 유효 성별이 그 그룹인 몸이다.
     var bodyAvailability: BodyAvailability {
         if let failure = selectedInfo?.bodyAnalysisFailure {
             return .unavailable(failure)
         }
         guard selectedInfo?.hasBody == true else { return .noBody }
-        guard let faceIndices = targetedFaceIndices else { return .ready }
         let paired = Set(bodyFaceMatches.values)
-        return faceIndices.contains(where: paired.contains) ? .ready : .noBodyForTarget
+        switch beautyTarget {
+        case .all:
+            return .ready
+        case .gender(let gender):
+            return paired.contains { effectiveGender(forFace: $0) == gender } ? .ready : .noBodyForTarget
+        case .face, .person:
+            let faceIndices = targetedFaceIndices ?? []
+            return faceIndices.contains(where: paired.contains) ? .ready : .noBodyForTarget
+        }
     }
     /// 선택 사진의 몸 인덱스 → 얼굴 인덱스.
     var bodyFaceMatches: [Int: Int] { selectedInfo?.bodyFaceMatches ?? [:] }
@@ -552,6 +561,12 @@ final class AppModel {
         }
         let probed = bodies.compactMap { outlines[$0] }
         return !probed.isEmpty && probed.allSatisfy { !$0.hasSideChestPoint }
+    }
+    /// "부유방은 여성 그룹이나 사람을 골라" 안내를 보일지.
+    /// 부유방 슬라이더가 없는 대상(전체·남성 그룹)일 때다.
+    /// 얼굴이 없는 사진은 고를 대상 칩이 없어 안내하지 않는다.
+    var showsSideChestScopeHint: Bool {
+        !faces.isEmpty && !showsBodyShape(.sideChest)
     }
     /// "다리 길게는 가장 큰 사람에게만" 안내를 보일지.
     /// 대상 사람의 몸은 있지만 다리 띠를 받지 않을 때다.
