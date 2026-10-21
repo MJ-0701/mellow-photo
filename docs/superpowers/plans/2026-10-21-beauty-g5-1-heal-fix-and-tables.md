@@ -37,7 +37,7 @@
 - **건드리지 않는 파일**: `ShapeWarpStage.swift`·`FaceShapeRig.swift`·`BodyShapeRig.swift`·`DisplacementWarp.swift`·`ShapePrimitive.swift`·`BodySkeleton.swift`와 그 테스트(다른 세션이 작업 중), `PhotoPickerButton.swift`·`project.yml`·`scripts/*`·UI 테스트 타깃.
 - 모듈 의존성 표(`docs/architecture/modules.md`)와 `scripts/verify-modules.sh`는 바뀌지 않는다. 파이프라인 단계 이름·순서 불변. 레시피 키·스키마는 이 계획에서 바뀌지 않는다(G5-2·G5-3이 더한다).
 - 피부 CIKL 색 커널은 `SkinKernels` 한 곳(`heal` 추가, 6개). 마스크는 `FaceRegions` 한 곳.
-- `RenderTuning` 추가(스펙 5절): `healLowBandScale` 0.6, `healRingInnerScale` 1.0, `healRingRadiusScale` 1.5, `healMaxGain` 2.0, `healLumaFloor` 0.01, `blemishCenterMaskMinimum` 0.9, `blemishMaxAspect` 2.0, `blemishMinFill` 0.4. 기존 상수는 바꾸지 않는다.
+- `RenderTuning` 추가(스펙 5절): `healLowBandScale` 0.3, `healRingInnerScale` 1.0, `healRingRadiusScale` 0.5(G5-1 구현 중 변경, 스펙 5.1), `healMaxGain` 2.0, `healLumaFloor` 0.01, `blemishCenterMaskMinimum` 0.9, `blemishMaxAspect` 2.0, `blemishMinFill` 0.4. 기존 상수는 바꾸지 않는다.
 - 표 변경(스펙 2절, G5-1 몫): `smoothing` 0.16/0.20/0.12, `toneEvening` 0.08/0.10/0.05, `darkCircles` 0.42/0.45/0.38, `nasolabial` 0.32/0.36/0.28, `bodyBrightness` 0.08. 나머지 그대로.
 - 한 줄 한 문장, 세미콜론 금지(CIKL 소스 안 제외), 매직 넘버는 명명 상수(`RenderTuning`·`OneTouchBundle.Table`·테스트 `Visibility`·`Naturalness`·`OneTouchVisibility`·`OneTouchNaturalness`). CIKL 안 표준 계수는 주석으로 이름을 단다.
 - 한국어 사용자 문구는 앱 타깃에만. 모듈은 `MellowError`만 던진다(새 case 없음).
@@ -69,7 +69,7 @@ extension SkinKernels {
     func heal(source: CIImage, sourceLow: CIImage, ringNumerator: CIImage, ringDenominator: CIImage,
               lumaFloor: Double, maxGain: Double, extent: CGRect) throws -> CIImage
 }
-RenderTuning.healLowBandScale = 0.6, healRingInnerScale = 1.0, healRingRadiusScale = 1.5, healMaxGain = 2.0, healLumaFloor = 0.01
+RenderTuning.healLowBandScale = 0.3, healRingInnerScale = 1.0, healRingRadiusScale = 0.5, healMaxGain = 2.0, healLumaFloor = 0.01
 LocalEditStage.applySpot(_:to:context:) -> CIImage      // 시그니처 그대로, 식만 색 맞춤
 
 // MellowRendering (Task 2)

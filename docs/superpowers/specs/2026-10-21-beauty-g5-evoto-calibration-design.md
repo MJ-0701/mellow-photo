@@ -274,7 +274,8 @@ healed   = S.rgb × gain
 out      = blend(healed, over: image, mask: ellipse(center, r))
 ```
 
-- 상수(`RenderTuning`): `healLowBandScale` 0.6, `healRingInnerScale` 1.0, `healRingRadiusScale` 1.5, `healMaxGain` 2.0, `healLumaFloor` 0.01.
+- 상수(`RenderTuning`): `healLowBandScale` 0.3, `healRingInnerScale` 1.0, `healRingRadiusScale` 0.5, `healMaxGain` 2.0, `healLumaFloor` 0.01.
+- (G5-1 구현 중 변경) 처음 값 `healLowBandScale` 0.6·`healRingRadiusScale` 1.5는 합성 경사 테스트에서 잔차 3.6/255였다. 합성 피부의 얼룩(흐림 8px)이 원본 패치에서 그대로 옮겨져 원반 평균을 흔들었고, 넓은 고리 흐림(1.5r)이 바로 둘레가 아닌 먼 피부까지 평균에 넣었다. 9개 위치 실측에서 0.3·0.5가 최대 잔차 0.81/255이고 질감(fine) 비는 1.1 이상으로 남았다. 식은 그대로다.
 - 커널 `SkinKernels.heal(source:sourceLow:ringNumerator:ringDenominator:floor:maxGain:extent:)`. 분모 `max(den, 0.001)`.
 - 원본의 고주파(질감)는 비율로 옮겨지고 저주파(밝기·색)는 대상 고리 평균이 된다. 경사 위에서도 원반이 생기지 않는다.
 - `RenderPipelineTests`의 기존 spot 테스트는 "바뀐다"만 보므로 유지. `SkinStageTests.testAutoBlemishHealsPlantedSpots`(+20 밝아짐)는 유지.
