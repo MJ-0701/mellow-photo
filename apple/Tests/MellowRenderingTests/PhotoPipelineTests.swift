@@ -437,6 +437,49 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(analysis.faceInstances, [0: 1], "얼굴은 상자 중심이 든 인스턴스")
     }
 
+    func testMoreBodiesThanInstancesUsesTheCombinedMask() async throws {
+        let url = try writeSolidPNG()
+        // 쓸 수 있는 몸 다섯이 가로로 늘어서 있고 인스턴스는 넷뿐이다(Vision 인스턴스 상한).
+        let bodies = (0..<5).map { index in
+            Support.standingBody(in: NormalizedRect(x: 0.2 * Double(index), y: 0, width: 0.2, height: 0.6))
+        }
+        let maskSize = CGSize(width: 80, height: 48)
+        let instances = (0..<4).map { index in
+            Support.personMask(size: maskSize, person: CGRect(x: 16 * index, y: 0, width: 16, height: 48))
+        }
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyInstances, [:], "사람이 인스턴스보다 많으면 모든 몸이 전체 마스크를 쓴다")
+        XCTAssertEqual(analysis.faceInstances, [:])
+    }
+
+    func testMoreFacesThanInstancesUsesTheCombinedMask() async throws {
+        let url = try writeSolidPNG()
+        let faces = (0..<3).map { index in
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.3 * Double(index), y: 0.6, width: 0.2, height: 0.2))
+        }
+        let maskSize = CGSize(width: 64, height: 48)
+        let instances = [
+            Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48)),
+            Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48)),
+        ]
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
+        let id = PhotoID()
+        _ = try await pipeline.prepare(id, at: url)
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.faceInstances, [:], "얼굴이 인스턴스보다 많아도 전체 마스크")
+        XCTAssertEqual(analysis.bodyInstances, [:])
+    }
+
     func testInstanceFailureIsSilent() async throws {
         let url = try writeSolidPNG()
         let body = Support.standingBody(in: Support.standingBox)

@@ -264,10 +264,14 @@ public actor PhotoPipeline {
 
     /// 몸·얼굴마다 그 표본점이 든 인스턴스를 고른다.
     /// 몸은 목·두 어깨·두 엉덩이, 얼굴은 상자 중심이다.
+    /// 쓸 수 있는 몸이나 얼굴이 인스턴스보다 많으면 아무것도 배정하지 않는다(스펙 결정: 5명 이상이면 전체 마스크).
+    /// 인스턴스가 없는 사람의 이웃 보호가 빠져 그 사람이 옆 사람 인스턴스를 끌 수 있기 때문이다.
     private func assignInstances(_ instances: [CIImage], bodies: [BodyGeometry], faces: [FaceGeometry], extent: CGRect)
         -> (bodies: [Int: Int], faces: [Int: Int])
     {
         guard !instances.isEmpty else { return ([:], [:]) }
+        let usableBodies = bodies.filter { BodySkeleton(body: $0, extent: extent, tuning: tuning) != nil }.count
+        guard usableBodies <= instances.count, faces.count <= instances.count else { return ([:], [:]) }
         var bodyOwners: [Int: Int] = [:]
         for (index, body) in bodies.enumerated() {
             let points = InstanceAssignment.samplePoints(of: body, extent: extent, tuning: tuning)

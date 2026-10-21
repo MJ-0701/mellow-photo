@@ -6,10 +6,10 @@ import Vision
 /// VNGeneratePersonInstanceMaskRequest로 사람마다 마스크를 만든다.
 /// 결과는 Vision이 준 저해상도 그대로이고 입력 비율과 다를 수 있다.
 public struct VisionPersonInstanceAnalyzer: PersonInstanceAnalyzer {
-    /// 인스턴스 번호 지도에서 배경(번호 0) 픽셀이 이 비율보다 적으면 사람이 없다고 본다.
-    /// Vision은 단색 장면을 화면 전체가 한 사람인 인스턴스로 돌려준다(배경 0%).
-    /// 실제 인물 사진은 화면을 꽉 채운 얼굴도 배경이 몇 %는 있다.
-    /// 버려도 렌더는 전체 인물 마스크로 대신하므로 결과가 크게 다르지 않다.
+    /// 인스턴스가 하나뿐이고 번호 지도에서 배경(번호 0) 픽셀이 이 비율보다 적으면 사람이 없다고 본다.
+    /// 이 기계에서 회색·하늘색·흰색 단색 장면을 넣었을 때 Vision이 화면 전체를 한 인스턴스로 돌려주는 것을 보았다(배경 0%).
+    /// 인스턴스가 둘 이상이면 거르지 않는다.
+    /// 하나를 버려도 렌더는 전체 인물 마스크로 대신한다.
     private static let minimumBackgroundCoverage = 0.01
     /// 인스턴스 번호 지도에서 배경의 번호.
     private static let backgroundLabel: UInt8 = 0
@@ -26,11 +26,14 @@ public struct VisionPersonInstanceAnalyzer: PersonInstanceAnalyzer {
         }
         // 결과가 없으면 사람이 없는 것이다.
         guard let observation = request.results?.first else { return [] }
-        guard Self.backgroundCoverage(of: observation.instanceMask) >= Self.minimumBackgroundCoverage else {
+        let instances = observation.allInstances
+        if instances.count == 1,
+            Self.backgroundCoverage(of: observation.instanceMask) < Self.minimumBackgroundCoverage
+        {
             return []
         }
         // allInstances는 배경(0)을 빼고 사람 번호만 담는다.
-        return try observation.allInstances.map { instance in
+        return try instances.map { instance in
             do {
                 let buffer = try observation.generateMask(forInstances: IndexSet(integer: instance))
                 // 0…1을 색 관리 없이 읽는다. 색공간을 붙이면 선형으로 바뀌어 경계 중간값이 달라진다.
