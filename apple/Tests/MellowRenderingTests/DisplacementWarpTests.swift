@@ -293,4 +293,116 @@ final class DisplacementWarpTests: XCTestCase {
         XCTAssertGreaterThan(result.x - marker.x, 4, "push 몫")
         XCTAssertLessThan(result.y - marker.y, -4, "띠 몫")
     }
+
+    // MARK: - 보호 워프(묶음)
+
+    /// 보호 테스트의 extent와 사람 사각형. 사각형 오른쪽 변은 x = 140이다.
+    private static let guardExtent = CGRect(x: 0, y: 0, width: 256, height: 256)
+    private static let personRect = CGRect(x: 40, y: 32, width: 100, height: 192)
+    /// 변에 둔 push의 이동(v)과 반지름(픽셀).
+    private static let edgeShift: CGFloat = 12
+    private static let edgeRadius: CGFloat = 80
+
+    private func personMask(_ rect: CGRect) -> CIImage {
+        Support.personMask(size: Self.guardExtent.size, person: rect)
+    }
+
+    /// 사각형 오른쪽 변 가운데에서 가로로 미는 원소. direction −1이면 안쪽(가늘게), +1이면 바깥(넓게).
+    private func edgePush(_ direction: CGFloat, edge: CGFloat = personRect.maxX) -> ShapePrimitive {
+        .push(
+            center: CGPoint(x: edge, y: Self.personRect.midY),
+            vector: CGVector(dx: direction * Self.edgeShift, dy: 0), radius: Self.edgeRadius)
+    }
+
+    private func groupField(_ groups: [ShapeGroup]) throws -> CIImage {
+        try XCTUnwrap(DisplacementWarp.shared.field(groups: groups, extent: Self.guardExtent, limit: limit))
+    }
+
+    func testGroupsWithoutMasksMatchTheSingleFieldPath() throws {
+        let input = CIImage(cgImage: try Support.renderer.makeCGImage(Support.skinTexture(size: 128)))
+        let first = [
+            ShapePrimitive.push(center: CGPoint(x: 40, y: 64), vector: CGVector(dx: 5, dy: 1), radius: 30),
+            ShapePrimitive.scale(center: CGPoint(x: 70, y: 80), factor: 0.1, radius: 20),
+        ]
+        let second = [
+            ShapePrimitive.push(center: CGPoint(x: 60, y: 60), vector: CGVector(dx: -4, dy: 2), radius: 40),
+            ShapePrimitive.band(yStart: 50, yEnd: 10, stretch: 0.05),
+        ]
+        let groups = [ShapeGroup(primitives: first), ShapeGroup(primitives: second)]
+        let grouped = try DisplacementWarp.shared.apply(groups: groups, to: input, extent: input.extent, limit: limit)
+        let single = try DisplacementWarp.shared.apply(first + second, to: input, extent: input.extent, limit: limit)
+        XCTAssertEqual(try Support.bytes(grouped), try Support.bytes(single), "마스크가 없으면 보호 없이 한 지도로 그린다")
+    }
+
+    func testBackgroundBeyondTheBandDoesNotMove() throws {
+        let push = edgePush(-1)
+        let bare = try groupField([ShapeGroup(primitives: [push])])
+        let guarded = try groupField([ShapeGroup(primitives: [push], ownMask: personMask(Self.personRect))])
+        let y = Self.personRect.midY
+        let outside = CGPoint(x: Self.personRect.maxX + 4 * Self.edgeShift + 4, y: y)
+        let inside = CGPoint(x: Self.personRect.maxX - Self.edgeShift / 2, y: y)
+        XCTAssertGreaterThan(try ShapeTestSupport.shift(bare, at: outside), 1, "보호가 없으면 배경도 움직인다")
+        XCTAssertLessThanOrEqual(try ShapeTestSupport.shift(guarded, at: outside), 0.25, "띠 너머 배경은 움직이지 않는다")
+        let expected = try ShapeTestSupport.shift(bare, at: inside)
+        XCTAssertEqual(
+            try ShapeTestSupport.shift(guarded, at: inside), expected, accuracy: expected * 0.02, "사람 안쪽은 그대로 민다")
+    }
+
+    func testWideningKeepsMostOfTheShift() throws {
+        let push = edgePush(1)
+        let bare = try groupField([ShapeGroup(primitives: [push])])
+        let guarded = try groupField([ShapeGroup(primitives: [push], ownMask: personMask(Self.personRect))])
+        let beyond = CGPoint(x: Self.personRect.maxX + Self.edgeShift, y: Self.personRect.midY)
+        let expected = try ShapeTestSupport.shift(bare, at: beyond)
+        XCTAssertGreaterThan(expected, Self.edgeShift / 2)
+        XCTAssertGreaterThanOrEqual(
+            try ShapeTestSupport.shift(guarded, at: beyond), expected * 0.9, "실루엣 바로 바깥도 넓히기를 막지 않는다")
+    }
+
+    func testOtherPersonIsNotMoved() throws {
+        let first = CGRect(x: 40, y: 32, width: 88, height: 192)
+        let second = CGRect(x: first.maxX, y: 32, width: 88, height: 192)
+        let push = edgePush(-1, edge: first.maxX)
+        let guarded = try groupField([
+            ShapeGroup(primitives: [push], ownMask: personMask(first), otherMasks: [personMask(second)])
+        ])
+        let bare = try groupField([ShapeGroup(primitives: [push])])
+        let y = first.midY
+        XCTAssertGreaterThan(try ShapeTestSupport.shift(bare, at: CGPoint(x: second.minX + 4, y: y)), 1)
+        for x in stride(from: second.minX + 2, through: second.maxX - 1, by: 4) {
+            for dy in [CGFloat(-40), 0, 40] {
+                let point = CGPoint(x: x, y: y + dy)
+                XCTAssertLessThanOrEqual(
+                    try ShapeTestSupport.shift(guarded, at: point), 0.25, "옆 사람 안쪽은 움직이지 않는다 \(point)")
+            }
+        }
+    }
+
+    func testCapsuleGuardZeroesTorsoShiftOnTheArm() throws {
+        let everyone = personMask(Self.guardExtent)
+        let push = ShapePrimitive.push(center: CGPoint(x: 128, y: 128), vector: CGVector(dx: -12, dy: 0), radius: 90)
+        let start = CGPoint(x: 120, y: 180)
+        let end = CGPoint(x: 140, y: 90)
+        let capsule = ShapeGuard.capsule(start: start, end: end, radius: 20, feather: 6)
+        let bare = try groupField([ShapeGroup(primitives: [push])])
+        let guarded = try groupField([ShapeGroup(primitives: [push], ownMask: everyone, guards: [capsule])])
+        let middle = ShapeTestSupport.lerp(start, end, 0.5)
+        // 선분에 수직인 단위 벡터. 선분 방향 (20, −90)을 반시계로 돌렸다.
+        let length = hypot(end.x - start.x, end.y - start.y)
+        let normal = CGVector(dx: (start.y - end.y) / length, dy: (end.x - start.x) / length)
+        for along in [CGFloat(0.1), 0.5, 0.9] {
+            for across in [CGFloat(-18), 0, 18] {
+                let point = ShapeTestSupport.offset(ShapeTestSupport.lerp(start, end, along), normal, across)
+                XCTAssertGreaterThan(try ShapeTestSupport.shift(bare, at: point), 1)
+                XCTAssertLessThanOrEqual(try ShapeTestSupport.shift(guarded, at: point), 0.01, "캡슐 안은 막는다 \(point)")
+            }
+        }
+        for across in [CGFloat(-28), 28, -40, 40] {
+            let point = ShapeTestSupport.offset(middle, normal, across)
+            let expected = try XCTUnwrap(ShapeTestSupport.fieldVectors(bare, at: [point]).first)
+            let actual = try XCTUnwrap(ShapeTestSupport.fieldVectors(guarded, at: [point]).first)
+            XCTAssertEqual(actual.dx, expected.dx, accuracy: 0.01, "반지름 + feather 밖은 그대로 \(point)")
+            XCTAssertEqual(actual.dy, expected.dy, accuracy: 0.01)
+        }
+    }
 }

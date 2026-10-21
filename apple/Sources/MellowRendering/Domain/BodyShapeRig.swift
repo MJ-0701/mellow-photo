@@ -47,8 +47,9 @@ enum BodyShapeRig {
     /// 허벅지 반폭. 어깨 폭 비율(허벅지 폭은 어깨 폭의 40% 안팎).
     private static let thighHalfWidth: CGFloat = 0.2
     /// 위팔·아래팔 반폭. 어깨 폭 비율.
-    private static let upperArmHalfWidth: CGFloat = 0.12
-    private static let forearmHalfWidth: CGFloat = 0.09
+    /// 팔 보호 캡슐 반지름도 이 값에서 정한다.
+    static let upperArmHalfWidth: CGFloat = 0.12
+    static let forearmHalfWidth: CGFloat = 0.09
     /// 위팔·허벅지는 항목 이동 그대로, 아래팔은 75%(아래팔이 가늘어 같은 이동이면 더 많이 줄어든다).
     private static let fullShift: CGFloat = 1
     private static let forearmShiftRatio: CGFloat = 0.75
@@ -79,21 +80,53 @@ enum BodyShapeRig {
         Limb(start: .rightHip, end: .rightKnee, halfWidth: thighHalfWidth, shiftRatio: fullShift),
     ]
 
+    /// 몸통 묶음(팔 보호를 받는 항목). 나머지 항목은 팔다리 묶음이다.
+    private static let torsoKeys: Set<BodyShapeKey> = [.waist, .overall, .sideChest]
+
+    /// 몸통·팔다리 묶음을 이은 원소. 다리 띠를 포함한다.
     static func primitives(
         body: BodyGeometry, adjustments: BodyShapeAdjustments, extent: CGRect, tuning: RenderTuning
     ) -> [ShapePrimitive] {
+        let parts = groups(body: body, adjustments: adjustments, extent: extent, tuning: tuning, includesLegBand: true)
+        return parts.torso + parts.limbs
+    }
+
+    /// 항목을 몸통(허리·몸 전체·부유방)과 팔다리(팔·허벅지·어깨·목·다리 띠)로 나눠 만든다(스펙 5.5).
+    /// guards는 몸통 묶음이 받는 팔 캡슐이다. 관절이 없는 선분은 빠진다.
+    /// includesLegBand가 false면 다리 길게를 건너뛴다(가장 큰 몸만 띠를 만든다).
+    static func groups(
+        body: BodyGeometry, adjustments: BodyShapeAdjustments, extent: CGRect, tuning: RenderTuning,
+        includesLegBand: Bool
+    ) -> (torso: [ShapePrimitive], limbs: [ShapePrimitive], guards: [ShapeGuard]) {
         guard adjustments.hasEffect, let skeleton = BodySkeleton(body: body, extent: extent, tuning: tuning) else {
-            return []
+            return ([], [], [])
         }
         let rig = Builder(skeleton: skeleton, limit: CGFloat(tuning.shapeDisplacementLimit))
-        var result: [ShapePrimitive] = []
-        for key in BodyShapeKey.allCases {
+        var torso: [ShapePrimitive] = []
+        var limbs: [ShapePrimitive] = []
+        for key in BodyShapeKey.allCases where includesLegBand || key != .legLength {
             let raw = adjustments[key]
             let value = AdjustmentRange.clamped(raw.isFinite ? raw : 0, to: AdjustmentRange.bodyShape(key))
             guard value != 0 else { continue }
-            result += primitives(for: key, value: CGFloat(value), rig: rig, tuning: tuning)
+            let made = primitives(for: key, value: CGFloat(value), rig: rig, tuning: tuning)
+            if torsoKeys.contains(key) {
+                torso += made
+            } else {
+                limbs += made
+            }
         }
-        return result
+        return (torso, limbs, armGuards(skeleton, tuning: tuning))
+    }
+
+    /// 어깨–팔꿈치·팔꿈치–손목 캡슐. 반지름은 어깨 폭 × 반폭 × armGuardScale, feather는 어깨 폭 × armGuardFeather다.
+    private static func armGuards(_ skeleton: BodySkeleton, tuning: RenderTuning) -> [ShapeGuard] {
+        let width = skeleton.torsoWidth
+        let scale = CGFloat(tuning.armGuardScale)
+        let feather = width * CGFloat(tuning.armGuardFeather)
+        return armLimbs.compactMap { limb in
+            guard let start = skeleton.point(limb.start), let end = skeleton.point(limb.end) else { return nil }
+            return .capsule(start: start, end: end, radius: width * limb.halfWidth * scale, feather: feather)
+        }
     }
 
     private static func primitives(

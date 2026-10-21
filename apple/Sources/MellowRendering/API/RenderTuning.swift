@@ -267,6 +267,21 @@ public struct RenderTuning: Sendable {
     public var bodyFaceMatchTolerance: Double = 1.0
     /// 몸·얼굴의 표본점에서 읽은 인스턴스 마스크 평균이 이 값 이상이어야 그 사람으로 본다.
     public var instanceMatchMinimum: Double = 0.5
+    /// 보호 워프의 배경 가중치 = clamp(이 값 × 흐린 사람 마스크, 0, 1).
+    /// Φ(−1 / 1.5) ≈ 0.25의 역수라 실루엣에서 최대 이동만큼 바깥까지 가중치가 1이다.
+    public var shapeBackgroundGain: Double = 4
+    /// 사람 마스크를 흐리는 표준편차.
+    /// 그 묶음의 최대 이동에 곱한다.
+    public var shapeBackgroundSigmaRatio: Double = 1.5
+    /// 사람 마스크 흐림 표준편차의 하한.
+    /// 짧은 변 비율이다.
+    public var shapeBackgroundSigmaMinimum: Double = 0.002
+    /// 팔 보호 캡슐 반지름.
+    /// 위팔·아래팔 반폭에 곱한다.
+    public var armGuardScale: Double = 1.0
+    /// 팔 보호 캡슐 가장자리 폭.
+    /// 어깨 폭 비율이다.
+    public var armGuardFeather: Double = 0.03
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000

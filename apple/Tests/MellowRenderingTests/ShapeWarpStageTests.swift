@@ -448,4 +448,123 @@ final class ShapeWarpStageTests: XCTestCase {
         let everyone = context(FaceShapeAdjustments(width: -1), faces: [leftFace, rightFace])
         XCTAssertEqual(stage.facePrimitives(in: everyone).count, fromIndividual.count * 2)
     }
+
+    // MARK: - 팔 보호
+
+    /// 팔 보호 테스트의 사람 마스크. 선 사람 전체를 덮는다.
+    private var standingPersonMask: CIImage {
+        Support.personMask(size: extent.size, person: CGRect(x: 24, y: 0, width: 464, height: 480))
+    }
+
+    /// 팔꿈치·손목을 몸통 옆선(같은 쪽 어깨–엉덩이)에서 바깥으로 띄운 몸과 그 표식 자리.
+    /// gap은 팔 가장자리와 옆선 사이 거리(어깨 폭 비율)이고 0이면 팔이 옆선에 붙는다.
+    private func armBody(gap: CGFloat) throws -> (body: BodyGeometry, arm: [CGPoint], waist: [CGPoint]) {
+        let base = Support.standingBody(in: Support.standingBox)
+        let skeleton = try XCTUnwrap(BodySkeleton(body: base, extent: extent, tuning: tuning))
+        let width = skeleton.torsoWidth
+        var moved: [BodyJoint: CGPoint] = [:]
+        var arm: [CGPoint] = []
+        var waist: [CGPoint] = []
+        let sides: [(BodyJoint, BodyJoint, BodyJoint, BodyJoint)] = [
+            (.rightShoulder, .rightHip, .rightElbow, .rightWrist), (.leftShoulder, .leftHip, .leftElbow, .leftWrist),
+        ]
+        for (shoulderJoint, hipJoint, elbowJoint, wristJoint) in sides {
+            let shoulder = try XCTUnwrap(skeleton.point(shoulderJoint))
+            let hip = try XCTUnwrap(skeleton.point(hipJoint))
+            let length = hypot(hip.x - shoulder.x, hip.y - shoulder.y)
+            var outward = CGVector(dx: (hip.y - shoulder.y) / length, dy: (shoulder.x - hip.x) / length)
+            if (shoulder.x - skeleton.shoulderCenter.x) * outward.dx < 0 {
+                outward = CGVector(dx: -outward.dx, dy: -outward.dy)
+            }
+            let waistPoint = ShapeTestSupport.lerp(shoulder, hip, 0.55)
+            let elbow = ShapeTestSupport.offset(
+                waistPoint, outward, (BodyShapeRig.upperArmHalfWidth + gap) * width)
+            let wrist = ShapeTestSupport.offset(hip, outward, (BodyShapeRig.forearmHalfWidth + gap) * width)
+            moved[elbowJoint] = elbow
+            moved[wristJoint] = wrist
+            arm += [elbow, ShapeTestSupport.lerp(elbow, wrist, 0.5)]
+            waist.append(waistPoint)
+        }
+        return (ShapeTestSupport.body(base, moving: moved, extent: extent), arm, waist)
+    }
+
+    /// 표식들을 그린 이미지를 변형해 각 표식이 움직인 거리.
+    private func measuredShifts(of markers: [CGPoint], in renderContext: RenderContext) throws -> [CGFloat] {
+        let input = Support.markers(markers, extent: extent)
+        let before = try Support.grid(input)
+        let after = try Support.grid(ShapeWarpStage().apply(input, in: renderContext))
+        return try markers.map { marker in
+            let original = try XCTUnwrap(Support.markerCentroid(before, near: marker))
+            let moved = try XCTUnwrap(Support.markerCentroid(after, near: marker, window: 20))
+            return hypot(moved.x - original.x, moved.y - original.y)
+        }
+    }
+
+    private func maskedBodyContext(_ body: BodyGeometry, mask: CIImage?) -> RenderContext {
+        var recipe = EditRecipe()
+        recipe.body = BodyShapeAdjustments(waist: -1)
+        let analysis = PhotoAnalysis(personMask: mask, bodies: [body])
+        return RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: tuning)
+    }
+
+    func testArmTouchingTorsoKeepsArmPixels() throws {
+        let layout = try armBody(gap: 0)
+        let unguarded = try measuredShifts(of: layout.arm, in: maskedBodyContext(layout.body, mask: nil))
+        XCTAssertGreaterThan(unguarded.max() ?? 0, 3, "보호가 없으면 허리 push가 붙은 팔을 끈다")
+        let guarded = try measuredShifts(
+            of: layout.arm, in: maskedBodyContext(layout.body, mask: standingPersonMask))
+        for (marker, shift) in zip(layout.arm, guarded) {
+            XCTAssertLessThanOrEqual(shift, 1, "팔 캡슐 안 표식은 움직이지 않는다 \(marker)")
+        }
+    }
+
+    func testArmAwayStillSlimsTheWaist() throws {
+        let layout = try armBody(gap: 0.2)
+        let unguarded = try measuredShifts(of: layout.waist, in: maskedBodyContext(layout.body, mask: nil))
+        let guarded = try measuredShifts(
+            of: layout.waist, in: maskedBodyContext(layout.body, mask: standingPersonMask))
+        for (expected, shift) in zip(unguarded, guarded) {
+            XCTAssertGreaterThan(expected, 5, "허리 윤곽이 실제로 움직인다")
+            XCTAssertGreaterThanOrEqual(shift, expected * 0.8, "떨어진 팔의 보호는 허리를 지우지 않는다")
+        }
+    }
+
+    func testGroupsSplitTorsoAndLimbsWithPersonMasks() throws {
+        let face = SyntheticFace.make().face
+        let body = Support.standingBody(in: Support.standingBox)
+        var recipe = EditRecipe()
+        recipe.body = BodyShapeAdjustments(waist: -1, arms: -1)
+        recipe.portrait.face = FaceShapeAdjustments(width: -1)
+        let mask = standingPersonMask
+        let analysis = PhotoAnalysis(faces: [face], personMask: mask, bodies: [body])
+        let renderContext = RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: tuning)
+        let groups = ShapeWarpStage().groups(in: renderContext)
+        XCTAssertEqual(groups.count, 3, "얼굴형, 몸통, 팔다리")
+        XCTAssertTrue(groups.allSatisfy { $0.ownMask === mask }, "인스턴스가 없으면 모두 전체 인물 마스크")
+        XCTAssertEqual(groups.map(\.guards.count), [0, 4, 0], "팔 캡슐은 몸통 묶음만")
+        let rig = BodyShapeRig.groups(
+            body: body, adjustments: recipe.body, extent: extent, tuning: tuning, includesLegBand: true)
+        XCTAssertEqual(groups[1].primitives, rig.torso)
+        XCTAssertEqual(groups[2].primitives, rig.limbs)
+        XCTAssertEqual(groups[1].guards, rig.guards)
+    }
+
+    /// 인물 마스크가 없으면 묶음으로 나눠도 항목 순서로 이은 옛 원소 목록과 같은 바이트다(Review Focus 1).
+    func testWithoutPersonMaskRendersLikeKeyOrderedPrimitives() throws {
+        let body = Support.standingBody(in: Support.standingBox)
+        let all = BodyShapeAdjustments(
+            legLength: 1, waist: -1, overall: -1, arms: -1, thighs: -1, shoulders: 1, neck: 1)
+        var keyOrdered: [ShapePrimitive] = []
+        for key in BodyShapeKey.allCases {
+            var single = BodyShapeAdjustments()
+            single[key] = all[key]
+            keyOrdered += BodyShapeRig.primitives(body: body, adjustments: single, extent: extent, tuning: tuning)
+        }
+        let input = CIImage(cgImage: try Support.renderer.makeCGImage(Support.skinTexture(size: SyntheticFace.size)))
+        let legacy = try DisplacementWarp.shared.apply(
+            keyOrdered, to: input, extent: extent, limit: tuning.shapeDisplacementLimit)
+        let renderContext = bodyContext(all, bodies: [body])
+        XCTAssertTrue(renderContext.personMask(forBody: 0).own == nil)
+        XCTAssertEqual(try Support.bytes(ShapeWarpStage().apply(input, in: renderContext)), try Support.bytes(legacy))
+    }
 }
