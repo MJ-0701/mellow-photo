@@ -103,7 +103,7 @@ git commit -m "test(fixtures): codex로 만든 이중턱·상반신·커플·직
 - Consumes: I1 `PortraitScope.allows`, `Resolved.body`, I2 `PreparedPhoto.bodyFaceMatches`.
 - Produces:
   - `AppModel.PhotoInfo.bodyFaceMatches: [Int: Int]`.
-  - `AppModel.bodyAvailability`는 대상이 `.face(i)`·`.person(id)`이고 그 얼굴과 짝인 몸이 없으면 `.noBodyForTarget`(새 case)이다. 전체·그룹은 지금 판정이다.
+  - `AppModel.bodyAvailability`는 대상이 `.face(i)`·`.person(id)`이고 그 얼굴과 짝인 몸이 없으면 `.noBodyForTarget`(새 case)이다. `.gender(g)`는 짝인 몸 중 유효 성별이 g인 얼굴의 몸이 없으면 `.noBodyForTarget`이다(최종 리뷰 중 변경). 전체는 지금 판정이다.
   - `AppModel.showsBodyShape(_ key: BodyShapeKey) -> Bool`: `.sideChest`는 현재 대상의 scope가 `allows`일 때만 true다. 기록이 없는 얼굴(`.face(i)`, scope nil)은 개인 층이 될 것이므로 true다.
   - `AppModel.canAdjustBodyShape(_ key: BodyShapeKey) -> Bool`: 잠금이면 false. 그 밖에는 드래그 중이거나, 상태가 `.ready`이고 (`legLength`가 아니거나 대상이 다리 띠를 받는 대상)이거나, 현재 값이 0이 아니면 true다. 다리 띠를 받는 대상은 전체·성별 그룹 또는 몸 0과 짝인 얼굴의 사람이다.
 
