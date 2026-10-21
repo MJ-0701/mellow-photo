@@ -1,6 +1,6 @@
 # 인물 보정 J (옷 주름 펴기) 설계
 
-작성 2026-10-21. 선행: [인물 보정 G](2026-10-20-beauty-g-evoto-design.md)(몸 피부 단계), [인물 보정 H](2026-10-21-beauty-h-per-person-design.md). 근거: Evoto `remove-wrinkles-from-clothes` 전후 12쌍 실측과 Python 시제품(아래 에이전트 참조 3절). 기준 코드: **beauty-g5와 beauty-body(인물 보정 I)가 main에 병합된 뒤의 main**. 이 문서를 쓰는 시점의 main은 `8accbf6`이다.
+작성 2026-10-21. 선행: [인물 보정 G](2026-10-20-beauty-g-evoto-design.md)(몸 피부 단계), [인물 보정 H](2026-10-21-beauty-h-per-person-design.md). 근거: Evoto `remove-wrinkles-from-clothes` 전후 12쌍 실측과 Python 시제품(아래 에이전트 참조 3절). 기준 코드: **beauty-g5와 beauty-body(인물 보정 I)가 main에 병합된 뒤의 main**. 이 문서를 쓰는 시점의 main은 `8accbf6`이다. 2026-10-22에 beauty-body가 main(`8157172`)에 병합됐고 beauty-g5는 아직이다.
 
 사용자 요구: Evoto의 "옷 주름 제거" 같은 의상 주름 제거. ML 모델 없이 Swift·Core Image·Vision만 쓴다.
 
@@ -65,9 +65,9 @@
 
 - 시작 조건은 beauty-g5와 beauty-body가 main에 병합된 것이다. 시작할 때 `git log main --oneline | head`로 확인한다. 그다음 `beauty-j-cloth` 브랜치(worktree `.claude/worktrees/beauty-j-cloth`)를 main 위로 다시 올린다(`git rebase main`).
 - 아래 파일 위치와 줄 번호는 `8accbf6` 기준이다. 두 브랜치가 병합되면 바뀌므로 구현 전에 다시 찾는다. 특히 확인할 것은 다음과 같다.
-  - `RenderPipeline.standard`: beauty-body가 `chinShade`를 `background`와 `shapeWarp` 사이에 넣는다.
-  - `PortraitKey`: beauty-body가 `.bodyShape`를 더한다.
-  - `PhotoAnalysis`: beauty-body가 `personInstances`를 더한다.
+  - `RenderPipeline.standard`: `8157172`에서 `skin, bodySkin, feature, makeup, background, chinShade, shapeWarp, localEdit, geometry, color, detail, look, effect`다(확인함).
+  - `PortraitKey`: `8157172`에 `.bodyShape(BodyShapeKey)`가 있다(확인함).
+  - `PhotoAnalysis`: `8157172`에 `personInstances: [CIImage]`와 `faceInstances: [Int: Int]`(얼굴 인덱스 → 인스턴스 인덱스)가 있다(확인함).
   - `RenderTuning`: 두 브랜치 모두 상수를 더한다.
 - 옷 단계의 수용 테스트는 새 파일 `ClothingAcceptanceTests.swift`에 둔다. 기존 `RealPhotoAcceptanceTests.swift`는 두 브랜치가 크게 고치므로 건드리지 않는다.
 
@@ -177,7 +177,7 @@ public struct ClothingAdjustments: Codable, Equatable, Sendable {
 - **획 비트맵만 `RenderContext.regionMasks`에 캐시한다.** 키는 extent, 비트맵 크기, 획 값이다. `RegionMaskCache.capacity`의 주석과 상한 계산에 사진당 2개(칠하기·지우기)를 더한다.
 - 시간 예산: 옷 강도 1일 때 미리보기 렌더 시간 증가를 기존 대비 +30% 이내로 잡는다. J1은 `ClothingStageTests`에서 2048px 합성 이미지 렌더 시간을 `record`로 남기기만 하고 실패시키지 않는다. 넘으면 중간 대역과 guided 필터를 절반 해상도에서 계산해 늘린다.
 - **사람 코어** `P = smoothstep(clothingPersonLow 0.6, clothingPersonHigh 0.95, Gauss(personMask, 1.5px@512))`. `BackgroundStage.personMask`로 늘린 마스크를 쓴다. 사람 마스크가 없으면 자동 영역은 0이다(획만 동작).
-- **얼굴 있는 사람만.** `analysis.personInstances`(beauty-body)가 있으면 얼굴 상자 중심을 담은 인스턴스만 모아 P에 곱한다. 인스턴스가 없으면(분석 실패·구형 OS) 사람 마스크 전체를 쓰되, 얼굴이 하나도 없으면 자동 영역은 0이다.
+- **얼굴 있는 사람만.** `analysis.personInstances`가 비어 있지 않으면 `analysis.faceInstances`의 값(얼굴이 배정된 인스턴스)만 모아 합집합을 P에 곱한다. 인스턴스가 배정되지 않은 얼굴의 사람은 자동으로 처리하지 않는다. 인스턴스가 없으면(분석 실패·구형 OS) 사람 마스크 전체를 쓰되, 얼굴이 하나도 없으면 자동 영역은 0이다.
 - **피부 K** = 얼굴마다 `K_f`를 구해 최댓값을 쓴다.
   - 기준색: `FaceRegions.cheekAverages`의 볼 평균색(Cb·Cr·Y).
   - 색 거리: `d² = ((Cb−Cb_f)/σc)² + ((Cr−Cr_f)/σc)² + (ln((Y+0.02)/(Y_f+0.02))/clothingSkinLumaSigma 0.28)²`. `σc = clothingSkinChromaSigma`는 8비트 기준 4.5다. 시제품 값은 MAD×1.8, 바닥 2.5였다. 볼 평균만 쓰므로 고정값을 쓴다. 구현 때 다시 잰다.

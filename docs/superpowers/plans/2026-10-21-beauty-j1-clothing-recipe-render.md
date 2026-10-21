@@ -20,7 +20,7 @@
 
 ## 사람이 확인할 것
 
-- **시작 조건.** beauty-g5와 beauty-body가 main에 병합된 뒤 시작한다. 시작 전에 `beauty-j-cloth`를 main 위로 올린다.
+- **시작 조건.** beauty-g5와 beauty-body가 main에 병합된 뒤 시작한다. beauty-body는 2026-10-22에 병합됐다(`8157172`). 이 브랜치는 그 위로 이미 올렸다. beauty-g5 병합 뒤 한 번 더 `git rebase main` 한다.
 - **순서.** Task는 아래 6개다. Task마다 Opus가 구현하고, 리뷰한 뒤 고친다. 끝에 전체 리뷰를 한다.
   1. 레시피
   2. 편집 규칙
@@ -51,7 +51,7 @@
 - 커밋은 한국어 Conventional Commits다. 끝에 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`를 붙인다. `git add`는 바꾼 경로만 한다.
 - 로컬 iOS 시뮬레이터 실행은 금지다. `MELLOW_IOS_TESTS`를 켜지 않는다.
 - 패키지 테스트는 `cd apple && swift test --filter <이름>`이다. 전체는 `./scripts/test-apple.sh`다.
-- 줄 번호는 `8accbf6` 기준이다. 병합 뒤 다시 찾는다. 병합 뒤 단계 이름 배열은 beauty-body의 `chinShade`를 포함한다.
+- 줄 번호는 `8accbf6` 기준이다. beauty-g5 병합 뒤 다시 찾는다. `8157172`의 단계 이름 배열은 `skin, bodySkin, feature, makeup, background, chinShade, shapeWarp, localEdit, geometry, color, detail, look, effect`다. J1 뒤에는 `bodySkin` 다음에 `clothing`이 들어간다.
 - 기준 테스트 수는 시작 전에 실측해 여기 적는다. 증분은 Shared +4, Editing +5, Rendering +12다.
 
 ## Review Focus
@@ -347,7 +347,7 @@ git commit -m "feat(rendering): 옷 주름 중간 대역 줄이기 커널 추가
   - `FaceRegions.cheekAverages`, `FaceRegions.wholeFaceMask`
   - `BackgroundStage.personMask`
   - `context.personMask`, `context.faces`
-  - 병합 뒤 `context.analysis.personInstances`(이름은 병합 코드에서 확인)
+  - `context.analysis.personInstances: [CIImage]`, `context.analysis.faceInstances: [Int: Int]`(얼굴 인덱스 → 인스턴스 인덱스, `8157172`에 있음). `RenderContext.analysis`는 public이다
 - Produces:
   - `enum ClothingMask`
   - `static func make(encoded: CIImage, context: RenderContext) throws -> CIImage?`
@@ -492,7 +492,7 @@ git commit -m "feat(rendering): 옷 주름 칠하기·지우기 획 마스크 �
 **Interfaces:**
 - Consumes:
   - `PeopleFixtures.url`, `ImageLoader`
-  - `VisionFaceAnalyzer`, `VisionPersonAnalyzer`(병합 뒤 인스턴스 분석기가 있으면 그것도)
+  - `PhotoPipeline(analyzer: VisionFaceAnalyzer(), personAnalyzer: VisionPersonAnalyzer(), bodyAnalyzer: VisionBodyAnalyzer(), instanceAnalyzer: VisionPersonInstanceAnalyzer(), tuning:)`의 `prepare`·`preparedAnalysis`(`ShapeTestSupport.swift`의 `RealBodyPhoto.prepared`와 같은 방식)
   - `DisplayScale`
   - `ClothingMask.make`, `ClothingKernels.midBandSigmas`
 - Produces:
@@ -501,7 +501,7 @@ git commit -m "feat(rendering): 옷 주름 칠하기·지우기 획 마스크 �
   - `record(item, metric, value)` 출력 형식은 `RealPhotoAcceptanceTests`와 같다(`acceptance <item> <metric>=<v>`).
 
 사진 셋은 `group-01.jpg`, `couple-01.jpg`, `demo-portrait.png`다.
-- `ClothingPhoto` 클래스를 이 파일에 둔다. 사진마다 `Result`로 한 번 준비한다. 들고 있는 것은 image, analysis(얼굴·사람 마스크·인스턴스)다.
+- `ClothingPhoto` 클래스를 이 파일에 둔다. `RealBodyPhoto.prepared`처럼 사진마다 한 번 준비해 잠금 캐시에 둔다. 들고 있는 것은 image, analysis(얼굴·사람 마스크·인스턴스·`faceInstances`)다. `group-01.jpg`·`couple-01.jpg`는 `Fixtures/people`, `demo-portrait.png`는 `Fixtures`에서 읽는다.
 - 측정 영역 C는 `ClothingMask.make` > 0.5(강도 1, 획 없음)인 곳이다. C가 짧은 변² × 0.02보다 작으면 그 사진은 `XCTSkip`한다. 셋 다 건너뛰면 실패다.
 
 - [ ] **Step 1: 측정만 하는 테스트를 쓴다**

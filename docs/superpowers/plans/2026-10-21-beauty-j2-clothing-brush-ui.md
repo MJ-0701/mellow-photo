@@ -46,7 +46,7 @@ xcodebuild -project apple/MellowPhoto.xcodeproj -scheme MellowPhoto -derivedData
 ```
 
 - iOS는 generic 빌드만 한다: `xcodebuild -project apple/MellowPhoto.xcodeproj -scheme MellowPhoto -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build`.
-- 병합 뒤 체형 패널에는 beauty-body의 대상 칩이 있다. 옷 절은 칩 아래, 체형 슬라이더 뒤에 둔다. 칩 코드는 바꾸지 않는다.
+- `8157172`의 체형 패널은 얼굴이 있을 때 `TargetChips()`를 맨 위에 두고 `model.scopedValues.body`를 보인다. 옷 절은 체형 슬라이더와 `bodyHint` 뒤에 둔다. 칩 코드는 바꾸지 않는다.
 
 ## Review Focus
 
@@ -237,7 +237,7 @@ git commit -m "feat(app): 옷 주름 브러시 경로 제스처와 칠한 영역
 | `clothingStrokeLimit` | (Task 1) |
 
 절의 순서는 다음과 같다.
-1. 제목 줄: `clothingSectionTitle`. 대상이 전체가 아니면 옆에 `clothingAppliesToAll` 캡션을 붙인다(병합 코드의 대상 상태 이름을 확인).
+1. 제목 줄: `clothingSectionTitle`. `model.beautyTarget != .all`이면 옆에 `clothingAppliesToAll` 캡션을 붙인다. 슬라이더 값은 대상과 무관하게 `currentRecipe.clothing`을 쓴다(`scopedValues`가 아님).
 2. `ForEach(ClothingKey.allCases)` 슬라이더(`.disabled(!model.canAdjustClothing)`)
 3. 칠하기·지우기 토글 두 개. `clothingBrush`를 바꾸고, 같은 것을 다시 누르면 nil이 된다.
 4. 브러시 크기 슬라이더(`BrushPanel`과 같은 바인딩·범위·접근성 라벨 `clothingBrushSize`)
