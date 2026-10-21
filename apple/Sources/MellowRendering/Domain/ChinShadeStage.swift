@@ -6,6 +6,7 @@ import MellowShared
 /// 워프가 접어 올리지 않는 얼굴(옆얼굴·턱 윤곽점 부족)은 그늘도 밝히지 않는다.
 /// 마스크는 턱밑 띠(FaceRegions+Chin.swift) × 볼 기준 피부색 가중치라 수염처럼 피부색이 아닌 픽셀은 밝히지 않는다.
 /// 감마 BT.601 휘도 L' = L + 값 × chinShadeMaxGain × max(0, R − L)이고 증가는 chinShadeMaxLift에서 자른다.
+/// 이득과 상한에 모두 FaceShapeRig.yawAttenuation을 곱한다(워프 이동과 같은 약화).
 /// R은 띠 둘레 피부(피부색 가중치 × (1 − 띠))의 넓은 가중 평균 휘도라 그늘을 둘레 피부 밝기 쪽으로 올린다.
 /// 색은 휘도 비율로 올려 색조를 지키고 결과는 입력보다 어둡지 않다. 띠 경계 안만 계산해 원본 위에 합성한다.
 struct ChinShadeStage: RenderStage {
@@ -46,6 +47,8 @@ struct ChinShadeStage: RenderStage {
                 face: face, extent: extent, tuning: tuning, cache: context.regionMasks)
         else { return image }
         let width = FaceRegions.faceWidth(face, extent: extent)
+        // 워프와 같은 yaw 약화로 밝히기 양과 상한을 함께 줄여 돌아간 얼굴에서 그늘만 세게 밝아지지 않게 한다.
+        let attenuation = FaceShapeRig.yawAttenuation(face.yaw, tuning: tuning)
         let radius = max(CGFloat(tuning.skinBlurMinimumRadius), width * Self.referenceRadius)
         let reach = radius * Self.blurReach
         let area = band.bounds.insetBy(dx: -reach, dy: -reach).intersection(extent).integral
@@ -67,7 +70,7 @@ struct ChinShadeStage: RenderStage {
         let wide = FrequencySeparation.maskedMean(encoded, mask: surround, radius: Double(radius))
         let lifted = try ChinShadeKernel.shared.lift(
             encoded: encoded, numerator: wide.numerator, denominator: wide.denominator,
-            amount: value * tuning.chinShadeMaxGain, maxLift: tuning.chinShadeMaxLift,
+            amount: value * tuning.chinShadeMaxGain * attenuation, maxLift: tuning.chinShadeMaxLift * attenuation,
             minimumCoverage: Self.minimumCoverage, extent: band.bounds)
         // 감마 왕복의 반올림이 입력보다 낮아지지 않게 선형에서 입력과의 최댓값을 둔다.
         let brighter = lifted.applyingFilter("CISRGBToneCurveToLinear")

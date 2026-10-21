@@ -219,6 +219,7 @@ extension PortraitScope {
 - 마스크에 볼 기준 피부색 가중치(`FaceRegions`의 기존 Cb·Cr 거리)를 곱한다. 마스크 코드는 `FaceRegions+Chin.swift`에 둔다.
 - 밝히기는 L' = L + 값 × `chinShadeMaxGain`(0.5) × max(0, R − L)이다. R은 피부색 가중치 × (1 − 띠) 가중 넓은 평균 휘도(반지름 얼굴 폭 × 0.15)다(주름 밝히기와 같은 방식, I2 구현 중 변경). 띠 자체로 가중하면 고른 그늘 띠를 밝히지 못한다. 어둡게 하지 않는다.
 - 결과 휘도 증가는 `chinShadeMaxLift`(12/255)에서 자른다.
+- 이득과 상한에 워프와 같은 yaw 약화 `FaceShapeRig.yawAttenuation`을 곱한다(I3 구현 중 변경). 돌아간 얼굴에서 워프보다 그늘만 세게 밝아지지 않게 한다.
 
 #### 5.8 부유방 원소 (`BodyShapeRig`)
 

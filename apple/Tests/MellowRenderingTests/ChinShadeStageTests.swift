@@ -209,6 +209,28 @@ final class ChinShadeStageTests: XCTestCase {
         XCTAssertEqual(try Support.bytes(output), try Support.bytes(input), "워프가 접지 않는 얼굴은 그늘도 밝히지 않는다")
     }
 
+    func testTurnedFaceLiftFollowsYawAttenuation() throws {
+        var turned = face
+        turned.yaw = Self.turnedYaw
+        let attenuation = FaceShapeRig.yawAttenuation(Self.turnedYaw, tuning: tuning)
+        XCTAssertLessThan(attenuation, 1, "yaw 0.8은 약화 기준(0.35)을 넘는다")
+        let input = try shadedImage(faces: [face])
+        let band = bandPoints(below: try chinTip(of: face))
+        let before = try Support.grid(input)
+        let frontal = try Support.grid(ChinShadeStage().apply(input, in: context(doubleChin: 1, faces: [face])))
+        let side = try Support.grid(ChinShadeStage().apply(input, in: context(doubleChin: 1, faces: [turned])))
+        let frontalLift = meanLuma(frontal, band) - meanLuma(before, band)
+        let turnedLift = meanLuma(side, band) - meanLuma(before, band)
+        XCTAssertGreaterThan(frontalLift, 6)
+        XCTAssertEqual(
+            turnedLift / frontalLift, attenuation, accuracy: attenuation * Self.yawTolerance,
+            "돌아간 얼굴의 밝히기는 워프와 같은 yaw 약화를 받는다")
+    }
+
+    /// 약화 기준을 넘는 yaw와 비율 허용 오차.
+    private static let turnedYaw = 0.8
+    private static let yawTolerance = 0.1
+
     func testFaceWithoutEnoughJawPointsIsNotLifted() throws {
         var sparse = face
         // 입꼬리 사이 아래 윤곽점은 7·8·9번 셋이다. 가운데를 빼면 둘이 남는다.
