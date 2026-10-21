@@ -373,6 +373,40 @@ final class EditorScenarioTests: XCTestCase {
         return copy
     }
 
+    /// 스텁 커플(얼굴 둘·몸 둘·짝): 사람 2를 여성으로 지정하고 여성 그룹에 부유방을 넣으면 렌더 대상에서 그 사람 몸만 받는다.
+    func testCoupleScenarioSideChestOnlyOnTheWoman() async throws {
+        let staged = try TestSupport.solidPNG(in: root)
+        let faces = TestSupport.coupleFaces()
+        let bodies = TestSupport.coupleBodies()
+        let model = TestSupport.makeModel(
+            root: root, analyzer: StubFaceAnalyzer(result: .success(faces)),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
+            importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
+        await model.importFromFiles([staged])
+        try await waitUntil { model.isReady && model.preview != nil }
+        model.selectTool(.body)
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertTrue(model.showsBodyShape(.sideChest))
+        XCTAssertTrue(model.canAdjustBodyShape(.sideChest))
+        model.beginSliderEdit()
+        model.edit(.bodyShape(.sideChest, 1))
+        model.endSliderEdit()
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.presentedError)
+        let info = try XCTUnwrap(model.selectedInfo)
+        // 렌더와 같은 RenderContext가 준비 때 저장한 짝으로 몸마다 체형을 건다.
+        let context = RenderContext(
+            extent: CGRect(origin: .zero, size: info.pixelSize), recipe: model.currentRecipe,
+            analysis: PhotoAnalysis(faces: info.faces, bodies: bodies, bodyFaceMatches: info.bodyFaceMatches),
+            tuning: RenderTuning())
+        XCTAssertEqual(context.bodyTargets.map(\.faceIndex), [0, 1])
+        XCTAssertEqual(context.bodyTargets.map(\.adjustments.sideChest), [0, 1], "여성 몸만 부유방을 받는다")
+        model.setBeautyTarget(.all)
+        XCTAssertFalse(model.showsBodyShape(.sideChest))
+    }
+
     /// 생성 커플 사진(실제 Vision): 라벨대로 성별을 지정하고 여성 그룹·개인 값을 넣은 뒤 단체 사진에 피부만 동기화하고 저장한다.
     func testCoupleFixtureManualGenderGroupAndIndividualThenSyncAndExport() async throws {
         let labels = try scenarioLabels()

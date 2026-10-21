@@ -31,6 +31,10 @@ final class AppModel {
         /// 얼굴마다 받아들인 성별 추정(faces와 같은 순서).
         /// 저장하지 않고 수동 지정이 늘 우선한다.
         var genders: [Gender?] = []
+        /// 몸 인덱스 → 얼굴 인덱스(준비 때 정한 짝, 렌더와 같다).
+        /// 몸 0이 가장 큰 사람이고 다리 길게 띠는 몸 0만 받는다.
+        /// 짝이 없는 몸은 키가 없다.
+        var bodyFaceMatches: [Int: Int] = [:]
     }
 
     /// 뷰티·메이크업 패널이 편집하는 대상.
@@ -80,9 +84,12 @@ final class AppModel {
     }
 
     /// 체형 도구가 보여줄 상태. 분석 실패가 전신 없음보다 먼저다.
+    /// 사람 대상은 전신이 있어도 그 얼굴과 짝인 몸이 없으면 noBodyForTarget이다.
     enum BodyAvailability: Equatable {
         case ready
         case noBody
+        /// 대상 사람의 얼굴과 짝인 몸이 없다.
+        case noBodyForTarget
         case unavailable(MellowError)
     }
 
@@ -260,12 +267,18 @@ final class AppModel {
         return selectedInfo?.hasPerson == true ? .ready : .noPerson
     }
     /// 선택 사진의 체형 도구 상태.
+    /// 분석 실패 → 전신 없음 → 대상 사람의 몸 없음 순서로 판정한다.
     var bodyAvailability: BodyAvailability {
         if let failure = selectedInfo?.bodyAnalysisFailure {
             return .unavailable(failure)
         }
-        return selectedInfo?.hasBody == true ? .ready : .noBody
+        guard selectedInfo?.hasBody == true else { return .noBody }
+        guard let faceIndices = targetedFaceIndices else { return .ready }
+        let paired = Set(bodyFaceMatches.values)
+        return faceIndices.contains(where: paired.contains) ? .ready : .noBodyForTarget
     }
+    /// 선택 사진의 몸 인덱스 → 얼굴 인덱스.
+    var bodyFaceMatches: [Int: Int] { selectedInfo?.bodyFaceMatches ?? [:] }
     /// 선택 사진의 뷰티 대상.
     /// 기억한 대상이 지금 없는 사람(실행 취소·초기화로 사라짐)이나 범위 밖 얼굴이면 전체로 읽는다.
     /// 기억은 그대로 두어 얼굴을 다시 찾으면 돌아온다.
@@ -428,14 +441,19 @@ final class AppModel {
     /// 대상이 가리키는 얼굴.
     /// 전체·그룹은 모든 얼굴이다.
     var targetedFaces: [FaceGeometry] {
+        targetedFaceIndices.map { $0.map { faces[$0] } } ?? faces
+    }
+
+    /// 사람 대상이 가리키는 얼굴 인덱스(왼쪽부터).
+    /// 전체·그룹은 nil이고 짝이 없는 기록은 빈 배열이다.
+    var targetedFaceIndices: [Int]? {
         switch beautyTarget {
         case .all, .gender:
-            return faces
+            return nil
         case .face(let index):
-            return faces.indices.contains(index) ? [faces[index]] : []
+            return faces.indices.contains(index) ? [index] : []
         case .person(let id):
-            let paired = currentRecipe.people.peopleByFace(faces.map(\.boundingBox))
-            return paired.filter { $0.value.id == id }.keys.sorted().map { faces[$0] }
+            return peopleByFace.filter { $0.value.id == id }.keys.sorted()
         }
     }
 
@@ -482,10 +500,37 @@ final class AppModel {
         }
         return isSliderEditActive || active || currentRecipe.bodySkin[key] != 0
     }
-    /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저이고, 관절이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 체형 슬라이더를 보일지.
+    /// 현재 대상 층이 그 키를 둘 수 있을 때만 보인다(부유방은 여성 그룹·사람).
+    /// 기록이 없는 얼굴은 첫 변경이 개인 층을 만들므로 보인다.
+    func showsBodyShape(_ key: BodyShapeKey) -> Bool {
+        scope(for: beautyTarget).map { $0.allows(.bodyShape(key)) } ?? true
+    }
+    /// 현재 대상이 다리 길게 띠를 받는지.
+    /// 전체·그룹은 받고, 사람 대상은 그 얼굴이 몸 0(가장 큰 몸)과 짝일 때만 받는다.
+    var targetReceivesLegBand: Bool {
+        guard let faceIndices = targetedFaceIndices else { return true }
+        guard let largest = bodyFaceMatches[Self.legBandBodyIndex] else { return false }
+        return faceIndices.contains(largest)
+    }
+    /// 다리 길게 띠를 받는 몸(가장 큰 몸).
+    private static let legBandBodyIndex = 0
+    /// "다리 길게는 가장 큰 사람에게만" 안내를 보일지.
+    /// 대상 사람의 몸은 있지만 다리 띠를 받지 않을 때다.
+    var showsLegLengthLargestOnly: Bool {
+        bodyAvailability == .ready && !targetReceivesLegBand
+    }
+    /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저다.
+    /// 관절이 없거나 대상 사람의 몸이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 다리 길게는 다리 띠를 받는 대상에서만 켠다.
     /// 드래그 중에는 0을 지나도 끄지 않는다.
     func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
-        !isGeometryLocked && (isSliderEditActive || bodyAvailability == .ready || currentRecipe.body[key] != 0)
+        guard !isGeometryLocked else { return false }
+        if isSliderEditActive || scopedValues.body[key] != 0 {
+            return true
+        }
+        guard bodyAvailability == .ready else { return false }
+        return key != .legLength || targetReceivesLegBand
     }
     /// 메이크업 룩·색·강도를 바꿀 수 있는지. 얼굴 분석이 실패한 사진에 메이크업을 넣으면 저장이 실패하므로 끈다.
     /// 이미 들어온 메이크업은 줄이거나 지울 수 있게 켜고, 드래그 중에는 0에 닿아도 끄지 않는다. 얼굴이 없을 뿐이면 저장은 되므로 켠다.
@@ -567,7 +612,8 @@ final class AppModel {
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
-            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders)
+            hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
+            bodyFaceMatches: prepared.bodyFaceMatches)
         bindLegacyPeople(id, faces: prepared.faces)
     }
 
