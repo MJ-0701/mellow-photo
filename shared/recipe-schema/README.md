@@ -20,9 +20,11 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
 - 좌표(`x`, `y`, `sourceX`, `sourceY`, `dx`, `dy`, `radius`)는 방향 보정된 이미지 기준 0~1 정규화 값이고, 원점은 왼쪽 아래입니다.
 - B0~G의 `portrait.targetFace`(왼쪽부터 센 얼굴 인덱스, "이 값을 i번 얼굴에만")는 읽기만 합니다(`deprecated: true`). `people.individuals`가 비어 있을 때만 `portrait`(`skin`·`face`·`features`)와 `makeup` 중 기본값과 다른 키 전부를 `people.individuals[0].layer`로 옮기고 전체 층은 기본값으로 둡니다. 그 기록은 `legacyIndex = i`와 결정적 id(`B0000000-0000-0000-0000-` 뒤 12자리 인덱스)를 갖고 anchor가 없습니다. 인덱스가 0…999 999 999 999 밖이면(음수·손상 파일) 범위의 마지막 값으로 모아 어느 얼굴과도 짝이 되지 않게 합니다. 옮길 값이 없으면 기록을 만들지 않습니다. 렌더 결과는 옛 뜻과 같습니다. 사진을 준비한 뒤 `legacyIndex`의 얼굴로 anchor를 채우면 `legacyIndex`를 지웁니다. 쓸 때는 `targetFace`를 쓰지 않습니다.
-- `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`, G의 피부 정밀 `darkCircles`·`nasolabial`·`marionette`·`glabella`·`toneEvening`·`shine` 0~1과 `redness` −1~1), `face`(얼굴형 10개, 가운데 0인 양방향, `smile`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
-- 최상위 `background`(배경 흐림), `bodySkin`(몸 피부 밝기·톤·매끄럽게, `tone`만 −1~1), `body`(체형 7개, `legLength`만 0~1), `makeup`(룩 id와 부위별 색 id·강도), `effects`(그레인·글로우 0~1, 룩 뒤 마지막 단계)가 있습니다. 렌더는 단계별로 들어오며 값이 기본이면 결과가 바뀌지 않습니다.
+- `portrait`는 `skin`(피부 보정 `smoothing` 0~1, 자동 잡티 `autoBlemish`, G의 피부 정밀 `darkCircles`·`nasolabial`·`marionette`·`glabella`·`toneEvening`·`shine` 0~1과 `redness` −1~1), `face`(얼굴형 11개, 가운데 0인 양방향, `smile`·`doubleChin`만 0~1), `features`(눈 또렷하게·치아 미백·입술 생기 0~1)로 나뉩니다.
+- 최상위 `background`(배경 흐림), `bodySkin`(몸 피부 밝기·톤·매끄럽게, `tone`만 −1~1), `body`(체형 8개, `legLength`·`sideChest`만 0~1), `makeup`(룩 id와 부위별 색 id·강도), `effects`(그레인·글로우 0~1, 룩 뒤 마지막 단계)가 있습니다. 렌더는 단계별로 들어오며 값이 기본이면 결과가 바뀌지 않습니다.
 - `people`은 사람별·성별 그룹 보정(H)입니다. `portrait`·`makeup`이 전체 층, `people.groups.male/female`이 성별 그룹 층, `people.individuals[].layer`가 개인 층이며 위 층이 아래 층을 키 단위로 덮어씁니다. 층은 있는 키만 담습니다(없음 = 상속). 층의 메이크업은 부위 단위로 덮어쓰고 부위 객체의 `colorID`가 없거나 `null`이면 "색 없음"으로 덮어씁니다. 층 스키마는 `$defs/portraitLayer` 하나입니다. `individuals[].anchor`는 정규화 얼굴 상자의 중심·폭이고 `gender`는 사용자가 지정한 성별만 담습니다(자동 추정은 저장하지 않음). `legacyIndex`는 옛 `targetFace`에서 이행한 기록에만 있습니다. 기록에는 `anchor`와 `legacyIndex` 중 하나가 있어야 합니다(`anyOf`). 읽는 쪽은 관대하게 읽습니다: `layer`가 없으면 빈 층, 모르는 `gender` 문자열은 미지정이고, `id`나 `anchor`가 잘못된 기록은 그 기록만 버리며, 같은 `id`의 기록이 둘 이상이면 앞의 것만 남깁니다. 편집과 렌더는 같은 전역 1:1 짝짓기 결과로 얼굴의 사람을 정합니다. Apple 구현은 레시피에 `people` 키를 늘 쓰고(`{}` 포함), 비어 있는 `groups`·`individuals`와 층의 빈 그룹 객체는 생략합니다.
+- 체형도 층을 가집니다(I). 최상위 `body`가 전체 층이고 층의 `body`(`$defs/portraitLayer`, 키는 최상위 `body`와 같고 모두 선택)가 그룹·개인 층입니다. 다른 키와 같이 키 단위로 덮어쓰고 빈 `body`는 쓰지 않습니다. 전체 층 체형은 사진의 모든 사람에게 걸립니다(I2부터, 그 전에는 가장 큰 사람 하나).
+- 허용 층 규칙: `sideChest`(부유방)는 여성 그룹 층과 개인 층에서만 렌더에 쓰입니다. 전체 층(`body.sideChest`)과 남성 그룹 층(`people.groups.male.body.sideChest`)의 값은 읽고 다시 쓰면서 보존하되 렌더와 해석은 0으로 봅니다. 편집은 그 두 층에 `sideChest`를 쓰지 않습니다. 프리셋이나 다른 구현이 그 값을 담아 와도 결과는 같습니다. 성별 미지정 사람은 그룹 층을 받지 않으므로 개인 층에 둔 값만 쓰입니다.
 - `portrait.oneTouch`와 층(`$defs/portraitLayer`)의 `oneTouch`는 원터치 표시(G4)입니다. 0~1의 마지막 원터치 강도이고, 없으면 표시가 없습니다. 뜻은 "이 층의 묶인 항목이 아래 표 × 이 강도와 같다"이며 렌더는 이 키를 읽지 않습니다(덮어쓰는 키도 아닙니다). 원터치는 렌더 시점에 펼치는 값이 아니라 항목 값을 레시피에 직접 쓰는 매크로입니다. 묶인 항목은 `skin` 9종 전부, `features` 3종, `makeup.blush`, `makeup.lip`이고 전체 층 표시에는 `bodySkin.brightness`도 듭니다. 얼굴형·체형은 들지 않습니다. `bodySkin.tone`은 표 값이 0인 동안 원터치가 쓰지 않습니다. 묶인 항목을 손으로 바꾸면 그 층의 표시만 지웁니다(메이크업 `lookID`와 같은 규칙). 전체 대상 원터치는 전체 층에 공통 표, `people.groups.male/female`에 각 성별 표, `bodySkin.brightness`에 몸 피부 표를 한 번에 씁니다. 개인 층은 그 사람의 수동 성별 표(미지정은 공통)를 씁니다. 강도 s는 숫자에 선형으로 곱하고(범위로 자름) `autoBlemish`는 s > 0이면 켭니다. 강도 0은 묶인 항목을 지웁니다(전체 층은 기본값, 그룹·개인은 상속). 블러셔 색이 없는 표는 블러셔를 `{"intensity": 0}`으로 덮어쓰고, 립은 모든 표에서 `{"intensity": 0}`으로 덮어씁니다. 동기화는 피부·눈입·메이크업·몸 피부를 모두 복사할 때만 표시를 복사하고 일부만 복사하면 받는 사진의 표시를 지웁니다.
 
   | 항목(강도 1 = 허용 상한) | 공통(미지정) | 여성 | 남성 |
@@ -73,12 +75,12 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 | `portrait.skin.smoothing` | 0 … 1 | 0 … 1 |
 | `portrait.skin.{darkCircles,nasolabial,marionette,glabella,toneEvening,shine}` | 0 … 1 | 0 … 1 |
 | `portrait.skin.redness` | −1 … 1 | −1 … 1 |
-| `portrait.face.*` | −1 … 1 (`smile` 0 … 1) | 같음 |
+| `portrait.face.*` | −1 … 1 (`smile`·`doubleChin` 0 … 1) | 같음 |
 | `portrait.features.*` | 0 … 1 | 0 … 1 |
 | `background.blur` | 0 … 1 | 0 … 1 |
 | `bodySkin.{brightness,smoothing}` | 0 … 1 | 0 … 1 |
 | `bodySkin.tone` | −1 … 1 | −1 … 1 |
-| `body.*` | −1 … 1 (`legLength` 0 … 1) | 같음 |
+| `body.*`, 층 `body.*` | −1 … 1 (`legLength`·`sideChest` 0 … 1) | 같음 |
 | `makeup.*.intensity` | 0 … 1 | 0 … 1 |
 | `effects.*` | 0 … 1 | 0 … 1 |
 | `detail.highlights` | −1 … 1 | −1 … 1 |
@@ -135,7 +137,7 @@ v1은 읽기만 합니다. 저장은 항상 v2로 합니다.
 
 ## 키를 추가할 때의 규칙 (B~H)
 
-B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다. G 단계는 `portrait.skin`에 피부 정밀 7개, 최상위 `bodySkin`·`effects`를 같은 규칙으로 더했습니다(기본값 0, schemaVersion 2 유지). H 단계는 최상위 `people`을 같은 규칙으로 더했습니다(기본값 비어 있음, schemaVersion 2 유지). G4는 `portrait.oneTouch`·층 `oneTouch`를 같은 규칙으로 더했습니다(기본값 없음 = 표시 없음, schemaVersion 2 유지).
+B 단계에서 B~F의 레시피 골격(`portrait.skin/face/features`, `background`, `body`, `makeup`)을 한 번에 넣었습니다. 이후 단계는 렌더만 채웁니다. 새 키가 더 필요하면 다음을 지킵니다. G 단계는 `portrait.skin`에 피부 정밀 7개, 최상위 `bodySkin`·`effects`를 같은 규칙으로 더했습니다(기본값 0, schemaVersion 2 유지). H 단계는 최상위 `people`을 같은 규칙으로 더했습니다(기본값 비어 있음, schemaVersion 2 유지). G4는 `portrait.oneTouch`·층 `oneTouch`를 같은 규칙으로 더했습니다(기본값 없음 = 표시 없음, schemaVersion 2 유지). I는 `portrait.face.doubleChin`·`body.sideChest`(기본값 0)와 층 `body`(기본값 비어 있음)를 같은 규칙으로 더했습니다(schemaVersion 2 유지).
 
 1. **새 키는 반드시 기본값을 가집니다.** 키가 없는 기존 파일은 기본값으로 읽혀 지금과 같은 결과를 내야 합니다. 스키마에도 `default`를 적고 `required`에 넣지 않습니다.
 2. **키를 지우거나 이름을 바꾸지 않습니다.** 더 쓰지 않는 값도 읽기는 계속합니다. 의미를 바꿔야 하면 새 키를 만듭니다.
