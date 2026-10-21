@@ -282,14 +282,23 @@ out      = blend(healed, over: image, mask: ellipse(center, r))
 ```
 
 - 상수(`RenderTuning`): `healLowBandScale` 0.3, `healRingInnerScale` 1.0, `healRingRadiusScale` 0.5, `healMaxGain` 2.0, `healLumaFloor` 0.01.
-- (G5-1 구현 중 변경) 처음 값 `healLowBandScale` 0.6·`healRingRadiusScale` 1.5는 합성 경사 테스트에서 잔차 3.6/255였다. 합성 피부의 얼룩(흐림 8px)이 원본 패치에서 그대로 옮겨져 원반 평균을 흔들었고, 넓은 고리 흐림(1.5r)이 바로 둘레가 아닌 먼 피부까지 평균에 넣었다. 9개 위치 실측에서 0.3·0.5가 최대 잔차 0.81/255이고 질감(fine) 비는 1.1 이상으로 남았다. 식은 그대로다.
+- (G5-1 구현 중 변경) 처음 값 `healLowBandScale` 0.6·`healRingRadiusScale` 1.5는 합성 경사 테스트에서 잔차 3.6/255였다.
+  합성 피부의 얼룩(흐림 8px)이 원본 패치에서 그대로 옮겨져 원반 평균을 흔들었고, 넓은 고리 흐림(1.5r)이 바로 둘레가 아닌 먼 피부까지 평균에 넣었다.
+  스크래치패드에서 9개 위치를 훑은 탐색에서 0.3·0.5가 최대 잔차 0.81/255이고 질감(fine) 비는 1.1 이상으로 남았다(저장소 테스트는 한 위치만 잰다).
+  식은 그대로다.
 - 커널 `SkinKernels.heal(source:sourceLow:ringNumerator:ringDenominator:floor:maxGain:extent:)`. 분모 `max(den, 0.001)`.
 - 원본의 고주파(질감)는 비율로 옮겨지고 저주파(밝기·색)는 대상 고리 평균이 된다. 경사 위에서도 원반이 생기지 않는다.
 - `RenderPipelineTests`의 기존 spot 테스트는 "바뀐다"만 보므로 유지. `SkinStageTests.testAutoBlemishHealsPlantedSpots`(+20 밝아짐)는 유지.
 
 #### 5.2 `BlemishDetector` 거절 조건
 
-- 중심 픽셀의 피부 마스크 ≥ `blemishCenterMaskMinimum` 0.9(후보 픽셀 문턱 `blemishMaskThreshold` 0.5는 그대로). 피부 다각형 가장자리(흐림 폭 안)와 손·턱 경계가 빠진다.
+- 중심 픽셀의 피부 다각형 마스크 ≥ `blemishCenterMaskMinimum` 0.9(후보 픽셀 문턱 `blemishMaskThreshold` 0.5는 그대로).
+  피부 다각형 가장자리(흐림 폭 안)와 손·턱 경계가 빠진다.
+- (G5-1 검토 뒤 변경) 중심 검사는 볼 색 가중치를 곱한 `skinMask`가 아니라 색 가중치 없는 피부 다각형 비트맵(`skinPolygonRaster`)을 `featherRadius`로 흐린 마스크로 한다.
+  색 가중 마스크는 붉은 잡티(Cr +0.07)에서 중심 값이 0.79까지 내려가 둥글고 안쪽에 있는 염증 여드름을 통째로 거절했다.
+  이 규칙의 뜻은 기하(가장자리·경계) 거절이다.
+  후보 픽셀 문턱(0.5)은 색 가중 마스크 그대로라 머리카락·배경은 여전히 빠진다.
+  단위 테스트: 볼 안쪽의 둥근 Cr +0.07 점은 잡히고, 가장자리·길쭉한 선 거절 테스트는 그대로 통과한다.
 - 연결 영역의 상자 종횡비 ≤ `blemishMaxAspect` 2.0이고 채움 비(픽셀 수 ÷ 상자 넓이) ≥ `blemishMinFill` 0.4. 원은 0.785, 그늘 선·주름은 낮다.
 - 단위 테스트: 합성 얼굴 턱 경계에 심은 그늘 선(폭 1%, 길이 10%)은 잡히지 않고 옆의 원은 잡힌다. 피부 다각형 가장자리 1.5% 안의 원은 잡히지 않는다.
 
