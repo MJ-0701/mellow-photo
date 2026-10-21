@@ -233,7 +233,7 @@ extension PortraitScope {
 
 ### 6. 화면 (I3)
 
-- `BodyPanel` 맨 위에 `TargetChips`를 둔다. 값은 `model.scopedValues.body`이고 변경은 대상 층으로 간다.
+- `BodyPanel` 맨 위에 `TargetChips`를 둔다(뷰티·메이크업 패널처럼 사진에 얼굴이 있을 때만, I3 구현 중 변경). 값은 `model.scopedValues.body`이고 변경은 대상 층으로 간다.
 - `sideChest` 슬라이더는 `scope.allows(.bodyShape(.sideChest))`가 true일 때만 보인다. 전체·남성 대상에서는 "부유방은 여성 그룹이나 사람을 골라 조정해요" 안내를 보인다.
 - 다리 길게는 대상이 전체·성별 그룹이거나 가장 큰 몸과 짝인 사람일 때만 켜고, 그 밖의 사람 대상에서는 끄고 "다리 길게는 사진에서 가장 큰 사람에게만 걸려요"를 보인다(0이 아닌 값은 되돌릴 수 있게 켬).
 - 사람 대상인데 그 얼굴과 짝인 몸이 없으면 "이 사람의 몸을 찾지 못했어요"를 보이고 슬라이더를 끈다. 0이 아닌 값은 되돌릴 수 있게 켠다(지금 `canAdjustBodyShape` 규칙).
