@@ -3,6 +3,15 @@ import XCTest
 @testable import MellowShared
 
 final class OneTouchBundleTests: XCTestCase {
+    /// Evoto 실측에 맞춘 표 상한(스펙 G5 판정 3).
+    enum EvotoCeiling {
+        /// Evoto는 중간 대역을 거의 그대로 둔다.
+        static let smoothing = 0.25
+        static let toneEvening = 0.15
+        /// 몸 피부 ΔY ≤ +1.5/255.
+        static let bodyBrightness = 0.1
+    }
+
     func testTablesScaleLinearlyAndNeverTouchShapeOrLipColour() {
         let female = OneTouchBundle.layer(for: .female, strength: 1)
         XCTAssertEqual(female.skinSmoothing, OneTouchBundle.Table.female.smoothing)
@@ -51,7 +60,10 @@ final class OneTouchBundleTests: XCTestCase {
         for values in [OneTouchBundle.Table.common, OneTouchBundle.Table.female, OneTouchBundle.Table.male] {
             XCTAssertLessThanOrEqual(values.smoothing, 0.5, "끝까지 올려도 중간 대역을 절반 넘게 줄이지 않는다")
             XCTAssertLessThanOrEqual(values.redness, 0, "혈색은 더하지 않는다")
+            XCTAssertLessThanOrEqual(values.smoothing, EvotoCeiling.smoothing, "Evoto는 중간 대역을 거의 그대로 둔다(스펙 G5 판정 3)")
+            XCTAssertLessThanOrEqual(values.toneEvening, EvotoCeiling.toneEvening)
         }
+        XCTAssertLessThanOrEqual(OneTouchBundle.Table.bodyBrightness, EvotoCeiling.bodyBrightness, "몸 피부 ΔY ≤ +1.5/255")
     }
 
     func testOneTouchMarkRoundTripsAndIsNotARenderValue() throws {

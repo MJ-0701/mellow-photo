@@ -70,24 +70,27 @@ public enum OneTouchBundle {
     /// 강도 1의 표.
     /// 매직 넘버는 여기에만 둔다.
     /// 남성은 질감을 남기고 색조 메이크업이 없다.
+    /// 값은 스펙 G5 2절(Evoto 7쌍 실측)이다.
+    /// 매끄럽게·얼룩 고르기·다크서클·팔자는 G4 값에서 내렸다(우리 0.6이 Evoto보다 더 평탄하고 더 밝았다).
     public enum Table {
         public static let blushColorID = "blush-peach"
         /// 성별 미지정(공통).
         public static let common = Values(
-            smoothing: 0.35, darkCircles: 0.55, nasolabial: 0.4, marionette: 0.25, glabella: 0.3, toneEvening: 0.25,
+            smoothing: 0.16, darkCircles: 0.42, nasolabial: 0.32, marionette: 0.25, glabella: 0.3, toneEvening: 0.08,
             redness: -0.2, shine: 0.45, eyeBrighten: 0.25, teethWhiten: 0.25, lipVitality: 0, blushIntensity: 0,
             blushColorID: nil)
         public static let female = Values(
-            smoothing: 0.45, darkCircles: 0.6, nasolabial: 0.45, marionette: 0.3, glabella: 0.3, toneEvening: 0.35,
+            smoothing: 0.20, darkCircles: 0.45, nasolabial: 0.36, marionette: 0.3, glabella: 0.3, toneEvening: 0.10,
             redness: -0.25, shine: 0.4, eyeBrighten: 0.3, teethWhiten: 0.3, lipVitality: 0.2, blushIntensity: 0.15,
             blushColorID: blushColorID)
         public static let male = Values(
-            smoothing: 0.25, darkCircles: 0.5, nasolabial: 0.35, marionette: 0.25, glabella: 0.3, toneEvening: 0.15,
+            smoothing: 0.12, darkCircles: 0.38, nasolabial: 0.28, marionette: 0.25, glabella: 0.3, toneEvening: 0.05,
             redness: -0.2, shine: 0.5, eyeBrighten: 0.2, teethWhiten: 0.25, lipVitality: 0, blushIntensity: 0,
             blushColorID: nil)
         /// 사진 단위 몸 피부 밝기.
         /// 전체 대상에서만 쓴다.
-        public static let bodyBrightness = 0.15
+        /// Evoto 원클릭의 몸 피부 ΔY(+0.3/255)에 맞춰 G5에서 0.15 → 0.08.
+        public static let bodyBrightness = 0.08
         /// 사진 단위 몸 피부 톤.
         /// 전체 대상에서만 쓴다.
         public static let bodyTone = 0.0

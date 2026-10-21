@@ -27,13 +27,13 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
 
   | 항목(강도 1 = 허용 상한) | 공통(미지정) | 여성 | 남성 |
   |---|---|---|---|
-  | `skin.smoothing` | 0.35 | 0.45 | 0.25 |
+  | `skin.smoothing` | 0.16 | 0.20 | 0.12 |
   | `skin.autoBlemish` | true | true | true |
-  | `skin.darkCircles` | 0.55 | 0.6 | 0.5 |
-  | `skin.nasolabial` | 0.4 | 0.45 | 0.35 |
+  | `skin.darkCircles` | 0.42 | 0.45 | 0.38 |
+  | `skin.nasolabial` | 0.32 | 0.36 | 0.28 |
   | `skin.marionette` | 0.25 | 0.3 | 0.25 |
   | `skin.glabella` | 0.3 | 0.3 | 0.3 |
-  | `skin.toneEvening` | 0.25 | 0.35 | 0.15 |
+  | `skin.toneEvening` | 0.08 | 0.10 | 0.05 |
   | `skin.redness` | −0.2 | −0.25 | −0.2 |
   | `skin.shine` | 0.45 | 0.4 | 0.5 |
   | `features.eyeBrighten` | 0.25 | 0.3 | 0.2 |
@@ -41,10 +41,10 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
   | `features.lipVitality` | 0 | 0.2 | 0 |
   | `makeup.blush` | 없음(강도 0) | `blush-peach` 0.15 | 없음(강도 0) |
   | `makeup.lip` | 없음(강도 0) | 없음(강도 0) | 없음(강도 0) |
-  | `bodySkin.brightness`(전체 대상만) | 0.15 | — | — |
+  | `bodySkin.brightness`(전체 대상만) | 0.08 | — | — |
   | `bodySkin.tone`(전체 대상만) | 0(0이면 쓰지 않음) | — | — |
 
-  기준 구현은 `apple/Sources/MellowShared/API/OneTouchBundle.swift`이고 다른 플랫폼도 같은 표를 씁니다.
+  기준 구현은 `apple/Sources/MellowShared/API/OneTouchBundle.swift`이고 다른 플랫폼도 같은 표를 씁니다. G5에서 Evoto 실측에 맞춰 매끄럽게·얼룩 고르기·다크서클·팔자·몸 피부 밝기를 내렸습니다.
 - B0까지 쓰던 `portrait.skinSmoothing`·`portrait.faceSlim`은 읽기만 합니다. `skin`이 없으면 `skin.smoothing = skinSmoothing`, `face`가 없으면 `face.width = −faceSlim`(0은 0)으로 읽고, 쓸 때는 새 키만 씁니다. 스키마에는 `deprecated: true`로 남아 있어 이전 파일도 검증을 통과합니다.
 - `detail`은 하이라이트·그림자·선명도·비네팅입니다. 기본값은 모두 0입니다.
 - `look`은 필터 선택입니다. `id`는 `shared/looks/looks.v1.json`의 룩 id이고, 값이 없으면 필터를 쓰지 않습니다. `intensity`는 원본과 룩 결과의 혼합 비율이며 기본값은 1입니다.
