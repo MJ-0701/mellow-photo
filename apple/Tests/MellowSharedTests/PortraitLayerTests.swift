@@ -70,7 +70,7 @@ final class PortraitLayerTests: XCTestCase {
                 makeup: [.blush: MakeupTint(colorID: "blush-pink", intensity: 0.4)], makeupLookID: "rosy"))
         XCTAssertEqual(
             PortraitLayer.difference(portrait: PortraitAdjustments(), makeup: MakeupAdjustments()), PortraitLayer())
-        XCTAssertEqual(PortraitKey.all.count, 2 + 7 + 11 + 3 + 5)
+        XCTAssertEqual(PortraitKey.all.count, 2 + 7 + 11 + 3 + 5 + 8)
         XCTAssertEqual(PortraitKey.skin.count, 9)
         XCTAssertTrue(PortraitKey.faceShape(.smile).isFaceShape)
         XCTAssertFalse(PortraitKey.feature(.teethWhiten).isFaceShape)
@@ -80,5 +80,47 @@ final class PortraitLayerTests: XCTestCase {
         XCTAssertEqual(
             PersonAnchor(faceBox: NormalizedRect(x: 0.25, y: 0.5, width: 0.25, height: 0.375)),
             PersonAnchor(x: 0.375, y: 0.6875, width: 0.25))
+    }
+
+    func testBodyLayerRoundTripsAndOmitsWhenEmpty() throws {
+        let layer = PortraitLayer(body: [.waist: -0.5])
+        let data = try JSONEncoder().encode(layer)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let body = try XCTUnwrap(json["body"] as? [String: Any])
+        XCTAssertEqual(body as? [String: Double], ["waist": -0.5])
+        XCTAssertEqual(try JSONDecoder().decode(PortraitLayer.self, from: data), layer)
+        let empty = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(PortraitLayer())) as? [String: Any])
+        XCTAssertNil(empty["body"], "빈 체형 사전은 쓰지 않는다")
+        let legacy = #"{"skin":{"smoothing":0.3}}"#
+        XCTAssertEqual(
+            try JSONDecoder().decode(PortraitLayer.self, from: Data(legacy.utf8)).body, [:], "I 이전 층은 체형이 없다")
+    }
+
+    func testBodyKeysCountAsOverriddenAndEffect() {
+        var zero = PortraitLayer(body: [.arms: 0])
+        XCTAssertEqual(zero.overriddenKeys, [.bodyShape(.arms)])
+        XCTAssertFalse(zero.hasEffect, "0으로 덮어쓴 체형은 렌더를 바꾸지 않는다")
+        let moved = PortraitLayer(body: [.arms: 0.2])
+        XCTAssertTrue(moved.hasEffect)
+        XCTAssertTrue(moved.numericValues.contains(0.2))
+        zero.remove([.bodyShape(.arms)])
+        XCTAssertTrue(zero.body.isEmpty)
+        XCTAssertTrue(zero.isEmpty)
+        var portrait = PortraitAdjustments()
+        var makeup = MakeupAdjustments()
+        var body = BodyShapeAdjustments(waist: -0.1, arms: -0.4)
+        moved.applied(to: &portrait, makeup: &makeup, body: &body)
+        XCTAssertEqual(body.arms, 0.2, "층의 체형 키가 아래 값을 덮는다")
+        XCTAssertEqual(body.waist, -0.1, "덮지 않은 체형 키는 아래 층 값")
+    }
+
+    func testIsShapeCoversFaceAndBody() {
+        XCTAssertTrue(PortraitKey.faceShape(.jaw).isShape)
+        XCTAssertTrue(PortraitKey.bodyShape(.waist).isShape)
+        XCTAssertFalse(PortraitKey.skinSmoothing.isShape)
+        XCTAssertFalse(PortraitKey.bodyShape(.waist).isFaceShape)
+        XCTAssertTrue(PortraitKey.all.isSuperset(of: PortraitKey.bodyShapes))
+        XCTAssertEqual(PortraitKey.bodyShapes.count, BodyShapeKey.allCases.count)
     }
 }

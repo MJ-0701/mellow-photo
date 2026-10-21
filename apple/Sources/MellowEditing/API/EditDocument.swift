@@ -443,6 +443,7 @@ public struct EditDocument: Equatable, Sendable {
             case .faceShape(let shape): target.face[shape] = source.face[shape]
             case .feature(let feature): target.features[feature] = source.features[feature]
             case .makeupPart(let part): target.makeup[part] = source.makeup[part]
+            case .bodyShape(let shape): target.body[shape] = source.body[shape]
             }
         }
         if keys.isSuperset(of: PortraitKey.makeup) {
@@ -696,6 +697,7 @@ public struct EditDocument: Equatable, Sendable {
                     recipe.makeup.setColorID(nil, of: part)
                 }
                 recipe.makeup.setIntensity(0, of: part)
+            case .bodyShape(let shape): recipe.body[shape] = 0
             }
         }
         if keys.isSuperset(of: PortraitKey.makeup) {
