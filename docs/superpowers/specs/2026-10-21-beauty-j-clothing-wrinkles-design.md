@@ -160,13 +160,13 @@ public struct ClothingAdjustments: Codable, Equatable, Sendable {
 
 `recipe.clothing.wrinkles == 0`이면 입력을 그대로 돌려준다. 아래 크기는 모두 짧은 변 `S`의 비율이다.
 
-1. **휘도 분리.** BT.601 휘도 Y만 다룬다. 결과는 세 채널에 같은 ΔY를 더해 색차를 지킨다(감마 인코딩 공간, 기존 `SkinKernels`와 같은 공간).
+1. **휘도 분리.** BT.601 휘도 Y만 다룬다. 결과는 세 채널에 같은 ΔY를 더해 색차를 지킨다(감마 인코딩 공간에서 계산한다). 단계 입력은 선형이므로 `BodySkinStage`처럼 `CILinearToSRGBToneCurve`로 인코딩해 계산하고 `CISRGBToneCurveToLinear`로 되돌린다.
 2. **중간 대역.** `Ys = Gauss(Y, σs)`, `σs = max(clothingFineSigmaMinimum 0.8px, clothingFineSigma 0.0012·S)`. `base = guided(Ys, 가이드 Ys, r = clothingGuidedRadius 1.5 × clothingCoarseSigma 0.016·S, ε = clothingGuidedEpsilon 0.02)`. `bp = Ys − base`.
    - guided 필터는 상자 평균으로 만든다. `mean_I = Box(I,r)`, `var_I = Box(I²,r) − mean_I²`, `a = var_I/(var_I+ε)`, `b = mean_I − a·mean_I`, `q = Box(a,r)·I + Box(b,r)`. 상자는 `CIBoxBlur`, 나머지는 색 커널이다.
    - `CIGuidedFilter`는 업샘플링용이라 같은 크기에서 위 정의와 같은 값을 주는지 확인하기 전에는 쓰지 않는다.
 3. **질감 게이트.** `fine = Y − Ys`. `fe = sqrt(Gauss(fine², 3σs))`. `tex = 1 − smoothstep(clothingTextureLow 0.025, clothingTextureHigh 0.06, fe)`.
 4. **옷 마스크 M**(아래 6절). 가중치 `w = M × tex × wrinkles`.
-5. **적용.** `ΔY = −w × (bp < 0 ? clothingShadowGain 1.0 : clothingHighlightGain 0.7) × bp`. 출력 RGB = 입력 RGB + ΔY(0…1로 자름). 커널 하나(`ClothingKernels.flatten`)로 한다.
+5. **적용.** `ΔY = −w × (bp < 0 ? clothingShadowGain 1.0 : clothingHighlightGain 0.7) × bp`. 출력 RGB = 입력 RGB + ΔY이고 자르지 않는다. 확장 범위(1 초과) 픽셀이 마스크 밖에서 잘리면 안 된다. 커널 하나(`ClothingKernels.flatten`)로 한다.
 6. 출력 extent는 입력과 같다. `wrinkles`가 0이 아니고 얼굴·사람 마스크·획이 모두 없으면 입력을 그대로 돌려준다.
 
 ### 6. 옷 마스크 `ClothingMask`
