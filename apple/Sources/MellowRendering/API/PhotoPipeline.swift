@@ -23,11 +23,15 @@ public struct PreparedPhoto: Sendable {
     /// 몸 인덱스 → 얼굴 인덱스.
     /// 짝이 없는 몸은 키가 없다.
     public let bodyFaceMatches: [Int: Int]
+    /// 몸 인덱스 → 준비 때 사람 마스크에서 찾은 몸통 옆선(렌더와 같다).
+    /// 사람 마스크가 없거나 두 엉덩이가 없는 몸은 키가 없다.
+    public let bodyOutlines: [Int: BodyOutline]
 
     public init(
         pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
         hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil, hasBody: Bool = false,
-        bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = [], bodyFaceMatches: [Int: Int] = [:]
+        bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = [], bodyFaceMatches: [Int: Int] = [:],
+        bodyOutlines: [Int: BodyOutline] = [:]
     ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
@@ -39,6 +43,7 @@ public struct PreparedPhoto: Sendable {
         self.bodyAnalysisFailure = bodyAnalysisFailure
         self.genders = genders
         self.bodyFaceMatches = bodyFaceMatches
+        self.bodyOutlines = bodyOutlines
     }
 }
 
@@ -138,7 +143,8 @@ public actor PhotoPipeline {
         return PreparedPhoto(
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
             hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable,
-            bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender }, bodyFaceMatches: matches)
+            bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender }, bodyFaceMatches: matches,
+            bodyOutlines: outlines)
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.

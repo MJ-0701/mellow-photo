@@ -64,7 +64,9 @@ enum BodyShapeRig {
     /// 부유방 push 기본 반지름. 어깨 폭 비율.
     private static let sideChestRadius: CGFloat = 0.14
     /// 사진 준비 때 몸통 옆선을 찾는 높이(부유방, 몸 전체의 가슴).
-    static let outlineLevels: [Double] = [Double(sideChestLevel), Double(chestLevel)]
+    static let outlineLevels: [Double] = [sideChestOutlineLevel, Double(chestLevel)]
+    /// 부유방 옆선 점의 높이(OutlineKey.level).
+    static let sideChestOutlineLevel = Double(sideChestLevel)
     /// 엉덩이 관절에서 골반 바깥 윤곽까지. 어깨 폭 비율. Vision 엉덩이 점은 윤곽보다 안쪽이다.
     private static let hipOutlineOffset: CGFloat = 0.12
     /// 허벅지 반폭. 어깨 폭 비율(허벅지 폭은 어깨 폭의 40% 안팎).

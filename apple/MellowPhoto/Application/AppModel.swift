@@ -35,6 +35,9 @@ final class AppModel {
         /// 몸 0이 가장 큰 사람이고 다리 길게 띠는 몸 0만 받는다.
         /// 짝이 없는 몸은 키가 없다.
         var bodyFaceMatches: [Int: Int] = [:]
+        /// 몸 인덱스 → 준비 때 사람 마스크에서 찾은 몸통 옆선(렌더와 같다).
+        /// 사람 마스크가 없거나 두 엉덩이가 없는 몸은 키가 없다.
+        var bodyOutlines: [Int: BodyOutline] = [:]
     }
 
     /// 뷰티·메이크업 패널이 편집하는 대상.
@@ -529,6 +532,21 @@ final class AppModel {
     }
     /// 다리 길게 띠를 받는 몸(가장 큰 몸).
     private static let legBandBodyIndex = 0
+    /// "팔이 붙어 부유방이 바뀌지 않음" 안내를 보일지.
+    /// 부유방 슬라이더가 보이고, 대상 몸(사람 대상은 그 얼굴과 짝인 몸, 전체·그룹은 모든 몸) 중 옆선을 찾은 몸이 있고,
+    /// 그 몸 모두 부유방 높이 옆선 점이 양쪽 다 없을 때다(렌더가 부유방 원소를 만들지 않는다).
+    var showsSideChestArmTouching: Bool {
+        guard bodyAvailability == .ready, showsBodyShape(.sideChest) else { return false }
+        let outlines = selectedInfo?.bodyOutlines ?? [:]
+        let bodies: [Int]
+        if let faceIndices = targetedFaceIndices {
+            bodies = bodyFaceMatches.filter { faceIndices.contains($0.value) }.map(\.key)
+        } else {
+            bodies = Array(outlines.keys)
+        }
+        let probed = bodies.compactMap { outlines[$0] }
+        return !probed.isEmpty && probed.allSatisfy { !$0.hasSideChestPoint }
+    }
     /// "다리 길게는 가장 큰 사람에게만" 안내를 보일지.
     /// 대상 사람의 몸은 있지만 다리 띠를 받지 않을 때다.
     var showsLegLengthLargestOnly: Bool {
@@ -628,7 +646,7 @@ final class AppModel {
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
             hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
-            bodyFaceMatches: prepared.bodyFaceMatches)
+            bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines)
         bindLegacyPeople(id, faces: prepared.faces)
     }
 

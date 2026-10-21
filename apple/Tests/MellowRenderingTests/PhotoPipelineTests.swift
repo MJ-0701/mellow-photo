@@ -511,20 +511,24 @@ final class PhotoPipelineTests: XCTestCase {
                 bodyAnalyzer: StubBodyAnalyzer(result: .success(bodies)),
                 instanceAnalyzer: StubInstanceAnalyzer(result: .success(instances)), tuning: RenderTuning())
             let id = PhotoID()
-            _ = try await pipeline.prepare(id, at: url)
-            let stored = await pipeline.preparedAnalysis(id)
-            return try XCTUnwrap(stored).bodyOutlines
+            let prepared = try await pipeline.prepare(id, at: url)
+            let analysis = await pipeline.preparedAnalysis(id)
+            let stored = try XCTUnwrap(analysis).bodyOutlines
+            XCTAssertEqual(prepared.bodyOutlines, stored, "앱이 받는 옆선은 렌더 분석과 같다")
+            return stored
         }
         let combined = try await outlines(
             person: try OutlineTestSupport.detachedMask(), instances: [], bodies: [body, noHips])
         XCTAssertEqual(combined.keys.sorted(), [0], "두 엉덩이가 없는 몸은 찾지 않는다")
         XCTAssertEqual(combined[0]?.points.count, 4, "27%·30% × 두 쪽")
+        XCTAssertEqual(combined[0]?.hasSideChestPoint, true)
         // 쓸 수 있는 몸이 인스턴스보다 많으면 배정하지 않으므로 몸 하나로 본다.
         let owned = try await outlines(
             person: everywhere, instances: [try OutlineTestSupport.detachedMask()], bodies: [body])
         XCTAssertEqual(owned[0]?.points.count, 4, "배정된 인스턴스 마스크를 쓴다(전체 마스크는 모두 사람이라 점이 없다)")
         let whole = try await outlines(person: everywhere, instances: [], bodies: [body])
         XCTAssertEqual(whole[0]?.points.count, 0, "마스크는 있는데 배경을 못 만나면 빈 옆선이다")
+        XCTAssertEqual(whole[0]?.hasSideChestPoint, false, "부유방 높이 점이 없다")
         let none = try await outlines(person: nil, instances: [], bodies: [body])
         XCTAssertTrue(none.isEmpty, "마스크가 없으면 옆선이 없다")
     }

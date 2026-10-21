@@ -1880,6 +1880,43 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(UserMessage.noBodyForTarget, "이 사람의 몸을 찾지 못했어요")
     }
 
+    func testSideChestArmTouchingHintFollowsTheTargetBodyOutline() async throws {
+        let model = try await coupleBodyModel()
+        let id = try XCTUnwrap(model.session.selectedPhotoID)
+        let info = try XCTUnwrap(model.selectedInfo)
+        let thumbnail = try XCTUnwrap(model.thumbnails[id])
+        // 부유방 높이(0.27)에 점이 없고 가슴 높이(0.3)에만 점이 있는 몸과, 부유방 높이에 한쪽 점이 있는 몸.
+        let touching = BodyOutline(points: [OutlineKey(level: 0.3, side: 1): NormalizedPoint(x: 0.4, y: 0.5)])
+        let clear = BodyOutline(points: [OutlineKey(level: 0.27, side: -1): NormalizedPoint(x: 0.6, y: 0.5)])
+        func prepare(_ outlines: [Int: BodyOutline]) {
+            model.remember(
+                id,
+                PreparedPhoto(
+                    pixelSize: info.pixelSize, thumbnail: thumbnail, faces: info.faces, faceAnalysisFailure: nil,
+                    hasPerson: true, hasBody: true, genders: info.genders, bodyFaceMatches: info.bodyFaceMatches,
+                    bodyOutlines: outlines))
+        }
+        prepare([0: touching, 1: clear])
+        XCTAssertEqual(model.selectedInfo?.bodyOutlines, [0: touching, 1: clear], "준비의 몸통 옆선을 사진 정보에 둔다")
+        model.setBeautyTarget(.face(0))
+        XCTAssertTrue(model.showsSideChestArmTouching, "대상 몸에 부유방 높이 옆선 점이 없으면 안내한다")
+        model.setBeautyTarget(.face(1))
+        XCTAssertFalse(model.showsSideChestArmTouching, "한쪽이라도 점이 있으면 안내하지 않는다")
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertFalse(model.showsSideChestArmTouching, "그룹은 모든 몸 중 하나라도 점이 있으면 안내하지 않는다")
+        for target in [AppModel.BeautyTarget.all, .gender(.male)] {
+            model.setBeautyTarget(target)
+            XCTAssertFalse(model.showsSideChestArmTouching, "부유방 슬라이더가 없는 \(target)")
+        }
+        prepare([0: touching, 1: touching])
+        model.setBeautyTarget(.gender(.female))
+        XCTAssertTrue(model.showsSideChestArmTouching, "모든 몸의 팔이 붙으면 그룹에도 안내한다")
+        prepare([:])
+        model.setBeautyTarget(.face(0))
+        XCTAssertFalse(model.showsSideChestArmTouching, "옆선을 찾지 않은 몸(마스크 없음)은 관절선으로 그려 안내하지 않는다")
+        XCTAssertEqual(UserMessage.sideChestArmTouching, "팔이 몸에 붙어 있으면 부유방은 바뀌지 않아요.")
+    }
+
     func testLegLengthOnlyForLargestBodyTarget() async throws {
         let model = try await coupleBodyModel()
         model.setBeautyTarget(.face(1))

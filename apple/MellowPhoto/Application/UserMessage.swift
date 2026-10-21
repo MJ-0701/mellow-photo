@@ -39,6 +39,7 @@ enum UserMessage {
     static let toolBody = "체형"
     static let bodyHint = "선택한 대상의 관절점으로 몸매를 다듬어요. 배경과 팔은 움직이지 않게 보호해요. 다리 길게는 골반과 발목이 보여야 바뀌어요."
     static let sideChestScopeHint = "부유방은 여성 그룹이나 사람을 골라 조정해요."
+    static let sideChestArmTouching = "팔이 몸에 붙어 있으면 부유방은 바뀌지 않아요."
     static let noBodyForTarget = "이 사람의 몸을 찾지 못했어요"
     static let legLengthLargestOnly = "다리 길게는 사진에서 가장 큰 사람에게만 걸려요."
     static let noBodyDetected = "몸의 관절을 찾지 못했어요"
