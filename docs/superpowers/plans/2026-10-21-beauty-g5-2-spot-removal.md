@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 레시피 키 `portrait.skin.spots`와 `skin` 단계 안 점 지우기 하위 단계(`SpotRemoval`)를 넣는다. 모공보다 크고 얼굴 폭 2.4%보다 작은 어두운·밝은 점을 닫힘·열림 차이로 채우고, 모공 대역과 깊은 구조(콧구멍·눈꼬리·입꼬리)는 건드리지 않으며, 강도는 깊이 문턱을 움직인다. 원터치 표는 `spots` 1.0/1.0/0.4(G5-2 구현 중 변경, 처음 0.75)를 쓰고 자동 잡티를 끈다. 하네스의 시제품을 지우고 제품 단계로 잰다.
+**Goal:** 레시피 키 `portrait.skin.spots`와 `skin` 단계 안 점 지우기 하위 단계(`SpotRemoval`)를 넣는다. 모공보다 크고 얼굴 폭 2.4%보다 작은 어두운 점을 닫힘 차이로 채우고(밝은 점 빼기는 `spotBrightAmount` 0으로 기본 꺼짐, G5-2 구현 중 변경), 모공 대역과 깊은 구조(콧구멍·눈꼬리·입꼬리)는 건드리지 않으며, 강도는 깊이 문턱을 움직인다. 원터치 표는 `spots` 1.0/1.0/0.4(G5-2 구현 중 변경, 처음 0.75)를 쓰고 자동 잡티를 끈다. 하네스의 시제품을 지우고 제품 단계로 잰다.
 
 **Architecture:** 키는 `SkinRefinementKey.spots`(MellowShared, 키 추가만, schemaVersion 2 유지). 렌더는 `SkinStage.refine`의 첫 하위 단계 `SpotRemoval.apply`(MellowRendering Domain)이고 커널은 `SkinKernels.spot`·`spotApply`, 제외 영역은 `FaceRegions+Spots.swift`. 보정 지도는 유한 영역에서 만들어 `insertingIntermediate()`로 굳힌다(실패 시 대안은 Task 3). 파이프라인 단계 이름·순서는 바뀌지 않는다.
 
