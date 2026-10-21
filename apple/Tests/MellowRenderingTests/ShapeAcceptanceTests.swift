@@ -42,10 +42,10 @@ final class ShapeAcceptanceTests: XCTestCase {
         /// 이중턱 띠. 턱 끝 아래 얼굴 좌표 거리, 얼굴 폭 비율.
         static let chinBandTop: CGFloat = 0.05
         static let chinBandBottom: CGFloat = 0.25
-        /// 부유방 원소 높이. 어깨~엉덩이 비율(BodyShapeRig.outlineLevels와 같은 27%).
-        static let sideChestLevel: CGFloat = 0.27
-        /// 몸 전체 가슴 원소 높이. 어깨~엉덩이 비율(BodyShapeRig.outlineLevels와 같은 30%).
-        static let chestLevel: CGFloat = 0.3
+        /// 부유방 원소 높이. 어깨~엉덩이 비율이고 렌더 rig 값 그대로다.
+        static let sideChestLevel = CGFloat(BodyShapeRig.sideChestOutlineLevel)
+        /// 몸 전체 가슴 원소 높이. 어깨~엉덩이 비율이고 렌더 rig 값 그대로다.
+        static let chestLevel = CGFloat(BodyShapeRig.chestOutlineLevel)
         /// 사람 마스크 안으로 보는 값.
         static let maskHalf: CGFloat = 0.5
         /// 배경 보호 띠 폭 = 묶음 최대 이동 × bandShiftScale + bandMargin(미리보기 px).
@@ -257,15 +257,27 @@ final class ShapeAcceptanceTests: XCTestCase {
         let torso = try await photo(Self.torso)
         let composite = try gridComposite(torso)
         let baseline = PixelGrid(try torso.render(EditRecipe(), input: composite))
+        let width = Int(torso.extent.width)
+        let unwarped = PixelGrid(try RenderingTestSupport.renderer.makeCGImage(composite))
+        var controlMaximum: CGFloat = 0
         for (name, recipe) in try straightnessRecipes(torso) {
-            let excluded = try excludedZone(torso, recipe: recipe)
+            let zone = try zones(torso, recipe: recipe)
             let after = PixelGrid(try torso.render(recipe, input: composite))
-            let bend = gridBend(before: baseline, after: after, excluded: excluded, width: Int(torso.extent.width))
+            let outsideBand = zone.excluded.map { !$0 }
+            let bend = gridBend(before: baseline, after: after, measurable: outsideBand, width: width)
             record("torso-01", "grid-\(name)", "measuredLines", CGFloat(bend.count))
             record("torso-01", "grid-\(name)", "maxLineShift", bend.maximum)
             XCTAssertGreaterThan(bend.count, 0, "\(name) 띠 밖 격자선을 잰다")
             XCTAssertLessThanOrEqual(bend.maximum, Naturalness.lineBend, "\(name) 띠 밖 격자선이 휘지 않는다")
+            // 대조: 같은 묶음을 보호 없이(사람 마스크 nil) 그리면 띠 안 배경 격자선이 휜다. 이 검사가 실패할 수 있음을 보인다.
+            let control = PixelGrid(try unprotectedWarp(torso, recipe: recipe, input: composite))
+            let inBand = gridBend(before: unwarped, after: control, measurable: zone.band, width: width)
+            let outside = gridBend(before: unwarped, after: control, measurable: outsideBand, width: width)
+            record("torso-01", "grid-\(name)", "unprotectedBandMaxLineShift", inBand.maximum)
+            record("torso-01", "grid-\(name)", "unprotectedOutsideMaxLineShift", outside.maximum)
+            controlMaximum = max(controlMaximum, inBand.maximum)
         }
+        XCTAssertGreaterThan(controlMaximum, Naturalness.lineBend, "보호를 끄면 띠 안 격자선이 0.5px 넘게 휜다(검사가 실패할 수 있다)")
         let lines = try await photo(Self.lines)
         let before = try DisplayScale.grid(try await lines.preview(EditRecipe()))
         for (name, recipe) in try straightnessRecipes(lines) {
@@ -315,12 +327,17 @@ final class ShapeAcceptanceTests: XCTestCase {
             couple.context(femaleGroup).bodyTargets[woman].adjustments.sideChest, 1, "여성 그룹 부유방은 여성 몸이 받는다")
         let womanCenters = try elementCenters(couple, recipe: femaleGroup, body: woman, key: .sideChest)
         XCTAssertEqual(womanCenters.count, womanSides)
+        var womanShifts: [CGFloat] = []
         for (index, center) in womanCenters.enumerated() {
             let vector = femaleField.vector(at: center)
-            let shift = hypot(vector.dx, vector.dy) * couple.phoneScale
-            record("couple-body-01", "femaleGroupSideChest", "womanCenter\(index)Phone", shift)
-            XCTAssertGreaterThanOrEqual(shift, Visibility.sideChestPhoneShift, "여성 그룹 부유방은 여성에게 보인다")
+            let shift = hypot(vector.dx, vector.dy)
+            womanShifts.append(shift)
+            record("couple-body-01", "femaleGroupSideChest", "womanCenter\(index)Phone", shift * couple.phoneScale)
+            XCTAssertGreaterThanOrEqual(
+                shift * couple.phoneScale, Visibility.sideChestPhoneShift, "여성 그룹 부유방은 여성에게 보인다")
         }
+        try checkArmRegion(
+            couple, recipe: femaleGroup, body: woman, field: femaleField, shifts: womanShifts, item: "woman")
         XCTAssertEqual(couple.context(femaleGroup).bodyTargets[man].adjustments.sideChest, 0, "같은 값이 남성 몸에서 0")
         for point in try torsoSides(couple.skeleton(man), level: Layout.sideChestLevel) {
             let vector = femaleField.vector(at: point)
@@ -335,12 +352,16 @@ final class ShapeAcceptanceTests: XCTestCase {
         _ = outlineSides(
             couple, recipe: maleIndividual, body: man, level: Layout.sideChestLevel, item: "maleIndividualSideChest")
         let manCenters = try elementCenters(couple, recipe: maleIndividual, body: man, key: .sideChest)
+        var manShifts: [CGFloat] = []
         for (index, center) in manCenters.enumerated() {
             let vector = maleField.vector(at: center)
-            let shift = hypot(vector.dx, vector.dy) * couple.phoneScale
-            record("couple-body-01", "maleIndividualSideChest", "manCenter\(index)Phone", shift)
-            XCTAssertGreaterThanOrEqual(shift, Visibility.sideChestPhoneShift, "남성 개인 층 부유방은 옆선 점이 있는 쪽을 바꾼다")
+            let shift = hypot(vector.dx, vector.dy)
+            manShifts.append(shift)
+            record("couple-body-01", "maleIndividualSideChest", "manCenter\(index)Phone", shift * couple.phoneScale)
+            XCTAssertGreaterThanOrEqual(
+                shift * couple.phoneScale, Visibility.sideChestPhoneShift, "남성 개인 층 부유방은 옆선 점이 있는 쪽을 바꾼다")
         }
+        try checkArmRegion(couple, recipe: maleIndividual, body: man, field: maleField, shifts: manShifts, item: "man")
         let maleMask = try instanceMask(couple, body: man)
         let after = try DisplayScale.grid(try await couple.preview(femaleGroup))
         let fraction = ShapeTestSupport.changedFraction(
@@ -502,6 +523,20 @@ final class ShapeAcceptanceTests: XCTestCase {
         return largest
     }
 
+    /// 팔 영역 최대 이동이 움직인 부유방 이동 중 가장 작은 것의 15% 이하인지(torso-01과 같은 armMaximum).
+    /// 움직인 쪽이 없으면 기준이 없어 로그만 남긴다.
+    private func checkArmRegion(
+        _ photo: RealBodyPhoto, recipe: EditRecipe, body: Int, field: FloatPatch, shifts: [CGFloat], item: String
+    ) throws {
+        let arm = try armMaximum(photo, recipe: recipe, body: body, field: field)
+        guard let reference = shifts.min(), reference > 0 else {
+            print("shape-acceptance \(photo.file) \(item)ArmRegion skipped=움직인 부유방 쪽 없음")
+            return
+        }
+        record(photo.file, "\(item)ArmRegion", "armMaxOverSide", arm / reference)
+        XCTAssertLessThanOrEqual(arm, reference * Naturalness.armShare, "\(item) 팔 영역 이동은 옆가슴 이동의 15% 이하")
+    }
+
     /// 그 몸의 인스턴스 마스크(extent). 인스턴스가 없는 기계는 이 검사만 건너뛴다.
     private func instanceMask(_ photo: RealBodyPhoto, body: Int) throws -> FloatPatch {
         guard !photo.analysis.personInstances.isEmpty else {
@@ -533,6 +568,11 @@ final class ShapeAcceptanceTests: XCTestCase {
 
     /// 실루엣(전체 인물 마스크 ≥ 0.5)에서 (묶음 최대 이동 × 4 + 4px) 안의 픽셀. 행 우선, 원점 왼쪽 아래 행부터다.
     private func excludedZone(_ photo: RealBodyPhoto, recipe: EditRecipe) throws -> [Bool] {
+        try zones(photo, recipe: recipe).excluded
+    }
+
+    /// excluded는 실루엣과 띠(실루엣에서 띠 폭 안), band는 그중 실루엣 밖(배경 보호 띠)이다.
+    private func zones(_ photo: RealBodyPhoto, recipe: EditRecipe) throws -> (excluded: [Bool], band: [Bool]) {
         let mask = try photo.personMaskPatch()
         let width = Int(photo.extent.width)
         let height = Int(photo.extent.height)
@@ -540,7 +580,18 @@ final class ShapeAcceptanceTests: XCTestCase {
         let distances = ShapeTestSupport.distanceToNearest(inside, width: width, height: height)
         let reach = Double(photo.largestShift(recipe) * Layout.bandShiftScale + Layout.bandMargin)
         record(photo.file, "band", "reachPixels", CGFloat(reach))
-        return distances.map { $0 <= reach }
+        let excluded = distances.map { $0 <= reach }
+        let band = zip(excluded, inside).map { $0 && !$1 }
+        return (excluded, band)
+    }
+
+    /// 렌더와 같은 묶음에서 사람 마스크·이웃·팔 보호를 모두 뺀 워프만 입력에 건다(보호 없는 대조).
+    private func unprotectedWarp(_ photo: RealBodyPhoto, recipe: EditRecipe, input: CIImage) throws -> CGImage {
+        let bare = photo.groups(recipe).map { ShapeGroup(primitives: $0.primitives) }
+        let warped = try DisplacementWarp.shared.apply(
+            groups: bare, to: input, extent: photo.extent, limit: photo.tuning.shapeDisplacementLimit,
+            tuning: photo.tuning)
+        return try RenderingTestSupport.renderer.makeCGImage(warped)
     }
 
     /// 사람을 흰 바탕 8px 간격 검은 격자 위에 전체 인물 마스크로 얹고 비트맵으로 굳힌다(스펙 7.2).
@@ -571,9 +622,10 @@ final class ShapeAcceptanceTests: XCTestCase {
         return CIImage(cgImage: try RenderingTestSupport.renderer.makeCGImage(composite))
     }
 
-    /// 띠 밖 모든 격자선의 위치(검은 픽셀 가중 중심)를 행·열마다 재 가장 큰 차이를 돌려준다.
-    /// 세로선은 간격 안 가운데 행들에서, 가로선은 가운데 열들에서 잰다. 창에 띠 안 픽셀이 하나라도 있으면 뺀다.
-    private func gridBend(before: PixelGrid, after: PixelGrid, excluded: [Bool], width: Int) -> (
+    /// 잴 수 있는 픽셀(measurable)만 든 창마다 격자선 위치(검은 픽셀 가중 중심)를 재 가장 큰 차이를 돌려준다.
+    /// 세로선은 간격 안 가운데 행들에서, 가로선은 가운데 열들에서 잰다.
+    /// 첫 선과 마지막 선도 재고, 사진 가장자리에서는 창을 사진 안으로 자른다.
+    private func gridBend(before: PixelGrid, after: PixelGrid, measurable: [Bool], width: Int) -> (
         count: Int, maximum: CGFloat
     ) {
         let height = before.height
@@ -586,20 +638,20 @@ final class ShapeAcceptanceTests: XCTestCase {
         for vertical in [true, false] {
             let across = vertical ? width : height
             let along = vertical ? height : width
-            for line in stride(from: spacing, to: across - spacing, by: spacing) {
-                let start = line - Layout.gridWindowLead
+            for line in stride(from: 0, to: across, by: spacing) {
+                let span = max(line - Layout.gridWindowLead, 0)..<min(line - Layout.gridWindowLead + spacing, across)
                 for base in stride(from: 0, to: along, by: spacing) {
                     for offset in Layout.gridProbeOffsets {
                         let probe = base + offset
                         guard probe < along else { continue }
-                        let window = (start..<(start + spacing)).map { vertical ? ($0, probe) : (probe, $0) }
-                        guard !window.contains(where: { excluded[$0.1 * width + $0.0] }) else { continue }
+                        let window = span.map { vertical ? ($0, probe) : (probe, $0) }
+                        guard window.allSatisfy({ measurable[$0.1 * width + $0.0] }) else { continue }
                         let first = window.map { darkness(before, $0.0, $0.1) }
                         let second = window.map { darkness(after, $0.0, $0.1) }
                         let firstTotal = first.reduce(0, +)
                         let secondTotal = second.reduce(0, +)
                         guard firstTotal > 0, secondTotal > 0 else { continue }
-                        let positions = (0..<spacing).map { CGFloat($0) }
+                        let positions = span.map { CGFloat($0) }
                         let firstCenter = zip(first, positions).map { $0 * $1 }.reduce(0, +) / firstTotal
                         let secondCenter = zip(second, positions).map { $0 * $1 }.reduce(0, +) / secondTotal
                         count += 1
