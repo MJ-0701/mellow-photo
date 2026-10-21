@@ -855,6 +855,17 @@ enum DisplayScale {
         return deltas[index]
     }
 
+    /// weight가 절반을 넘는 픽셀의 |ΔY| 분위수(8비트).
+    static func percentileAbsoluteLumaDelta(
+        _ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid, percentile: Double
+    ) -> Double {
+        let inside = points(before, in: nil).filter { weight.red($0) > maskHalf }
+        let deltas = inside.map { abs(luma(after.rgba($0)) - luma(before.rgba($0))) }.sorted()
+        guard !deltas.isEmpty else { return 0 }
+        let index = min(deltas.count - 1, Int(Double(deltas.count - 1) * percentile))
+        return deltas[index]
+    }
+
     /// 가중 평균 Y(8비트).
     static func luma(_ grid: PixelGrid, weight: PixelGrid) -> Double {
         var total = 0.0
@@ -1142,6 +1153,17 @@ final class RealPortrait: @unchecked Sendable {
     /// 점 지우기 제외 비트맵(콧구멍 띠·눈꼬리·입꼬리, 흐리기 전, 원본 배율).
     func spotExclusionMask() throws -> PixelGrid {
         let raster = FaceRegions.spotExclusionRaster(face: face, extent: extent, tuning: tuning, cache: nil)
+        return try RenderingTestSupport.grid(raster.cropped(to: extent))
+    }
+
+    /// 점 지우기 제외 영역 중 콧구멍 띠(첫 다각형) 비트맵.
+    /// 코 특징점이 없으면 nil이다.
+    func nostrilBandMask() throws -> PixelGrid? {
+        guard face.landmarks[.nose] != nil,
+            let band = FaceRegions.spotExclusionPolygons(face: face, extent: extent, tuning: tuning).first
+        else { return nil }
+        let raster = FaceRegions.polygonMask(
+            fill: [band], cut: [], cutWidth: 0, extent: extent, tuning: tuning, cache: nil)
         return try RenderingTestSupport.grid(raster.cropped(to: extent))
     }
 

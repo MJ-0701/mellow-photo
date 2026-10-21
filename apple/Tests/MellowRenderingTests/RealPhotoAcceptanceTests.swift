@@ -775,6 +775,10 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let poreRatio = 0.9
         /// 콧구멍 띠·눈꼬리·입꼬리 원 안 평균 |ΔY| 상한(8비트).
         static let exclusionMeanAbsolute = 1.0
+        /// 콧구멍 띠 다각형 안 |ΔY| 99분위 상한(8비트).
+        /// 데모 기본 6.7, 제외를 끄면 9.4다(스펙 G5 1.2, G5-3 구현 중 변경).
+        static let nostrilPercentileAbsolute = 8.0
+        static let nostrilPercentile = 0.99
         /// 얼굴 마스크 영역 밖 채널 차이 상한(바이트).
         static let outsideByteDelta = 1
         static let defaultDarkRecovery = 0.6
@@ -879,6 +883,11 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         let excluded = DisplayScale.lumaDelta(before, after, weight: exclusion).meanAbsolute
         XCTAssertLessThanOrEqual(
             record("spots", "exclusionMeanAbs", excluded), SpotBounds.exclusionMeanAbsolute, "콧구멍 띠·눈꼬리·입꼬리")
+        let nostril = try XCTUnwrap(try portrait.nostrilBandMask(), "데모 사진은 코 특징점이 있다")
+        let nostrilShift = DisplayScale.percentileAbsoluteLumaDelta(
+            before, after, weight: nostril, percentile: SpotBounds.nostrilPercentile)
+        XCTAssertLessThanOrEqual(
+            record("spots", "nostrilP99Abs", nostrilShift), SpotBounds.nostrilPercentileAbsolute, "콧구멍 띠 안 99분위")
         var outsideMax = 0
         for y in 0..<before.height {
             for x in 0..<before.width {
