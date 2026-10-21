@@ -560,8 +560,8 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(
             model.currentRecipe.portrait.skin,
             SkinAdjustments(
-                darkCircles: 0.6, nasolabial: 0.6, marionette: 0.6, glabella: 0.6, toneEvening: 0.6, redness: -0.5,
-                shine: 0.6, spots: 0.6))
+                darkCircles: 0.6, nasolabial: 0.6, marionette: 0.6, glabella: 0.6, toneEvening: 0.6, chromaEvening: 0.6,
+                redness: -0.5, shine: 0.6, spots: 0.6))
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
         model.undo()
@@ -569,7 +569,10 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.currentRecipe.portrait.skin.shine, 0.6)
         XCTAssertEqual(
             SkinRefinementKey.allCases.map(UserMessage.skinRefinementTitle),
-            ["다크서클", "팔자주름", "마리오네트 주름", "미간 주름", "피부 얼룩 고르기", "붉은기", "번들거림", "점 지우기"])
+            [
+                "다크서클", "팔자주름", "마리오네트 주름", "미간 주름", "피부 얼룩 고르기", "얼룩 색 고르기", "붉은기", "번들거림",
+                "점 지우기",
+            ])
     }
 
     func testAutoEnhanceWithFaceAppliesOneTouchSkinAndKeepsFaceWidth() async throws {

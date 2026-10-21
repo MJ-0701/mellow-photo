@@ -122,7 +122,7 @@ final class EvotoCalibrationTests: XCTestCase {
 
     /// 비교 계열.
     /// MELLOW_EVOTO_CANDIDATES=1일 때만 잰다.
-    /// legacy 계열은 1.4.0 표(점 지우기 없음, 자동 잡티 켬)다.
+    /// legacy 계열은 1.4.0 표(점 지우기·얼룩 색 고르기 없음, 자동 잡티 켬)다.
     static let candidateFamilies: [Family] = [
         candidate("legacy", table: Legacy.values(for:), bodyBrightness: Legacy.bodyBrightness, autoBlemish: true)
     ]
@@ -143,6 +143,7 @@ final class EvotoCalibrationTests: XCTestCase {
             values.darkCircles = darkCircles[gender] ?? values.darkCircles
             values.nasolabial = nasolabial[gender] ?? values.nasolabial
             values.spots = 0
+            values.chromaEvening = 0
             return values
         }
     }
@@ -170,8 +171,8 @@ final class EvotoCalibrationTests: XCTestCase {
         layer.autoBlemish = autoBlemish
         let refinements: [SkinRefinementKey: Double] = [
             .darkCircles: values.darkCircles, .nasolabial: values.nasolabial, .marionette: values.marionette,
-            .glabella: values.glabella, .toneEvening: values.toneEvening, .redness: values.redness,
-            .shine: values.shine, .spots: values.spots,
+            .glabella: values.glabella, .toneEvening: values.toneEvening, .chromaEvening: values.chromaEvening,
+            .redness: values.redness, .shine: values.shine, .spots: values.spots,
         ]
         for (key, value) in refinements {
             layer.skinRefinement[key] = AdjustmentRange.clamped(

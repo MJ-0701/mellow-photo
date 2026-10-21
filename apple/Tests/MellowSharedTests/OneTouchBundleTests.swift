@@ -79,6 +79,21 @@ final class OneTouchBundleTests: XCTestCase {
         XCTAssertTrue(OneTouchBundle.keys.contains(.skinRefinement(.spots)))
     }
 
+    func testOneTouchEvensBlotchChromaMoreForWomenThanMen() {
+        XCTAssertEqual(
+            OneTouchBundle.layer(for: .female, strength: 1).skinRefinement[.chromaEvening],
+            OneTouchBundle.Table.female.chromaEvening)
+        XCTAssertLessThan(OneTouchBundle.Table.male.chromaEvening, OneTouchBundle.Table.female.chromaEvening)
+        XCTAssertEqual(
+            SkinRefinementKey.allCases,
+            [
+                .darkCircles, .nasolabial, .marionette, .glabella, .toneEvening, .chromaEvening, .redness, .shine,
+                .spots,
+            ],
+            "화면 순서")
+        XCTAssertTrue(OneTouchBundle.keys.contains(.skinRefinement(.chromaEvening)))
+    }
+
     func testOneTouchMarkRoundTripsAndIsNotARenderValue() throws {
         var recipe = EditRecipe()
         recipe.portrait.oneTouch = 0.6

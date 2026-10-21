@@ -58,7 +58,7 @@ enum UserMessage {
     static let autoBlemish = "자동 잡티"
     static let skinHint = "피부 보정은 모공 질감을 남기고 얼룩만 고르게 합니다. 자동 잡티는 사진을 준비할 때 찾은 작은 잡티를 지웁니다."
     static let skinRefinementHint =
-        "다크서클·팔자주름·마리오네트 주름·미간 주름은 특징점으로 어림한 띠 안에서 어두운 만큼만 밝힙니다. 붉은기는 왼쪽이 맑게, 오른쪽이 혈색이에요. 점 지우기는 모공보다 큰 점만 채워요."
+        "다크서클·팔자주름·마리오네트 주름·미간 주름은 특징점으로 어림한 띠 안에서 어두운 만큼만 밝힙니다. 붉은기는 왼쪽이 맑게, 오른쪽이 혈색이에요. 점 지우기는 모공보다 큰 점만 채워요. 얼룩 색 고르기는 얼룩의 보라·붉은 색만 고르고 밝기는 그대로 둬요."
     static let effectsHint = "그레인과 글로우는 필터와 선명도 뒤에 사진 전체에 얹어요."
     static let faceHint = "미소는 왼쪽 끝, 나머지는 가운데가 원래 모양이에요. 얼굴 형태를 먼저 조정한 뒤 잡티를 보정해 주세요."
     static let featureHint = "치아 미백은 치아가 보이는 사진에서만 바뀌어요. 눈·입 보정은 얼굴 특징점을 찾은 얼굴에 적용돼요."
@@ -271,6 +271,7 @@ enum UserMessage {
         case .marionette: return "마리오네트 주름"
         case .glabella: return "미간 주름"
         case .toneEvening: return "피부 얼룩 고르기"
+        case .chromaEvening: return "얼룩 색 고르기"
         case .redness: return "붉은기"
         case .shine: return "번들거림"
         case .spots: return "점 지우기"
