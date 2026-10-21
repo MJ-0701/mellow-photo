@@ -19,6 +19,11 @@ struct StubBodyAnalyzer: BodyAnalyzer {
     func analyze(_ image: CIImage) throws -> [BodyGeometry] { try result.get() }
 }
 
+struct StubInstanceAnalyzer: PersonInstanceAnalyzer {
+    var result: Result<[CIImage], MellowError>
+    func instanceMasks(_ image: CIImage) throws -> [CIImage] { try result.get() }
+}
+
 struct StubGenderEstimator: GenderEstimator {
     var result: Result<[GenderEstimate?], MellowError>
     func estimate(_ image: CIImage, faces: [FaceGeometry]) throws -> [GenderEstimate?] { try result.get() }
@@ -393,6 +398,60 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertNil(prepared.bodyAnalysisFailure)
         let analysis = await pipeline.preparedAnalysis(id)
         XCTAssertEqual(analysis?.bodies, [])
+    }
+
+    func testAnyUsableBodyReportsBody() async throws {
+        let url = try writeSolidPNG()
+        let unusable = Support.standingBody(in: Support.standingBox, omitting: [.leftShoulder])
+        let usable = Support.standingBody(in: NormalizedRect(x: 0.6, y: 0.3, width: 0.3, height: 0.5))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([unusable, usable])), tuning: RenderTuning())
+        let prepared = try await pipeline.prepare(PhotoID(), at: url)
+        XCTAssertTrue(prepared.hasBody, "가장 큰 몸이 아니어도 쓸 수 있는 몸이 있으면 체형 도구를 쓴다")
+    }
+
+    func testPrepareStoresBodyFaceMatchesAndInstances() async throws {
+        let url = try writeSolidPNG()
+        // 왼쪽 몸의 목(0.2, 0.492)은 얼굴 기대점(0.2, 0.5) 바로 아래이고 오른쪽 몸은 얼굴 폭의 2.5배 떨어져 있다.
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.55, width: 0.2, height: 0.2))
+        let left = Support.standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.4, height: 0.6))
+        let right = Support.standingBody(in: NormalizedRect(x: 0.5, y: 0, width: 0.4, height: 0.6))
+        // Vision처럼 사진과 비율이 다른 작은 마스크다. 인스턴스 0이 오른쪽 절반, 1이 왼쪽 절반이다.
+        let maskSize = CGSize(width: 64, height: 48)
+        let rightHalf = Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48))
+        let leftHalf = Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([face])),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([left, right])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success([rightHalf, leftHalf])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertEqual(prepared.bodyFaceMatches, [0: 0], "얼굴 아래 몸만 짝이 된다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyFaceMatches, [0: 0])
+        XCTAssertEqual(analysis.personInstances.count, 2, "인스턴스 마스크는 받은 그대로 보관한다")
+        XCTAssertEqual(analysis.personInstances.first?.extent, rightHalf.extent, "Vision 원래 해상도")
+        XCTAssertEqual(analysis.bodyInstances, [0: 1, 1: 0], "두 몸이 서로 다른 인스턴스에 놓인다")
+        XCTAssertEqual(analysis.faceInstances, [0: 1], "얼굴은 상자 중심이 든 인스턴스")
+    }
+
+    func testInstanceFailureIsSilent() async throws {
+        let url = try writeSolidPNG()
+        let body = Support.standingBody(in: Support.standingBox)
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success([])), bodyAnalyzer: StubBodyAnalyzer(result: .success([body])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .failure(.personAnalysisUnavailable(reason: "test"))),
+            tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertTrue(prepared.hasBody, "인스턴스 실패가 체형 분석에 영향을 주지 않는다")
+        XCTAssertNil(prepared.personAnalysisFailure, "인스턴스 실패는 사유를 남기지 않는다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertTrue(analysis.personInstances.isEmpty)
+        XCTAssertEqual(analysis.bodyInstances, [:])
     }
 
     func testReprepareReturnsNothingWhilePreviewIsCached() async throws {

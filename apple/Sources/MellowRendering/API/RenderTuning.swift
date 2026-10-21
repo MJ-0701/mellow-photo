@@ -260,6 +260,14 @@ public struct RenderTuning: Sendable {
         }
     }
 
+    /// 얼굴–몸 짝짓기의 목 기대점.
+    /// 얼굴 상자 아래 가운데에서 상자 높이의 이 비율만큼 아래다.
+    public var bodyFaceNeckDrop: Double = 0.25
+    /// 몸의 목(또는 어깨 중점)과 얼굴 기대점의 거리가 얼굴 폭의 이 배수 이하여야 짝 후보다.
+    public var bodyFaceMatchTolerance: Double = 1.0
+    /// 몸·얼굴의 표본점에서 읽은 인스턴스 마스크 평균이 이 값 이상이어야 그 사람으로 본다.
+    public var instanceMatchMinimum: Double = 0.5
+
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
