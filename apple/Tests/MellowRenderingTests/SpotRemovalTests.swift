@@ -189,6 +189,28 @@ final class SpotRemovalTests: XCTestCase {
         XCTAssertLessThan(SpotRemoval.thresholds(strength: Bounds.partialFillStrength, tuning: RenderTuning()).fill, 1)
     }
 
+    func testDarkOnlySkipsTheBrightPassesAndKeepsTheBytes() throws {
+        let bright = try planted(Bounds.brightFactor, centers: gridCenters, radiusFraction: Bounds.spotRadiusFraction)
+        let tuning = RenderTuning()
+        XCTAssertEqual(tuning.spotBrightAmount, 0, "기본은 어두운 점만")
+        let bounds = FaceRegions.maskBounds(face: bright.face, extent: extent, tuning: tuning)
+        let width = Double(Bounds.faceWidth)
+        let spot = width * tuning.spotRadiusFraction
+        let pore = max(tuning.skinBlurMinimumRadius, width * tuning.spotPoreRadiusFraction)
+        let limits = SpotRemoval.thresholds(strength: 1, tuning: tuning)
+        func correction(includesBright: Bool, tuning: RenderTuning) throws -> [UInt8] {
+            try Support.bytes(
+                SpotRemoval.correction(
+                    bright.image, bounds: bounds, spot: spot, pore: pore, limits: limits, tuning: tuning,
+                    includesBright: includesBright))
+        }
+        let skipped = try correction(includesBright: false, tuning: tuning)
+        XCTAssertEqual(skipped, try correction(includesBright: true, tuning: tuning), "밝은 점 형태 필터를 건너뛰어도 같은 바이트")
+        var withBright = tuning
+        withBright.spotBrightAmount = Bounds.brightAmountOn
+        XCTAssertNotEqual(skipped, try correction(includesBright: true, tuning: withBright), "켜면 밝은 점 입력이 쓰인다")
+    }
+
     func testSpotRemovalLeavesPixelsOutsideTheFaceBoundsUntouched() throws {
         let dark = try planted(Bounds.darkFactor, centers: spotCenters, radiusFraction: Bounds.spotRadiusFraction)
         let before = try Support.grid(dark.image)
