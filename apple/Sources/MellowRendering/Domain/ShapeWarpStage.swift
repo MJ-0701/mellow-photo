@@ -9,6 +9,7 @@ import MellowShared
 /// 다리 길게 띠는 가장 큰 몸 하나만 만든다(DisplacementWarp.maximumBands 1). 값 범위는 각 rig가 직접 자른다.
 /// 원소가 없으면 입력을 그대로 돌려준다. 관절이 없거나 체형 분석이 실패했으면 체형 원소만 빠진다(오류 아님).
 /// 인물 마스크가 없으면 보호가 꺼져 이 계획 전과 같은 바이트로 그린다.
+/// 부유방·몸 전체 가슴 원소는 준비 때 찾은 몸통 옆선(BodyTarget.outline)에 둔다(스펙 5.8).
 struct ShapeWarpStage: RenderStage {
     let name = "shapeWarp"
 
@@ -51,7 +52,7 @@ struct ShapeWarpStage: RenderStage {
         context.bodyTargets.flatMap { target -> [ShapeGroup] in
             let parts = BodyShapeRig.groups(
                 body: target.body, adjustments: target.adjustments, extent: context.extent, tuning: context.tuning,
-                includesLegBand: target.index == Self.bandBodyIndex)
+                includesLegBand: target.index == Self.bandBodyIndex, outline: target.outline)
             let masks = context.personMask(forBody: target.index)
             var result: [ShapeGroup] = []
             if !parts.torso.isEmpty {

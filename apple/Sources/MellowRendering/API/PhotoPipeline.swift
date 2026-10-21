@@ -118,13 +118,17 @@ public actor PhotoPipeline {
         let body = analyzeBodies(in: preview)
         let instances = analyzeInstances(in: preview)
         let people = assignInstances(instances, bodies: body.bodies, faces: faces, extent: preview.extent)
+        let outlines = probeOutlines(
+            bodies: body.bodies, personMask: person.mask, instances: instances, owners: people.bodies,
+            extent: preview.extent)
         let matches = BodyFaceMatcher.match(bodies: body.bodies, faces: faces, extent: preview.extent, tuning: tuning)
         let genders = estimateGenders(in: preview, faces: faces)
         let analysis = PhotoAnalysis(
             faces: faces, faceAnalysisFailure: failure, blemishes: detectBlemishes(in: preview, faces: faces),
             personMask: person.mask, personAnalysisFailure: person.failure, bodies: body.bodies,
             bodyAnalysisFailure: body.failure, genderEstimates: genders, personInstances: instances,
-            bodyFaceMatches: matches, bodyInstances: people.bodies, faceInstances: people.faces)
+            bodyFaceMatches: matches, bodyInstances: people.bodies, faceInstances: people.faces,
+            bodyOutlines: outlines)
         let thumbnail = try renderer.makeCGImage(Self.scaled(preview, maxDimension: tuning.thumbnailMaxDimension))
         entries[id] = Entry(analysis: analysis, thumbnail: CIImage(cgImage: thumbnail))
         cache.insert(preview, for: id)
@@ -286,6 +290,35 @@ public actor PhotoPipeline {
         }
         return (bodyOwners, faceOwners)
     }
+
+    /// 몸마다 그 사람 마스크에서 몸통 옆선을 찾는다(스펙 5.8).
+    /// 마스크는 배정된 인스턴스 ?? 전체 인물 마스크다(RenderContext.personMask(forBody:)의 own과 같은 규칙).
+    /// 두 엉덩이가 있는 쓸 수 있는 몸만 찾는다.
+    /// 마스크가 없거나 읽지 못하면 그 몸은 키가 없다.
+    /// 마스크마다 CPU 바이트로 한 번만 읽는다.
+    private func probeOutlines(
+        bodies: [BodyGeometry], personMask: CIImage?, instances: [CIImage], owners: [Int: Int], extent: CGRect
+    ) -> [Int: BodyOutline] {
+        var samplers: [Int: MaskSampler] = [:]
+        var result: [Int: BodyOutline] = [:]
+        for (index, body) in bodies.enumerated() {
+            guard let skeleton = BodySkeleton(body: body, extent: extent, tuning: tuning), skeleton.hipCenter != nil
+            else { continue }
+            let owner = owners[index].flatMap { instances.indices.contains($0) ? $0 : nil }
+            let key = owner ?? Self.combinedMaskKey
+            if samplers[key] == nil {
+                guard let mask = owner.map({ instances[$0] }) ?? personMask else { continue }
+                samplers[key] = MaskSampler(mask: mask, renderer: renderer)
+            }
+            guard let sampler = samplers[key] else { continue }
+            result[index] = BodyOutlineProbe.probe(
+                skeleton: skeleton, mask: sampler, extent: extent, levels: BodyShapeRig.outlineLevels, tuning: tuning)
+        }
+        return result
+    }
+
+    /// probeOutlines의 표본기 캐시에서 전체 인물 마스크의 열쇠. 인스턴스 인덱스는 0 이상이다.
+    private static let combinedMaskKey = -1
 
     /// 미리보기 캐시에 없는 사진의 마스크 비트맵을 놓는다. 메모리를 최근 사진 몇 장 몫으로 묶는다.
     private func releaseMasksOfEvictedPreviews() {

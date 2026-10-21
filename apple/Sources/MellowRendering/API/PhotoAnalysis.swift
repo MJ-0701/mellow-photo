@@ -37,6 +37,11 @@ public struct PhotoAnalysis: Sendable {
     /// 얼굴 인덱스 → personInstances 인덱스.
     /// 인스턴스를 고르지 못한 얼굴은 키가 없다.
     public var faceInstances: [Int: Int]
+    /// 몸 인덱스 → 몸통 옆선(BodyOutlineProbe, 스펙 5.8).
+    /// 그 몸의 사람 마스크(배정된 인스턴스 ?? 전체 인물 마스크)에서 사진 준비 때 찾는다.
+    /// 두 엉덩이가 있는 쓸 수 있는 몸만 키가 있고 마스크가 없으면 비어 있다.
+    /// 영속화하지 않는다.
+    public var bodyOutlines: [Int: BodyOutline]
     /// 다각형 마스크 비트맵 캐시. 묶음을 복사해도 같은 캐시를 나눠 쓴다. 키에 다각형 점이 들어 있어 얼굴이 바뀌어도 낡은 값을 쓰지 않는다.
     /// 상한은 준비 때 찾은 얼굴 수에 비례한다(RegionMaskCache.capacity(forFaces:)).
     let regionMasks: RegionMaskCache
@@ -46,7 +51,7 @@ public struct PhotoAnalysis: Sendable {
         personMask: CIImage? = nil, personAnalysisFailure: MellowError? = nil, bodies: [BodyGeometry] = [],
         bodyAnalysisFailure: MellowError? = nil, genderEstimates: [GenderEstimate?] = [],
         personInstances: [CIImage] = [], bodyFaceMatches: [Int: Int] = [:], bodyInstances: [Int: Int] = [:],
-        faceInstances: [Int: Int] = [:]
+        faceInstances: [Int: Int] = [:], bodyOutlines: [Int: BodyOutline] = [:]
     ) {
         self.faces = faces
         self.faceAnalysisFailure = faceAnalysisFailure
@@ -60,6 +65,7 @@ public struct PhotoAnalysis: Sendable {
         self.bodyFaceMatches = bodyFaceMatches
         self.bodyInstances = bodyInstances
         self.faceInstances = faceInstances
+        self.bodyOutlines = bodyOutlines
         regionMasks = RegionMaskCache(maximumEntries: RegionMaskCache.capacity(forFaces: faces.count))
     }
 }

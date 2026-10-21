@@ -48,6 +48,9 @@ public struct BodyTarget: Sendable {
     public let faceIndex: Int?
     /// 짝 얼굴이 있으면 그 FaceTarget.body, 없으면 PortraitResolver.allLayerBody다.
     public let adjustments: BodyShapeAdjustments
+    /// 준비 때 그 몸의 사람 마스크에서 찾은 몸통 옆선(analysis.bodyOutlines).
+    /// 마스크가 없었으면 nil이고 rig가 관절선 점을 쓴다.
+    public let outline: BodyOutline?
 }
 
 public struct RenderContext: Sendable {
@@ -112,7 +115,8 @@ public struct RenderContext: Sendable {
             let faceIndex = analysis.bodyFaceMatches[index].flatMap { faceTargets.indices.contains($0) ? $0 : nil }
             let adjustments = faceIndex.map { faceTargets[$0].body } ?? unmatched
             return BodyTarget(
-                index: index, body: analysis.bodies[index], faceIndex: faceIndex, adjustments: adjustments)
+                index: index, body: analysis.bodies[index], faceIndex: faceIndex, adjustments: adjustments,
+                outline: analysis.bodyOutlines[index])
         }
     }
 

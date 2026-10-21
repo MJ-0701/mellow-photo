@@ -37,4 +37,21 @@ public final class Renderer: @unchecked Sendable {
         }
         return pixels
     }
+
+    /// 회색 마스크를 색 관리 없이 8비트 한 채널(빨강)로 읽는다.
+    /// 행 우선, 맨 위 행부터다.
+    /// 분석기 원래 해상도 마스크를 사진 준비 때 한 번 읽는 데 쓴다(MaskSampler).
+    func readMaskBytes(_ image: CIImage) throws -> (bytes: [UInt8], width: Int, height: Int) {
+        guard !image.extent.isInfinite else { throw MellowError.renderFailed }
+        let bounds = image.extent.integral
+        let width = Int(bounds.width)
+        let height = Int(bounds.height)
+        guard width > 0, height > 0 else { throw MellowError.renderFailed }
+        var bytes = [UInt8](repeating: 0, count: width * height)
+        bytes.withUnsafeMutableBytes { buffer in
+            context.render(
+                image, toBitmap: buffer.baseAddress!, rowBytes: width, bounds: bounds, format: .R8, colorSpace: nil)
+        }
+        return (bytes, width, height)
+    }
 }

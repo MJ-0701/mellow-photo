@@ -20,6 +20,9 @@ enum BodyShapeRig {
     private struct Builder {
         let skeleton: BodySkeleton
         let limit: CGFloat
+        /// 사람 마스크에서 찾은 몸통 옆선. 마스크가 없으면 nil이다.
+        let outline: BodyOutline?
+        let extent: CGRect
 
         var width: CGFloat { skeleton.torsoWidth }
 
@@ -36,6 +39,20 @@ enum BodyShapeRig {
             guard side != 0 else { return nil }
             return CGVector(dx: skeleton.across.dx * side, dy: skeleton.across.dy * side)
         }
+
+        /// level 높이 옆선 원소의 중심(스펙 5.8).
+        /// outline이 nil이면 관절선 점 그대로다(마스크 없는 렌더는 이전과 같은 원소).
+        /// outline이 있으면 그 쪽 옆선 점이고 없으면 nil이다(팔이 붙음).
+        func sideCenter(_ jointPoint: CGPoint, level: CGFloat, middle: CGPoint) -> CGPoint? {
+            guard let outline else { return jointPoint }
+            let side = skeleton.side(of: jointPoint, from: middle)
+            guard side != 0, let point = outline.points[OutlineKey(level: Double(level), side: Int(side))] else {
+                return nil
+            }
+            let x = extent.minX + CGFloat(point.x) * extent.width
+            let y = extent.minY + CGFloat(point.y) * extent.height
+            return CGPoint(x: x, y: y)
+        }
     }
 
     /// 허리 높이. 어깨에서 엉덩이까지의 비율(스펙 55%).
@@ -46,6 +63,8 @@ enum BodyShapeRig {
     private static let sideChestLevel: CGFloat = 0.27
     /// 부유방 push 기본 반지름. 어깨 폭 비율.
     private static let sideChestRadius: CGFloat = 0.14
+    /// 사진 준비 때 몸통 옆선을 찾는 높이(부유방, 몸 전체의 가슴).
+    static let outlineLevels: [Double] = [Double(sideChestLevel), Double(chestLevel)]
     /// 엉덩이 관절에서 골반 바깥 윤곽까지. 어깨 폭 비율. Vision 엉덩이 점은 윤곽보다 안쪽이다.
     private static let hipOutlineOffset: CGFloat = 0.12
     /// 허벅지 반폭. 어깨 폭 비율(허벅지 폭은 어깨 폭의 40% 안팎).
@@ -89,23 +108,29 @@ enum BodyShapeRig {
 
     /// 몸통·팔다리 묶음을 이은 원소. 다리 띠를 포함한다.
     static func primitives(
-        body: BodyGeometry, adjustments: BodyShapeAdjustments, extent: CGRect, tuning: RenderTuning
+        body: BodyGeometry, adjustments: BodyShapeAdjustments, extent: CGRect, tuning: RenderTuning,
+        outline: BodyOutline? = nil
     ) -> [ShapePrimitive] {
-        let parts = groups(body: body, adjustments: adjustments, extent: extent, tuning: tuning, includesLegBand: true)
+        let parts = groups(
+            body: body, adjustments: adjustments, extent: extent, tuning: tuning, includesLegBand: true,
+            outline: outline)
         return parts.torso + parts.limbs
     }
 
     /// 항목을 몸통(허리·몸 전체·부유방)과 팔다리(팔·허벅지·어깨·목·다리 띠)로 나눠 만든다(스펙 5.5).
     /// guards는 몸통 묶음이 받는 팔 캡슐이다. 관절이 없는 선분은 빠진다.
     /// includesLegBand가 false면 다리 길게를 건너뛴다(가장 큰 몸만 띠를 만든다).
+    /// outline은 그 몸의 사람 마스크에서 찾은 몸통 옆선이다(BodyTarget.outline).
+    /// 부유방·몸 전체 가슴 원소만 쓰고 nil이면 관절선 점을 쓴다.
     static func groups(
         body: BodyGeometry, adjustments: BodyShapeAdjustments, extent: CGRect, tuning: RenderTuning,
-        includesLegBand: Bool
+        includesLegBand: Bool, outline: BodyOutline? = nil
     ) -> (torso: [ShapePrimitive], limbs: [ShapePrimitive], guards: [ShapeGuard]) {
         guard adjustments.hasEffect, let skeleton = BodySkeleton(body: body, extent: extent, tuning: tuning) else {
             return ([], [], [])
         }
-        let rig = Builder(skeleton: skeleton, limit: CGFloat(tuning.shapeDisplacementLimit))
+        let rig = Builder(
+            skeleton: skeleton, limit: CGFloat(tuning.shapeDisplacementLimit), outline: outline, extent: extent)
         var torso: [ShapePrimitive] = []
         var limbs: [ShapePrimitive] = []
         for key in BodyShapeKey.allCases where includesLegBand || key != .legLength {
@@ -169,24 +194,30 @@ enum BodyShapeRig {
         }
     }
 
-    /// 같은 쪽 어깨~엉덩이 27% 점(겨드랑이 아래 옆선)을 가로축 안쪽으로 민다(스펙 5.8). 부유방은 0…1이다.
+    /// 27% 높이(겨드랑이 아래) 몸통 옆선 점을 가로축 안쪽으로 민다(스펙 5.8). 부유방은 0…1이다.
+    /// 옆선 점은 몸통 옆선(rig.sideCenter)이고 마스크가 없으면 같은 쪽 어깨~엉덩이 27% 점이다.
     /// 두 엉덩이가 있어야 한다.
     private static func sideChest(_ rig: Builder, shift: CGFloat) -> [ShapePrimitive] {
         guard let hipCenter = rig.skeleton.hipCenter else { return [] }
         let middle = BodySkeleton.lerp(rig.skeleton.shoulderCenter, hipCenter, sideChestLevel)
         return torsoSides(rig, level: sideChestLevel).compactMap { point in
-            guard let direction = rig.outward(point, from: middle) else { return nil }
-            return rig.push(point, direction, shift: -shift, radius: sideChestRadius)
+            guard let direction = rig.outward(point, from: middle),
+                let center = rig.sideCenter(point, level: sideChestLevel, middle: middle)
+            else { return nil }
+            return rig.push(center, direction, shift: -shift, radius: sideChestRadius)
         }
     }
 
     /// 가슴·골반 바깥·허벅지 바깥 세 높이의 양옆을 민다. 두 엉덩이가 있어야 하고 허벅지 높이는 그쪽 무릎이 있어야 한다.
+    /// 가슴 점은 부유방처럼 몸통 옆선(rig.sideCenter)이다. 골반·허벅지는 관절에서 정한다.
     private static func overall(_ rig: Builder, shift: CGFloat) -> [ShapePrimitive] {
         guard let hipCenter = rig.skeleton.hipCenter else { return [] }
         let chestMiddle = BodySkeleton.lerp(rig.skeleton.shoulderCenter, hipCenter, chestLevel)
         var result: [ShapePrimitive] = torsoSides(rig, level: chestLevel).compactMap { point in
-            guard let direction = rig.outward(point, from: chestMiddle) else { return nil }
-            return rig.push(point, direction, shift: shift, radius: torsoRadius)
+            guard let direction = rig.outward(point, from: chestMiddle),
+                let center = rig.sideCenter(point, level: chestLevel, middle: chestMiddle)
+            else { return nil }
+            return rig.push(center, direction, shift: shift, radius: torsoRadius)
         }
         for (hipJoint, kneeJoint) in [(BodyJoint.leftHip, BodyJoint.leftKnee), (.rightHip, .rightKnee)] {
             guard let hip = rig.skeleton.point(hipJoint), let direction = rig.outward(hip, from: hipCenter) else {

@@ -524,13 +524,17 @@ final class ShapeWarpStageTests: XCTestCase {
     }
 
     /// 부유방은 전체 층에 둘 수 없어 몸과 짝이 된 얼굴의 개인 층에 둔다.
-    private func sideChestContext(_ body: BodyGeometry, mask: CIImage?) -> RenderContext {
+    /// outlines는 준비 때 찾은 몸통 옆선이다(기본은 없음 = 관절선 점).
+    private func sideChestContext(
+        _ body: BodyGeometry, mask: CIImage?, outlines: [Int: BodyOutline] = [:]
+    ) -> RenderContext {
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.4, y: 0.82, width: 0.2, height: 0.15))
         var recipe = EditRecipe()
         recipe.people.individuals = [
             PersonRecord(anchor: PersonAnchor(faceBox: face.boundingBox), layer: PortraitLayer(body: [.sideChest: 1]))
         ]
-        let analysis = PhotoAnalysis(faces: [face], personMask: mask, bodies: [body], bodyFaceMatches: [0: 0])
+        let analysis = PhotoAnalysis(
+            faces: [face], personMask: mask, bodies: [body], bodyFaceMatches: [0: 0], bodyOutlines: outlines)
         return RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: tuning)
     }
 
@@ -544,6 +548,32 @@ final class ShapeWarpStageTests: XCTestCase {
             of: layout.upperArm, in: sideChestContext(layout.body, mask: standingPersonMask))
         for (marker, shift) in zip(layout.upperArm, guarded) {
             XCTAssertLessThanOrEqual(shift, 1, "팔 캡슐 안 표식은 움직이지 않는다 \(marker)")
+        }
+    }
+
+    /// 스펙 5.8: 사람 마스크에서 찾은 몸통 옆선의 부유방 원소는 팔 보호에 지워지지 않고 팔은 그대로다.
+    func testSideChestOnTheMaskOutlineMovesTheTorsoEdgeButNotTheArm() throws {
+        let layout = try armBody(gap: 0.2)
+        let mask = try OutlineTestSupport.detachedMask()
+        let skeleton = try XCTUnwrap(BodySkeleton(body: layout.body, extent: extent, tuning: tuning))
+        let outline = BodyOutlineProbe.probe(
+            skeleton: skeleton, mask: try OutlineTestSupport.sampler(mask), extent: extent,
+            levels: BodyShapeRig.outlineLevels, tuning: tuning)
+        let edges = try [-1, 1].map { side -> CGPoint in
+            let point = try XCTUnwrap(outline.points[OutlineKey(level: 0.27, side: side)], "\(side) 쪽 옆선")
+            return CGPoint(x: extent.minX + point.x * extent.width, y: extent.minY + point.y * extent.height)
+        }
+        let outlines = [0: outline]
+        let unguarded = try measuredShifts(
+            of: edges, in: sideChestContext(layout.body, mask: nil, outlines: outlines))
+        let guarded = try measuredShifts(
+            of: edges + layout.upperArm, in: sideChestContext(layout.body, mask: mask, outlines: outlines))
+        for (expected, shift) in zip(unguarded, guarded.prefix(edges.count)) {
+            XCTAssertGreaterThan(expected, 4, "보호가 없으면 옆선이 부유방 이동만큼 움직인다")
+            XCTAssertGreaterThanOrEqual(shift, expected * 0.8, "보호를 켜도 몸통 옆선 이동의 80% 이상이 남는다")
+        }
+        for (marker, shift) in zip(layout.upperArm, guarded.suffix(layout.upperArm.count)) {
+            XCTAssertLessThanOrEqual(shift, 1, "위팔 표식은 움직이지 않는다 \(marker)")
         }
     }
 
