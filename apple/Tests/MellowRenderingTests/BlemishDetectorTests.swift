@@ -9,6 +9,25 @@ final class BlemishDetectorTests: XCTestCase {
 
     private let size = CGFloat(SyntheticFace.size)
 
+    /// 합성 결함 기하(얼굴 폭 비율).
+    enum Geometry {
+        /// 그늘 선 반 길이·반 폭.
+        static let lineHalfLengthFraction: CGFloat = 0.05
+        static let lineHalfWidthFraction: CGFloat = 0.005
+        /// 원이 잡혔다고 보는 거리.
+        static let discMatchFraction: CGFloat = 0.02
+        /// 선이 잡혔다고 보는 거리(선 반 길이 + 여유).
+        static let lineMatchFraction: CGFloat = 0.06
+        /// 가장자리 원을 윤곽 가장 아래 점에서 안쪽으로 들이는 거리.
+        static let edgeInsetFraction: CGFloat = 0.01
+        /// 가장자리 원 반지름(픽셀).
+        static let edgeRadius: CGFloat = 3
+    }
+
+    /// 염증 여드름 색(Cr 약 +0.07, 피부보다 휘도 40% 이상 낮음).
+    /// 볼 색 가중치(σ 0.04) 밖이라 색 가중 마스크 중심 값이 0.79까지 내려간다.
+    static let inflamedColor = CIColor(red: 0.62, green: 0.28, blue: 0.25)
+
     private func detector(_ tuning: RenderTuning = RenderTuning()) -> BlemishDetector {
         BlemishDetector(tuning: tuning, renderer: Support.renderer)
     }
@@ -88,7 +107,8 @@ final class BlemishDetectorTests: XCTestCase {
         let faceWidth = SyntheticFace.box.width
         // 입 보호 영역(입 아래 끝 y 120 − 넓힘)보다 아래, 피부 아래 끝(y 50)보다 충분히 위다.
         let lineCenter = CGPoint(x: 256, y: 90)
-        let lineRadii = CGSize(width: faceWidth * 0.05, height: faceWidth * 0.005)
+        let lineRadii = CGSize(
+            width: faceWidth * Geometry.lineHalfLengthFraction, height: faceWidth * Geometry.lineHalfWidthFraction)
         let disc = SyntheticFace.cheek
         let discRadii = CGSize(width: SyntheticFace.blemishRadius, height: SyntheticFace.blemishRadius)
         let painted = SyntheticFace.painted(
@@ -96,9 +116,12 @@ final class BlemishDetectorTests: XCTestCase {
         let image = CIImage(cgImage: try Support.renderer.makeCGImage(painted))
         let spots = try detector().detect(image: image, faces: [base.face])
         let centers = spots.map(pixelCenter)
-        XCTAssertTrue(centers.contains { hypot($0.x - disc.x, $0.y - disc.y) < faceWidth * 0.02 }, "원은 잡힌다")
+        XCTAssertTrue(
+            centers.contains { hypot($0.x - disc.x, $0.y - disc.y) < faceWidth * Geometry.discMatchFraction }, "원은 잡힌다")
         XCTAssertFalse(
-            centers.contains { hypot($0.x - lineCenter.x, $0.y - lineCenter.y) < faceWidth * 0.06 }, "선은 거절")
+            centers.contains {
+                hypot($0.x - lineCenter.x, $0.y - lineCenter.y) < faceWidth * Geometry.lineMatchFraction
+            }, "선은 거절")
     }
 
     /// 피부 다각형 가장자리(마스크 < 0.9)의 원은 잡지 않는다(스펙 G5 5.2).
@@ -110,10 +133,30 @@ final class BlemishDetectorTests: XCTestCase {
         let polygon = FaceRegions.skinPolygon(face: base.face, extent: extent, tuning: RenderTuning())
         // 윤곽 가장 아래 점에서 안쪽으로 얼굴 폭 1%만 들어간 자리.
         let lowest = try XCTUnwrap(polygon.min { $0.y < $1.y })
-        let edge = CGPoint(x: lowest.x, y: lowest.y + faceWidth * 0.01)
-        let painted = SyntheticFace.painted(base.image, center: edge, radii: CGSize(width: 3, height: 3))
+        let edge = CGPoint(x: lowest.x, y: lowest.y + faceWidth * Geometry.edgeInsetFraction)
+        let painted = SyntheticFace.painted(
+            base.image, center: edge, radii: CGSize(width: Geometry.edgeRadius, height: Geometry.edgeRadius))
         let image = CIImage(cgImage: try Support.renderer.makeCGImage(painted))
         let spots = try detector().detect(image: image, faces: [base.face])
         XCTAssertTrue(spots.isEmpty, "가장자리 원은 거절 \(spots.map(pixelCenter))")
+    }
+
+    /// 볼 안쪽의 둥글고 붉은 염증 여드름(Cr 약 +0.07)은 잡힌다(스펙 G5 5.2, G5-1 검토 뒤 변경).
+    /// 색 가중 마스크로 중심을 검사하면 중심 값 0.79로 거절됐다.
+    func testInflamedRedSpotInTheCheekIsDetected() throws {
+        let base = SyntheticFace.make()
+        let center = SyntheticFace.cheek
+        let radii = CGSize(width: SyntheticFace.blemishRadius, height: SyntheticFace.blemishRadius)
+        let mask = Support.hardEllipse(center: center, radii: radii, extent: base.image.extent)
+        let painted = CIImage(color: Self.inflamedColor).applyingFilter(
+            "CIBlendWithMask", parameters: [kCIInputBackgroundImageKey: base.image, kCIInputMaskImageKey: mask]
+        ).cropped(to: base.image.extent)
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(painted))
+        let spots = try detector().detect(image: image, faces: [base.face])
+        let faceWidth = SyntheticFace.box.width
+        XCTAssertTrue(
+            spots.map(pixelCenter).contains {
+                hypot($0.x - center.x, $0.y - center.y) < faceWidth * Geometry.discMatchFraction
+            }, "붉은 원은 잡힌다 \(spots.map(pixelCenter))")
     }
 }
