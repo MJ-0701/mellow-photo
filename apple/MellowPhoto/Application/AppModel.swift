@@ -343,14 +343,21 @@ final class AppModel {
         return chips
     }
 
-    /// 얼굴마다 해석한 얼굴형 값(렌더와 같은 짝짓기·유효 성별).
-    /// 잠긴 사진에서 편집이 얼굴형 값을 다른 얼굴로 옮기는지 볼 때 쓴다.
-    func resolvedFaceShapes(of recipe: EditRecipe) -> [FaceShapeAdjustments] {
+    /// 한 얼굴에 해석한 얼굴형·체형 값.
+    struct ResolvedShape: Equatable {
+        let face: FaceShapeAdjustments
+        let body: BodyShapeAdjustments
+    }
+
+    /// 얼굴마다 해석한 얼굴형·체형 값(렌더와 같은 짝짓기·유효 성별).
+    /// 잠긴 사진에서 편집이 얼굴형·체형 값을 다른 얼굴로 옮기는지 볼 때 쓴다.
+    func resolvedShapes(of recipe: EditRecipe) -> [ResolvedShape] {
         let people = recipe.people.peopleByFace(faces.map(\.boundingBox))
         return faces.indices.map { index in
             let person = people[index]
             let gender = PortraitResolver.effectiveGender(person: person, estimate: estimatedGender(forFace: index))
-            return PortraitResolver.resolve(recipe, person: person, gender: gender).portrait.face
+            let resolved = PortraitResolver.resolve(recipe, person: person, gender: gender)
+            return ResolvedShape(face: resolved.portrait.face, body: resolved.body)
         }
     }
 

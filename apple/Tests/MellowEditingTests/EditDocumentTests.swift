@@ -354,7 +354,7 @@ final class EditDocumentTests: XCTestCase {
         locked.applyFromBatch(values, categories: [])
         XCTAssertEqual(locked.undoStack.count, steps, "빈 선택은 아무것도 하지 않는다")
         XCTAssertEqual(SyncCategory.allCases.count, 9)
-        XCTAssertEqual(SyncCategory.allCases.filter(\.dependsOnFaces), [.skin, .faceShape, .features, .makeup])
+        XCTAssertEqual(SyncCategory.allCases.filter(\.dependsOnFaces), [.skin, .faceShape, .features, .makeup, .body])
         XCTAssertEqual(SyncCategory.all, Set(SyncCategory.allCases))
     }
 
@@ -1185,5 +1185,119 @@ final class EditDocumentTests: XCTestCase {
         XCTAssertEqual(document.recipe.people.peopleByFace(twoFaces).mapValues(\.id), before, "연결은 짝을 바꾸지 않는다")
         XCTAssertFalse(document.canUndo)
         XCTAssertFalse(document.bindLegacyPeople(faces: twoFaces))
+    }
+
+    func testBodyShapeGoesToTheTargetLayer() {
+        var document = EditDocument()
+        XCTAssertNil(document.set(.bodyShape(.waist, -0.4), in: .gender(.female)))
+        XCTAssertEqual(document.recipe.people.groups[.female]?.body[.waist], -0.4)
+        XCTAssertEqual(document.recipe.body.waist, 0, "전체 층은 그대로")
+        XCTAssertEqual(EditChange.bodyShape(.arms, 0).portraitKey, .bodyShape(.arms))
+        let box = twoFaces[0]
+        XCTAssertNil(document.set(.bodyShape(.arms, -0.3), forFace: 0, of: [box]))
+        XCTAssertEqual(document.recipe.people.individuals.count, 1)
+        XCTAssertEqual(document.recipe.people.individuals[0].layer.body[.arms], -0.3, "새 기록 층에 쓴다")
+        XCTAssertEqual(document.recipe.body.arms, 0)
+    }
+
+    func testBodyShapeInLayersIsClamped() {
+        var document = EditDocument()
+        XCTAssertNil(document.set(.bodyShape(.waist, 5), in: .gender(.male)))
+        XCTAssertEqual(document.recipe.people.groups[.male]?.body[.waist], 1, "층 값도 같은 범위로 자른다")
+        XCTAssertNil(document.set(.bodyShape(.sideChest, -1), forFace: 0, of: twoFaces))
+        XCTAssertEqual(document.recipe.people.individuals.first?.layer.body[.sideChest], 0, "부유방은 0 아래로 가지 않는다")
+    }
+
+    func testSideChestRejectedOutsideFemaleGroupAndPeople() {
+        var document = EditDocument()
+        document.set(.gender(.male), forFace: 0, of: twoFaces)
+        let id = document.recipe.people.individuals[0].id
+        let before = document
+        XCTAssertEqual(document.set(.bodyShape(.sideChest, 0.5), in: .all), .scopeNotAllowed)
+        XCTAssertEqual(document.set(.bodyShape(.sideChest, 0.5), in: .gender(.male)), .scopeNotAllowed)
+        XCTAssertEqual(document, before, "거절된 변경은 레시피도 실행 취소 스택도 바꾸지 않는다")
+        XCTAssertNil(document.set(.bodyShape(.sideChest, 0.5), in: .gender(.female)))
+        XCTAssertEqual(document.recipe.people.groups[.female]?.body[.sideChest], 0.5)
+        XCTAssertNil(document.set(.bodyShape(.sideChest, 0.3), in: .person(id)), "개인 층은 성별과 무관하게 허용")
+        XCTAssertEqual(document.recipe.people.person(id)?.layer.body[.sideChest], 0.3)
+        XCTAssertEqual(document.recipe.body.sideChest, 0)
+    }
+
+    func testLockedPhotoRejectsLayerBodyEdits() {
+        let spot = LocalEdit.spot(RetouchSpot(x: 0.5, y: 0.4, sourceX: 0.4, sourceY: 0.4, radius: 0.02))
+        var document = EditDocument()
+        document.set(.bodyShape(.waist, -0.3), forFace: 0, of: twoFaces)
+        let id = document.recipe.people.individuals[0].id
+        document.appendLocalEdit(spot)
+        let locked = document
+        XCTAssertEqual(document.set(.bodyShape(.waist, -0.5), in: .gender(.female)), .geometryLocked)
+        XCTAssertEqual(document.set(.bodyShape(.arms, -0.5), in: .person(id)), .geometryLocked)
+        XCTAssertEqual(document.set(.bodyShape(.arms, -0.5), forFace: 1, of: twoFaces), .geometryLocked)
+        XCTAssertEqual(
+            document.rebindPerson(id, to: PersonAnchor(faceBox: twoFaces[1])), .geometryLocked, "체형이 다른 몸으로 옮겨 간다")
+        XCTAssertEqual(document.removePerson(id), .geometryLocked, "지우면 그 몸의 체형이 빠진다")
+        XCTAssertEqual(document.resetOverrides([.bodyShape(.waist)], in: .person(id)), .geometryLocked)
+        XCTAssertEqual(document.resetOverrides(in: .person(id)), .geometryLocked, "층 전체 재설정도 체형 키를 지운다")
+        XCTAssertEqual(document.set(.bodyShape(.sideChest, 0.5), in: .all), .geometryLocked, "잠금이 허용 층 검사보다 먼저")
+        XCTAssertEqual(document, locked)
+        var grouped = EditDocument()
+        grouped.set(.gender(.female), forFace: 0, of: twoFaces)
+        grouped.set(.skinSmoothing(0.4), forFace: 0, of: twoFaces)
+        grouped.set(.bodyShape(.waist, -0.4), in: .gender(.female))
+        let groupedID = grouped.recipe.people.individuals[0].id
+        grouped.appendLocalEdit(spot)
+        XCTAssertEqual(grouped.removePerson(groupedID), .geometryLocked, "수동 성별 그룹의 체형도 그 사람에게 걸린다")
+        XCTAssertEqual(grouped.resetOverrides([.bodyShape(.waist)], in: .gender(.female)), .geometryLocked)
+        XCTAssertNil(grouped.resetOverrides([.bodyShape(.arms)], in: .gender(.female)), "덮지 않은 키는 바뀌지 않아 허용")
+    }
+
+    func testResetAllLayerBodyKey() {
+        var document = EditDocument()
+        document.set(.bodyShape(.waist, -0.5))
+        XCTAssertNil(document.resetOverrides([.bodyShape(.waist)], in: .all))
+        XCTAssertEqual(document.recipe.body.waist, 0)
+        document.set(.bodyShape(.waist, -0.5))
+        document.appendLocalEdit(.warp(WarpStroke(x: 0.5, y: 0.5, dx: 0.01, dy: 0, radius: 0.1)))
+        XCTAssertEqual(document.resetOverrides([.bodyShape(.waist)], in: .all), .geometryLocked)
+        XCTAssertEqual(document.recipe.body.waist, -0.5)
+        XCTAssertNil(document.resetOverrides([.bodyShape(.arms)], in: .all), "이미 0인 키는 바뀌지 않아 허용")
+    }
+
+    func testSyncBodyCopiesGroupsAndClearsIndividualBodyKeysOnly() {
+        var document = EditDocument()
+        document.set(.bodyShape(.waist, -0.9), forFace: 0, of: twoFaces)
+        document.set(.skinSmoothing(0.4), forFace: 0, of: twoFaces)
+        let id = document.recipe.people.individuals[0].id
+        XCTAssertTrue(SyncCategory.body.dependsOnFaces)
+        XCTAssertEqual(SyncCategory.body.portraitKeys, PortraitKey.bodyShapes)
+        var values = PresetValues()
+        values.body.waist = -0.3
+        values.people.groups[.female] = PortraitLayer(body: [.sideChest: 0.5])
+        document.applyFromBatch(values, categories: [.body])
+        XCTAssertEqual(document.recipe.body.waist, -0.3)
+        XCTAssertEqual(document.recipe.people.groups[.female]?.body[.sideChest], 0.5)
+        let layer = document.recipe.people.person(id)?.layer
+        XCTAssertEqual(layer?.body, [:], "받는 사진의 개인 체형 키는 지운다")
+        XCTAssertEqual(layer?.skinSmoothing, 0.4, "다른 개인 키는 남는다")
+    }
+
+    func testOneTouchLeavesBodyLayersAlone() {
+        var document = EditDocument()
+        document.set(.bodyShape(.waist, -0.2))
+        document.set(.bodyShape(.arms, -0.4), in: .gender(.male))
+        document.set(.bodyShape(.sideChest, 0.3), in: .gender(.female))
+        document.set(.bodyShape(.thighs, -0.5), forFace: 0, of: twoFaces)
+        let id = document.recipe.people.individuals[0].id
+        let before = document.recipe
+        for strength in [0.6, 0] {
+            XCTAssertNil(document.applyOneTouch(strength: strength, in: .all))
+            XCTAssertEqual(document.recipe.body, before.body, "\(strength)")
+            for gender in Gender.allCases {
+                XCTAssertEqual(
+                    document.recipe.people.groups[gender]?.body ?? [:], before.people.groups[gender]?.body ?? [:],
+                    "\(gender) \(strength)")
+            }
+            XCTAssertEqual(document.recipe.people.person(id)?.layer.body, before.people.person(id)?.layer.body)
+        }
     }
 }

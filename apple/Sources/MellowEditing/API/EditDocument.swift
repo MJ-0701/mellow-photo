@@ -7,6 +7,9 @@ public struct EditDocument: Equatable, Sendable {
         case geometryLocked
         /// 개인 scope의 기록이 없거나 성별을 개인이 아닌 scope에 보냈다.
         case unknownPerson
+        /// 그 층에 둘 수 없는 키다(PortraitScope.allows).
+        /// 전체 층·남성 그룹의 부유방이다.
+        case scopeNotAllowed
     }
 
     public private(set) var recipe: EditRecipe
@@ -40,13 +43,18 @@ public struct EditDocument: Equatable, Sendable {
         isContinuousChange = false
     }
 
-    /// 얼굴 의존 변경(portraitKey가 있는 것과 .gender)만 scope를 본다.
+    /// 얼굴 의존 변경·체형(portraitKey가 있는 것)과 .gender만 scope를 본다.
     /// 나머지는 scope와 무관하게 전체에 쓴다.
     /// 개인 scope의 기록이 없거나 .gender를 개인이 아닌 scope에 보내면 .unknownPerson이고 아무것도 하지 않는다.
+    /// 그 층에 둘 수 없는 키(PortraitScope.allows)는 .scopeNotAllowed이고 아무것도 하지 않는다.
+    /// 잠금 검사가 먼저다.
     @discardableResult
     public mutating func set(_ change: EditChange, in scope: PortraitScope = .all) -> Rejection? {
         if change.affectsGeometry, isGeometryLocked {
             return .geometryLocked
+        }
+        if let key = change.portraitKey, !scope.allows(key) {
+            return .scopeNotAllowed
         }
         var updated = recipe
         if let rejection = Self.apply(change, scope: scope, to: &updated) {
@@ -79,15 +87,18 @@ public struct EditDocument: Equatable, Sendable {
     /// 그 층에서 keys를 지워 상속으로 되돌린다.
     /// nil이면 층 전체이고 개인은 성별 지정을 유지한다.
     /// .all은 그 키를 기본값으로 둔다.
-    /// 잠긴 사진에서 실제로 바뀌는 얼굴형 키가 들어 있으면 거절한다.
+    /// 잠긴 사진에서 실제로 바뀌는 얼굴형·체형 키가 들어 있으면 거절한다.
     @discardableResult
     public mutating func resetOverrides(_ keys: Set<PortraitKey>? = nil, in scope: PortraitScope) -> Rejection? {
         let targets = keys ?? PortraitKey.all
         var updated = recipe
         if scope == .all {
             let changesShape = targets.contains { key in
-                guard case .faceShape(let shape) = key else { return false }
-                return recipe.portrait.face[shape] != 0
+                switch key {
+                case .faceShape(let shape): return recipe.portrait.face[shape] != 0
+                case .bodyShape(let shape): return recipe.body[shape] != 0
+                default: return false
+                }
             }
             guard !(isGeometryLocked && changesShape) else { return .geometryLocked }
             Self.resetAllLayer(targets, in: &updated)
@@ -95,7 +106,7 @@ public struct EditDocument: Equatable, Sendable {
         }
         guard var layer = PortraitResolver.layer(updated, scope: scope) else { return .unknownPerson }
         let removing = targets.intersection(layer.overriddenKeys)
-        guard !(isGeometryLocked && removing.contains(where: \.isFaceShape)) else { return .geometryLocked }
+        guard !(isGeometryLocked && removing.contains(where: \.isShape)) else { return .geometryLocked }
         layer.remove(targets)
         if keys == nil {
             layer.makeupLookID = nil
@@ -106,11 +117,11 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 찾지 못한 사람을 다른 얼굴에 연결한다(체크포인트 한 번).
-    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형 키가 있으면 거절한다(carriesFaceShape).
+    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형·체형 키가 있으면 거절한다(carriesShape).
     @discardableResult
     public mutating func rebindPerson(_ id: PersonID, to anchor: PersonAnchor) -> Rejection? {
         guard let index = recipe.people.individuals.firstIndex(where: { $0.id == id }) else { return .unknownPerson }
-        if isGeometryLocked, carriesFaceShape(recipe.people.individuals[index]) {
+        if isGeometryLocked, carriesShape(recipe.people.individuals[index]) {
             return .geometryLocked
         }
         var updated = recipe
@@ -120,11 +131,11 @@ public struct EditDocument: Equatable, Sendable {
     }
 
     /// 사람 기록을 지운다(체크포인트 한 번).
-    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형 키가 있으면 거절한다(carriesFaceShape).
+    /// 잠긴 사진에서 그 사람에게 걸린 얼굴형·체형 키가 있으면 거절한다(carriesShape).
     @discardableResult
     public mutating func removePerson(_ id: PersonID) -> Rejection? {
         guard let index = recipe.people.individuals.firstIndex(where: { $0.id == id }) else { return .unknownPerson }
-        if isGeometryLocked, carriesFaceShape(recipe.people.individuals[index]) {
+        if isGeometryLocked, carriesShape(recipe.people.individuals[index]) {
             return .geometryLocked
         }
         var updated = recipe
@@ -132,12 +143,12 @@ public struct EditDocument: Equatable, Sendable {
         return commit(updated)
     }
 
-    /// 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형 키가 있는지.
-    /// 그 기록을 옮기거나 지우면 그 얼굴형 값이 얼굴 사이를 옮겨 가 수동 편집 좌표가 어긋난다.
+    /// 기록 층이나 기록의 수동 성별 그룹 층에 얼굴형·체형 키가 있는지.
+    /// 그 기록을 옮기거나 지우면 그 얼굴형·체형 값이 사람 사이를 옮겨 가 수동 편집 좌표가 어긋난다.
     /// 편집 규칙은 자동 추정을 모르므로 그룹은 수동 성별로만 고른다.
-    private func carriesFaceShape(_ record: PersonRecord) -> Bool {
+    private func carriesShape(_ record: PersonRecord) -> Bool {
         let group = record.gender.flatMap { recipe.people.groups[$0] } ?? PortraitLayer()
-        return record.layer.overriddenKeys.union(group.overriddenKeys).contains(where: \.isFaceShape)
+        return record.layer.overriddenKeys.union(group.overriddenKeys).contains(where: \.isShape)
     }
 
     /// 대상 층에 원터치 표 × 강도를 쓴다(스펙 G4 3.3).
@@ -147,7 +158,7 @@ public struct EditDocument: Equatable, Sendable {
     /// 그룹 층의 묶음 밖 키와 개인 층은 그대로 둔다.
     /// .gender는 그 그룹 층만, .person은 그 기록 층에 기록의 수동 성별 표(없으면 공통)를 쓴다.
     /// 강도 0은 묶인 키를 지우고(전체 층은 기본값, 그 외 상속) 표시도 지운다.
-    /// 얼굴형 키를 쓰지 않으므로 잠긴 사진에서도 허용한다.
+    /// 얼굴형·체형 키를 쓰지 않으므로 잠긴 사진에서도 허용한다.
     /// 모르는 사람이면 .unknownPerson이다.
     @discardableResult
     public mutating func applyOneTouch(strength: Double, in scope: PortraitScope = .all) -> Rejection? {
@@ -357,7 +368,7 @@ public struct EditDocument: Equatable, Sendable {
     /// 고른 그룹을 프리셋 값으로 바꾼다.
     /// 룩·기하·수동 편집은 그대로 두고, 잠긴 사진은 얼굴형·체형을 건너뛴다.
     /// 얼굴 의존 항목은 그룹 층의 그 키도 바꾸고, clearsIndividuals면 개인 층에서 그 키를 지운다.
-    /// 잠긴 사진에서 건너뛴 얼굴형은 개인 층에서도 지우지 않는다.
+    /// 잠긴 사진에서 건너뛴 얼굴형·체형은 개인 층에서도 지우지 않는다.
     private func merged(
         _ values: PresetValues, categories: Set<SyncCategory>, clearsIndividuals: Bool
     ) -> EditRecipe {
@@ -637,6 +648,8 @@ public struct EditDocument: Equatable, Sendable {
             layer.face[shape] = EditingPolicy.clamped(value, to: EditingPolicy.faceShapeRange(shape))
         case .feature(let feature, let value):
             layer.features[feature] = EditingPolicy.clamped(value, to: EditingPolicy.unitRange)
+        case .bodyShape(let shape, let value):
+            layer.body[shape] = EditingPolicy.clamped(value, to: EditingPolicy.bodyShapeRange(shape))
         case .makeupColor(let part, let id):
             guard part.hasColor else { return }
             var tint = layer.makeup[part] ?? inherited(part, from: beneath.makeup)

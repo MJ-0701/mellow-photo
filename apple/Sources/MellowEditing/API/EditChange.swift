@@ -44,7 +44,7 @@ public enum EditChange: Equatable, Sendable {
 
 extension EditChange {
     /// 층이 덮어쓸 수 있는 키.
-    /// 얼굴 의존 변경만 값이 있고 나머지는 scope를 무시한다.
+    /// 얼굴 의존 변경과 체형만 값이 있고 나머지는 scope를 무시한다.
     public var portraitKey: PortraitKey? {
         switch self {
         case .skinSmoothing: return .skinSmoothing
@@ -53,6 +53,7 @@ extension EditChange {
         case .faceShape(let key, _): return .faceShape(key)
         case .feature(let key, _): return .feature(key)
         case .makeupColor(let part, _), .makeupIntensity(let part, _): return .makeupPart(part)
+        case .bodyShape(let key, _): return .bodyShape(key)
         default: return nil
         }
     }

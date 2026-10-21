@@ -619,8 +619,8 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(Set(titles).count, FaceShapeKey.allCases.count, "슬라이더 이름이 겹치지 않는다")
         XCTAssertEqual(titles.first, "얼굴 폭")
         model.undo()
-        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0, "실행 취소 한 번에 마지막 슬라이더만")
-        XCTAssertEqual(model.currentRecipe.portrait.face.forehead, 0.4, accuracy: 1e-9)
+        XCTAssertEqual(model.currentRecipe.portrait.face.doubleChin, 0, "실행 취소 한 번에 마지막 슬라이더만")
+        XCTAssertEqual(model.currentRecipe.portrait.face.chinLength, 0.4, accuracy: 1e-9)
     }
 
     func testGeometryLockRejectsEveryFaceShapeKey() async throws {
@@ -815,17 +815,26 @@ final class AppModelTests: XCTestCase {
         model.selectTool(.body)
         XCTAssertEqual(EditorTool.body.title, "체형")
         XCTAssertEqual(model.bodyAvailability, .ready)
-        for key in BodyShapeKey.allCases {
+        // 부유방은 전체 층에 둘 수 없어 따로 본다.
+        let allLayerKeys = BodyShapeKey.allCases.filter { PortraitScope.all.allows(.bodyShape($0)) }
+        for key in allLayerKeys {
             model.beginSliderEdit()
             model.edit(.bodyShape(key, 0.2))
             model.edit(.bodyShape(key, 0.4))
             model.endSliderEdit()
         }
-        for key in BodyShapeKey.allCases {
+        for key in allLayerKeys {
             XCTAssertEqual(model.currentRecipe.body[key], 0.4, accuracy: 1e-9, "\(key)")
         }
+        let steps = model.session.selected?.document.undoStack.count
+        let status = model.statusMessage
+        model.edit(.bodyShape(.sideChest, 0.4))
+        XCTAssertEqual(model.currentRecipe.body.sideChest, 0, "전체 층 부유방은 조용히 거절한다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, steps)
+        XCTAssertEqual(model.statusMessage, status, "화면이 숨기는 항목이라 안내를 띄우지 않는다")
         XCTAssertEqual(
-            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle), ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목"])
+            BodyShapeKey.allCases.map(UserMessage.bodyShapeTitle),
+            ["다리 길게", "허리", "몸 전체", "팔", "허벅지", "어깨", "목", "부유방"])
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
         model.undo()
