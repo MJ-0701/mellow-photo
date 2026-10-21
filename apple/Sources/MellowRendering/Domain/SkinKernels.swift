@@ -108,7 +108,7 @@ final class SkinKernels: @unchecked Sendable {
             source: """
                 kernel vec4 spotCorrection(__sample darkFill, __sample darkPore, __sample brightCut,
                                            __sample brightPore, float start, float end, float capStart,
-                                           float capEnd, float floorLuma) {
+                                           float capEnd, float floorLuma, float brightAmount) {
                     vec3 luma = vec3(0.2126, 0.7152, 0.0722);
                     vec3 dark = max(darkFill.rgb - darkPore.rgb, vec3(0.0));
                     vec3 bright = max(brightPore.rgb - brightCut.rgb, vec3(0.0));
@@ -117,7 +117,7 @@ final class SkinKernels: @unchecked Sendable {
                     float height = dot(bright, luma) / base;
                     float wd = smoothstep(start, end, depth) * (1.0 - smoothstep(capStart, capEnd, depth));
                     float wb = smoothstep(start, end, height) * (1.0 - smoothstep(capStart, capEnd, height));
-                    return vec4(dark * wd - bright * wb, 1.0);
+                    return vec4(dark * wd - bright * wb * brightAmount, 1.0);
                 }
                 """)
         spotBlend = CIColorKernel(
@@ -208,15 +208,16 @@ final class SkinKernels: @unchecked Sendable {
     }
 
     /// 점 지우기 보정 지도(스펙 G5 4.3).
-    /// 어두운 점은 더하고 밝은 점은 빼는 선형 RGB 차이다(음수 가능).
+    /// 어두운 점은 더하고 밝은 점은 brightAmount배로 빼는 선형 RGB 차이다(음수 가능).
+    /// brightAmount 0이면 어두운 점만 채운다.
     /// start < end, capStart < capEnd, lumaFloor > 0이 아니면 렌더 실패다.
     func spot(
         darkFill: CIImage, darkPore: CIImage, brightCut: CIImage, brightPore: CIImage, start: Double, end: Double,
-        capStart: Double, capEnd: Double, lumaFloor: Double, extent: CGRect
+        capStart: Double, capEnd: Double, lumaFloor: Double, brightAmount: Double, extent: CGRect
     ) throws -> CIImage {
         guard let spotCorrection, start < end, capStart < capEnd, lumaFloor > 0 else { throw MellowError.renderFailed }
         let images: [Any] = [darkFill, darkPore, brightCut, brightPore]
-        let limits: [Any] = [start, end, capStart, capEnd, lumaFloor]
+        let limits: [Any] = [start, end, capStart, capEnd, lumaFloor, brightAmount]
         guard let correction = spotCorrection.apply(extent: extent, arguments: images + limits) else {
             throw MellowError.renderFailed
         }

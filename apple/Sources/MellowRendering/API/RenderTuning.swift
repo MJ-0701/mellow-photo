@@ -285,7 +285,7 @@ public struct RenderTuning: Sendable {
     /// 지름 2.4%까지의 점을 채운다.
     public var spotRadiusFraction: Double = 0.012
     /// 모공 닫힘·열림 반지름.
-    /// 얼굴 폭 비율(올림, 하한 spotMorphologyMinimumRadius).
+    /// 얼굴 폭 비율(하한 skinBlurMinimumRadius).
     /// 이 크기의 명암은 차이에서 빠져 남는다.
     public var spotPoreRadiusFraction: Double = 0.003
     /// 보정 지도 흐림 반지름.
@@ -298,6 +298,10 @@ public struct RenderTuning: Sendable {
     public var spotDepthStartWeak: Double = 0.020
     /// 끝 문턱 = 시작 문턱 + 이 값.
     public var spotDepthRamp: Double = 0.032
+    /// 밝은 점(땀 반사점·좁쌀) 빼기 배율.
+    /// 0이면 어두운 점만 채운다(G5-2 구현 중 변경).
+    /// 밝은 점 빼기는 데모 원터치 0.6에서 피부 밝기를 +0.5/255 아래로 내리고 중간 대역 비를 0.80 아래로 내렸다.
+    public var spotBrightAmount: Double = 0
     /// 상대 깊이가 이보다 깊으면 점이 아니라 구조(콧구멍·눈꼬리)라 가중치가 줄기 시작한다.
     public var spotDepthCapStart: Double = 0.25
     /// 이 상대 깊이에서 가중치 0.
@@ -310,9 +314,6 @@ public struct RenderTuning: Sendable {
     /// 형태 필터 입력 여유.
     /// 점 반지름 배수.
     public var spotMorphologyPaddingInSpots: Double = 3.0
-    /// 형태 필터 반지름 하한(픽셀).
-    /// CIMorphologyMaximum·Minimum은 반지름을 내림하고 1픽셀 아래는 아무것도 하지 않는다(G5-2 구현 중 추가).
-    public var spotMorphologyMinimumRadius: Double = 1.0
     /// 점 지우기(스펙 G5 4.2)에서 뺄 눈꼬리·입꼬리 원의 반지름.
     /// 얼굴 폭 비율.
     public var spotExclusionRadiusFraction: Double = 0.03

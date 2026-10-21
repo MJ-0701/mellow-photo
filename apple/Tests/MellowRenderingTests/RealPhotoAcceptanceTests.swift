@@ -712,7 +712,6 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let brightFactor = 1.10
         static let spacingFraction: CGFloat = 0.08
         static let darkRecovery = 0.7
-        static let brightRecovery = 0.6
         static let fineRatio = 0.9
         static let poreRatio = 0.9
         /// 콧구멍 띠·눈꼬리·입꼬리 원 안 평균 |ΔY| 상한(8비트).
@@ -721,6 +720,8 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let outsideByteDelta = 1
         static let defaultDarkRecovery = 0.6
         static let maleDefaultDarkRecovery = 0.4
+        /// 원터치 0.6 남성 회복률이 여성보다 이만큼 이상 낮다.
+        static let maleMargin = 0.05
         /// 회복률은 원 반지름 × 이 값 안에서 잰다(심은 원 가장자리 계단 제외).
         static let discFraction: CGFloat = 0.65
         /// fine 비에서 뺄 원 둘레(심은 반지름 배수).
@@ -789,8 +790,8 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         // 한 점 회복률은 둘레 결(밝은 얼룩)에 따라 흩어져 평균으로 단언한다(스펙 G5 1.2·4.4, G5-2 구현 중 변경).
         let dark = meanRecovery(planted.dark, radiusFraction: SpotBounds.darkRadiusFraction, name: "spots-dark")
         XCTAssertGreaterThanOrEqual(dark, SpotBounds.darkRecovery, "어두운 점 평균 회복률")
-        let bright = meanRecovery(planted.bright, radiusFraction: SpotBounds.brightRadiusFraction, name: "spots-bright")
-        XCTAssertGreaterThanOrEqual(bright, SpotBounds.brightRecovery, "밝은 점 평균 회복률")
+        // 밝은 점 빼기는 꺼져 있어 기록만 한다(스펙 G5 1.2, G5-2 구현 중 변경, VALIDATION 남은 간극).
+        _ = meanRecovery(planted.bright, radiusFraction: SpotBounds.brightRadiusFraction, name: "spots-bright")
         // 심은 원 둘레를 뺀 피부 가중치로 질감·모공을 잰다.
         let black = CIImage(color: .black).cropped(to: portrait.extent)
         let reach = width * SpotBounds.darkRadiusFraction * SpotBounds.fineExclusionScale
@@ -810,8 +811,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             before: planted.image, after: output, weight: weight, in: bounds, fineRadius: fineRadius())
         XCTAssertGreaterThanOrEqual(record("spots", "fineRatio", fine), SpotBounds.fineRatio, "원 밖 피부 질감")
         let poreRadius = max(
-            portrait.tuning.spotMorphologyMinimumRadius,
-            (Double(width) * portrait.tuning.spotPoreRadiusFraction).rounded(.up))
+            portrait.tuning.skinBlurMinimumRadius, Double(width) * portrait.tuning.spotPoreRadiusFraction)
         let poreBefore = try Support.closingDarkMean(planted.image, weight: weight, in: bounds, radius: poreRadius)
         let poreAfter = try Support.closingDarkMean(output, weight: weight, in: bounds, radius: poreRadius)
         let poreRatio = poreBefore > 0 ? poreAfter / poreBefore : 1
@@ -864,7 +864,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(female, SpotBounds.defaultDarkRecovery, "여성 0.6")
         XCTAssertGreaterThanOrEqual(common, SpotBounds.defaultDarkRecovery, "공통 0.6")
         XCTAssertGreaterThanOrEqual(male, SpotBounds.maleDefaultDarkRecovery, "남성 0.6")
-        XCTAssertLessThan(male, female, "남성은 점을 더 남긴다")
+        XCTAssertLessThanOrEqual(male, female - SpotBounds.maleMargin, "남성은 점을 더 남긴다")
     }
 
     /// 원터치 레시피는 복제 원을 하나도 만들지 않는다(자동 잡티 false 덮어쓰기).

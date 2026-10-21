@@ -16,7 +16,10 @@ final class SpotRemovalTests: XCTestCase {
         static let size = CGFloat(SyntheticFace.size) * scale
         static let faceWidth = SyntheticFace.box.width * scale
         static let spotRadiusFraction: CGFloat = 0.01
-        static let poreRadiusFraction: CGFloat = 0.003
+        /// 모공 크기 점의 반지름(얼굴 폭 비율).
+        /// 형태 필터가 반지름을 내림하므로 모공 대역은 반지름 내림(560 × 0.3% = 1.68 → 1픽셀) 이하의 점이다.
+        /// 그래서 1픽셀 반지름 점(560px 얼굴의 0.18%)을 심는다(스펙 G5 4.4, G5-2 구현 중 변경).
+        static let poreRadiusFraction: CGFloat = 1 / (SyntheticFace.box.width * scale)
         static let darkFactor = 0.85
         static let brightFactor = 1.10
         /// 얕은 점(상대 깊이 3%).
@@ -24,6 +27,10 @@ final class SpotRemovalTests: XCTestCase {
         static let spotRecovery = 0.7
         static let poreRemaining = 0.9
         static let strengthGap = 0.1
+        /// 밝은 점 빼기를 끈 기본에서 밝은 점 평균 회복률 상한.
+        static let brightLeftRecovery = 0.3
+        /// 밝은 점 빼기를 켤 때의 배율.
+        static let brightAmountOn = 1.0
         static let weakStrength = 0.3
         /// 채움 비율이 1보다 작은 강도(spotFullFillStrength 아래).
         static let partialFillStrength = 0.15
@@ -79,11 +86,13 @@ final class SpotRemovalTests: XCTestCase {
         return (CIImage(cgImage: try Support.renderer.makeCGImage(spotted)), source.face)
     }
 
-    private func render(_ image: CIImage, face: FaceGeometry, spots: Double) throws -> PixelGrid {
+    private func render(_ image: CIImage, face: FaceGeometry, spots: Double, tuning: RenderTuning = RenderTuning())
+        throws -> PixelGrid
+    {
         var recipe = EditRecipe()
         recipe.portrait.skin.spots = spots
         let context = RenderContext(
-            extent: image.extent, recipe: recipe, analysis: PhotoAnalysis(faces: [face]), tuning: RenderTuning())
+            extent: image.extent, recipe: recipe, analysis: PhotoAnalysis(faces: [face]), tuning: tuning)
         return try Support.grid(SkinStage().apply(image, in: context))
     }
 
@@ -112,13 +121,18 @@ final class SpotRemovalTests: XCTestCase {
         return left / planted
     }
 
-    private func pair(_ factor: Double, centers: [CGPoint], radiusFraction: CGFloat, spots: Double) throws -> Pair {
+    private func pair(
+        _ factor: Double, centers: [CGPoint], radiusFraction: CGFloat, spots: Double,
+        tuning: RenderTuning = RenderTuning()
+    ) throws -> Pair {
         let cleanImage = CIImage(cgImage: try Support.renderer.makeCGImage(base().image))
         let defective = try planted(factor, centers: centers, radiusFraction: radiusFraction)
+        let face = defective.face
         return Pair(
-            clean: try Support.grid(cleanImage), cleanAfter: try render(cleanImage, face: defective.face, spots: spots),
+            clean: try Support.grid(cleanImage),
+            cleanAfter: try render(cleanImage, face: face, spots: spots, tuning: tuning),
             before: try Support.grid(defective.image),
-            after: try render(defective.image, face: defective.face, spots: spots))
+            after: try render(defective.image, face: face, spots: spots, tuning: tuning))
     }
 
     /// 격자 점들의 평균 회복률(1 − 남은 비율).
@@ -136,9 +150,15 @@ final class SpotRemovalTests: XCTestCase {
         let dark = try pair(Bounds.darkFactor, centers: gridCenters, radiusFraction: fraction, spots: 1)
         let darkMean = try meanRecovery(dark)
         XCTAssertGreaterThanOrEqual(darkMean, Bounds.spotRecovery, "어두운 점 평균 회복률")
+        // 기본은 어두운 점만 채운다(spotBrightAmount 0, 스펙 G5 4.1 G5-2 구현 중 변경).
         let bright = try pair(Bounds.brightFactor, centers: gridCenters, radiusFraction: fraction, spots: 1)
-        let brightMean = try meanRecovery(bright)
-        XCTAssertGreaterThanOrEqual(brightMean, Bounds.spotRecovery, "밝은 점 평균 회복률")
+        XCTAssertLessThanOrEqual(try meanRecovery(bright), Bounds.brightLeftRecovery, "기본은 밝은 점을 남긴다")
+        // 밝은 점 빼기를 켜면 같은 식으로 채운다(커널 경로 검사).
+        var withBright = RenderTuning()
+        withBright.spotBrightAmount = Bounds.brightAmountOn
+        let brightOn = try pair(
+            Bounds.brightFactor, centers: gridCenters, radiusFraction: fraction, spots: 1, tuning: withBright)
+        XCTAssertGreaterThanOrEqual(try meanRecovery(brightOn), Bounds.spotRecovery, "밝은 점 빼기를 켜면 채운다")
         let pores = try pair(
             Bounds.darkFactor, centers: poreCenters, radiusFraction: Bounds.poreRadiusFraction, spots: 1)
         for center in poreCenters {

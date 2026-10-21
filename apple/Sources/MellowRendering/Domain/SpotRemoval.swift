@@ -28,11 +28,10 @@ enum SpotRemoval {
         let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(extent)
         guard !bounds.isEmpty else { return image }
         let width = Double(faceWidth)
-        // 형태 필터는 반지름을 정수로 내림하고 1픽셀 아래는 아무것도 하지 않는다.
-        // 올림해야 모공 크기 명암이 닫힘(모공)에 들어가 차이에서 빠진다.
-        let minimum = tuning.spotMorphologyMinimumRadius
-        let spot: Double = max(minimum, (width * tuning.spotRadiusFraction).rounded(.up))
-        let pore: Double = max(minimum, (width * tuning.spotPoreRadiusFraction).rounded(.up))
+        // CIMorphologyMaximum·Minimum은 반지름을 정수로 내림하고 1픽셀 아래는 아무것도 하지 않는다.
+        // 그래서 모공 대역은 반지름 내림(모공 반지름) 이하의 점이고, 얼굴 폭 333px 아래에서는 모공 대역이 없다(시제품과 같음).
+        let spot: Double = width * tuning.spotRadiusFraction
+        let pore: Double = max(tuning.skinBlurMinimumRadius, width * tuning.spotPoreRadiusFraction)
         // 형태 필터 입력은 가장자리 여유를 둔 유한 영역이다.
         // 무한 extent를 넣으면 영역 밖이 늘어난 픽셀이 된다.
         let padding = CGFloat(spot * tuning.spotMorphologyPaddingInSpots)
@@ -46,7 +45,7 @@ enum SpotRemoval {
             darkFill: morphology(dilate, erode, spot), darkPore: morphology(dilate, erode, pore),
             brightCut: morphology(erode, dilate, spot), brightPore: morphology(erode, dilate, pore),
             start: limits.start, end: limits.end, capStart: tuning.spotDepthCapStart, capEnd: tuning.spotDepthCapEnd,
-            lumaFloor: tuning.spotLumaFloor, extent: bounds)
+            lumaFloor: tuning.spotLumaFloor, brightAmount: tuning.spotBrightAmount, extent: bounds)
         // 보정 지도를 중간 결과로 굳혀 뒤의 흐림·합성이 형태 필터 그래프를 다시 펼치지 않게 한다.
         let baked = correction.insertingIntermediate()
         let blurRadius: Double = pore * tuning.spotCorrectionBlurInPores

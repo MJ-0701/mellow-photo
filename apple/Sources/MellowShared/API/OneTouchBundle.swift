@@ -89,7 +89,7 @@ public enum OneTouchBundle {
             blushIntensity: 0.15, blushColorID: blushColorID)
         public static let male = Values(
             smoothing: 0.12, darkCircles: 0.38, nasolabial: 0.28, marionette: 0.25, glabella: 0.3, toneEvening: 0.05,
-            redness: -0.2, shine: 0.5, spots: 0.75, eyeBrighten: 0.2, teethWhiten: 0.25, lipVitality: 0,
+            redness: -0.2, shine: 0.5, spots: 0.4, eyeBrighten: 0.2, teethWhiten: 0.25, lipVitality: 0,
             blushIntensity: 0, blushColorID: nil)
         /// 사진 단위 몸 피부 밝기.
         /// 전체 대상에서만 쓴다.
