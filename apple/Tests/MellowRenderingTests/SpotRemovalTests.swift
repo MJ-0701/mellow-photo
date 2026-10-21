@@ -87,29 +87,8 @@ final class SpotRemovalTests: XCTestCase {
         return try Support.grid(SkinStage().apply(image, in: context))
     }
 
-    /// BT.601 휘도 계수(감마 바이트).
-    private static let lumaWeights: (r: Double, g: Double, b: Double) = (0.299, 0.587, 0.114)
-
-    /// 원(중심 center, 반지름 radius) 안에 픽셀 중심이 든 픽셀의 평균 휘도(감마 바이트).
-    /// 원을 둘러싼 상자만 훑는다(사진 전체를 훑으면 격자 점마다 1M 픽셀이다).
     private func discLuma(_ grid: PixelGrid, at center: CGPoint, radius: CGFloat) -> Double {
-        var total = 0.0
-        var count = 0
-        let reach = Int(radius.rounded(.up))
-        for y in Int(center.y) - reach...Int(center.y) + reach {
-            for x in Int(center.x) - reach...Int(center.x) + reach {
-                let dx = CGFloat(x) + 0.5 - center.x
-                let dy = CGFloat(y) + 0.5 - center.y
-                guard dx * dx + dy * dy <= radius * radius else { continue }
-                let rgba = grid.rgba(CGPoint(x: x, y: y))
-                let red = Double(rgba[0]) * Self.lumaWeights.r
-                let green = Double(rgba[1]) * Self.lumaWeights.g
-                let blue = Double(rgba[2]) * Self.lumaWeights.b
-                total += red + green + blue
-                count += 1
-            }
-        }
-        return count > 0 ? total / Double(count) : 0
+        Support.discLuma(grid, at: center, radius: radius)
     }
 
     /// 같은 레시피로 렌더한 깨끗한 사진과 심은 사진.

@@ -1110,6 +1110,66 @@ final class RealPortrait: @unchecked Sendable {
             .cropped(to: extent)
     }
 
+    /// 점 지우기 제외 비트맵(콧구멍 띠·눈꼬리·입꼬리, 흐리기 전, 원본 배율).
+    func spotExclusionMask() throws -> PixelGrid {
+        let raster = FaceRegions.spotExclusionRaster(face: face, extent: extent, tuning: tuning, cache: nil)
+        return try RenderingTestSupport.grid(raster.cropped(to: extent))
+    }
+
+    /// 점을 심을 격자 점(원본 배율 픽셀).
+    /// 얼굴 상자 안을 얼굴 폭 × spacingFraction 간격으로 위에서 아래, 왼쪽에서 오른쪽으로 훑는다.
+    /// 피부 마스크(세기 1)가 spotGridMaskMinimum 이상이고, 둘레에 제외 영역이 없고, 둘레 결이 고른(머리카락이 아닌) 점을 count개 모은다.
+    /// 격자 간격이라 서로 spacingFraction 이상 떨어진다.
+    /// 모자라면 실패한다.
+    func spotGrid(count: Int, radiusFraction: CGFloat, spacingFraction: CGFloat) throws -> [CGPoint] {
+        let skin = try RenderingTestSupport.grid(skinMask().cropped(to: extent))
+        let original = try RenderingTestSupport.grid(image)
+        let exclusion = try spotExclusionMask()
+        let step = faceWidth * spacingFraction
+        let radius = faceWidth * radiusFraction
+        let box = FaceRegions.pixelRect(face.boundingBox, in: extent).intersection(extent.insetBy(dx: step, dy: step))
+        let threshold = UInt8(Self.spotGridMaskMinimum * Double(UInt8.max))
+        var points: [CGPoint] = []
+        var y = box.maxY - step / 2
+        while y >= box.minY, points.count < count {
+            var x = box.minX + step / 2
+            while x <= box.maxX, points.count < count {
+                let center = CGPoint(x: x.rounded(), y: y.rounded())
+                if skin.red(center) >= threshold, exclusionFree(exclusion, center: center, radius: radius * 2),
+                    RenderingTestSupport.discLumaDeviation(original, at: center, radius: radius * 2)
+                        <= Self.spotGridMaximumDeviation
+                {
+                    points.append(center)
+                }
+                x += step
+            }
+            y -= step
+        }
+        guard points.count == count else { throw MellowError.renderFailed }
+        return points
+    }
+
+    /// 점 격자의 피부 마스크 하한.
+    static let spotGridMaskMinimum = 0.9
+    /// 점 둘레(심는 반지름 2배) 휘도 표준편차 상한(8비트).
+    /// 데모 사진 이마의 밝은 갈색 머리카락은 피부색 가중치를 넘어 마스크가 0.9 이상이라 결로 거른다.
+    static let spotGridMaximumDeviation = 4.0
+
+    /// 원 안 픽셀에 제외 영역이 하나도 없는지.
+    private func exclusionFree(_ exclusion: PixelGrid, center: CGPoint, radius: CGFloat) -> Bool {
+        let reach = Int(radius.rounded(.up))
+        for dy in -reach...reach {
+            for dx in -reach...reach where CGFloat(dx * dx + dy * dy) <= radius * radius {
+                let point = CGPoint(x: Int(center.x) + dx, y: Int(center.y) + dy)
+                guard extent.contains(point) else { continue }
+                if exclusion.red(point) > 0 {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
     /// 얼굴 다각형을 뺀 몸 피부 영역(하네스 body 가중치와 같다).
     func bodyOnlySkinArea() throws -> CIImage {
         let black = CIImage(color: .black).cropped(to: extent)
@@ -1124,6 +1184,71 @@ final class RealPortrait: @unchecked Sendable {
 }
 
 extension RenderingTestSupport {
+    /// BT.601 휘도 계수(감마 바이트).
+    private static let discLumaWeights: (r: Double, g: Double, b: Double) = (0.299, 0.587, 0.114)
+
+    /// 원(중심 center, 반지름 radius) 안에 픽셀 중심이 든 픽셀의 평균 휘도(감마 바이트).
+    /// 원을 둘러싼 상자만 훑는다(사진 전체를 훑으면 점마다 수백만 픽셀이다).
+    static func discLuma(_ grid: PixelGrid, at center: CGPoint, radius: CGFloat) -> Double {
+        var total = 0.0
+        var count = 0
+        let reach = Int(radius.rounded(.up))
+        for y in Int(center.y) - reach...Int(center.y) + reach {
+            for x in Int(center.x) - reach...Int(center.x) + reach {
+                guard x >= 0, y >= 0, x < grid.width, y < grid.height else { continue }
+                let dx = CGFloat(x) + 0.5 - center.x
+                let dy = CGFloat(y) + 0.5 - center.y
+                guard dx * dx + dy * dy <= radius * radius else { continue }
+                let rgba = grid.rgba(CGPoint(x: x, y: y))
+                let red = Double(rgba[0]) * discLumaWeights.r
+                let green = Double(rgba[1]) * discLumaWeights.g
+                let blue = Double(rgba[2]) * discLumaWeights.b
+                total += red + green + blue
+                count += 1
+            }
+        }
+        return count > 0 ? total / Double(count) : 0
+    }
+
+    /// 원 안 휘도(감마 바이트) 표준편차.
+    static func discLumaDeviation(_ grid: PixelGrid, at center: CGPoint, radius: CGFloat) -> Double {
+        var values: [Double] = []
+        let reach = Int(radius.rounded(.up))
+        for y in Int(center.y) - reach...Int(center.y) + reach {
+            for x in Int(center.x) - reach...Int(center.x) + reach {
+                guard x >= 0, y >= 0, x < grid.width, y < grid.height else { continue }
+                let dx = CGFloat(x) + 0.5 - center.x
+                let dy = CGFloat(y) + 0.5 - center.y
+                guard dx * dx + dy * dy <= radius * radius else { continue }
+                let rgba = grid.rgba(CGPoint(x: x, y: y))
+                let red = Double(rgba[0]) * discLumaWeights.r
+                let green = Double(rgba[1]) * discLumaWeights.g
+                let blue = Double(rgba[2]) * discLumaWeights.b
+                values.append(red + green + blue)
+            }
+        }
+        return variance(values).squareRoot()
+    }
+
+    /// weight 가중 평균 (닫힘(radius) − 원본) 선형 휘도.
+    /// 반지름 radius보다 작은 어두운 점(모공)의 양이다.
+    /// 원본 배율에서 잰다.
+    static func closingDarkMean(_ image: CIImage, weight: CIImage, in rect: CGRect, radius: Double) throws -> Double {
+        let closed = image.clampedToExtent()
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: radius])
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: radius])
+        let weights = try luma(weight.cropped(to: rect))
+        let original = try luma(image.cropped(to: rect))
+        let filled = try luma(closed.cropped(to: rect))
+        let total = weights.reduce(0, +)
+        guard total > 0, weights.count == original.count else { throw MellowError.renderFailed }
+        var sum = 0.0
+        for index in weights.indices {
+            sum += weights[index] * (filled[index] - original[index])
+        }
+        return sum / total
+    }
+
     /// rect 안 fine 대역(원본 − blur(fineRadius)) 휘도 분산의 후/전 비를 weight(회색 마스크) 가중으로 잰다.
     /// 1이면 질감 그대로이고 작으면 뭉갠 것이다.
     /// 원본 배율에서 잰다.
