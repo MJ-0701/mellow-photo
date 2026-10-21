@@ -459,7 +459,34 @@ final class PhotoPipelineTests: XCTestCase {
         XCTAssertEqual(analysis.faceInstances, [:])
     }
 
-    func testMoreFacesThanInstancesUsesTheCombinedMask() async throws {
+    func testFacesWithoutBodiesDoNotCountAgainstInstances() async throws {
+        let url = try writeSolidPNG()
+        // 커플(얼굴–몸 두 쌍)과 오른쪽 위에 작게 찍힌 행인 얼굴 하나. 행인은 몸이 없다.
+        let faces = [
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.1, y: 0.55, width: 0.2, height: 0.2)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.6, y: 0.55, width: 0.2, height: 0.2)),
+            FaceGeometry(boundingBox: NormalizedRect(x: 0.92, y: 0.9, width: 0.04, height: 0.04)),
+        ]
+        let left = Support.standingBody(in: NormalizedRect(x: 0, y: 0, width: 0.4, height: 0.6))
+        let right = Support.standingBody(in: NormalizedRect(x: 0.5, y: 0, width: 0.4, height: 0.6))
+        let maskSize = CGSize(width: 64, height: 48)
+        let rightHalf = Support.personMask(size: maskSize, person: CGRect(x: 32, y: 0, width: 32, height: 48))
+        let leftHalf = Support.personMask(size: maskSize, person: CGRect(x: 0, y: 0, width: 32, height: 48))
+        let pipeline = PhotoPipeline(
+            analyzer: StubFaceAnalyzer(result: .success(faces)),
+            bodyAnalyzer: StubBodyAnalyzer(result: .success([left, right])),
+            instanceAnalyzer: StubInstanceAnalyzer(result: .success([rightHalf, leftHalf])), tuning: RenderTuning())
+        let id = PhotoID()
+        let prepared = try await pipeline.prepare(id, at: url)
+        XCTAssertEqual(prepared.bodyFaceMatches, [0: 0, 1: 1], "행인 얼굴은 몸과 짝이 되지 않는다")
+        let stored = await pipeline.preparedAnalysis(id)
+        let analysis = try XCTUnwrap(stored)
+        XCTAssertEqual(analysis.bodyInstances, [0: 1, 1: 0], "얼굴 셋·인스턴스 둘이어도 몸과 짝인 사람은 둘이라 배정한다")
+        XCTAssertEqual(analysis.faceInstances[0], 1)
+        XCTAssertEqual(analysis.faceInstances[1], 0)
+    }
+
+    func testFacesWithoutAnyBodyStillGetInstances() async throws {
         let url = try writeSolidPNG()
         let faces = (0..<3).map { index in
             FaceGeometry(boundingBox: NormalizedRect(x: 0.3 * Double(index), y: 0.6, width: 0.2, height: 0.2))
@@ -476,7 +503,7 @@ final class PhotoPipelineTests: XCTestCase {
         _ = try await pipeline.prepare(id, at: url)
         let stored = await pipeline.preparedAnalysis(id)
         let analysis = try XCTUnwrap(stored)
-        XCTAssertEqual(analysis.faceInstances, [:], "얼굴이 인스턴스보다 많아도 전체 마스크")
+        XCTAssertEqual(analysis.faceInstances, [0: 0, 1: 0, 2: 1], "몸이 없는 얼굴은 사람 수에 들지 않고 상자 중심 인스턴스를 받는다")
         XCTAssertEqual(analysis.bodyInstances, [:])
     }
 
