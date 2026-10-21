@@ -316,3 +316,29 @@ Expected: 오류 없음.
 git add apple/Sources/MellowRendering apple/Tests/MellowRenderingTests/ChinShadeStageTests.swift apple/Tests/MellowRenderingTests/RenderPipelineTests.swift docs/architecture/modules.md
 git commit -m "feat(rendering): 이중턱 값으로 턱밑 그늘을 밝히는 chinShade 단계 추가"
 ```
+
+### Task 6: 몸통 옆선 찾기 (I3 수용 테스트 중 추가)
+
+I3 수용 테스트에서 부유방(27%)과 몸 전체 가슴(30%) 원소가 이동 0으로 측정됐다. Vision 어깨 관절은 팔이 붙는 자리라 어깨~엉덩이 관절선의 위쪽 점이 팔 캡슐 안에 들어가 보호가 이동을 지운다. 보호를 줄이면 팔이 끌린다(측정 8.9~16.6px). 그래서 원소를 실제 몸통 옆선(사람 마스크의 경계)에 둔다.
+
+**Files:**
+- Create: `apple/Sources/MellowRendering/Domain/BodyOutlineProbe.swift`
+- Create: `apple/Sources/MellowRendering/Domain/MaskSampler.swift` (Vision 원래 해상도 마스크를 CPU 바이트로 한 번 읽고 정규화 좌표로 표본)
+- Modify: `apple/Sources/MellowRendering/API/PhotoAnalysis.swift`, `PhotoPipeline.swift`, `RenderStage.swift`(`BodyTarget.outline`), `apple/Sources/MellowRendering/Domain/BodyShapeRig.swift`, `ShapeWarpStage.swift`
+- Test: `apple/Tests/MellowRenderingTests/BodyOutlineProbeTests.swift`, `BodyShapeRigTests.swift`, `ShapeWarpStageTests.swift`
+
+**Interfaces:**
+- `struct BodyOutline: Equatable, Sendable { var sideChest: [CGFloat: CGPoint]; var chest: [CGFloat: CGPoint] }`는 쓰지 않는다. 대신 `struct BodyOutline: Equatable, Sendable { let points: [OutlineKey: NormalizedPoint] }`와 `struct OutlineKey: Hashable, Sendable { let level: Double; let side: Int }`(side는 몸통 가로축 기준 −1·+1)다.
+- `enum BodyOutlineProbe { static func probe(skeleton: BodySkeleton, mask: MaskSampler, extent: CGRect, levels: [Double], tuning: RenderTuning) -> BodyOutline }`.
+- `PhotoAnalysis.bodyOutlines: [Int: BodyOutline]`(몸 인덱스 → 옆선, 기본 `[:]`), 사진 준비 때 그 몸의 own 마스크(인스턴스 ?? 전체)로 계산한다. 마스크가 없으면 비어 있다.
+- `BodyTarget.outline: BodyOutline?`.
+- `BodyShapeRig`: 부유방(27%)과 몸 전체 가슴(30%)은 outline에 그 (level, side) 점이 있으면 그 점을 원소 중심으로 쓴다. outline이 nil(마스크 없음)이면 지금처럼 관절선 점을 쓴다(마스크 없는 렌더 바이트 동일 유지). outline은 있는데 그 (level, side) 점이 없으면(팔이 붙음) 그쪽 원소를 만들지 않는다. 허리·골반·허벅지는 바꾸지 않는다.
+
+**옆선 찾기:** level마다 몸 가운데 점 C = lerp(어깨 중점, 엉덩이 중점, level)에서 몸통 가로축으로 side 방향을 따라 어깨 폭 × `outlineProbeStep`(0.01)씩 어깨 폭 × `outlineProbeReach`(0.8)까지 걷는다. 마스크 값이 0.5 미만인 첫 표본을 만나면 그 직전 표본이 옆선이다. 그 전에 같은 쪽 위팔 선분(어깨–팔꿈치, 없으면 어깨 관절)까지의 거리가 어깨 폭 × `upperArmHalfWidth` 이하인 표본에 닿으면 팔이 붙은 것이라 점이 없다. 끝까지 배경을 못 만나도 점이 없다. 상수 `outlineProbeStep`·`outlineProbeReach`는 `BodyOutlineProbe`의 `private static let`이다.
+
+**Tests:**
+- `BodyOutlineProbeTests`: 합성 사각 몸통 마스크(팔 사각형이 몸통에서 떨어짐)에서 27%·30% 양쪽 점이 몸통 사각형 변에서 한 걸음 안이다. 팔 사각형이 몸통에 붙으면 그쪽 점이 없다. 마스크가 전부 사람이면 점이 없다.
+- `BodyShapeRigTests`: outline이 주어지면 부유방 원소 중심이 그 점이고, 그쪽 점이 없으면 그쪽 원소가 없다. outline이 nil이면 기존 관절선 점이다.
+- `ShapeWarpStageTests`: 사람 마스크가 있고 팔이 떨어진 합성 몸에서 부유방 1의 몸통 옆선 표식이 보호 없는 렌더 이동의 80% 이상 움직이고 팔 표식은 1px 이하다.
+
+**Commit:** `feat(rendering): 부유방·가슴 원소를 인물 마스크에서 찾은 몸통 옆선에 둠`
