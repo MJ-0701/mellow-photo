@@ -80,4 +80,40 @@ final class BlemishDetectorTests: XCTestCase {
             XCTAssertFalse(FaceRegions.contains(point, polygons: protected, dilation: 0), "눈·눈썹·입술 안의 잡티 \(point)")
         }
     }
+
+    /// 턱 위 그늘 선(폭 얼굴 폭 1%, 길이 10%)은 잡티가 아니다(스펙 G5 5.2).
+    /// 옆의 원은 잡힌다.
+    func testElongatedShadowLineIsNotABlemish() throws {
+        let base = SyntheticFace.make()
+        let faceWidth = SyntheticFace.box.width
+        // 입 보호 영역(입 아래 끝 y 120 − 넓힘)보다 아래, 피부 아래 끝(y 50)보다 충분히 위다.
+        let lineCenter = CGPoint(x: 256, y: 90)
+        let lineRadii = CGSize(width: faceWidth * 0.05, height: faceWidth * 0.005)
+        let disc = SyntheticFace.cheek
+        let discRadii = CGSize(width: SyntheticFace.blemishRadius, height: SyntheticFace.blemishRadius)
+        let painted = SyntheticFace.painted(
+            SyntheticFace.painted(base.image, center: lineCenter, radii: lineRadii), center: disc, radii: discRadii)
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(painted))
+        let spots = try detector().detect(image: image, faces: [base.face])
+        let centers = spots.map(pixelCenter)
+        XCTAssertTrue(centers.contains { hypot($0.x - disc.x, $0.y - disc.y) < faceWidth * 0.02 }, "원은 잡힌다")
+        XCTAssertFalse(
+            centers.contains { hypot($0.x - lineCenter.x, $0.y - lineCenter.y) < faceWidth * 0.06 }, "선은 거절")
+    }
+
+    /// 피부 다각형 가장자리(마스크 < 0.9)의 원은 잡지 않는다(스펙 G5 5.2).
+    /// 합성 얼굴은 윤곽이 피부 타원보다 넓어 양옆 가장자리가 배경이므로 윤곽과 피부가 만나는 턱 끝을 쓴다.
+    func testSpotOnTheSkinEdgeIsRejected() throws {
+        let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let faceWidth = SyntheticFace.box.width
+        let polygon = FaceRegions.skinPolygon(face: base.face, extent: extent, tuning: RenderTuning())
+        // 윤곽 가장 아래 점에서 안쪽으로 얼굴 폭 1%만 들어간 자리.
+        let lowest = try XCTUnwrap(polygon.min { $0.y < $1.y })
+        let edge = CGPoint(x: lowest.x, y: lowest.y + faceWidth * 0.01)
+        let painted = SyntheticFace.painted(base.image, center: edge, radii: CGSize(width: 3, height: 3))
+        let image = CIImage(cgImage: try Support.renderer.makeCGImage(painted))
+        let spots = try detector().detect(image: image, faces: [base.face])
+        XCTAssertTrue(spots.isEmpty, "가장자리 원은 거절 \(spots.map(pixelCenter))")
+    }
 }

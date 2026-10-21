@@ -367,6 +367,7 @@ struct SyntheticFace {
     /// 눈 바로 아래(보호 영역 안)의 잡티. 검출되면 안 된다.
     static let blemishNearEye = CGPoint(x: 200, y: 278)
     static let blemishRadius: CGFloat = 3.5
+    static let blemishColor = CIColor(red: 0.56, green: 0.32, blue: 0.27)
     static let cheek = CGPoint(x: 180, y: 200)
     static let forehead = CGPoint(x: 256, y: 380)
     static let backgroundInsideContour = CGPoint(x: 96, y: 240)
@@ -401,15 +402,20 @@ struct SyntheticFace {
         let lipColor = CIImage(color: CIColor(red: 0.72, green: 0.28, blue: 0.32))
         image = paint(lipColor, center: mouth, radii: mouthRadii, over: image)
         if withBlemishes {
-            // 피부보다 휘도 40% 낮고 Cr이 0.026 높다. 피부색 가중치(σ 0.04) 안이라 마스크에 남는다.
-            let spotColor = CIImage(color: CIColor(red: 0.56, green: 0.32, blue: 0.27))
             let radii = CGSize(width: blemishRadius, height: blemishRadius)
             for center in blemishes + [blemishNearEye] {
-                image = paint(spotColor, center: center, radii: radii, over: image)
+                image = painted(image, center: center, radii: radii)
             }
         }
         let face = landmarks ? geometry() : FaceGeometry(boundingBox: normalized(box))
         return SyntheticFace(image: image.cropped(to: extent), face: face)
+    }
+
+    /// 잡티 색(붉고 어두운 피부)으로 칠한 단단한 타원.
+    /// 피부보다 휘도 40% 낮고 Cr이 0.026 높다.
+    /// 피부색 가중치(σ 0.04) 안이라 마스크에 남는다.
+    static func painted(_ image: CIImage, center: CGPoint, radii: CGSize) -> CIImage {
+        paint(CIImage(color: blemishColor), center: center, radii: radii, over: image)
     }
 
     private static func paint(_ color: CIImage, center: CGPoint, radii: CGSize, over image: CIImage) -> CIImage {

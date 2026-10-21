@@ -42,6 +42,15 @@ public struct RenderTuning: Sendable {
     public var blemishMaskThreshold: Double = 0.5
     /// 얼굴당 잡티 수 상한(스펙).
     public var blemishMaxPerFace: Int = 40
+    /// 잡티 중심의 피부 마스크 하한.
+    /// 피부 다각형 가장자리와 손·턱 경계의 그늘을 거절한다(스펙 G5 5.2).
+    public var blemishCenterMaskMinimum: Double = 0.9
+    /// 연결 영역 상자의 긴 변 ÷ 짧은 변 상한.
+    /// 선·주름은 길쭉하다.
+    public var blemishMaxAspect: Double = 2.0
+    /// 연결 영역의 픽셀 수 ÷ 상자 넓이 하한.
+    /// 원은 0.785다.
+    public var blemishMinFill: Double = 0.4
     /// 잡티를 덮는 복제 원의 반지름 배수. applySpot 마스크는 반지름 65%까지만 완전히 복사하므로 1/0.65보다 커야 한다.
     public var blemishHealRadiusScale: Double = 1.8
     /// 복제 원본을 복제 반지름의 이 배수만큼 얼굴 가운데 쪽 옆 피부에서 가져온다. 2 이상이면 원이 겹치지 않는다.
