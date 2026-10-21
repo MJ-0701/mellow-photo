@@ -23,7 +23,7 @@ final class EvotoCalibrationTests: XCTestCase {
         static let features = "MELLOW_EVOTO_FEATURES"
         /// 1이면 나란히 보기 PNG를 쓰지 않는다.
         static let skipImages = "MELLOW_EVOTO_NO_IMAGES"
-        /// 1이면 후보 표·시제품도 잰다.
+        /// 1이면 legacy 계열(1.4.0 표)도 잰다.
         static let candidates = "MELLOW_EVOTO_CANDIDATES"
     }
 
@@ -91,11 +91,9 @@ final class EvotoCalibrationTests: XCTestCase {
         let bodyBrightness: Double
         let bodyTone: Double
         let tuning: RenderTuning
-        /// 렌더 뒤에 거는 점 지우기 시제품의 강도 1 값(성별 표).
-        /// nil이면 걸지 않는다.
-        var spots: ((Gender?) -> Double)?
         /// 자동 잡티(복제 원) 스위치.
-        var cloneHeal = true
+        /// 현재 표는 false다(OneTouchBundle.layer와 같다).
+        var autoBlemish = false
 
         static func current(_ family: String, gender: Gender?, strength: Double) -> Variant {
             Variant(
@@ -122,42 +120,29 @@ final class EvotoCalibrationTests: XCTestCase {
             })
     }
 
-    /// 후보 표·상수(G5 제안 측정).
+    /// 비교 계열.
     /// MELLOW_EVOTO_CANDIDATES=1일 때만 잰다.
+    /// legacy 계열은 1.4.0 표(점 지우기 없음, 자동 잡티 켬)다.
     static let candidateFamilies: [Family] = [
-        candidate("spots", spots: Candidate.spots),
-        candidate("calm", table: Candidate.calm, bodyBrightness: Candidate.calmBodyBrightness, spots: Candidate.spots),
-        candidate(
-            "calmNoClone", table: Candidate.calm, bodyBrightness: Candidate.calmBodyBrightness,
-            spots: Candidate.spots, cloneHeal: false),
-        candidate(
-            "calmFemale", gender: .female, table: Candidate.calm, bodyBrightness: Candidate.calmBodyBrightness,
-            spots: Candidate.spots, cloneHeal: false),
-        candidate(
-            "calmMale", gender: .male, table: Candidate.calm, bodyBrightness: Candidate.calmBodyBrightness,
-            spots: Candidate.spots, cloneHeal: false),
+        candidate("legacy", table: Legacy.values(for:), bodyBrightness: Legacy.bodyBrightness, autoBlemish: true)
     ]
 
-    /// 후보 값.
-    enum Candidate {
-        /// 점 지우기 강도 1(성별 표).
-        /// 1을 넘는 값은 기본 강도 0.6에서 거의 다 걸리게 하려는 것이다(시제품이 1에서 자른다).
-        /// 남성은 질감을 더 남긴다.
-        static let maleSpots = 1.2
-        static let otherSpots = 1.6
-        /// 중간·넓은 대역 평탄화를 Evoto 쪽(중간 대역 분산비 0.85~1.0)으로 낮춘 매끄럽게·얼룩 고르기.
-        static let calmSmoothing: [Gender?: Double] = [nil: 0.16, .female: 0.2, .male: 0.12]
-        static let calmToneEvening: [Gender?: Double] = [nil: 0.08, .female: 0.1, .male: 0.05]
-        static let calmBodyBrightness = 0.08
+    /// 1.4.0 표(G5 전).
+    /// 다른 값은 현재 표와 같다.
+    enum Legacy {
+        static let smoothing: [Gender?: Double] = [nil: 0.35, .female: 0.45, .male: 0.25]
+        static let toneEvening: [Gender?: Double] = [nil: 0.25, .female: 0.35, .male: 0.15]
+        static let darkCircles: [Gender?: Double] = [nil: 0.55, .female: 0.6, .male: 0.5]
+        static let nasolabial: [Gender?: Double] = [nil: 0.4, .female: 0.45, .male: 0.35]
+        static let bodyBrightness = 0.15
 
-        static func spots(_ gender: Gender?) -> Double {
-            gender == .male ? maleSpots : otherSpots
-        }
-
-        static func calm(_ gender: Gender?) -> OneTouchBundle.Values {
+        static func values(for gender: Gender?) -> OneTouchBundle.Values {
             var values = OneTouchBundle.values(for: gender)
-            values.smoothing = calmSmoothing[gender] ?? values.smoothing
-            values.toneEvening = calmToneEvening[gender] ?? values.toneEvening
+            values.smoothing = smoothing[gender] ?? values.smoothing
+            values.toneEvening = toneEvening[gender] ?? values.toneEvening
+            values.darkCircles = darkCircles[gender] ?? values.darkCircles
+            values.nasolabial = nasolabial[gender] ?? values.nasolabial
+            values.spots = 0
             return values
         }
     }
@@ -165,8 +150,7 @@ final class EvotoCalibrationTests: XCTestCase {
     static func candidate(
         _ name: String, gender: Gender? = nil,
         table: @escaping (Gender?) -> OneTouchBundle.Values = OneTouchBundle.values(for:),
-        bodyBrightness: Double = OneTouchBundle.Table.bodyBrightness, spots: ((Gender?) -> Double)? = nil,
-        cloneHeal: Bool = true
+        bodyBrightness: Double = OneTouchBundle.Table.bodyBrightness, autoBlemish: Bool = false
     ) -> Family {
         Family(
             name: name,
@@ -174,20 +158,20 @@ final class EvotoCalibrationTests: XCTestCase {
                 Variant(
                     name: "\(name)-\(strength)", strength: strength, gender: gender, table: table,
                     bodyBrightness: bodyBrightness, bodyTone: OneTouchBundle.Table.bodyTone, tuning: RenderTuning(),
-                    spots: spots, cloneHeal: cloneHeal)
+                    autoBlemish: autoBlemish)
             })
     }
 
     /// OneTouchBundle.layer와 같은 규칙의 층.
-    /// 후보 표를 넣으려고 따로 둔다(testLocalLayerMatchesTheBundle가 같음을 지킨다).
-    static func layer(_ values: OneTouchBundle.Values, strength: Double) -> PortraitLayer {
+    /// 비교 표를 넣으려고 따로 둔다(testLocalLayerMatchesTheBundle가 같음을 지킨다).
+    static func layer(_ values: OneTouchBundle.Values, strength: Double, autoBlemish: Bool = false) -> PortraitLayer {
         var layer = PortraitLayer()
         layer.skinSmoothing = AdjustmentRange.clamped(values.smoothing * strength, to: AdjustmentRange.unit)
-        layer.autoBlemish = true
+        layer.autoBlemish = autoBlemish
         let refinements: [SkinRefinementKey: Double] = [
             .darkCircles: values.darkCircles, .nasolabial: values.nasolabial, .marionette: values.marionette,
             .glabella: values.glabella, .toneEvening: values.toneEvening, .redness: values.redness,
-            .shine: values.shine,
+            .shine: values.shine, .spots: values.spots,
         ]
         for (key, value) in refinements {
             layer.skinRefinement[key] = AdjustmentRange.clamped(
@@ -214,13 +198,11 @@ final class EvotoCalibrationTests: XCTestCase {
             variant.bodyBrightness * variant.strength, to: AdjustmentRange.bodySkin(.brightness))
         recipe.bodySkin.tone = AdjustmentRange.clamped(
             variant.bodyTone * variant.strength, to: AdjustmentRange.bodySkin(.tone))
-        var all = layer(variant.table(nil), strength: variant.strength)
-        all.autoBlemish = variant.cloneHeal
+        let all = layer(variant.table(nil), strength: variant.strength, autoBlemish: variant.autoBlemish)
         all.applied(to: &recipe.portrait, makeup: &recipe.makeup)
         for group in Gender.allCases {
-            var grouped = layer(variant.table(group), strength: variant.strength)
-            grouped.autoBlemish = variant.cloneHeal
-            recipe.people.groups[group] = grouped
+            recipe.people.groups[group] = layer(
+                variant.table(group), strength: variant.strength, autoBlemish: variant.autoBlemish)
         }
         if let gender = variant.gender {
             recipe.people.individuals = faces.map {
@@ -415,12 +397,7 @@ struct EvotoPhoto {
             extent: extent, recipe: EvotoCalibrationTests.recipe(variant, faces: faces),
             analysis: try analysis(tuning: variant.tuning), tuning: variant.tuning,
             makeupCatalog: try Support.sharedMakeupCatalog())
-        var output = try RenderPipeline.standard.render(original, context: context)
-        if let spots = variant.spots {
-            let amount = spots(variant.gender) * variant.strength
-            output = try SpotPrototype.apply(
-                output, faces: faces, extent: extent, amount: amount, tuning: variant.tuning)
-        }
+        let output = try RenderPipeline.standard.render(original, context: context)
         return try Self.baked(output)
     }
 
@@ -997,108 +974,5 @@ enum Board {
         else { throw MellowError.renderFailed }
         CGImageDestinationAddImage(destination, cgImage, nil)
         guard CGImageDestinationFinalize(destination) else { throw MellowError.renderFailed }
-    }
-}
-
-// MARK: 점 지우기 시제품
-
-/// 새 렌더 능력 후보(G5 제안)의 측정용 시제품.
-/// 렌더 단계가 아니고 측정 하네스 안에서만 렌더 결과 뒤에 건다.
-/// 점 = 닫힘(spot 반지름) − 닫힘(pore 반지름)이라 모공 크기 명암은 그대로 두고 그보다 큰 주근깨·여드름 자국만 채운다.
-/// 밝은 점(땀 반사점·좁쌀)은 열림으로 같은 방식이다.
-/// 상대 깊이가 문턱보다 얕은 차이(피부 결)는 건드리지 않는다.
-enum SpotPrototype {
-    typealias Support = RenderingTestSupport
-
-    static let spotRadiusFraction = 0.012
-    static let poreRadiusFraction = 0.003
-    /// 보정 지도를 흐리는 반지름.
-    /// pore 반지름의 배수.
-    /// 닫힘의 평평한 꼭대기 계단을 지운다.
-    static let correctionBlurInPores = 1.0
-    /// 국소 휘도 대비 상대 깊이 문턱(시작·끝).
-    static let thresholdStart = 0.008
-    static let thresholdEnd = 0.04
-    static let lumaFloor = 0.01
-    /// 이보다 깊은 상대 깊이(콧구멍·눈꼬리·입꼬리 같은 진짜 구조)는 점이 아니라서 건드리지 않는다.
-    static let depthCapStart = 0.25
-    static let depthCapEnd = 0.4
-    /// 형태 필터 입력 여유.
-    /// spot 반지름의 배수.
-    static let morphologyPaddingInSpots = 3.0
-
-    private static let floatContext = CIContext(options: [
-        .workingColorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
-    ])
-
-    private static let correctionKernel = CIColorKernel(
-        source: """
-            kernel vec4 spotCorrection(__sample darkFill, __sample darkPore, __sample brightCut, __sample brightPore,
-                                       float start, float end, float capStart, float capEnd, float floorLuma) {
-                vec3 luma = vec3(0.2126, 0.7152, 0.0722);
-                vec3 dark = max(darkFill.rgb - darkPore.rgb, vec3(0.0));
-                vec3 bright = max(brightPore.rgb - brightCut.rgb, vec3(0.0));
-                float base = max(dot(darkPore.rgb, luma), floorLuma);
-                float depth = dot(dark, luma) / base;
-                float height = dot(bright, luma) / base;
-                float wd = smoothstep(start, end, depth) * (1.0 - smoothstep(capStart, capEnd, depth));
-                float wb = smoothstep(start, end, height) * (1.0 - smoothstep(capStart, capEnd, height));
-                return vec4(dark * wd - bright * wb, 1.0);
-            }
-            """)
-
-    private static let applyKernel = CIColorKernel(
-        source: """
-            kernel vec4 spotApply(__sample image, __sample correction, __sample mask, float amount) {
-                return vec4(image.rgb + correction.rgb * mask.r * amount, image.a);
-            }
-            """)
-
-    static func apply(_ image: CIImage, faces: [FaceGeometry], extent: CGRect, amount: Double, tuning: RenderTuning)
-        throws -> CIImage
-    {
-        guard amount > 0, let correctionKernel, let applyKernel else { return image }
-        var result = try EvotoPhoto.baked(image)
-        for face in faces {
-            let width = Double(FaceRegions.faceWidth(face, extent: extent))
-            let spot = width * spotRadiusFraction
-            let pore = max(tuning.skinBlurMinimumRadius, width * poreRadiusFraction)
-            let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning)
-            guard !bounds.isEmpty else { continue }
-            // 형태 필터 입력은 가장자리 여유를 둔 유한 영역으로 자른다.
-            let padding = CGFloat(spot * morphologyPaddingInSpots)
-            let area = bounds.insetBy(dx: -padding, dy: -padding)
-            let source = result.clampedToExtent().cropped(to: area)
-            func morphology(_ first: String, _ second: String, _ radius: Double) -> CIImage {
-                source.applyingFilter(first, parameters: [kCIInputRadiusKey: radius])
-                    .applyingFilter(second, parameters: [kCIInputRadiusKey: radius]).cropped(to: bounds)
-            }
-            let maximum = "CIMorphologyMaximum"
-            let minimum = "CIMorphologyMinimum"
-            let arguments: [Any] = [
-                morphology(maximum, minimum, spot), morphology(maximum, minimum, pore),
-                morphology(minimum, maximum, spot), morphology(minimum, maximum, pore), thresholdStart, thresholdEnd,
-                depthCapStart, depthCapEnd, lumaFloor,
-            ]
-            guard let raw = correctionKernel.apply(extent: bounds, arguments: arguments),
-                let floats = floatContext.createCGImage(
-                    raw, from: bounds, format: .RGBAf, colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB))
-            else { throw MellowError.renderFailed }
-            // 형태 필터와 원본 합성을 한 그래프로 렌더하면 영역 밖이 늘어난 픽셀이 되어 보정 지도를 부동소수 비트맵으로 먼저 굳힌다.
-            let correction = CIImage(
-                cgImage: floats, options: [.colorSpace: CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!]
-            ).transformed(by: CGAffineTransform(translationX: bounds.minX, y: bounds.minY))
-            let smoothed = correction.clampedToExtent()
-                .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: pore * correctionBlurInPores])
-            let mask = try FaceRegions.skinMask(face: face, image: result, extent: extent, tuning: tuning)
-            guard let fixed = applyKernel.apply(extent: bounds, arguments: [result, smoothed, mask, min(1, amount)])
-            else { throw MellowError.renderFailed }
-            let patch = try Support.renderer.makeCGImage(fixed.cropped(to: bounds))
-            // 보정한 얼굴 영역만 비트맵으로 굳혀 원본 위에 얹는다.
-            let placed = CIImage(cgImage: patch).transformed(
-                by: CGAffineTransform(translationX: bounds.minX, y: bounds.minY))
-            result = try EvotoPhoto.baked(placed.composited(over: result).cropped(to: extent))
-        }
-        return result
     }
 }
