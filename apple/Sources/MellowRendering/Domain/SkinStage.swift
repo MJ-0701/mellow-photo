@@ -1,7 +1,7 @@
 import CoreImage
 import MellowShared
 
-/// 자동 잡티를 먼저 지우고 얼굴마다 주름 밝히기 4종(다크서클·팔자·마리오네트·미간)을 건다.
+/// 자동 잡티를 먼저 지우고 얼굴마다 점 지우기와 주름 밝히기 4종(다크서클·팔자·마리오네트·미간)을 건다.
 /// 이어서 피부 마스크 안 대역 합성으로 얼룩(피부 보정)·넓은 톤 차이(얼룩 고르기)·번들거림을 줄이고 마지막에 붉은기를 조정한다.
 /// 모공 질감(가는 대역)은 남긴다.
 struct SkinStage: RenderStage {
@@ -35,7 +35,8 @@ struct SkinStage: RenderStage {
         return copy
     }
 
-    /// 얼굴 하나: 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림) → 붉은기. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    /// 얼굴 하나: 점 지우기 → 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림) → 붉은기. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    /// 점 지우기는 주름 밝히기(곱셈)보다 앞이라 점이 함께 밝혀지지 않는다.
     private func refine(_ image: CIImage, face: FaceGeometry, skin: SkinAdjustments, context: RenderContext) throws
         -> CIImage
     {
@@ -45,12 +46,17 @@ struct SkinStage: RenderStage {
         let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(image.extent)
         guard !bounds.isEmpty else { return image }
         let faceWidth = FaceRegions.faceWidth(face, extent: extent)
-        // 피부 마스크는 주름 전 이미지에서 한 번 만든다.
-        // 주름 밝히기의 둘레 기준 가중치와 대역 합성·붉은기가 함께 쓴다.
+        // 피부 마스크는 점 지우기·주름 전 이미지에서 한 번 만든다.
+        // 점 지우기·주름 밝히기의 둘레 기준 가중치와 대역 합성·붉은기가 함께 쓴다.
         // 캐시된 비트맵과 볼 평균만 쓰므로 주름만 켜도 비용이 거의 없다.
         let unitMask = try FaceRegions.skinMask(
             face: face, image: image, extent: extent, tuning: tuning, strength: 1, cache: context.regionMasks)
         var result = image
+        if skin.spots > 0 {
+            result = try SpotRemoval.apply(
+                result, face: face, skinMask: unitMask, faceWidth: faceWidth, amount: skin.spots, tuning: tuning,
+                extent: extent, cache: context.regionMasks)
+        }
         for fold in Self.folds(for: face, skin: skin, context: context) {
             result = try SkinRefinement.liftFold(
                 result, region: fold.region, skinMask: unitMask, faceWidth: faceWidth, amount: fold.amount,

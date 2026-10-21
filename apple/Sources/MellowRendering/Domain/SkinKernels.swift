@@ -11,6 +11,8 @@ final class SkinKernels: @unchecked Sendable {
     private let tone: CIColorKernel?
     private let blush: CIColorKernel?
     private let healing: CIColorKernel?
+    private let spotCorrection: CIColorKernel?
+    private let spotBlend: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -97,6 +99,32 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(source.rgb * gain, source.a);
                 }
                 """)
+        // luma는 BT.709 선형 휘도 계수다.
+        // dark = 닫힘(점) − 닫힘(모공), bright = 열림(모공) − 열림(점)이라 모공 크기 명암은 빠진다.
+        // 상대 깊이 = 휘도 차이 ÷ max(닫힘(모공) 휘도, floorLuma).
+        // 가중치는 start…end에서 0 → 1로 오르고 capStart…capEnd에서 1 → 0으로 내린다(깊은 구조는 점이 아니다).
+        spotCorrection = CIColorKernel(
+            source: """
+                kernel vec4 spotCorrection(__sample darkFill, __sample darkPore, __sample brightCut,
+                                           __sample brightPore, float start, float end, float capStart,
+                                           float capEnd, float floorLuma) {
+                    vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+                    vec3 dark = max(darkFill.rgb - darkPore.rgb, vec3(0.0));
+                    vec3 bright = max(brightPore.rgb - brightCut.rgb, vec3(0.0));
+                    float base = max(dot(darkPore.rgb, luma), floorLuma);
+                    float depth = dot(dark, luma) / base;
+                    float height = dot(bright, luma) / base;
+                    float wd = smoothstep(start, end, depth) * (1.0 - smoothstep(capStart, capEnd, depth));
+                    float wb = smoothstep(start, end, height) * (1.0 - smoothstep(capStart, capEnd, height));
+                    return vec4(dark * wd - bright * wb, 1.0);
+                }
+                """)
+        spotBlend = CIColorKernel(
+            source: """
+                kernel vec4 spotApply(__sample image, __sample correction, __sample mask, float amount) {
+                    return vec4(image.rgb + correction.rgb * mask.r * amount, image.a);
+                }
+                """)
     }
 
     /// encoded는 sRGB 감마 값 이미지, left·right는 볼 평균을 무한 확장한 이미지. 결과는 회색 가중치.
@@ -176,5 +204,34 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [source, sourceLow, ringNumerator, ringDenominator, lumaFloor, maxGain]
         guard let healed = healing.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return healed
+    }
+
+    /// 점 지우기 보정 지도(스펙 G5 4.3).
+    /// 어두운 점은 더하고 밝은 점은 빼는 선형 RGB 차이다(음수 가능).
+    /// start < end, capStart < capEnd, lumaFloor > 0이 아니면 렌더 실패다.
+    func spot(
+        darkFill: CIImage, darkPore: CIImage, brightCut: CIImage, brightPore: CIImage, start: Double, end: Double,
+        capStart: Double, capEnd: Double, lumaFloor: Double, extent: CGRect
+    ) throws -> CIImage {
+        guard let spotCorrection, start < end, capStart < capEnd, lumaFloor > 0 else { throw MellowError.renderFailed }
+        let images: [Any] = [darkFill, darkPore, brightCut, brightPore]
+        let limits: [Any] = [start, end, capStart, capEnd, lumaFloor]
+        guard let correction = spotCorrection.apply(extent: extent, arguments: images + limits) else {
+            throw MellowError.renderFailed
+        }
+        return correction
+    }
+
+    /// image.rgb + correction.rgb × mask.r × amount.
+    /// 알파는 image 그대로다.
+    func spotApply(image: CIImage, correction: CIImage, mask: CIImage, amount: Double, extent: CGRect) throws
+        -> CIImage
+    {
+        guard let spotBlend else { throw MellowError.renderFailed }
+        let arguments: [Any] = [image, correction, mask, amount]
+        guard let applied = spotBlend.apply(extent: extent, arguments: arguments) else {
+            throw MellowError.renderFailed
+        }
+        return applied
     }
 }

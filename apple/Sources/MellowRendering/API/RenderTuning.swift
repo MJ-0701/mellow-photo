@@ -280,6 +280,39 @@ public struct RenderTuning: Sendable {
     public var healMaxGain: Double = 2.0
     /// 배율 분모 하한(선형).
     public var healLumaFloor: Double = 0.01
+    /// 점 지우기(스펙 G5 4.1) 닫힘·열림 반지름.
+    /// 얼굴 폭 비율.
+    /// 지름 2.4%까지의 점을 채운다.
+    public var spotRadiusFraction: Double = 0.012
+    /// 모공 닫힘·열림 반지름.
+    /// 얼굴 폭 비율(올림, 하한 spotMorphologyMinimumRadius).
+    /// 이 크기의 명암은 차이에서 빠져 남는다.
+    public var spotPoreRadiusFraction: Double = 0.003
+    /// 보정 지도 흐림 반지름.
+    /// 모공 반지름 배수.
+    /// 닫힘의 평평한 계단을 지운다.
+    public var spotCorrectionBlurInPores: Double = 1.0
+    /// 강도 1의 상대 깊이 시작 문턱.
+    public var spotDepthStart: Double = 0.008
+    /// 강도 0의 상대 깊이 시작 문턱(강도로 선형 보간).
+    public var spotDepthStartWeak: Double = 0.020
+    /// 끝 문턱 = 시작 문턱 + 이 값.
+    public var spotDepthRamp: Double = 0.032
+    /// 상대 깊이가 이보다 깊으면 점이 아니라 구조(콧구멍·눈꼬리)라 가중치가 줄기 시작한다.
+    public var spotDepthCapStart: Double = 0.25
+    /// 이 상대 깊이에서 가중치 0.
+    public var spotDepthCapEnd: Double = 0.40
+    /// 상대 깊이 분모 하한(선형 휘도).
+    public var spotLumaFloor: Double = 0.01
+    /// 이 강도부터 채움 비율 1.
+    /// 아래는 강도 ÷ 이 값이다.
+    public var spotFullFillStrength: Double = 0.3
+    /// 형태 필터 입력 여유.
+    /// 점 반지름 배수.
+    public var spotMorphologyPaddingInSpots: Double = 3.0
+    /// 형태 필터 반지름 하한(픽셀).
+    /// CIMorphologyMaximum·Minimum은 반지름을 내림하고 1픽셀 아래는 아무것도 하지 않는다(G5-2 구현 중 추가).
+    public var spotMorphologyMinimumRadius: Double = 1.0
     /// 점 지우기(스펙 G5 4.2)에서 뺄 눈꼬리·입꼬리 원의 반지름.
     /// 얼굴 폭 비율.
     public var spotExclusionRadiusFraction: Double = 0.03

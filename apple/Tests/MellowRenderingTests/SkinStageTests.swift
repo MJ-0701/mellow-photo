@@ -636,6 +636,13 @@ final class SkinStageTests: XCTestCase {
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+        var spotted = recipe
+        spotted.portrait.skin.spots = 1
+        let spotContext = RenderContext(
+            extent: synthetic.image.extent, recipe: spotted, analysis: analysis, tuning: RenderTuning())
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        XCTAssertEqual(analysis.regionMasks.count, 3, "점 지우기는 제외 비트맵 하나를 더한다(G5)")
     }
 
     /// 띠 둘레 피부 가중치 합이 SkinKernels.foldMinimumCoverage보다 작으면 기준이 없어 배율 1이어야 한다.
