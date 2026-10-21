@@ -19,7 +19,7 @@
 | 결정 | 이유 | 바꾸면 비용 |
 |---|---|---|
 | 몸·얼굴과 인스턴스의 짝은 사진 준비 때 CPU로 한 번 정하고 저장하지 않는다 | 렌더마다 마스크를 표본하면 미리보기가 느려진다. 분석 결과와 수명이 같다 | 작음 |
-| 보호 가중치의 흐림은 마스크를 extent로 늘린 뒤 그룹 영향 경계 + 3σ로 잘라 extent 해상도에서 한다(스펙 5.4의 "원래 해상도에서 흐림"을 바꿈) | Vision 마스크는 가로·세로 배율이 달라 저해상도에서 등방 흐림을 하면 σ가 축마다 달라진다. 잘라서 흐리므로 비용은 영향 경계 크기에 비례한다 | 작음 |
+| 보호 가중치의 흐림은 분석기 마스크 해상도 근처에서 한다. 두 축 배율 중 큰 쪽에 맞춰 덜 촘촘한 축만 늘린 뒤 흐리고 extent로 늘린다(최종 리뷰 중 변경, 처음에는 extent로 늘린 뒤 extent 해상도에서 흐렸다) | Vision 마스크(512×384)는 사진과 가로세로 비가 달라 마스크 그대로 등방 흐림을 하면 σ가 축마다 달라진다. 축을 먼저 맞추면 두 축 모두 σ이고, 48MP 내보내기에서도 흐림 비용이 마스크 크기에 머문다 | 작음 |
 | 모든 그룹의 사람 마스크가 nil이면 지금처럼 원소를 한 지도에 모아 그린다 | 그룹별 합은 부동소수 더하기 순서가 달라 바이트가 달라질 수 있다. 마스크 없는 기존 테스트가 그대로 통과해야 한다 | 작음 |
 | 기존 `testOnlyLargestBodyIsReshaped`는 "전체 층 체형은 모든 몸, 다리 띠는 가장 큰 몸만"으로 바꾼다 | 스펙 결정(전체 층 = 모든 사람)이다 | 작음 |
 
@@ -202,7 +202,7 @@ Expected: 컴파일 오류.
 
 - 모든 그룹의 `ownMask`가 nil이면 원소를 이어 기존 경로로 그린다.
 - 그 밖에는 그룹마다 `displacementField`로 지도를 그리고 가중치를 곱한 뒤 그룹 지도를 더한다. 띠는 지금처럼 샘플링 커널이 더한다.
-- 가중치는 스펙 5.4다. own 마스크는 `BackgroundStage.personMask(_:extent:feather: 0)`로 늘리고 그룹 영향 경계 + 3σ로 잘라 `CIGaussianBlur`(σ)를 건다. σ = max(그룹 최대 이동 × `shapeBackgroundSigmaRatio`, 짧은 변 × `shapeBackgroundSigmaMinimum`)이다.
+- 가중치는 스펙 5.4다. own 마스크는 `DisplacementWarp.nativeBlurred`가 두 축 배율 중 큰 쪽 s에 맞춰 덜 촘촘한 축만 늘린 뒤 `CIGaussianBlur`(σ × s)를 걸고 `BackgroundStage.personMask(_:extent:feather: 0)`로 extent에 늘린다(최종 리뷰 중 변경). σ = max(그룹 최대 이동 × `shapeBackgroundSigmaRatio`, 짧은 변 × `shapeBackgroundSigmaMinimum`)이다.
 - others는 같은 배치로 늘린 뒤 `CIMaximumCompositing`으로 합친다(흐리지 않음).
 - 캡슐은 그룹당 최대 4개다. 가중치 커널은 vec4(start.xy, end.xy) 4개와 vec2(radius, feather) 4개를 받고, 없는 캡슐은 radius 0으로 넘긴다.
 - 가중치·곱·합 커널은 `DisplacementWarp` 안 CIColorKernel이다. 알파는 늘 1이다(기존 지도 커널과 같은 이유).
@@ -334,7 +334,7 @@ I3 수용 테스트에서 부유방(27%)과 몸 전체 가슴(30%) 원소가 이
 - `BodyTarget.outline: BodyOutline?`.
 - `BodyShapeRig`: 부유방(27%)과 몸 전체 가슴(30%)은 outline에 그 (level, side) 점이 있으면 그 점을 원소 중심으로 쓴다. outline이 nil(마스크 없음)이면 지금처럼 관절선 점을 쓴다(마스크 없는 렌더 바이트 동일 유지). outline은 있는데 그 (level, side) 점이 없으면(팔이 붙음) 그쪽 원소를 만들지 않는다. 허리·골반·허벅지는 바꾸지 않는다.
 
-**옆선 찾기:** level마다 몸 가운데 점 C = lerp(어깨 중점, 엉덩이 중점, level)에서 몸통 가로축으로 side 방향을 따라 어깨 폭 × `outlineProbeStep`(0.01)씩 어깨 폭 × `outlineProbeReach`(0.8)까지 걷는다. 마스크 값이 0.5 미만인 첫 표본을 만나면 그 직전 표본이 옆선이다. 그 전에 같은 쪽 위팔 선분(어깨–팔꿈치, 없으면 어깨 관절)까지의 거리가 어깨 폭 × `upperArmHalfWidth` 이하인 표본에 닿으면 팔이 붙은 것이라 점이 없다. 끝까지 배경을 못 만나도 점이 없다. 상수 `outlineProbeStep`·`outlineProbeReach`는 `BodyOutlineProbe`의 `private static let`이다.
+**옆선 찾기:** level마다 몸 가운데 점 C = lerp(어깨 중점, 엉덩이 중점, level)에서 몸통 가로축으로 side 방향을 따라 어깨 폭 × `outlineProbeStep`(0.01)씩 어깨 폭 × `outlineProbeReach`(0.8)까지 걷는다. 마스크 값이 0.5 미만인 첫 표본을 만나면 그 직전 표본이 옆선이다. 그 전에 같은 쪽 위팔 선분(어깨–팔꿈치, 없으면 어깨 관절)까지의 거리가 어깨 폭 × (`upperArmHalfWidth` × `armGuardScale` + `armGuardFeather`) 이하(보호 캡슐 반지름 + feather 띠, `bc48a39`에서 feather를 더함)인 표본에 닿으면 팔이 붙은 것이라 점이 없다. 끝까지 배경을 못 만나도 점이 없다. 상수 `outlineProbeStep`·`outlineProbeReach`는 `BodyOutlineProbe`의 `private static let`이다.
 
 **Tests:**
 - `BodyOutlineProbeTests`: 합성 사각 몸통 마스크(팔 사각형이 몸통에서 떨어짐)에서 27%·30% 양쪽 점이 몸통 사각형 변에서 한 걸음 안이다. 팔 사각형이 몸통에 붙으면 그쪽 점이 없다. 마스크가 전부 사람이면 점이 없다.
