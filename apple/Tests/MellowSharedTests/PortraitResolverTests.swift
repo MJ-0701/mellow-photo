@@ -113,7 +113,8 @@ final class PortraitResolverTests: XCTestCase {
         recipe.body.waist = -0.2
         recipe.body.arms = -0.1
         recipe.people.groups[.female] = PortraitLayer(body: [.waist: -0.5])
-        let record = PersonRecord(anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), layer: PortraitLayer(body: [.arms: -0.8]))
+        let record = PersonRecord(
+            anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), layer: PortraitLayer(body: [.arms: -0.8]))
         recipe.people.individuals = [record]
         let female = PortraitResolver.resolve(recipe, person: record, gender: .female).body
         XCTAssertEqual(female.waist, -0.5, "그룹 층이 전체 층을 덮는다")
@@ -130,7 +131,8 @@ final class PortraitResolverTests: XCTestCase {
         recipe.people.groups[.male] = PortraitLayer(body: [.sideChest: 0.7])
         recipe.people.groups[.female] = PortraitLayer(body: [.sideChest: 0.4])
         let man = PersonRecord(
-            anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male, layer: PortraitLayer(body: [.sideChest: 0.6]))
+            anchor: PersonAnchor(x: 0.5, y: 0.5, width: 0.2), gender: .male,
+            layer: PortraitLayer(body: [.sideChest: 0.6]))
         recipe.people.individuals = [man]
         XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .male).body.sideChest, 0)
         XCTAssertEqual(PortraitResolver.resolve(recipe, person: nil, gender: .female).body.sideChest, 0.4)

@@ -30,7 +30,8 @@ public enum PortraitResolver {
         public var body: BodyShapeAdjustments
 
         public init(
-            portrait: PortraitAdjustments, makeup: MakeupAdjustments, body: BodyShapeAdjustments = BodyShapeAdjustments()
+            portrait: PortraitAdjustments, makeup: MakeupAdjustments,
+            body: BodyShapeAdjustments = BodyShapeAdjustments()
         ) {
             self.portrait = portrait
             self.makeup = makeup
