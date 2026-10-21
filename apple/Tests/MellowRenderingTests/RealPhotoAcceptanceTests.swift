@@ -156,20 +156,6 @@ final class RealPhotoAcceptanceTests: XCTestCase {
 
     // MARK: 주름
 
-    private func foldMask(_ key: SkinRefinementKey) throws -> FaceRegions.RegionMask? {
-        let portrait = try self.portrait()
-        let extent = portrait.extent
-        let tuning = portrait.tuning
-        let face = portrait.face
-        switch key {
-        case .darkCircles: return FaceRegions.darkCircleMask(face: face, extent: extent, tuning: tuning)
-        case .nasolabial: return FaceRegions.nasolabialMask(face: face, extent: extent, tuning: tuning)
-        case .marionette: return FaceRegions.marionetteMask(face: face, extent: extent, tuning: tuning)
-        case .glabella: return FaceRegions.glabellaMask(face: face, extent: extent, tuning: tuning)
-        default: return nil
-        }
-    }
-
     /// 자연 사진에서의 상한 + 합성 그늘 회복률.
     /// 하한은 호출자가 더한다.
     private func assertFoldIsNaturalAndRecoversShadow(
@@ -178,7 +164,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         throws
     {
         let portrait = try self.portrait()
-        let region = try XCTUnwrap(foldMask(key), "\(key) 띠", file: file, line: line)
+        let region = try XCTUnwrap(portrait.foldBandMask(key), "\(key) 띠", file: file, line: line)
         let weight = try portrait.mask(region)
         let before = try base().grid
         let natural = try grid({ $0.portrait.skin[key] = 1 }, stage: SkinStage())
@@ -219,7 +205,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             record("darkCircles", "changed", DisplayScale.changedFraction(before, after, in: try faceRect)),
             Visibility.darkCirclesChangedFraction)
-        let weight = try self.portrait().mask(foldMask(.darkCircles))
+        let weight = try self.portrait().mask(self.portrait().foldBandMask(.darkCircles))
         XCTAssertGreaterThanOrEqual(
             DisplayScale.lumaDelta(before, after, weight: weight).mean, Visibility.darkCirclesMeanLift, "눈 아래가 밝아진다")
         try assertFoldIsNaturalAndRecoversShadow(.darkCircles)
@@ -420,12 +406,14 @@ final class RealPhotoAcceptanceTests: XCTestCase {
 
     // MARK: 원터치
 
-    /// 원터치 하한(스펙 G4 1.2 원터치 행).
+    /// 원터치 하한(스펙 G4 1.2 원터치 행, G5 1.2에서 재조정).
     /// 화면 배율 얼굴 상자 changedFraction.
+    /// 실측이 옛 문턱을 넘는 항목은 옛 문턱을 유지하고 미달 항목만 G5 새 문턱으로 내린다(VALIDATION G5-1).
     enum OneTouchVisibility {
         static let femaleDefaultChangedFraction = 0.05
         /// 남성·공통 기본 0.6도 같은 하한(스펙 G4 1.2, G4-2 구현 중 추가).
-        static let maleDefaultChangedFraction = 0.05
+        /// 남성은 G5 표 인하 뒤 실측 0.047이라 G5 새 문턱 0.03으로 내렸다(스펙 G5 1.2).
+        static let maleDefaultChangedFraction = 0.03
         static let commonDefaultChangedFraction = 0.05
         static let femaleMaximumChangedFraction = 0.10
         static let maleMaximumChangedFraction = 0.06
@@ -433,11 +421,32 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let coupleMinimumChangedFraction = 0.03
     }
 
-    /// 원터치 상한(스펙 G4 1.4 원터치 행).
+    /// 원터치 상한·밝기 하한(스펙 G4 1.4 원터치 행, G5 1.2에서 재조정).
     enum OneTouchNaturalness {
-        static let skinMeanLiftRange = (0.005 * 255)...(0.05 * 255)
+        /// 기본 0.6 얼굴 피부 평균 ΔY(/255).
+        /// Evoto 원클릭 +1.9, 75분위 +3.0(스펙 G5 1.2).
+        static let skinMeanLiftRange = 0.5...3.0
+        /// 강도 1 얼굴 피부 평균 ΔY 상한.
+        static let maximumSkinMeanLift = 4.0
         static let defaultFineVarianceRatio = 0.9
         static let maximumFineVarianceRatio = 0.85
+        static let defaultMidVarianceRatio = 0.80
+        static let maximumMidVarianceRatio = 0.70
+        static let defaultLowVarianceRatio = 0.85
+        static let maximumLowVarianceRatio = 0.80
+        /// 중간 대역 바깥 경계·넓은 대역 바깥 경계(얼굴 폭 비율).
+        /// 하네스 Calibration과 같다.
+        static let midOuterFraction = 0.03
+        static let lowOuterFraction = 0.12
+        /// 강도 1 띠 가중 평균 ΔY 상한(Evoto 전용 도구 × 1.3).
+        static let darkCircleBandMaximumLift = 10.5
+        static let nasolabialBandMaximumLift = 6.7
+        static let defaultChromaDeviationRatio = 0.80
+        static let maximumChromaDeviationRatio = 0.70
+        /// 몸 피부(얼굴 다각형 밖) 평균 ΔY 상한.
+        /// Evoto +0.3(스펙 G5 1.1).
+        static let defaultBodyMeanLift = 1.5
+        static let maximumBodyMeanLift = 2.5
         static let percentileAbsoluteLuma = 60.0
         static let percentile = 0.99
         static let skinChroma = 0.015
@@ -445,6 +454,20 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let femaleLipChroma = 0.03
         static let browChangedFraction = 0.05
         static let outsideFaceChangedFraction = 0.002
+    }
+
+    /// 자동 잡티 복구 원반 잔차(스펙 G5 1.2 "자동 잡티 복구").
+    enum HealBounds {
+        /// 심는 어두운 원의 반지름(얼굴 폭 비율)과 선형 휘도 배율.
+        static let plantedRadiusFraction: CGFloat = 0.012
+        static let plantedFactor = 0.80
+        /// 복구 원 안 평균 Y와 고리 평균 Y의 차 상한(8비트).
+        static let discResidual = 3.0
+        /// 잡티 반지름 → 복구 원 반지름 배수가 blemishHealRadiusScale이다.
+        /// 원반 평균은 복구 원의 0.65배(MaskBuilder 타원이 완전히 덮는 범위) 안에서 잰다.
+        static let discFraction: CGFloat = 0.65
+        /// 고리는 복구 원 반지름의 1~1.5배다.
+        static let ringOuterFraction: CGFloat = 1.5
     }
 
     /// 전체 대상 원터치와 같은 층(전체 층 공통 표, 그룹 층 성별 표)에 faces[i]를 genders[i]로 지정한 레시피.
@@ -563,11 +586,22 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         for item in cases {
             let result = try oneTouchRender(strength: item.strength, gender: item.gender, withBodySkin: true)
             let name = label(item.gender, item.strength)
-            if item.strength == OneTouchBundle.defaultStrength {
-                let lift = DisplayScale.lumaDelta(before, result.grid, weight: skin).mean
-                XCTAssertTrue(
-                    OneTouchNaturalness.skinMeanLiftRange.contains(record(name, "skinMeanLuma", lift)),
-                    "\(name) 피부 평균 ΔY \(lift)")
+            let isDefault = item.strength == OneTouchBundle.defaultStrength
+            let lift = record(name, "skinMeanLuma", DisplayScale.lumaDelta(before, result.grid, weight: skin).mean)
+            if isDefault {
+                XCTAssertTrue(OneTouchNaturalness.skinMeanLiftRange.contains(lift), "\(name) 피부 평균 ΔY \(lift)")
+            } else {
+                XCTAssertLessThanOrEqual(lift, OneTouchNaturalness.maximumSkinMeanLift, "\(name) 밝기 상한")
+            }
+            try assertBandsAndChromaStayNatural(name: name, isDefault: isDefault, output: result.output)
+            let crRatio = DisplayScale.chromaStandardDeviationRatio(before, result.grid, weight: skin)
+            XCTAssertGreaterThanOrEqual(
+                record(name, "crSigmaRatio", crRatio),
+                isDefault
+                    ? OneTouchNaturalness.defaultChromaDeviationRatio : OneTouchNaturalness.maximumChromaDeviationRatio,
+                "\(name) 붉은기 분산")
+            if !isDefault {
+                try assertFoldBandsStayBelowEvoto(name: name, before: before, after: result.grid)
             }
             let fineRatio = try Support.fineVarianceRatio(
                 before: portrait.image, after: result.output, weight: portrait.skinMask(), in: skinBounds,
@@ -607,6 +641,100 @@ final class RealPhotoAcceptanceTests: XCTestCase {
                 item.gender == .female ? OneTouchNaturalness.femaleLipChroma : OneTouchNaturalness.maleLipChroma,
                 "\(name) 입술")
         }
+    }
+
+    /// 피부 안쪽 중간·넓은 대역 분산 비(스펙 G5 1.2).
+    /// Evoto는 두 대역을 거의 그대로 둔다.
+    private func assertBandsAndChromaStayNatural(name: String, isDefault: Bool, output: CIImage) throws {
+        let portrait = try self.portrait()
+        let interior = try portrait.interiorSkinMask()
+        let bounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let faceWidth = Double(portrait.faceWidth)
+        let midOuter = faceWidth * OneTouchNaturalness.midOuterFraction
+        let lowOuter = faceWidth * OneTouchNaturalness.lowOuterFraction
+        let midRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: bounds, innerRadius: fineRadius(),
+            outerRadius: midOuter)
+        XCTAssertGreaterThanOrEqual(
+            record(name, "midRatio", midRatio),
+            isDefault ? OneTouchNaturalness.defaultMidVarianceRatio : OneTouchNaturalness.maximumMidVarianceRatio,
+            "\(name) 중간 대역")
+        let lowRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: bounds, innerRadius: midOuter,
+            outerRadius: lowOuter)
+        XCTAssertGreaterThanOrEqual(
+            record(name, "lowRatio", lowRatio),
+            isDefault ? OneTouchNaturalness.defaultLowVarianceRatio : OneTouchNaturalness.maximumLowVarianceRatio,
+            "\(name) 넓은 대역")
+    }
+
+    /// 강도 1 다크서클·팔자 띠 평균 ΔY ≤ Evoto 전용 도구 × 1.3(스펙 G5 판정 5).
+    private func assertFoldBandsStayBelowEvoto(name: String, before: PixelGrid, after: PixelGrid) throws {
+        let portrait = try self.portrait()
+        let darkCircle = try portrait.mask(portrait.foldBandMask(.darkCircles))
+        XCTAssertLessThanOrEqual(
+            record(name, "darkCircleBand", DisplayScale.lumaDelta(before, after, weight: darkCircle).mean),
+            OneTouchNaturalness.darkCircleBandMaximumLift, "\(name) 다크서클 ≤ Evoto × 1.3")
+        let nasolabial = try portrait.mask(portrait.foldBandMask(.nasolabial))
+        XCTAssertLessThanOrEqual(
+            record(name, "nasolabialBand", DisplayScale.lumaDelta(before, after, weight: nasolabial).mean),
+            OneTouchNaturalness.nasolabialBandMaximumLift, "\(name) 팔자 ≤ Evoto × 1.3")
+    }
+
+    /// 전체 대상 원터치의 몸 피부(얼굴 다각형 밖) 평균 ΔY(스펙 G5 1.1 몸 피부 행).
+    func testOneTouchKeepsBodyLiftWithinEvotoBounds() throws {
+        let portrait = try self.portrait()
+        let before = try base().grid
+        let body = try DisplayScale.grid(portrait.bodyOnlySkinArea())
+        XCTAssertGreaterThan(DisplayScale.maskedPixelCount(body), 0, "몸 피부 영역이 비어 있지 않다")
+        let cases: [(strength: Double, maximum: Double)] = [
+            (OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultBodyMeanLift),
+            (OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumBodyMeanLift),
+        ]
+        for item in cases {
+            let result = try oneTouchRender(strength: item.strength, gender: nil, withBodySkin: true)
+            let name = label(nil, item.strength)
+            XCTAssertLessThanOrEqual(
+                record(name, "bodyMeanLuma", DisplayScale.lumaDelta(before, result.grid, weight: body).mean),
+                item.maximum, "\(name) 몸 피부 밝기")
+        }
+    }
+
+    /// 자동 잡티 복구가 데모 사진의 경사면에서 원반을 남기지 않는다(스펙 G5 1.2 "자동 잡티 복구").
+    func testAutoBlemishHealLeavesNoDiscOnTheDemoCheek() throws {
+        let portrait = try self.portrait()
+        let extent = portrait.extent
+        let cheek = try XCTUnwrap(FaceRegions.cheekRects(face: portrait.face, extent: extent).first)
+        // 볼 상자 아래 턱 쪽(상자 높이만큼 아래)의 경사면.
+        let center = CGPoint(x: cheek.midX, y: cheek.minY - cheek.height)
+        let radius = portrait.faceWidth * HealBounds.plantedRadiusFraction
+        let spotted = try portrait.baked(
+            SyntheticDefect.spotted(
+                portrait.image, centers: [center], radius: radius, factor: HealBounds.plantedFactor, extent: extent))
+        let shortSide = min(extent.width, extent.height)
+        let blemish = BlemishSpot(
+            x: Double((center.x - extent.minX) / extent.width), y: Double((center.y - extent.minY) / extent.height),
+            radius: Double(radius / shortSide), faceIndex: 0)
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        let analysis = PhotoAnalysis(
+            faces: portrait.analysis.faces, blemishes: [blemish], personMask: nil, bodies: [])
+        let context = RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: portrait.tuning)
+        let healed = try DisplayScale.grid(SkinStage().apply(spotted, in: context))
+        // 복구 원은 잡티 반지름 × blemishHealRadiusScale이다.
+        let healRadius = radius * CGFloat(portrait.tuning.blemishHealRadiusScale)
+        let discRadius = healRadius * HealBounds.discFraction
+        let disc = try DisplayScale.grid(
+            Support.hardEllipse(center: center, radii: CGSize(width: discRadius, height: discRadius), extent: extent))
+        let ring = try DisplayScale.grid(
+            portrait.annulus(center: center, inner: healRadius, outer: healRadius * HealBounds.ringOuterFraction))
+        let residual = abs(DisplayScale.luma(healed, weight: disc) - DisplayScale.luma(healed, weight: ring))
+        XCTAssertLessThanOrEqual(record("heal", "discResidual", residual), HealBounds.discResidual, "원반 잔차 없음")
+        let defective = try DisplayScale.grid(spotted)
+        let defectDisc = DisplayScale.luma(defective, weight: disc)
+        let defectResidual = abs(defectDisc - DisplayScale.luma(defective, weight: ring))
+        record("heal", "plantedResidual", defectResidual)
+        XCTAssertGreaterThan(defectResidual, HealBounds.discResidual, "심은 원이 복구 전에는 보인다")
     }
 
     /// 변형은 묶음 밖이다(스펙 G4 1.4 마지막 행).
