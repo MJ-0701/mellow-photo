@@ -3,12 +3,12 @@ import XCTest
 @testable import MellowShared
 
 final class OneTouchBundleTests: XCTestCase {
-    /// Evoto 실측에 맞춘 표 상한(스펙 G5 판정 3).
+    /// 표가 G4 값으로 되돌아가지 않게 막는 가드(구현자가 고른 값이다, 스펙 값이 아니다).
+    /// 스펙 G5 판정 3이 내린 표(매끄럽게 ≤ 0.20, 얼룩 고르기 ≤ 0.10, 몸 피부 밝기 0.08)와 G4 값(0.45·0.35·0.15) 사이에 둔다.
+    /// 값 자체의 근거는 스펙 2절 표와 하네스 실측이다.
     enum EvotoCeiling {
-        /// Evoto는 중간 대역을 거의 그대로 둔다.
         static let smoothing = 0.25
         static let toneEvening = 0.15
-        /// 몸 피부 ΔY ≤ +1.5/255.
         static let bodyBrightness = 0.1
     }
 
@@ -60,10 +60,11 @@ final class OneTouchBundleTests: XCTestCase {
         for values in [OneTouchBundle.Table.common, OneTouchBundle.Table.female, OneTouchBundle.Table.male] {
             XCTAssertLessThanOrEqual(values.smoothing, 0.5, "끝까지 올려도 중간 대역을 절반 넘게 줄이지 않는다")
             XCTAssertLessThanOrEqual(values.redness, 0, "혈색은 더하지 않는다")
-            XCTAssertLessThanOrEqual(values.smoothing, EvotoCeiling.smoothing, "Evoto는 중간 대역을 거의 그대로 둔다(스펙 G5 판정 3)")
+            XCTAssertLessThanOrEqual(values.smoothing, EvotoCeiling.smoothing, "G4 값으로 되돌아가지 않는다(스펙 G5 판정 3)")
             XCTAssertLessThanOrEqual(values.toneEvening, EvotoCeiling.toneEvening)
         }
-        XCTAssertLessThanOrEqual(OneTouchBundle.Table.bodyBrightness, EvotoCeiling.bodyBrightness, "몸 피부 ΔY ≤ +1.5/255")
+        XCTAssertLessThanOrEqual(
+            OneTouchBundle.Table.bodyBrightness, EvotoCeiling.bodyBrightness, "G4 몸 피부 밝기로 되돌아가지 않는다")
     }
 
     func testOneTouchRemovesSpotsAndTurnsCloneHealOff() {

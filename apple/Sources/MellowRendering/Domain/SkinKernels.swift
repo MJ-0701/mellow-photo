@@ -89,7 +89,8 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(clamp(rgb, 0.0, 1.0), pixel.a);
                 }
                 """)
-        // 채널별 배율 = 고리 평균 ÷ 원본 저주파. 분모 하한 0.001은 고리 가중치가 0인 곳(extent 밖)에서 0으로 나누지 않게 한다.
+        // 채널별 배율 = 고리 평균 ÷ 원본 저주파.
+        // 분모 하한 0.001은 고리 가중치가 0인 곳(extent 밖)에서 0으로 나누지 않게 한다.
         healing = CIColorKernel(
             source: """
                 kernel vec4 healTone(__sample source, __sample sourceLow, __sample ringNumerator,

@@ -4,7 +4,8 @@ import XCTest
 
 @testable import MellowRendering
 
-/// 색 맞춤 복구(스펙 G5 5.1). 원본 패치의 질감만 옮기고 밝기·색은 대상 둘레 고리에 맞춘다.
+/// 색 맞춤 복구(스펙 G5 5.1).
+/// 원본 패치의 질감만 옮기고 밝기·색은 대상 둘레 고리에 맞춘다.
 final class HealTests: XCTestCase {
     typealias Support = RenderingTestSupport
 

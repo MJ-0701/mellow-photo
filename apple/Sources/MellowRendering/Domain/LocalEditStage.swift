@@ -31,8 +31,10 @@ struct LocalEditStage: RenderStage {
             displacementLimit: tuning.warpDisplacementLimit)
     }
 
-    /// 색 맞춤 복구(스펙 G5 5.1). 원본 패치의 질감(고주파)만 옮기고 밝기·색(저주파)은 대상 둘레 고리 평균에 맞춘다.
-    /// 수동 잡티와 자동 잡티가 같은 함수를 쓴다. 커널이 실패하면 입력 그대로다.
+    /// 색 맞춤 복구(스펙 G5 5.1).
+    /// 원본 패치의 질감(고주파)만 옮기고 밝기·색(저주파)은 대상 둘레 고리 평균에 맞춘다.
+    /// 수동 잡티와 자동 잡티가 같은 함수를 쓴다.
+    /// 커널이 실패하면 입력 그대로다.
     static func applySpot(_ spot: RetouchSpot, to image: CIImage, context: RenderContext) -> CIImage {
         guard spot.radius > 0 else { return image }
         let extent = context.extent
@@ -45,12 +47,14 @@ struct LocalEditStage: RenderStage {
         let patch = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
         let mask = MaskBuilder.ellipse(patch, extent: extent)
         // 대상 둘레 고리(패치 자신을 뺀 피부)의 평균이 복구 패치의 밝기·색이 된다.
-        let innerRadius = radius * tuning.healRingInnerScale
+        let innerRadius = radius * CGFloat(tuning.healRingInnerScale)
         let inner = CGRect(
             x: center.x - innerRadius, y: center.y - innerRadius, width: innerRadius * 2, height: innerRadius * 2)
         let ring = MaskBuilder.ellipse(inner, extent: extent).applyingFilter("CIColorInvert").cropped(to: extent)
-        let ringMean = FrequencySeparation.maskedMean(image, mask: ring, radius: radius * tuning.healRingRadiusScale)
-        let sourceLow = FrequencySeparation.blurred(source, radius: radius * tuning.healLowBandScale)
+        let ringRadius = Double(radius) * tuning.healRingRadiusScale
+        let ringMean = FrequencySeparation.maskedMean(image, mask: ring, radius: ringRadius)
+        let lowRadius = Double(radius) * tuning.healLowBandScale
+        let sourceLow = FrequencySeparation.blurred(source, radius: lowRadius)
         let area = patch.intersection(extent)
         guard !area.isEmpty,
             let healed = try? SkinKernels.shared.heal(
