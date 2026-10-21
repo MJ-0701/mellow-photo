@@ -10,7 +10,7 @@
       "people": [
         { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
     { "file": "couple-body-01.jpg",
-      "notes": "왼쪽 남자, 오른쪽 여자, 머리부터 정강이까지 정면이다. 두 사람은 가깝지만 닿지 않는다(소매 사이 약 20px, 엉덩이 사이 틈 약 110px). 양쪽 엉덩이와 무릎이 보이고 팔은 몸통에서 조금 떨어져 있다. 몸에 맞는 무지 티셔츠와 청바지, 단순한 실내 배경.",
+      "notes": "왼쪽 남자, 오른쪽 여자, 머리부터 무릎 아래까지 정면이다. 얼굴 폭은 사진 폭의 약 14%다. 두 사람 모두 손을 허리에 짚고 팔꿈치를 벌렸고 사진 가운데에서 남자의 왼쪽 팔꿈치(화면 오른쪽)가 여자의 오른쪽 팔꿈치에 닿는다. 위팔이 겨드랑이 아래 몸통에 붙어 옆가슴 쪽 틈은 없고 아래팔과 허리 사이로만 배경이 보인다. 양쪽 엉덩이가 보인다. 몸에 맞는 티셔츠와 청바지, 밝은 회색 무지 배경.",
       "people": [
         { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false },
         { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
