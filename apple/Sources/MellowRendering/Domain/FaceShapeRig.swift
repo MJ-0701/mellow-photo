@@ -47,6 +47,18 @@ enum FaceShapeRig {
     private static let fallbackBrowRise: CGFloat = 0.12
     /// chinLength push 반지름. 얼굴 폭 비율. 입(턱 끝에서 얼굴 폭의 약 30% 위)에는 닿지 않는다.
     private static let chinRadius: CGFloat = 0.25
+    /// 이중턱 윗줄 push 중심을 각 윤곽점에서 내리는 거리와 반지름. 얼굴 폭 비율.
+    /// 거리와 반지름이 같아 윤곽점은 감쇠 끝(0)이라 턱선이 움직이지 않는다.
+    private static let doubleChinOffset: CGFloat = 0.10
+    private static let doubleChinRadius: CGFloat = 0.10
+    /// 이중턱 아랫줄 push 중심을 턱 끝에서 내리는 거리와 반지름. 얼굴 폭 비율.
+    /// 목이 한 곳에서 늘어나지 않게 늘림을 나눈다.
+    private static let doubleChinLowerOffset: CGFloat = 0.22
+    private static let doubleChinLowerRadius: CGFloat = 0.16
+    /// 아랫줄 이동. 윗줄 최대 이동 대비.
+    private static let doubleChinLowerShare: CGFloat = 0.5
+    /// 이중턱 원소를 만들려면 필요한 입꼬리 사이 아래 윤곽점 수.
+    private static let doubleChinMinimumPoints = 3
     /// 좌우 끝점을 고르려면 필요한 점 수.
     private static let minimumFeaturePoints = 2
     /// 두 눈 중심이 얼굴 폭의 이 비율보다 가까우면 눈 원소를 만들지 않는다.
@@ -94,8 +106,7 @@ enum FaceShapeRig {
         case .smile: return smile(frame, shift: shift)
         case .forehead: return forehead(frame, shift: shift)
         case .chinLength: return chinLength(frame, shift: shift)
-        // I2 Task 4에서 채움.
-        case .doubleChin: return []
+        case .doubleChin: return doubleChin(frame, shift: shift)
         }
     }
 
@@ -201,6 +212,47 @@ enum FaceShapeRig {
     private static func chinLength(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
         guard let chin = frame.contour.min(by: { frame.local($0).y < frame.local($1).y }) else { return [] }
         return [.push(center: chin, vector: frame.vector(u: 0, v: -shift), radius: chinRadius * frame.faceWidth)]
+    }
+
+    /// 턱 아래 살을 턱선 쪽(위)으로 접어 올린다(스펙 5.6).
+    /// 입 높이 아래 윤곽점 중 두 입꼬리 사이(얼굴 좌표 x)에 있는 점마다 얼굴 폭 × 0.10 아래에 위쪽 push를 둔다.
+    /// 입술 점이 둘 미만이면 아래 윤곽 전체를 쓴다. 고른 점이 3개 미만이면 원소가 없다.
+    /// 윗줄 점마다 이동은 shift / c이고 c는 턱 끝 윗줄 중심에서 본 윗줄 모든 중심의 감쇠 합이다.
+    /// 그래서 턱 끝 아래 이동이 shift가 된다. 아랫줄은 턱 끝 아래 하나이고 이동은 shift × 0.5다.
+    private static func doubleChin(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
+        var chosen = frame.contour.filter { frame.local($0).y < frame.mouthLevel }
+        if let mouth = mouth(frame) {
+            let cornerXs = mouth.corners.map { frame.local($0).x }
+            let left = cornerXs.min() ?? 0
+            let right = cornerXs.max() ?? 0
+            chosen = chosen.filter { point in
+                let u = frame.local(point).x
+                return left <= u && u <= right
+            }
+        }
+        guard chosen.count >= doubleChinMinimumPoints,
+            let tip = chosen.min(by: { frame.local($0).y < frame.local($1).y })
+        else { return [] }
+        let radius = doubleChinRadius * frame.faceWidth
+        let drop = frame.vector(u: 0, v: -doubleChinOffset * frame.faceWidth)
+        let centers = chosen.map { offset($0, drop) }
+        let reference = offset(tip, drop)
+        let overlap = centers.reduce(CGFloat(0)) { sum, center in
+            let distance = hypot(center.x - reference.x, center.y - reference.y)
+            return sum + ShapePrimitive.falloff(distance: distance, radius: radius)
+        }
+        guard overlap > 0 else { return [] }
+        let lift = frame.vector(u: 0, v: shift / overlap)
+        var result: [ShapePrimitive] = centers.map { .push(center: $0, vector: lift, radius: radius) }
+        let lowerCenter = offset(tip, frame.vector(u: 0, v: -doubleChinLowerOffset * frame.faceWidth))
+        let lowerLift = frame.vector(u: 0, v: shift * doubleChinLowerShare)
+        result.append(
+            .push(center: lowerCenter, vector: lowerLift, radius: doubleChinLowerRadius * frame.faceWidth))
+        return result
+    }
+
+    private static func offset(_ point: CGPoint, _ vector: CGVector) -> CGPoint {
+        CGPoint(x: point.x + vector.dx, y: point.y + vector.dy)
     }
 
     /// 중심선(얼굴 좌표 u = midline) 왼쪽·오른쪽 윤곽점 중 얼굴 좌표 조건에 맞는 점. 중심선 위의 점은 빠진다.

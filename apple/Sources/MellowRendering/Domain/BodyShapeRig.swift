@@ -42,6 +42,10 @@ enum BodyShapeRig {
     private static let waistLevel: CGFloat = 0.55
     /// 몸 전체의 가슴 높이. 어깨에서 엉덩이까지의 비율.
     private static let chestLevel: CGFloat = 0.3
+    /// 부유방 높이(겨드랑이 아래 옆선). 어깨에서 엉덩이까지의 비율.
+    private static let sideChestLevel: CGFloat = 0.27
+    /// 부유방 push 기본 반지름. 어깨 폭 비율.
+    private static let sideChestRadius: CGFloat = 0.14
     /// 엉덩이 관절에서 골반 바깥 윤곽까지. 어깨 폭 비율. Vision 엉덩이 점은 윤곽보다 안쪽이다.
     private static let hipOutlineOffset: CGFloat = 0.12
     /// 허벅지 반폭. 어깨 폭 비율(허벅지 폭은 어깨 폭의 40% 안팎).
@@ -142,8 +146,7 @@ enum BodyShapeRig {
         case .thighs: return limbs(rig, thighLimbs, shift: shift, radius: thighRadius)
         case .shoulders: return shoulders(rig, shift: shift)
         case .neck: return neck(rig, shift: shift)
-        // I2 Task 4에서 채움.
-        case .sideChest: return []
+        case .sideChest: return sideChest(rig, shift: shift)
         }
     }
 
@@ -163,6 +166,17 @@ enum BodyShapeRig {
         return torsoSides(rig, level: waistLevel).compactMap { point in
             guard let direction = rig.outward(point, from: middle) else { return nil }
             return rig.push(point, direction, shift: shift, radius: torsoRadius)
+        }
+    }
+
+    /// 같은 쪽 어깨~엉덩이 27% 점(겨드랑이 아래 옆선)을 가로축 안쪽으로 민다(스펙 5.8). 부유방은 0…1이다.
+    /// 두 엉덩이가 있어야 한다.
+    private static func sideChest(_ rig: Builder, shift: CGFloat) -> [ShapePrimitive] {
+        guard let hipCenter = rig.skeleton.hipCenter else { return [] }
+        let middle = BodySkeleton.lerp(rig.skeleton.shoulderCenter, hipCenter, sideChestLevel)
+        return torsoSides(rig, level: sideChestLevel).compactMap { point in
+            guard let direction = rig.outward(point, from: middle) else { return nil }
+            return rig.push(point, direction, shift: -shift, radius: sideChestRadius)
         }
     }
 

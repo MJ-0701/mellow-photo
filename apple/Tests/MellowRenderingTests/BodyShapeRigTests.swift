@@ -295,4 +295,38 @@ final class BodyShapeRigTests: XCTestCase {
             XCTAssertTrue(mirrored, "좌우 대칭인 사람은 중심선 반대편에 거울상 원소가 있다: \(push)")
         }
     }
+
+    func testSideChestPushesBothTorsoSidesInward() {
+        let result = pushes(primitives(BodyShapeAdjustments(sideChest: 1)))
+        XCTAssertEqual(result.count, 2)
+        let level: CGFloat = 0.27
+        for push in result {
+            let left = push.center.x < midline
+            let shoulderX: CGFloat = left ? 0.25 : 0.75
+            let hipX: CGFloat = left ? 0.38 : 0.62
+            let expectedX = (0.1 + 0.8 * (shoulderX + (hipX - shoulderX) * level)) * 512
+            XCTAssertEqual(push.center.x, expectedX, accuracy: 1e-6, "어깨~엉덩이 27% 점")
+            XCTAssertEqual(push.center.y, (0.8 + (0.5 - 0.8) * level) * 512, accuracy: 1e-6)
+            let towardMidline: CGFloat = left ? 1 : -1
+            XCTAssertEqual(push.vector.dx, towardMidline * 0.03 * torsoWidth, accuracy: 1e-6, "몸통 가로축 안쪽")
+            XCTAssertEqual(push.vector.dy, 0, accuracy: 1e-9)
+            XCTAssertGreaterThanOrEqual(push.radius, 0.14 * torsoWidth - 1e-9)
+        }
+    }
+
+    func testSideChestNeedsHips() {
+        let upperBody = Support.standingBody(in: Support.standingBox, omitting: [.leftHip, .rightHip])
+        XCTAssertTrue(primitives(BodyShapeAdjustments(sideChest: 1), body: upperBody).isEmpty)
+        let oneHip = Support.standingBody(in: Support.standingBox, omitting: [.leftHip])
+        XCTAssertTrue(primitives(BodyShapeAdjustments(sideChest: 1), body: oneHip).isEmpty, "두 엉덩이가 있어야 한다")
+    }
+
+    func testSideChestIsTorsoGroup() {
+        let parts = BodyShapeRig.groups(
+            body: Support.standingBody(in: Support.standingBox), adjustments: BodyShapeAdjustments(sideChest: 1),
+            extent: extent, tuning: tuning, includesLegBand: true)
+        XCTAssertEqual(parts.torso.count, 2)
+        XCTAssertTrue(parts.limbs.isEmpty)
+        XCTAssertEqual(parts.guards.count, 4, "몸통 묶음은 두 팔의 위팔·아래팔 캡슐을 받는다")
+    }
 }
