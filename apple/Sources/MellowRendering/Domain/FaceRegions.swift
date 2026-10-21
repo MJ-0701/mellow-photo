@@ -469,7 +469,7 @@ enum FaceRegions {
         return ellipsePolygon(in: inset)
     }
 
-    private static func ellipsePolygon(in rect: CGRect) -> [CGPoint] {
+    static func ellipsePolygon(in rect: CGRect) -> [CGPoint] {
         (0..<ellipseSegments).map { step in
             let angle = 2 * Double.pi * Double(step) / Double(ellipseSegments)
             return CGPoint(

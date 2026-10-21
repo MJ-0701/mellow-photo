@@ -280,6 +280,11 @@ public struct RenderTuning: Sendable {
     public var healMaxGain: Double = 2.0
     /// 배율 분모 하한(선형).
     public var healLumaFloor: Double = 0.01
+    /// 점 지우기(스펙 G5 4.2)에서 뺄 눈꼬리·입꼬리 원의 반지름.
+    /// 얼굴 폭 비율.
+    public var spotExclusionRadiusFraction: Double = 0.03
+    /// 코 다각형 아래쪽 이 비율 높이를 콧구멍 띠로 점 지우기에서 뺀다.
+    public var spotNostrilBandFraction: Double = 0.4
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
 
