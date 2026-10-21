@@ -109,6 +109,14 @@ final class ChinShadeStageTests: XCTestCase {
         let lift = meanLuma(after, band) - meanLuma(before, band)
         XCTAssertGreaterThan(lift, 6, "띠 안이 밝아진다")
         XCTAssertLessThanOrEqual(lift, 12 + Self.byte / 2, "증가는 chinShadeMaxLift(12/255)에서 자른다")
+        var largestRise: Double = 0
+        for row in 0..<before.height {
+            for column in 0..<before.width {
+                let point = CGPoint(x: column, y: row)
+                largestRise = max(largestRise, luma(after, point) - luma(before, point))
+            }
+        }
+        XCTAssertLessThanOrEqual(largestRise, 12 + Self.byte / 2, "어느 픽셀도 12/255(+ 반올림 0.5)보다 더 밝아지지 않는다")
         let gapBefore = meanLuma(before, surround) - meanLuma(before, band)
         let gapAfter = meanLuma(after, surround) - meanLuma(after, band)
         XCTAssertGreaterThan(gapBefore, 35)
@@ -186,5 +194,28 @@ final class ChinShadeStageTests: XCTestCase {
         let width = FaceRegions.faceWidth(faces[0], extent: extent)
         let band = [CGPoint(x: tip.x, y: tip.y - width * 0.115)]
         XCTAssertGreaterThan(meanLuma(after, band) - meanLuma(before, band), 4, "고른 얼굴은 밝아진다")
+    }
+
+    func testProfileFaceIsNotLiftedLikeTheWarp() throws {
+        var profile = face
+        profile.yaw = Double.pi / 2
+        XCTAssertFalse(FaceShapeRig.doubleChinApplies(face: profile, extent: extent, tuning: tuning))
+        XCTAssertTrue(
+            FaceShapeRig.primitives(
+                face: profile, adjustments: FaceShapeAdjustments(doubleChin: 1), extent: extent, tuning: tuning
+            ).isEmpty, "워프도 옆얼굴에 이중턱 원소를 만들지 않는다")
+        let input = try shadedImage(faces: [face])
+        let output = try ChinShadeStage().apply(input, in: context(doubleChin: 1, faces: [profile]))
+        XCTAssertEqual(try Support.bytes(output), try Support.bytes(input), "워프가 접지 않는 얼굴은 그늘도 밝히지 않는다")
+    }
+
+    func testFaceWithoutEnoughJawPointsIsNotLifted() throws {
+        var sparse = face
+        // 입꼬리 사이 아래 윤곽점은 7·8·9번 셋이다. 가운데를 빼면 둘이 남는다.
+        sparse.landmarks[.faceContour]?.remove(at: 8)
+        XCTAssertFalse(FaceShapeRig.doubleChinApplies(face: sparse, extent: extent, tuning: tuning))
+        let input = try shadedImage(faces: [face])
+        let output = try ChinShadeStage().apply(input, in: context(doubleChin: 1, faces: [sparse]))
+        XCTAssertEqual(try Support.bytes(output), try Support.bytes(input))
     }
 }

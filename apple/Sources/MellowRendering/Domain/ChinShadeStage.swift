@@ -2,7 +2,8 @@ import CoreImage
 import MellowShared
 
 /// 이중턱 값으로 턱밑 그늘을 밝힌다(스펙 5.7). 모양 워프 앞이라 원본 좌표의 턱밑 띠를 쓴다.
-/// doubleChin이 0보다 큰 얼굴 대상만 처리하고 없으면 입력을 그대로 돌려준다.
+/// doubleChin이 0보다 크고 FaceShapeRig가 이중턱 원소를 만드는 얼굴(doubleChinApplies)만 처리하고 없으면 입력을 그대로 돌려준다.
+/// 워프가 접어 올리지 않는 얼굴(옆얼굴·턱 윤곽점 부족)은 그늘도 밝히지 않는다.
 /// 마스크는 턱밑 띠(FaceRegions+Chin.swift) × 볼 기준 피부색 가중치라 수염처럼 피부색이 아닌 픽셀은 밝히지 않는다.
 /// 감마 BT.601 휘도 L' = L + 값 × chinShadeMaxGain × max(0, R − L)이고 증가는 chinShadeMaxLift에서 자른다.
 /// R은 띠 둘레 피부(피부색 가중치 × (1 − 띠))의 넓은 가중 평균 휘도라 그늘을 둘레 피부 밝기 쪽으로 올린다.
@@ -29,7 +30,9 @@ struct ChinShadeStage: RenderStage {
         for target in context.faceTargets {
             let raw = target.portrait.face.doubleChin
             let value = AdjustmentRange.clamped(raw.isFinite ? raw : 0, to: AdjustmentRange.faceShape(.doubleChin))
-            guard value > 0 else { continue }
+            guard value > 0,
+                FaceShapeRig.doubleChinApplies(face: target.face, extent: context.extent, tuning: context.tuning)
+            else { continue }
             result = try lift(result, face: target.face, value: value, context: context)
         }
         return result

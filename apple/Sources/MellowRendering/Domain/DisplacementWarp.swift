@@ -118,7 +118,7 @@ final class DisplacementWarp: @unchecked Sendable {
     /// 모든 묶음의 ownMask가 nil이면 원소를 이어 apply(_:to:extent:limit:)로 그린다(보호 없음, 같은 바이트).
     /// 다리 띠는 지도에 그리지 않고 샘플링 커널이 더하므로 보호를 받지 않는다.
     func apply(
-        groups: [ShapeGroup], to image: CIImage, extent: CGRect, limit: Double, tuning: RenderTuning = RenderTuning()
+        groups: [ShapeGroup], to image: CIImage, extent: CGRect, limit: Double, tuning: RenderTuning
     ) throws -> CIImage {
         guard Self.isProtected(groups) else {
             return try apply(groups.flatMap(\.primitives), to: image, extent: extent, limit: limit)
@@ -137,7 +137,7 @@ final class DisplacementWarp: @unchecked Sendable {
     /// apply(groups:)가 샘플링하는 이동량 지도(띠 제외). 그릴 push·scale 원소가 없으면 nil이다.
     /// 테스트와 수용 테스트가 이동량을 직접 읽는다.
     func field(
-        groups: [ShapeGroup], extent: CGRect, limit: Double, tuning: RenderTuning = RenderTuning()
+        groups: [ShapeGroup], extent: CGRect, limit: Double, tuning: RenderTuning
     ) throws -> CIImage? {
         let limited = groups.map { Self.limited($0, to: limit) }
         guard Self.isProtected(groups) else {

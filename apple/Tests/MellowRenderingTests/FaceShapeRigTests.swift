@@ -411,7 +411,7 @@ final class FaceShapeRigTests: XCTestCase {
         let list = primitives(FaceShapeAdjustments(doubleChin: 1), face: synthetic)
         XCTAssertFalse(list.isEmpty)
         let target = faceWidth * 0.035
-        let under = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.10)
+        let under = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.14)
         // rig가 정한 이동(limit 전)은 목표의 ±10% 안이다.
         let requested = DisplacementWarp.displacement(at: under, of: list, limit: .infinity)
         XCTAssertGreaterThan(requested.dy, 0, "위쪽")
@@ -419,9 +419,10 @@ final class FaceShapeRigTests: XCTestCase {
         let lifted = shift(at: under, of: list)
         XCTAssertGreaterThan(lifted.dy, 0, "위쪽")
         XCTAssertEqual(lifted.dx, 0, accuracy: 1e-9)
-        XCTExpectFailure(
-            "I2 Task 4 보고: 반지름 0.10 × 얼굴 폭에 이동 0.035 × 얼굴 폭은 shapeDisplacementLimit 0.25를 넘어 잘린다(판단 대기)")
-        XCTAssertEqual(lifted.dy, target, accuracy: target * 0.1, "턱 끝 아래 얼굴 폭 × 0.10 점이 얼굴 폭 × 0.035 오른다")
+        XCTAssertEqual(lifted.dy, target, accuracy: target * 0.1, "턱 끝 아래 얼굴 폭 × 0.14 점이 얼굴 폭 × 0.035 오른다")
+        for primitive in list {
+            XCTAssertEqual(primitive.limited(to: tuning.shapeDisplacementLimit), primitive, "점마다 이동이 limit에 잘리지 않는다")
+        }
     }
 
     func testDoubleChinKeepsJawLipsAndLowerNeck() throws {
@@ -437,13 +438,13 @@ final class FaceShapeRigTests: XCTestCase {
             let pixel = CGPoint(x: point.x * extent.width, y: point.y * extent.height)
             XCTAssertEqual(shift(at: pixel, of: list), .zero, "입술은 그대로 \(pixel)")
         }
-        let neck = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.40)
-        XCTAssertEqual(shift(at: neck, of: list), .zero, "턱 끝 아래 얼굴 폭 × 0.40은 그대로")
+        let neck = CGPoint(x: chinTip.x, y: chinTip.y - faceWidth * 0.55)
+        XCTAssertEqual(shift(at: neck, of: list), .zero, "턱 끝 아래 얼굴 폭 × 0.55는 그대로")
     }
 
     func testDoubleChinFoldsWithoutFlipping() {
         let list = primitives(FaceShapeAdjustments(doubleChin: 1))
-        let below = CGRect(x: 160, y: -80, width: 192, height: 140)
+        let below = CGRect(x: 160, y: -100, width: 192, height: 160)
         let worst = Support.minimumJacobian(of: list, limit: tuning.shapeDisplacementLimit, in: below)
         XCTAssertGreaterThan(worst, 0.5, "턱 아래가 접히지 않는다(최소 야코비안 \(worst))")
         XCTAssertLessThan(worst, 1, "실제로 줄어든다")
@@ -462,7 +463,9 @@ final class FaceShapeRigTests: XCTestCase {
         let straight = primitives(FaceShapeAdjustments(doubleChin: 1), face: face)
         face.yaw = 0.8
         let turned = primitives(FaceShapeAdjustments(doubleChin: 1), face: face)
-        let largest = { (list: [ShapePrimitive]) in list.map(\.maxDisplacement).max() ?? 0 }
+        // limit를 적용한 뒤의 최대 이동이다. 렌더가 실제로 옮기는 양이 yaw 비율을 따른다.
+        let limit = tuning.shapeDisplacementLimit
+        let largest = { (list: [ShapePrimitive]) in list.map { $0.limited(to: limit).maxDisplacement }.max() ?? 0 }
         let ratio = CGFloat(FaceShapeRig.yawAttenuation(0.8, tuning: tuning))
         XCTAssertLessThan(ratio, 1)
         XCTAssertEqual(largest(turned), largest(straight) * ratio, accuracy: 1e-9)

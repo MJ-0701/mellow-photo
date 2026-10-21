@@ -49,12 +49,13 @@ enum FaceShapeRig {
     private static let chinRadius: CGFloat = 0.25
     /// 이중턱 윗줄 push 중심을 각 윤곽점에서 내리는 거리와 반지름. 얼굴 폭 비율.
     /// 거리와 반지름이 같아 윤곽점은 감쇠 끝(0)이라 턱선이 움직이지 않는다.
-    private static let doubleChinOffset: CGFloat = 0.10
-    private static let doubleChinRadius: CGFloat = 0.10
+    /// 최대 이동(0.035)의 4배라 점마다 이동이 shapeDisplacementLimit(0.25)에 잘리지 않는다.
+    private static let doubleChinOffset: CGFloat = 0.14
+    private static let doubleChinRadius: CGFloat = 0.14
     /// 이중턱 아랫줄 push 중심을 턱 끝에서 내리는 거리와 반지름. 얼굴 폭 비율.
-    /// 목이 한 곳에서 늘어나지 않게 늘림을 나눈다.
-    private static let doubleChinLowerOffset: CGFloat = 0.22
-    private static let doubleChinLowerRadius: CGFloat = 0.16
+    /// 목이 한 곳에서 늘어나지 않게 늘림을 나눈다. 턱 끝 아래 0.50에서 0이 된다.
+    private static let doubleChinLowerOffset: CGFloat = 0.30
+    private static let doubleChinLowerRadius: CGFloat = 0.20
     /// 아랫줄 이동. 윗줄 최대 이동 대비.
     private static let doubleChinLowerShare: CGFloat = 0.5
     /// 이중턱 원소를 만들려면 필요한 입꼬리 사이 아래 윤곽점 수.
@@ -214,12 +215,18 @@ enum FaceShapeRig {
         return [.push(center: chin, vector: frame.vector(u: 0, v: -shift), radius: chinRadius * frame.faceWidth)]
     }
 
-    /// 턱 아래 살을 턱선 쪽(위)으로 접어 올린다(스펙 5.6).
-    /// 입 높이 아래 윤곽점 중 두 입꼬리 사이(얼굴 좌표 x)에 있는 점마다 얼굴 폭 × 0.10 아래에 위쪽 push를 둔다.
-    /// 입술 점이 둘 미만이면 아래 윤곽 전체를 쓴다. 고른 점이 3개 미만이면 원소가 없다.
-    /// 윗줄 점마다 이동은 shift / c이고 c는 턱 끝 윗줄 중심에서 본 윗줄 모든 중심의 감쇠 합이다.
-    /// 그래서 턱 끝 아래 이동이 shift가 된다. 아랫줄은 턱 끝 아래 하나이고 이동은 shift × 0.5다.
-    private static func doubleChin(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
+    /// 이 얼굴에 이중턱 원소가 생기는지. 턱밑 그늘 단계가 워프와 같은 얼굴만 밝히도록 같은 규칙을 묻는다.
+    /// 특징점 프레임이 있고, 옆얼굴 약화가 무시할 만큼 작지 않고, 이중턱 점이 3개 이상이어야 한다.
+    static func doubleChinApplies(face: FaceGeometry, extent: CGRect, tuning: RenderTuning) -> Bool {
+        guard let frame = FaceFrame(face: face, extent: extent),
+            yawAttenuation(face.yaw, tuning: tuning) > negligibleAttenuation
+        else { return false }
+        return doubleChinPoints(frame) != nil
+    }
+
+    /// 입 높이 아래 윤곽점 중 두 입꼬리 사이(얼굴 좌표 x)에 있는 점. 입술 점이 둘 미만이면 아래 윤곽 전체다.
+    /// 3개 미만이면 nil이다.
+    private static func doubleChinPoints(_ frame: FaceFrame) -> [CGPoint]? {
         var chosen = frame.contour.filter { frame.local($0).y < frame.mouthLevel }
         if let mouth = mouth(frame) {
             let cornerXs = mouth.corners.map { frame.local($0).x }
@@ -230,7 +237,15 @@ enum FaceShapeRig {
                 return left <= u && u <= right
             }
         }
-        guard chosen.count >= doubleChinMinimumPoints,
+        return chosen.count >= doubleChinMinimumPoints ? chosen : nil
+    }
+
+    /// 턱 아래 살을 턱선 쪽(위)으로 접어 올린다(스펙 5.6).
+    /// 이중턱 점(doubleChinPoints)마다 얼굴 폭 × 0.14 아래에 반지름 0.14의 위쪽 push를 둔다.
+    /// 윗줄 점마다 이동은 shift / c이고 c는 턱 끝 윗줄 중심에서 본 윗줄 모든 중심의 감쇠 합이다.
+    /// 그래서 턱 끝 아래 이동이 shift가 된다. 아랫줄은 턱 끝 아래 0.30에 반지름 0.20 하나이고 이동은 shift × 0.5다.
+    private static func doubleChin(_ frame: FaceFrame, shift: CGFloat) -> [ShapePrimitive] {
+        guard let chosen = doubleChinPoints(frame),
             let tip = chosen.min(by: { frame.local($0).y < frame.local($1).y })
         else { return [] }
         let radius = doubleChinRadius * frame.faceWidth

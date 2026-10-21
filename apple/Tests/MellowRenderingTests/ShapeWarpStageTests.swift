@@ -458,13 +458,17 @@ final class ShapeWarpStageTests: XCTestCase {
 
     /// 팔꿈치·손목을 몸통 옆선(같은 쪽 어깨–엉덩이)에서 바깥으로 띄운 몸과 그 표식 자리.
     /// gap은 팔 가장자리와 옆선 사이 거리(어깨 폭 비율)이고 0이면 팔이 옆선에 붙는다.
-    private func armBody(gap: CGFloat) throws -> (body: BodyGeometry, arm: [CGPoint], waist: [CGPoint]) {
+    /// upperArm은 어깨–팔꿈치 가운데(부유방 높이 근처)다.
+    private func armBody(gap: CGFloat) throws -> (
+        body: BodyGeometry, arm: [CGPoint], waist: [CGPoint], upperArm: [CGPoint]
+    ) {
         let base = Support.standingBody(in: Support.standingBox)
         let skeleton = try XCTUnwrap(BodySkeleton(body: base, extent: extent, tuning: tuning))
         let width = skeleton.torsoWidth
         var moved: [BodyJoint: CGPoint] = [:]
         var arm: [CGPoint] = []
         var waist: [CGPoint] = []
+        var upperArm: [CGPoint] = []
         let sides: [(BodyJoint, BodyJoint, BodyJoint, BodyJoint)] = [
             (.rightShoulder, .rightHip, .rightElbow, .rightWrist), (.leftShoulder, .leftHip, .leftElbow, .leftWrist),
         ]
@@ -484,8 +488,9 @@ final class ShapeWarpStageTests: XCTestCase {
             moved[wristJoint] = wrist
             arm += [elbow, ShapeTestSupport.lerp(elbow, wrist, 0.5)]
             waist.append(waistPoint)
+            upperArm.append(ShapeTestSupport.lerp(shoulder, elbow, 0.5))
         }
-        return (ShapeTestSupport.body(base, moving: moved, extent: extent), arm, waist)
+        return (ShapeTestSupport.body(base, moving: moved, extent: extent), arm, waist, upperArm)
     }
 
     /// 표식들을 그린 이미지를 변형해 각 표식이 움직인 거리.
@@ -514,6 +519,30 @@ final class ShapeWarpStageTests: XCTestCase {
         let guarded = try measuredShifts(
             of: layout.arm, in: maskedBodyContext(layout.body, mask: standingPersonMask))
         for (marker, shift) in zip(layout.arm, guarded) {
+            XCTAssertLessThanOrEqual(shift, 1, "팔 캡슐 안 표식은 움직이지 않는다 \(marker)")
+        }
+    }
+
+    /// 부유방은 전체 층에 둘 수 없어 몸과 짝이 된 얼굴의 개인 층에 둔다.
+    private func sideChestContext(_ body: BodyGeometry, mask: CIImage?) -> RenderContext {
+        let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.4, y: 0.82, width: 0.2, height: 0.15))
+        var recipe = EditRecipe()
+        recipe.people.individuals = [
+            PersonRecord(anchor: PersonAnchor(faceBox: face.boundingBox), layer: PortraitLayer(body: [.sideChest: 1]))
+        ]
+        let analysis = PhotoAnalysis(faces: [face], personMask: mask, bodies: [body], bodyFaceMatches: [0: 0])
+        return RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: tuning)
+    }
+
+    func testArmTouchingTorsoKeepsArmPixelsUnderSideChest() throws {
+        let layout = try armBody(gap: 0)
+        let bare = sideChestContext(layout.body, mask: nil)
+        XCTAssertEqual(bare.bodyTargets.first?.adjustments.sideChest, 1)
+        let unguarded = try measuredShifts(of: layout.upperArm, in: bare)
+        XCTAssertGreaterThan(unguarded.max() ?? 0, 2, "보호가 없으면 부유방 push가 붙은 위팔을 끈다")
+        let guarded = try measuredShifts(
+            of: layout.upperArm, in: sideChestContext(layout.body, mask: standingPersonMask))
+        for (marker, shift) in zip(layout.upperArm, guarded) {
             XCTAssertLessThanOrEqual(shift, 1, "팔 캡슐 안 표식은 움직이지 않는다 \(marker)")
         }
     }

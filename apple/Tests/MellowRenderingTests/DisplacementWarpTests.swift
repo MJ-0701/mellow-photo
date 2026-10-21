@@ -315,7 +315,9 @@ final class DisplacementWarpTests: XCTestCase {
     }
 
     private func groupField(_ groups: [ShapeGroup]) throws -> CIImage {
-        try XCTUnwrap(DisplacementWarp.shared.field(groups: groups, extent: Self.guardExtent, limit: limit))
+        try XCTUnwrap(
+            DisplacementWarp.shared.field(
+                groups: groups, extent: Self.guardExtent, limit: limit, tuning: RenderTuning()))
     }
 
     func testGroupsWithoutMasksMatchTheSingleFieldPath() throws {
@@ -329,7 +331,8 @@ final class DisplacementWarpTests: XCTestCase {
             ShapePrimitive.band(yStart: 50, yEnd: 10, stretch: 0.05),
         ]
         let groups = [ShapeGroup(primitives: first), ShapeGroup(primitives: second)]
-        let grouped = try DisplacementWarp.shared.apply(groups: groups, to: input, extent: input.extent, limit: limit)
+        let grouped = try DisplacementWarp.shared.apply(
+            groups: groups, to: input, extent: input.extent, limit: limit, tuning: RenderTuning())
         let single = try DisplacementWarp.shared.apply(first + second, to: input, extent: input.extent, limit: limit)
         XCTAssertEqual(try Support.bytes(grouped), try Support.bytes(single), "마스크가 없으면 보호 없이 한 지도로 그린다")
     }
