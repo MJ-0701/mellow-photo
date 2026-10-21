@@ -282,6 +282,10 @@ public struct RenderTuning: Sendable {
     /// 팔 보호 캡슐 가장자리 폭.
     /// 어깨 폭 비율이다.
     public var armGuardFeather: Double = 0.03
+    /// 이중턱 1에서 턱밑 그늘을 둘레 피부와의 휘도 차의 이 비율만큼 밝힌다.
+    public var chinShadeMaxGain: Double = 0.5
+    /// 턱밑 그늘 밝히기의 휘도 증가 상한(sRGB 감마 값).
+    public var chinShadeMaxLift: Double = 12.0 / 255.0
 
     public var spotMaxRadiusFraction: Double = 0.3
     public var warmthKelvinRange: Double = 2000
