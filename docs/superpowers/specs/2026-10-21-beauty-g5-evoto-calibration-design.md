@@ -225,6 +225,9 @@ G4 1.2·1.4의 원터치 행을 다음으로 바꾼다. 다른 항목(슬라이�
 | `spotMorphologyPaddingInSpots` | 3 | 형태 필터 입력 여유(점 반지름 배수) |
 | `spotExclusionRadiusFraction` | 0.03 | 눈꼬리·입꼬리 제외 원 반지름(얼굴 폭 비율) |
 | `spotNostrilBandFraction` | 0.4 | 코 다각형 아래쪽 이 비율 높이를 콧구멍 띠로 제외 |
+| `spotMorphologyMinimumRadius` | 1.0 | 형태 필터 반지름 하한(픽셀). 점·모공 반지름은 올림한다 (G5-2 구현 중 추가) |
+
+- (G5-2 구현 중 변경) `CIMorphologyMaximum`·`Minimum`은 반지름을 정수로 내림하고 1픽셀 아래는 아무것도 하지 않는다(실측: 반지름 0.84·0.5는 1픽셀 점을 그대로 둠, 2.8 원은 반지름 3에서야 채움). 모공 반지름 하한이 `skinBlurMinimumRadius` 0.5면 얼굴 폭 333px 아래에서 모공 대역이 사라져 픽셀 질감 전체가 점으로 채워진다. 그래서 점·모공 반지름은 올림하고 하한은 1픽셀이다. 얼굴 폭 560px에서 모공 1.68 → 2, 점 6.72 → 7이다.
 
 #### 4.2 마스크 (`FaceRegions+Spots.swift`)
 
@@ -250,6 +253,7 @@ out    = image + blur(correction, poreR × spotCorrectionBlurInPores) × spotMas
 - 입력은 `image.clampedToExtent().cropped(to: area)`(`area = maskBounds.insetBy(−spotR × padding)`), 형태 필터 출력은 `bounds`로 자른다.
 - 보정 지도는 `spot` 커널 출력(`extent: bounds`)에 `.insertingIntermediate()`를 걸어 굳힌 뒤 `clampedToExtent().blur`한다. `spotApply`는 `bounds`에서만 계산하고 `MaskBuilder.blend` 없이 `image.rgb + correction × mask × fill`을 돌려 `composited(over: image).cropped(to: extent)`.
 - 대안(단위 테스트 `testSpotRemovalLeavesPixelsOutsideTheFaceBoundsUntouched`가 실패할 때만): `RenderContext.init`에 `renderer: Renderer? = nil`을 더하고 `PhotoPipeline`이 자기 `renderer`를 넘기며, `SpotRemoval`은 `renderer`가 있으면 보정 지도를 `readPixels` 대신 `CIContext.createCGImage(…, format: .RGBAf, colorSpace: extendedLinearSRGB)`로 굳힌 `CIImage(cgImage:)`를 쓴다(시제품과 같음). `Renderer`에 `makeFloatImage(_:) -> CIImage`를 더한다. nil이면 중간 결과 방식.
+- (G5-2 구현 중 변경) `spotApply`에는 `image.cropped(to: bounds)`를 넘긴다. 자르지 않은 이미지를 커널 입력과 바탕(`composited(over: image)`)에 함께 쓰면 Core Image가 바탕 전체를 `bounds` 가장자리를 늘린 픽셀로 그렸다(두 얼굴 사진에서 다른 얼굴 86 600픽셀이 바뀜, 굳히기 유무와 무관, 기존 `bandMix`로도 재현). 시제품의 "영역 밖이 늘어난 픽셀"은 이 현상이었고 자르기로 사라져 대안(`Renderer` 부동소수 굳히기)은 쓰지 않는다. 굳히기(`insertingIntermediate`)는 그래프 재전개를 막으려 그대로 둔다.
 - `SkinStage.refine` 순서: 점 지우기 → 주름 밝히기 → 대역 합성 → 붉은기. `skin.spots > 0`일 때만. `hasEffect`는 `allCases`라 자동.
 
 #### 4.4 단위 테스트 (`SpotRemovalTests.swift`, 합성 피부 질감 `Support.skinTexture` + 합성 얼굴)
@@ -258,6 +262,7 @@ out    = image + blur(correction, poreR × spotCorrectionBlurInPores) × spotMas
 - 강도 0.3과 1의 회복률 차이 ≥ 0.1(얕은 점 깊이 3%), 강도 0은 바이트 동일.
 - 콧구멍 띠·눈꼬리 원 안은 바이트 1 이내, 얼굴 마스크 영역 밖은 바이트 동일(굳히기 검사).
 - 대상 얼굴만(H 규칙).
+- (G5-2 구현 중 변경) 측정 방식: 합성 얼굴을 2배(얼굴 폭 560px)로 키운다. 512 그대로면 모공 0.3%가 0.84px라 형태 필터가 모공을 구분하지 못한다(미리보기 얼굴은 400px 이상). 회복률은 원(심은 반지름 × 0.65) 안 평균 휘도에서 "심은 사진 렌더 − 깨끗한 사진 렌더"를 "심은 사진 − 깨끗한 사진"으로 나눈 남은 비율의 1 − 값이다(점 지우기가 합성 질감 얼룩을 조금 깎는 몫을 뺌). 어두운·밝은 점 회복률은 볼·이마 격자 18점 평균으로 단언한다. 합성 질감의 얼룩(흐림 16px)이 밝은 점과 붙으면 열림이 얼룩까지 남겨 한 점 회복률이 0.46~0.94로 흩어진다(평균 0.71, 어두운 점 평균 0.81). 강도 차이는 첫 점 하나(0.54 − 0.40), 모공은 두 점 각각(남음 1.0).
 
 ### 5. 색 맞춤 복구와 오검출 거절 (G5-1)
 

@@ -39,7 +39,7 @@ G5-1 계획의 Global Constraints를 그대로 따른다(브랜치 `beauty-g5`·
 - 시작 조건: G5-1 머지(`SkinKernels.heal`·새 수용 경계 존재). 기준 테스트 수는 **시작 전에 실측해 이 줄에 적는다**(G5-1 뒤 추정 패키지 462, Mac 99). 이 계획이 더하는 수: **Shared +1, Rendering +9, Mac +0**(Task 1 Shared +1, Task 2 Rendering +2, Task 3 Rendering +4, Task 4 Rendering +3, Task 5 Rendering 0 — `SpotPrototype`은 테스트가 아니라 수가 줄지 않음).
 - 레시피 `schemaVersion` 2 유지, 키 추가만(`portrait.skin.spots`, `$defs/portraitLayer.skin.spots`, 기본값 0).
 - 파이프라인 단계 이름·순서 불변. `skin` 단계 안 순서: 자동 잡티 복구 → **점 지우기** → 주름 밝히기 → 대역 합성 → 붉은기.
-- `RenderTuning` 추가(스펙 4.1): `spotRadiusFraction` 0.012, `spotPoreRadiusFraction` 0.003, `spotCorrectionBlurInPores` 1.0, `spotDepthStart` 0.008, `spotDepthStartWeak` 0.020, `spotDepthRamp` 0.032, `spotDepthCapStart` 0.25, `spotDepthCapEnd` 0.40, `spotLumaFloor` 0.01, `spotFullFillStrength` 0.3, `spotMorphologyPaddingInSpots` 3.0, `spotExclusionRadiusFraction` 0.03, `spotNostrilBandFraction` 0.4. 캐시 `RegionMaskCache.entriesPerFacePerResolution` 10 → 11.
+- `RenderTuning` 추가(스펙 4.1): `spotRadiusFraction` 0.012, `spotPoreRadiusFraction` 0.003, `spotCorrectionBlurInPores` 1.0, `spotDepthStart` 0.008, `spotDepthStartWeak` 0.020, `spotDepthRamp` 0.032, `spotDepthCapStart` 0.25, `spotDepthCapEnd` 0.40, `spotLumaFloor` 0.01, `spotFullFillStrength` 0.3, `spotMorphologyPaddingInSpots` 3.0, `spotExclusionRadiusFraction` 0.03, `spotNostrilBandFraction` 0.4, `spotMorphologyMinimumRadius` 1.0(G5-2 구현 중 추가, 점·모공 반지름 올림). 캐시 `RegionMaskCache.entriesPerFacePerResolution` 10 → 11.
 - 표 변경(스펙 2절 G5-2 몫): `spots` 1.0/1.0/0.75, `autoBlemish` false(층이 `false`를 덮어씀).
 - `SkinKernels` 커널 6 → 8(`spot`·`spotApply`). 마스크는 `FaceRegions`(확장 파일 `FaceRegions+Spots.swift`).
 - 테스트 문턱은 스펙 1.2 심은 점 행의 값이고 `SpotBounds` 명명 상수다.
@@ -401,7 +401,8 @@ enum SpotRemoval {
         let bounds = FaceRegions.maskBounds(face: face, extent: extent, tuning: tuning).intersection(extent)
         guard !bounds.isEmpty else { return image }
         let spot = Double(faceWidth) * tuning.spotRadiusFraction
-        let pore = max(tuning.skinBlurMinimumRadius, Double(faceWidth) * tuning.spotPoreRadiusFraction)
+        // (G5-2 구현 중 변경) 형태 필터는 반지름을 내림하므로 올림하고 하한은 spotMorphologyMinimumRadius다.
+        let pore = max(tuning.spotMorphologyMinimumRadius, (Double(faceWidth) * tuning.spotPoreRadiusFraction).rounded(.up))
         // 형태 필터 입력은 가장자리 여유를 둔 유한 영역이다. 무한 extent를 넣으면 영역 밖이 늘어난 픽셀이 된다.
         let padding = CGFloat(spot * tuning.spotMorphologyPaddingInSpots)
         let source = image.clampedToExtent().cropped(to: bounds.insetBy(dx: -padding, dy: -padding))
@@ -439,6 +440,8 @@ enum SpotRemoval {
 ```
 
 `apply`의 `where skin.smoothing > 0 || skin.hasRefinement`는 `hasRefinement`가 `allCases`라 `spots`를 포함한다. `refine`의 `guard bandMix || skin.redness != 0 else { return result }`는 그대로(점 지우기 결과를 돌려준다).
+
+**(G5-2 구현 중 변경)** `spotApply`에 `image.cropped(to: bounds)`를 넘긴다(스펙 4.3). 자르지 않으면 바탕까지 늘어난 픽셀이 된다. 단위 테스트는 2배 합성 얼굴·깨끗한 사진 렌더 대비 남은 비율·격자 18점 평균 회복률로 잰다(스펙 4.4).
 
 **대안(`testSpotRemovalLeavesPixelsOutsideTheFaceBoundsUntouched`가 실패할 때만):** `RenderContext.init`에 `renderer: Renderer? = nil`(저장 속성 `public let renderer: Renderer?`), `PhotoPipeline`의 `preview`·`render(url:…)`가 `renderer: renderer`를 넘기고, `Renderer`에 `func makeFloatImage(_ image: CIImage) throws -> CIImage`(`createCGImage(format: .RGBAf, colorSpace: extendedLinearSRGB)` → `CIImage(cgImage:options: [.colorSpace: extendedLinearSRGB])`, extent 원점으로 되돌리는 translate)를 더한다. `SpotRemoval.apply`에 `renderer: Renderer?` 인자를 더해 있으면 `insertingIntermediate()` 대신 `makeFloatImage`를 쓴다. 테스트는 `Support.renderer`를 넘긴다. 이 경우 `modules.md`의 `RenderContext` 설명에 한 줄을 더하고 VALIDATION "스펙과 다르게 한 것"에 적는다.
 
