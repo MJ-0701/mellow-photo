@@ -14,7 +14,7 @@ public struct PhotoAnalysis: Sendable {
     public var personMask: CIImage?
     /// 인물 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var personAnalysisFailure: MellowError?
-    /// 관절점. 상자 넓이가 큰 사람이 앞이고 체형은 첫 사람만 바꾼다. 사람이 없으면 빈 배열.
+    /// 관절점. 상자 넓이가 큰 사람이 앞이고 다리 길게 띠는 첫 사람만 만든다. 사람이 없으면 빈 배열.
     public var bodies: [BodyGeometry]
     /// 체형 분석이 실패했으면 그 이유. 사람이 없는 것과 구분한다.
     public var bodyAnalysisFailure: MellowError?
