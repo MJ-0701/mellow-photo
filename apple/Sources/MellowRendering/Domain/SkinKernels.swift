@@ -10,6 +10,7 @@ final class SkinKernels: @unchecked Sendable {
     private let fold: CIColorKernel?
     private let tone: CIColorKernel?
     private let blush: CIColorKernel?
+    private let healing: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -86,6 +87,16 @@ final class SkinKernels: @unchecked Sendable {
                     return vec4(clamp(rgb, 0.0, 1.0), pixel.a);
                 }
                 """)
+        // 채널별 배율 = 고리 평균 ÷ 원본 저주파. 분모 하한 0.001은 고리 가중치가 0인 곳(extent 밖)에서 0으로 나누지 않게 한다.
+        healing = CIColorKernel(
+            source: """
+                kernel vec4 healTone(__sample source, __sample sourceLow, __sample ringNumerator,
+                                     __sample ringDenominator, float floorValue, float maxGain) {
+                    vec3 ring = ringNumerator.rgb / max(ringDenominator.r, 0.001);
+                    vec3 gain = clamp(ring / max(sourceLow.rgb, vec3(floorValue)), vec3(1.0 / maxGain), vec3(maxGain));
+                    return vec4(source.rgb * gain, source.a);
+                }
+                """)
     }
 
     /// encoded는 sRGB 감마 값 이미지, left·right는 볼 평균을 무한 확장한 이미지. 결과는 회색 가중치.
@@ -152,5 +163,18 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [encoded, reference, clear, flush, referenceOffset]
         guard let shifted = blush.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return shifted
+    }
+
+    /// 원본 패치 S × (고리 평균 ÷ S 저주파), 채널별, 배율 1/maxGain…maxGain.
+    /// 원본의 고주파(질감)는 비율로 옮겨지고 저주파(밝기·색)는 대상 둘레 고리 평균이 된다.
+    /// lumaFloor가 0 이하이거나 maxGain이 1보다 작으면 렌더 실패다.
+    func heal(
+        source: CIImage, sourceLow: CIImage, ringNumerator: CIImage, ringDenominator: CIImage, lumaFloor: Double,
+        maxGain: Double, extent: CGRect
+    ) throws -> CIImage {
+        guard let healing, lumaFloor > 0, maxGain >= 1 else { throw MellowError.renderFailed }
+        let arguments: [Any] = [source, sourceLow, ringNumerator, ringDenominator, lumaFloor, maxGain]
+        guard let healed = healing.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
+        return healed
     }
 }

@@ -255,6 +255,22 @@ public struct RenderTuning: Sendable {
     }
 
     public var spotMaxRadiusFraction: Double = 0.3
+    /// 색 맞춤 복구(스펙 G5 5.1)가 원본 패치의 저주파를 재는 흐림 반지름.
+    /// 복구 반지름 배수.
+    /// 이보다 큰 원본 명암은 고리 평균으로 바뀐다.
+    /// 0.6이면 원본 얼룩이 원반 평균을 2/255 넘게 흔들어 0.3으로 내렸다(G5-1 구현 중 변경).
+    public var healLowBandScale: Double = 0.3
+    /// 대상 둘레 고리의 안쪽 반지름.
+    /// 복구 반지름 배수.
+    public var healRingInnerScale: Double = 1.0
+    /// 고리 평균을 재는 흐림 반지름.
+    /// 복구 반지름 배수.
+    /// 바로 둘레 피부에 맞추도록 1.5에서 0.5로 내렸다(G5-1 구현 중 변경).
+    public var healRingRadiusScale: Double = 0.5
+    /// 채널별 배율의 상한(하한은 역수).
+    public var healMaxGain: Double = 2.0
+    /// 배율 분모 하한(선형).
+    public var healLumaFloor: Double = 0.01
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
 
