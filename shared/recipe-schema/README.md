@@ -30,8 +30,8 @@ Apple·Android·Windows 구현이 함께 읽고 쓰는 파일 형식의 계약�
   | `skin.smoothing` | 0.16 | 0.20 | 0.12 |
   | `skin.autoBlemish` | false | false | false |
   | `skin.spots` | 1.0 | 1.0 | 0.4 |
-  | `skin.darkCircles` | 0.42 | 0.45 | 0.38 |
-  | `skin.nasolabial` | 0.32 | 0.36 | 0.28 |
+  | `skin.darkCircles` | 0.30 | 0.30 | 0.28 |
+  | `skin.nasolabial` | 0.12 | 0.08 | 0.14 |
   | `skin.marionette` | 0.25 | 0.3 | 0.25 |
   | `skin.glabella` | 0.3 | 0.3 | 0.3 |
   | `skin.toneEvening` | 0.08 | 0.10 | 0.05 |

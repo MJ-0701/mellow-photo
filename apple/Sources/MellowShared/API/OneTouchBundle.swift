@@ -81,19 +81,21 @@ public enum OneTouchBundle {
     /// 점 지우기는 G5-2에서 더했다(Evoto와의 가장 큰 간극이 점 제거였다).
     /// 남성은 점을 더 남긴다.
     /// 얼룩 색 고르기는 G5-3에서 더했다(볼의 보라·붉은 얼룩이 점 지우기 뒤에 남은 간극이었다).
+    /// 다크서클·팔자는 G5-3에서 한 번 더 내렸다(점 지우기·매끄럽게가 띠를 함께 밝혀 강도 1이 Evoto × 1.3을 넘었다).
+    /// 여성은 다른 항목이 팔자 띠를 더 밝혀 팔자 값이 가장 낮다.
     public enum Table {
         public static let blushColorID = "blush-peach"
         /// 성별 미지정(공통).
         public static let common = Values(
-            smoothing: 0.16, darkCircles: 0.42, nasolabial: 0.32, marionette: 0.25, glabella: 0.3, toneEvening: 0.08,
+            smoothing: 0.16, darkCircles: 0.30, nasolabial: 0.12, marionette: 0.25, glabella: 0.3, toneEvening: 0.08,
             chromaEvening: 0.5, redness: -0.2, shine: 0.45, spots: 1.0, eyeBrighten: 0.25, teethWhiten: 0.25,
             lipVitality: 0, blushIntensity: 0, blushColorID: nil)
         public static let female = Values(
-            smoothing: 0.20, darkCircles: 0.45, nasolabial: 0.36, marionette: 0.3, glabella: 0.3, toneEvening: 0.10,
+            smoothing: 0.20, darkCircles: 0.30, nasolabial: 0.08, marionette: 0.3, glabella: 0.3, toneEvening: 0.10,
             chromaEvening: 0.5, redness: -0.25, shine: 0.4, spots: 1.0, eyeBrighten: 0.3, teethWhiten: 0.3,
             lipVitality: 0.2, blushIntensity: 0.15, blushColorID: blushColorID)
         public static let male = Values(
-            smoothing: 0.12, darkCircles: 0.38, nasolabial: 0.28, marionette: 0.25, glabella: 0.3, toneEvening: 0.05,
+            smoothing: 0.12, darkCircles: 0.28, nasolabial: 0.14, marionette: 0.25, glabella: 0.3, toneEvening: 0.05,
             chromaEvening: 0.35, redness: -0.2, shine: 0.5, spots: 0.4, eyeBrighten: 0.2, teethWhiten: 0.25,
             lipVitality: 0, blushIntensity: 0, blushColorID: nil)
         /// 사진 단위 몸 피부 밝기.
