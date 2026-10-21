@@ -19,6 +19,9 @@ enum OutlineTestSupport {
     ]
     /// 화면 왼쪽 팔이 몸통 변까지 붙은 사각형.
     static let attachedLeftArm = CGRect(x: 96, y: 220, width: 88, height: 204)
+    /// 두 변이 위팔 캡슐의 feather 띠(반지름 24.6px ~ 반지름 + feather 30.7px) 안에 드는 몸통.
+    /// 27%·30% 높이에서 변의 위팔 선 거리는 약 26–28px다.
+    static let torsoInGuardFeather = CGRect(x: 168, y: 200, width: 176, height: 240)
 
     /// rects(extent 픽셀)를 사람 1로 칠한 회색 마스크. 원점 0이다.
     /// Vision 마스크처럼 비트맵이라 늘리면 Core Image가 이웃 픽셀을 보간한다(절차 이미지는 늘려도 변이 날카롭다).
@@ -132,6 +135,19 @@ final class BodyOutlineProbeTests: XCTestCase {
             XCTAssertNil(outline.points[OutlineKey(level: level, side: -1)], "팔이 붙은 쪽은 점이 없다 \(level)")
             XCTAssertNotNil(outline.points[OutlineKey(level: level, side: 1)], "떨어진 쪽은 그대로 \(level)")
         }
+    }
+
+    func testTorsoEdgeInsideTheGuardFeatherCountsAsTouching() throws {
+        let mask = try OutlineTestSupport.mask(people: [OutlineTestSupport.torsoInGuardFeather])
+        XCTAssertTrue(try probe(mask).points.isEmpty, "보호가 이동을 줄이는 feather 띠 안의 옆선은 팔에 붙은 것으로 본다")
+        var wide = tuning
+        wide.armGuardFeather = 0
+        let skeleton = try XCTUnwrap(
+            BodySkeleton(body: Support.standingBody(in: Support.standingBox), extent: extent, tuning: wide))
+        let withoutFeather = BodyOutlineProbe.probe(
+            skeleton: skeleton, mask: try OutlineTestSupport.sampler(mask), extent: extent, levels: levels,
+            tuning: wide)
+        XCTAssertEqual(withoutFeather.points.count, 4, "feather를 빼면 같은 변을 찾는다(마스크·걷기는 그대로)")
     }
 
     func testAllPersonMaskHasNoPoints() throws {

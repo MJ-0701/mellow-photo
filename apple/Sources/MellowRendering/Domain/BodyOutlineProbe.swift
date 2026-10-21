@@ -6,7 +6,8 @@ import MellowShared
 /// 그래서 부유방·몸 전체 가슴 원소는 실제 몸통 경계에 둔다.
 /// 높이마다 몸 가운데 점 C = lerp(어깨 중점, 엉덩이 중점, level)에서 몸통 가로축으로 양쪽을 걷는다.
 /// 마스크 값이 personMinimum 미만인 첫 표본을 만나면 그 직전 표본이 옆선이다.
-/// 그 전에 같은 쪽 위팔 선분(어깨–팔꿈치, 팔꿈치가 없으면 어깨 관절)에서 팔 캡슐 반지름 안인 표본에 닿으면 팔이 붙은 것이라 점이 없다.
+/// 그 전에 같은 쪽 위팔 선분(어깨–팔꿈치, 팔꿈치가 없으면 어깨 관절)에서 팔 캡슐 반지름 + feather 안인 표본에 닿으면 팔이 붙은 것이라 점이 없다.
+/// feather까지 보는 것은 찾은 점이 보호가 이동을 줄이는 가장자리 띠 안에 들지 않게 하려는 것이다.
 /// 끝까지 배경을 못 만나거나 C가 배경이어도 점이 없다.
 enum BodyOutlineProbe {
     /// 한 걸음. 어깨 폭 비율.
@@ -19,7 +20,7 @@ enum BodyOutlineProbe {
     private static let sides = [-1, 1]
 
     /// 두 엉덩이가 없으면 빈 옆선이다.
-    /// 팔 캡슐 반지름은 렌더의 팔 보호와 같은 어깨 폭 × upperArmHalfWidth × armGuardScale이다.
+    /// 팔 판정 거리는 렌더의 팔 보호와 같은 반지름(어깨 폭 × upperArmHalfWidth × armGuardScale)에 feather(어깨 폭 × armGuardFeather)를 더한 값이다.
     static func probe(
         skeleton: BodySkeleton, mask: MaskSampler, extent: CGRect, levels: [Double], tuning: RenderTuning
     ) -> BodyOutline {
@@ -27,7 +28,8 @@ enum BodyOutlineProbe {
             return BodyOutline(points: [:])
         }
         let width = skeleton.torsoWidth
-        let armRadius = width * BodyShapeRig.upperArmHalfWidth * CGFloat(tuning.armGuardScale)
+        let guardRadius = width * BodyShapeRig.upperArmHalfWidth * CGFloat(tuning.armGuardScale)
+        let armRadius = guardRadius + width * CGFloat(tuning.armGuardFeather)
         var points: [OutlineKey: NormalizedPoint] = [:]
         for level in levels {
             let center = BodySkeleton.lerp(skeleton.shoulderCenter, hipCenter, CGFloat(level))
