@@ -62,7 +62,7 @@ struct SkinStage: RenderStage {
                 result, region: fold.region, skinMask: unitMask, faceWidth: faceWidth, amount: fold.amount,
                 tuning: tuning, extent: extent)
         }
-        let bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.shine > 0
+        let bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.chromaEvening > 0 || skin.shine > 0
         guard bandMix || skin.redness != 0 else { return result }
         let blendMask = MaskBuilder.scaled(unitMask, by: tuning.skinMaskMaxStrength)
         if bandMix {
@@ -72,8 +72,8 @@ struct SkinStage: RenderStage {
             let smooth = try FrequencySeparation.refined(
                 result, bounds: bounds, faceWidth: faceWidth, mask: unitMask,
                 reference: reference ?? CIImage(color: .black),
-                smoothing: skin.smoothing, toneEvening: skin.toneEvening, shine: reference == nil ? 0 : skin.shine,
-                tuning: tuning)
+                smoothing: skin.smoothing, toneEvening: skin.toneEvening, chromaEvening: skin.chromaEvening,
+                shine: reference == nil ? 0 : skin.shine, tuning: tuning)
             result = MaskBuilder.blend(smooth, over: result, mask: blendMask).cropped(to: extent)
         }
         // 볼 상자가 없으면 붉은기의 기준이 없어 붉은기는 건너뛴다.

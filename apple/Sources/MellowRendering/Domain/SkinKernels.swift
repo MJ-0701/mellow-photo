@@ -56,11 +56,26 @@ final class SkinKernels: @unchecked Sendable {
                 """)
         // luma는 BT.709 선형 휘도 계수다. 분모 하한 0.001은 마스크 밖(가중치 0)에서 0으로 나누지 않게 한다.
         // 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다. 모공 대역은 그대로다.
+        // 얼룩 색 고르기는 얼룩 크기 흐림(blotchBlur)이 넓은 평균에서 벗어난 Cb·Cr만큼을 뺀다.
+        // 화면 값(sRGB 감마)에서 BT.601로 재고 빼야 화면 Y가 그대로다(선형에서 빼면 화면 Y가 1바이트 넘게 바뀐다).
+        // cbv·crv는 BT.601 Cb·Cr 계수, invCb·invCr는 Y 성분이 0인 역변환 열이다.
+        // evenChroma가 0이면 step이 0이라 감마 왕복 오차도 더하지 않는다(같은 바이트).
         tone = CIColorKernel(
             source: """
-                kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample wideNumerator,
-                                    __sample wideDenominator, __sample reference, float keep, float even,
-                                    float shine, float shineOffset, float shineRamp) {
+                vec3 encodeSRGB(vec3 linear) {
+                    vec3 positive = max(linear, vec3(0.0));
+                    vec3 curve = 1.055 * pow(positive, vec3(1.0 / 2.4)) - 0.055;
+                    return mix(12.92 * positive, curve, step(vec3(0.0031308), positive));
+                }
+                vec3 decodeSRGB(vec3 encoded) {
+                    vec3 positive = max(encoded, vec3(0.0));
+                    vec3 curve = pow((positive + 0.055) / 1.055, vec3(2.4));
+                    return mix(positive / 12.92, curve, step(vec3(0.04045), positive));
+                }
+                kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample blotchBlur,
+                                    __sample wideNumerator, __sample wideDenominator, __sample reference,
+                                    float keep, float even, float evenChroma, float shine, float shineOffset,
+                                    float shineRamp) {
                     vec3 luma = vec3(0.2126, 0.7152, 0.0722);
                     vec3 wide = wideNumerator.rgb / max(wideDenominator.r, 0.001);
                     float gloss = clamp((dot(image.rgb, luma) - dot(reference.rgb, luma) - shineOffset) / shineRamp,
@@ -69,7 +84,15 @@ final class SkinKernels: @unchecked Sendable {
                     vec3 low = mix(midBlur.rgb, wide, pull);
                     vec3 mid = (fineBlur.rgb - midBlur.rgb) * (1.0 - shine * gloss);
                     vec3 fine = image.rgb - fineBlur.rgb;
-                    return vec4(low + mid * keep + fine, image.a);
+                    vec3 mixed = low + mid * keep + fine;
+                    vec3 cbv = vec3(-0.168736, -0.331264, 0.5);
+                    vec3 crv = vec3(0.5, -0.418688, -0.081312);
+                    vec3 invCb = vec3(0.0, -0.344136, 1.772);
+                    vec3 invCr = vec3(1.402, -0.714136, 0.0);
+                    vec3 blotch = encodeSRGB(blotchBlur.rgb) - encodeSRGB(wide);
+                    vec3 shift = evenChroma * (dot(blotch, cbv) * invCb + dot(blotch, crv) * invCr);
+                    vec3 evened = decodeSRGB(encodeSRGB(mixed) - shift) - mixed;
+                    return vec4(mixed + evened * step(0.000001, evenChroma), image.a);
                 }
                 """)
         // Y·Cb·Cr 계수와 역변환 계수는 BT.601(sRGB 감마 값 기준)이다.
@@ -169,16 +192,17 @@ final class SkinKernels: @unchecked Sendable {
     /// low = mix(midBlur, 마스크 가중 넓은 평균, max(even, shine × 번들거림 가중치)). mid는 (1 − shine × 가중치)배다.
     /// 번들거림 가중치는 선형 휘도(BT.709)가 reference보다 shineOffset 이상 밝은 곳에서 shineRamp에 걸쳐 0 → 1.
     /// shine이 0이면 mid는 bandMix와 같고 fine(모공)은 언제나 그대로다.
+    /// evenChroma는 blotchBlur − 넓은 평균의 감마 Cb·Cr을 되돌리는 비율이다.
+    /// 감마 값에서 Y 성분이 0인 역변환 열만 빼므로 화면 BT.601 Y는 바뀌지 않는다.
     func toneMix(
-        image: CIImage, fineBlur: CIImage, midBlur: CIImage, wideNumerator: CIImage, wideDenominator: CIImage,
-        reference: CIImage, keep: Double, even: Double, shine: Double, shineOffset: Double, shineRamp: Double,
-        extent: CGRect
+        image: CIImage, fineBlur: CIImage, midBlur: CIImage, blotchBlur: CIImage, wideNumerator: CIImage,
+        wideDenominator: CIImage, reference: CIImage, keep: Double, even: Double, evenChroma: Double, shine: Double,
+        shineOffset: Double, shineRamp: Double, extent: CGRect
     ) throws -> CIImage {
         guard let tone, shineRamp > 0 else { throw MellowError.renderFailed }
-        let arguments: [Any] = [
-            image, fineBlur, midBlur, wideNumerator, wideDenominator, reference, keep, even, shine, shineOffset,
-            shineRamp,
-        ]
+        let samples: [Any] = [image, fineBlur, midBlur, blotchBlur, wideNumerator, wideDenominator, reference]
+        let scalars: [Any] = [keep, even, evenChroma, shine, shineOffset, shineRamp]
+        let arguments: [Any] = samples + scalars
         guard let mixed = tone.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return mixed
     }

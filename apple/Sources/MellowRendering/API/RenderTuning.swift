@@ -81,6 +81,13 @@ public struct RenderTuning: Sendable {
     public var toneBandFraction: Double = 0.12
     /// 얼룩 고르기 1에서 저주파를 넓은 평균 쪽으로 당기는 비율.
     public var toneEveningMax: Double = 0.8
+    /// 얼룩 색 고르기가 보는 얼룩 크기 흐림 반지름.
+    /// 얼굴 폭 비율이다.
+    /// 볼의 보라·붉은 얼룩(얼굴 폭 5~10%)의 색을 대부분 담으려면 흐림이 얼룩 반지름의 절반 아래여야 한다.
+    /// G5-3에서 0.06 → 0.025(6%는 반지름 6% 얼룩 색의 약 40%만 담았다, 스펙 G5 6절).
+    public var chromaBlotchFraction: Double = 0.025
+    /// 얼룩 색 고르기 1에서 Cb·Cr 편차를 되돌리는 비율.
+    public var chromaEveningMax: Double = 1.0
     /// 선형 휘도가 볼 기준보다 이만큼 밝으면 번들거림으로 보기 시작한다. 피부 질감 잡음(±10%)은 걸리지 않는다.
     /// G4: 0.12에서 내려 부드러운 조명의 번들거림도 잡는다.
     public var shineLumaOffset: Double = 0.08

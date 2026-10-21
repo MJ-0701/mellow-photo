@@ -911,6 +911,35 @@ enum SyntheticDefect {
             .cropped(to: extent)
     }
 
+    /// 색 얼룩.
+    /// 감마 공간에서 Cb·Cr만 cb·cr만큼 옮긴 단단한 원이다.
+    /// RGB 편향은 BT.601 역변환(ΔR = 1.402·cr, ΔG = −0.344136·cb − 0.714136·cr, ΔB = 1.772·cb)이라 감마 Y는 그대로다.
+    static func tinted(_ image: CIImage, center: CGPoint, radius: CGFloat, cb: Double, cr: Double, extent: CGRect)
+        -> CIImage
+    {
+        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        let redShift = BT601.crToRed * cr
+        let greenShift = BT601.cbToGreen * cb + BT601.crToGreen * cr
+        let blueShift = BT601.cbToBlue * cb
+        let shifted = encoded.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputBiasVector": CIVector(x: CGFloat(redShift), y: CGFloat(greenShift), z: CGFloat(blueShift), w: 0)
+            ])
+        let mask = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: radius, height: radius), extent: extent)
+        return MaskBuilder.blend(shifted, over: encoded, mask: mask).applyingFilter("CISRGBToneCurveToLinear")
+            .cropped(to: extent)
+    }
+
+    /// BT.601 역변환 계수(Cb·Cr → RGB).
+    private enum BT601 {
+        static let crToRed = 1.402
+        static let cbToGreen = -0.344136
+        static let crToGreen = -0.714136
+        static let cbToBlue = 1.772
+    }
+
     /// 반사광.
     /// 선형 휘도를 가우시안 봉우리(중심에서 약 lift)만큼 더한다.
     /// lift를 더한 사본을 봉우리 마스크로 섞어 image + lift × 봉우리가 된다.
