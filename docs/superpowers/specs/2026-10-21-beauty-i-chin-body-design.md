@@ -214,7 +214,7 @@ extension PortraitScope {
 #### 5.7 턱밑 그늘 (`ChinShadeStage`, 이름 `chinShade`)
 
 - 단계 순서는 `skin` → `bodySkin` → `feature` → `makeup` → `background` → `chinShade` → `shapeWarp` → 이후 같다.
-- `doubleChin`이 0보다 큰 얼굴 대상만 처리하고 없으면 입력을 그대로 돌려준다.
+- `doubleChin`이 0보다 크고 워프와 같은 조건(`FaceShapeRig.doubleChinApplies`: 아래턱 점 수·yaw)을 만족하는 얼굴 대상만 처리하고 없으면 입력을 그대로 돌려준다(I2 구현 중 변경).
 - 마스크는 아래턱 윤곽에서 얼굴 폭 × 0.03 아래부터 0.20 아래까지의 띠다. 가로는 입꼬리 x 바깥 얼굴 폭 × 0.08까지이고 가장자리는 얼굴 폭 × 0.03으로 부드럽게 한다.
 - 마스크에 볼 기준 피부색 가중치(`FaceRegions`의 기존 Cb·Cr 거리)를 곱한다. 마스크 코드는 `FaceRegions+Chin.swift`에 둔다.
 - 밝히기는 L' = L + 값 × `chinShadeMaxGain`(0.5) × max(0, R − L)이다. R은 피부색 가중치 × (1 − 띠) 가중 넓은 평균 휘도(반지름 얼굴 폭 × 0.15)다(주름 밝히기와 같은 방식, I2 구현 중 변경). 띠 자체로 가중하면 고른 그늘 띠를 밝히지 못한다. 어둡게 하지 않는다.
