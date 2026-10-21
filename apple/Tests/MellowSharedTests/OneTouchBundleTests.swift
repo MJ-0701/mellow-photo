@@ -22,7 +22,7 @@ final class OneTouchBundleTests: XCTestCase {
             MakeupTint(
                 colorID: OneTouchBundle.Table.blushColorID, intensity: OneTouchBundle.Table.female.blushIntensity))
         XCTAssertEqual(female.makeup[.lip], MakeupTint(colorID: nil, intensity: 0), "립은 늘 없음으로 덮어쓴다")
-        XCTAssertEqual(female.autoBlemish, true)
+        XCTAssertEqual(female.autoBlemish, false)
         XCTAssertEqual(female.oneTouch, 1)
         XCTAssertTrue(female.face.isEmpty, "얼굴형은 묶음 밖")
         XCTAssertNil(female.makeup[.eyeshadow])
@@ -64,6 +64,18 @@ final class OneTouchBundleTests: XCTestCase {
             XCTAssertLessThanOrEqual(values.toneEvening, EvotoCeiling.toneEvening)
         }
         XCTAssertLessThanOrEqual(OneTouchBundle.Table.bodyBrightness, EvotoCeiling.bodyBrightness, "몸 피부 ΔY ≤ +1.5/255")
+    }
+
+    func testOneTouchRemovesSpotsAndTurnsCloneHealOff() {
+        let female = OneTouchBundle.layer(for: .female, strength: 1)
+        XCTAssertEqual(female.skinRefinement[.spots], OneTouchBundle.Table.female.spots)
+        XCTAssertEqual(female.autoBlemish, false, "점 지우기가 있으면 복제 원을 끈다(스펙 G5 판정 4b)")
+        XCTAssertTrue(female.overriddenKeys.contains(.autoBlemish), "false를 덮어쓴다(상속 아님)")
+        XCTAssertLessThan(OneTouchBundle.Table.male.spots, OneTouchBundle.Table.female.spots, "남성은 점을 더 남긴다")
+        XCTAssertEqual(
+            OneTouchBundle.layer(for: .male, strength: 0.5).skinRefinement[.spots] ?? 0,
+            OneTouchBundle.Table.male.spots * 0.5, accuracy: 1e-12)
+        XCTAssertTrue(OneTouchBundle.keys.contains(.skinRefinement(.spots)))
     }
 
     func testOneTouchMarkRoundTripsAndIsNotARenderValue() throws {

@@ -244,17 +244,20 @@ final class EditRecipeCodingTests: XCTestCase {
         let legacy = #"{"schemaVersion":2,"portrait":{"skin":{"smoothing":0.4,"autoBlemish":true}}}"#
         let decoded = try JSONDecoder().decode(EditRecipe.self, from: Data(legacy.utf8))
         XCTAssertEqual(decoded.portrait.skin, SkinAdjustments(smoothing: 0.4, autoBlemish: true), "G 이전 파일은 정밀 값이 0")
-        XCTAssertEqual(decoded.portrait.skin.refinementValues, Array(repeating: 0, count: 7))
+        let count = SkinRefinementKey.allCases.count
+        XCTAssertEqual(decoded.portrait.skin.refinementValues, Array(repeating: 0, count: count))
+        XCTAssertEqual(decoded.portrait.skin.spots, 0, "G5 이전 파일은 점 지우기가 0")
         XCTAssertFalse(decoded.portrait.skin.hasRefinement)
         var recipe = EditRecipe()
         for (offset, key) in SkinRefinementKey.allCases.enumerated() {
             recipe.portrait.skin[key] = Double(offset + 1) / 10
         }
-        XCTAssertEqual(recipe.portrait.skin.refinementValues, (1...7).map { Double($0) / 10 })
+        XCTAssertEqual(recipe.portrait.skin.refinementValues, (1...count).map { Double($0) / 10 })
         XCTAssertEqual(recipe.portrait.skin.darkCircles, 0.1)
         XCTAssertEqual(recipe.portrait.skin.marionette, 0.3)
         XCTAssertEqual(recipe.portrait.skin.shine, 0.7)
-        XCTAssertEqual(recipe.portrait.skin.numericValues, [0] + (1...7).map { Double($0) / 10 })
+        XCTAssertEqual(recipe.portrait.skin.spots, 0.8)
+        XCTAssertEqual(recipe.portrait.skin.numericValues, [0] + (1...count).map { Double($0) / 10 })
         XCTAssertTrue(recipe.portrait.skin.hasEffect)
         XCTAssertTrue(recipe.dependsOnFaces, "정밀 값만 있어도 얼굴이 필요하다")
         XCTAssertFalse(recipe.dependsOnPerson)
@@ -265,6 +268,10 @@ final class EditRecipeCodingTests: XCTestCase {
         XCTAssertEqual(
             Set(skin.keys), Set(["smoothing", "autoBlemish"] + SkinRefinementKey.allCases.map(\.rawValue)))
         XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: data), recipe)
+        var spotted = EditRecipe()
+        spotted.portrait.skin.spots = 0.4
+        let spottedData = try JSONEncoder().encode(spotted)
+        XCTAssertEqual(try JSONDecoder().decode(EditRecipe.self, from: spottedData).portrait.skin.spots, 0.4)
         XCTAssertEqual(AdjustmentRange.skinRefinement(.redness), AdjustmentRange.bipolar)
         for key in SkinRefinementKey.allCases where key != .redness {
             XCTAssertEqual(AdjustmentRange.skinRefinement(key), AdjustmentRange.unit, "\(key)")
@@ -275,6 +282,7 @@ final class EditRecipeCodingTests: XCTestCase {
         let paths: [WritableKeyPath<EditRecipe, Double>] = [
             \.portrait.skin.darkCircles, \.portrait.skin.nasolabial, \.portrait.skin.marionette,
             \.portrait.skin.glabella, \.portrait.skin.toneEvening, \.portrait.skin.redness, \.portrait.skin.shine,
+            \.portrait.skin.spots,
         ]
         for path in paths {
             var recipe = EditRecipe()

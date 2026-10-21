@@ -70,8 +70,8 @@ final class PortraitLayerTests: XCTestCase {
                 makeup: [.blush: MakeupTint(colorID: "blush-pink", intensity: 0.4)], makeupLookID: "rosy"))
         XCTAssertEqual(
             PortraitLayer.difference(portrait: PortraitAdjustments(), makeup: MakeupAdjustments()), PortraitLayer())
-        XCTAssertEqual(PortraitKey.all.count, 2 + 7 + 10 + 3 + 5)
-        XCTAssertEqual(PortraitKey.skin.count, 9)
+        XCTAssertEqual(PortraitKey.all.count, 2 + SkinRefinementKey.allCases.count + 10 + 3 + 5)
+        XCTAssertEqual(PortraitKey.skin.count, 2 + SkinRefinementKey.allCases.count)
         XCTAssertTrue(PortraitKey.faceShape(.smile).isFaceShape)
         XCTAssertFalse(PortraitKey.feature(.teethWhiten).isFaceShape)
         XCTAssertEqual(PersonID.legacy(index: 1), PersonID.legacy(index: 1))

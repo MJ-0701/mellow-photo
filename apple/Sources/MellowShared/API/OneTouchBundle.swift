@@ -27,6 +27,7 @@ public enum OneTouchBundle {
         public var toneEvening: Double
         public var redness: Double
         public var shine: Double
+        public var spots: Double
         public var eyeBrighten: Double
         public var teethWhiten: Double
         public var lipVitality: Double
@@ -35,8 +36,8 @@ public enum OneTouchBundle {
 
         public init(
             smoothing: Double, darkCircles: Double, nasolabial: Double, marionette: Double, glabella: Double,
-            toneEvening: Double, redness: Double, shine: Double, eyeBrighten: Double, teethWhiten: Double,
-            lipVitality: Double, blushIntensity: Double, blushColorID: String?
+            toneEvening: Double, redness: Double, shine: Double, spots: Double, eyeBrighten: Double,
+            teethWhiten: Double, lipVitality: Double, blushIntensity: Double, blushColorID: String?
         ) {
             self.smoothing = smoothing
             self.darkCircles = darkCircles
@@ -46,6 +47,7 @@ public enum OneTouchBundle {
             self.toneEvening = toneEvening
             self.redness = redness
             self.shine = shine
+            self.spots = spots
             self.eyeBrighten = eyeBrighten
             self.teethWhiten = teethWhiten
             self.lipVitality = lipVitality
@@ -53,11 +55,11 @@ public enum OneTouchBundle {
             self.blushColorID = blushColorID
         }
 
-        /// 피부 정밀 일곱 값.
+        /// 피부 정밀 여덟 값.
         var refinements: [SkinRefinementKey: Double] {
             [
                 .darkCircles: darkCircles, .nasolabial: nasolabial, .marionette: marionette, .glabella: glabella,
-                .toneEvening: toneEvening, .redness: redness, .shine: shine,
+                .toneEvening: toneEvening, .redness: redness, .shine: shine, .spots: spots,
             ]
         }
 
@@ -72,21 +74,23 @@ public enum OneTouchBundle {
     /// 남성은 질감을 남기고 색조 메이크업이 없다.
     /// 값은 스펙 G5 2절(Evoto 7쌍 실측)이다.
     /// 매끄럽게·얼룩 고르기·다크서클·팔자는 G4 값에서 내렸다(우리 0.6이 Evoto보다 더 평탄하고 더 밝았다).
+    /// 점 지우기는 G5-2에서 더했다(Evoto와의 가장 큰 간극이 점 제거였다).
+    /// 남성은 점을 더 남긴다.
     public enum Table {
         public static let blushColorID = "blush-peach"
         /// 성별 미지정(공통).
         public static let common = Values(
             smoothing: 0.16, darkCircles: 0.42, nasolabial: 0.32, marionette: 0.25, glabella: 0.3, toneEvening: 0.08,
-            redness: -0.2, shine: 0.45, eyeBrighten: 0.25, teethWhiten: 0.25, lipVitality: 0, blushIntensity: 0,
-            blushColorID: nil)
+            redness: -0.2, shine: 0.45, spots: 1.0, eyeBrighten: 0.25, teethWhiten: 0.25, lipVitality: 0,
+            blushIntensity: 0, blushColorID: nil)
         public static let female = Values(
             smoothing: 0.20, darkCircles: 0.45, nasolabial: 0.36, marionette: 0.3, glabella: 0.3, toneEvening: 0.10,
-            redness: -0.25, shine: 0.4, eyeBrighten: 0.3, teethWhiten: 0.3, lipVitality: 0.2, blushIntensity: 0.15,
-            blushColorID: blushColorID)
+            redness: -0.25, shine: 0.4, spots: 1.0, eyeBrighten: 0.3, teethWhiten: 0.3, lipVitality: 0.2,
+            blushIntensity: 0.15, blushColorID: blushColorID)
         public static let male = Values(
             smoothing: 0.12, darkCircles: 0.38, nasolabial: 0.28, marionette: 0.25, glabella: 0.3, toneEvening: 0.05,
-            redness: -0.2, shine: 0.5, eyeBrighten: 0.2, teethWhiten: 0.25, lipVitality: 0, blushIntensity: 0,
-            blushColorID: nil)
+            redness: -0.2, shine: 0.5, spots: 0.75, eyeBrighten: 0.2, teethWhiten: 0.25, lipVitality: 0,
+            blushIntensity: 0, blushColorID: nil)
         /// 사진 단위 몸 피부 밝기.
         /// 전체 대상에서만 쓴다.
         /// Evoto 원클릭의 몸 피부 ΔY(+0.3/255)에 맞춰 G5에서 0.15 → 0.08.
@@ -128,7 +132,9 @@ public enum OneTouchBundle {
         let table = values(for: gender)
         var layer = PortraitLayer()
         layer.skinSmoothing = AdjustmentRange.clamped(table.smoothing * scale, to: AdjustmentRange.unit)
-        layer.autoBlemish = true
+        // 점 지우기가 복제 원을 대신한다(스펙 G5 판정 4b).
+        // false를 덮어써 1.4.0 세션의 true를 끈다.
+        layer.autoBlemish = false
         for (key, value) in table.refinements {
             layer.skinRefinement[key] = AdjustmentRange.clamped(value * scale, to: AdjustmentRange.skinRefinement(key))
         }

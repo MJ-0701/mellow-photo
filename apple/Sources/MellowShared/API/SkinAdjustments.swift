@@ -9,9 +9,10 @@ public enum SkinRefinementKey: String, CaseIterable, Codable, Sendable {
     case toneEvening
     case redness
     case shine
+    case spots
 }
 
-/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 7종(G). redness만 −1…1이고 나머지는 0…1이다.
+/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 8종(G·G5). redness만 −1…1이고 나머지는 0…1이다.
 public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var smoothing: Double
     public var autoBlemish: Bool
@@ -22,10 +23,14 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var toneEvening: Double
     public var redness: Double
     public var shine: Double
+    /// 점 지우기(G5).
+    /// 모공보다 큰 어두운·밝은 점을 채운다.
+    public var spots: Double
 
     public init(
         smoothing: Double = 0, autoBlemish: Bool = false, darkCircles: Double = 0, nasolabial: Double = 0,
-        marionette: Double = 0, glabella: Double = 0, toneEvening: Double = 0, redness: Double = 0, shine: Double = 0
+        marionette: Double = 0, glabella: Double = 0, toneEvening: Double = 0, redness: Double = 0, shine: Double = 0,
+        spots: Double = 0
     ) {
         self.smoothing = smoothing
         self.autoBlemish = autoBlemish
@@ -36,6 +41,7 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
         self.toneEvening = toneEvening
         self.redness = redness
         self.shine = shine
+        self.spots = spots
     }
 
     public init(from decoder: Decoder) throws {
@@ -49,6 +55,7 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
         toneEvening = try container.decodeIfPresent(Double.self, forKey: .toneEvening) ?? 0
         redness = try container.decodeIfPresent(Double.self, forKey: .redness) ?? 0
         shine = try container.decodeIfPresent(Double.self, forKey: .shine) ?? 0
+        spots = try container.decodeIfPresent(Double.self, forKey: .spots) ?? 0
     }
 
     public subscript(key: SkinRefinementKey) -> Double {
@@ -61,6 +68,7 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
             case .toneEvening: return toneEvening
             case .redness: return redness
             case .shine: return shine
+            case .spots: return spots
             }
         }
         set {
@@ -72,6 +80,7 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
             case .toneEvening: toneEvening = newValue
             case .redness: redness = newValue
             case .shine: shine = newValue
+            case .spots: spots = newValue
             }
         }
     }
