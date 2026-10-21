@@ -506,6 +506,20 @@ final class AppModel {
     func showsBodyShape(_ key: BodyShapeKey) -> Bool {
         scope(for: beautyTarget).map { $0.allows(.bodyShape(key)) } ?? true
     }
+    /// 현재 대상 층이 그 체형 키에 직접 둔 값이 0이 아닌지.
+    /// 전체는 전체 층 값, 그룹·사람은 그 층이 덮어쓴 값이고 기록이 없는 얼굴은 자기 값이 없다.
+    func hasOwnBodyShapeValue(_ key: BodyShapeKey) -> Bool {
+        switch scope(for: beautyTarget) {
+        case .all:
+            return currentRecipe.body[key] != 0
+        case .some(let scope):
+            guard overriddenKeys.contains(.bodyShape(key)) else { return false }
+            let own = PortraitResolver.layer(currentRecipe, scope: scope)?.body[key] ?? 0
+            return own != 0
+        case nil:
+            return false
+        }
+    }
     /// 현재 대상이 다리 길게 띠를 받는지.
     /// 전체·그룹은 받고, 사람 대상은 그 얼굴이 몸 0(가장 큰 몸)과 짝일 때만 받는다.
     var targetReceivesLegBand: Bool {
@@ -521,12 +535,13 @@ final class AppModel {
         bodyAvailability == .ready && !targetReceivesLegBand
     }
     /// 체형 슬라이더를 움직일 수 있는지. 잠금이 먼저다.
-    /// 관절이 없거나 대상 사람의 몸이 없어도 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 관절이 없거나 대상 사람의 몸이 없어도 대상 층에 직접 둔 0이 아닌 값은 되돌릴 수 있게 켠다.
+    /// 상속한 값은 되돌릴 대상이 아니다.
     /// 다리 길게는 다리 띠를 받는 대상에서만 켠다.
     /// 드래그 중에는 0을 지나도 끄지 않는다.
     func canAdjustBodyShape(_ key: BodyShapeKey) -> Bool {
         guard !isGeometryLocked else { return false }
-        if isSliderEditActive || scopedValues.body[key] != 0 {
+        if isSliderEditActive || hasOwnBodyShapeValue(key) {
             return true
         }
         guard bodyAvailability == .ready else { return false }

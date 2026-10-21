@@ -1838,10 +1838,10 @@ final class AppModelTests: XCTestCase {
         model.edit(.bodyShape(.waist, -0.2))
         XCTAssertNotNil(model.scope(for: .face(0)), "첫 변경이 기록을 만든다")
         XCTAssertTrue(model.showsBodyShape(.sideChest), "기록이 있는 사람도 보인다")
-        XCTAssertEqual(UserMessage.sideChestScopeHint, "부유방은 여성 그룹이나 사람을 골라 조정해요")
+        XCTAssertEqual(UserMessage.sideChestScopeHint, "부유방은 여성 그룹이나 사람을 골라 조정해요.")
         XCTAssertEqual(UserMessage.bodyShapeTitle(.sideChest), "부유방")
         XCTAssertEqual(UserMessage.faceShapeTitle(.doubleChin), "이중턱")
-        XCTAssertEqual(UserMessage.bodyHint, "선택한 대상의 관절점으로 몸매를 다듬어요. 배경과 팔은 움직이지 않게 보호해요")
+        XCTAssertEqual(UserMessage.bodyHint, "선택한 대상의 관절점으로 몸매를 다듬어요. 배경과 팔은 움직이지 않게 보호해요. 다리 길게는 골반과 발목이 보여야 바뀌어요.")
     }
 
     func testBodySliderWritesToTheTargetLayer() async throws {
@@ -1892,7 +1892,29 @@ final class AppModelTests: XCTestCase {
             XCTAssertTrue(model.canAdjustBodyShape(.legLength), "\(target)")
             XCTAssertFalse(model.showsLegLengthLargestOnly, "\(target)")
         }
-        XCTAssertEqual(UserMessage.legLengthLargestOnly, "다리 길게는 사진에서 가장 큰 사람에게만 걸려요")
+        XCTAssertEqual(
+            UserMessage.legLengthLargestOnly, "다리 길게는 사진에서 가장 큰 사람에게만 걸려요.")
+    }
+
+    func testInheritedLegLengthDoesNotEnableSliderForNonLargestBody() async throws {
+        let model = try await coupleBodyModel()
+        model.edit(.bodyShape(.legLength, 0.5))
+        XCTAssertTrue(model.canAdjustBodyShape(.legLength), "전체 대상은 전체 층 값")
+        model.setBeautyTarget(.face(1))
+        XCTAssertEqual(model.scopedValues.body.legLength, 0.5, "사람은 전체 값을 상속한다")
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "기록이 없는 얼굴은 자기 값이 없다")
+        model.edit(.bodyShape(.waist, -0.2))
+        XCTAssertNotNil(model.scope(for: .face(1)))
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "상속한 값은 슬라이더를 켜지 않는다")
+        model.setBeautyTarget(.gender(.male))
+        model.edit(.bodyShape(.legLength, 0.3))
+        model.setBeautyTarget(.face(1))
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength), "다른 층에 둔 값도 상속이다")
+        model.edit(.bodyShape(.legLength, 0.5))
+        XCTAssertEqual(model.overriddenKeys, [.bodyShape(.waist), .bodyShape(.legLength)])
+        XCTAssertTrue(model.canAdjustBodyShape(.legLength), "그 사람 층의 0이 아닌 값은 되돌릴 수 있다")
+        model.resetOverrides([.bodyShape(.legLength)])
+        XCTAssertFalse(model.canAdjustBodyShape(.legLength))
     }
 
     func testLockedPhotoDisablesBodySliders() async throws {
