@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "photos": [
+    { "file": "chin-01.jpg",
+      "notes": "이중턱이 턱선 아래에 부드럽게 보인다(약함). 얼굴 폭은 사진 폭의 약 38%다. 밝은 회색 무지 배경, 깃 셔츠.",
+      "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "torso-01.jpg",
+      "notes": "머리부터 엉덩이까지 정면이다. 양팔과 허리 사이로 배경이 보인다. 두 어깨와 두 엉덩이가 사진 안에 있다. 검은 민소매 상의.",
+      "people": [
+        { "gender": "female", "ageBand": "young",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "couple-body-01.jpg",
+      "notes": "왼쪽 남자, 오른쪽 여자, 머리부터 엉덩이까지 정면이다. 어깨가 거의 닿고 사진 가운데에서 남자의 왼팔 일부가 여자의 오른팔 뒤에 가린다. 남자의 손은 아래 가장자리에서 잘린다.",
+      "people": [
+        { "gender": "male",   "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "partial", "ambiguous": false },
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] },
+    { "file": "lines-01.jpg",
+      "notes": "흰 타일 벽 앞 정면이다. 좌우 가장자리에 곧은 세로 문틀이 있고 가로 타일선이 고르다. 양팔과 몸통 사이에 작은 틈이 있다. 조명이 고르다.",
+      "people": [
+        { "gender": "female", "ageBand": "adult",  "glasses": false, "pose": "frontal", "occlusion": "none",    "ambiguous": false } ] }
+  ]
+}
