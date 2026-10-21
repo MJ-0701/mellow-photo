@@ -55,7 +55,8 @@ struct BeautyPanel: View {
         }
     }
 
-    /// 피부 보정·자동 잡티 아래에 정밀 키 전부(SkinRefinementKey.allCases 순서). 붉은기만 가운데 0인 양방향이고 0 근처에서 0에 붙는다.
+    /// 피부 보정·자동 잡티 아래에 정밀 키 전부(SkinRefinementKey.allCases 순서).
+    /// 붉은기만 가운데 0인 양방향이고 0 근처에서 0에 붙는다.
     @ViewBuilder
     private func skinControls(_ skin: SkinAdjustments) -> some View {
         let overridden = model.overriddenKeys

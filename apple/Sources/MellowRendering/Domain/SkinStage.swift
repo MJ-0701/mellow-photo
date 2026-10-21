@@ -35,7 +35,8 @@ struct SkinStage: RenderStage {
         return copy
     }
 
-    /// 얼굴 하나: 점 지우기 → 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·번들거림) → 붉은기. 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
+    /// 얼굴 하나: 점 지우기 → 주름 밝히기 4종 → 피부 마스크 안 대역 합성(피부 보정·얼룩 고르기·얼룩 색 고르기·번들거림) → 붉은기.
+    /// 마스크 계산 영역이 비면(얼굴이 사진 밖) 건너뛴다.
     /// 점 지우기는 주름 밝히기(곱셈)보다 앞이라 점이 함께 밝혀지지 않는다.
     private func refine(_ image: CIImage, face: FaceGeometry, skin: SkinAdjustments, context: RenderContext) throws
         -> CIImage

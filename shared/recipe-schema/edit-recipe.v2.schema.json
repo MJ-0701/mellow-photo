@@ -37,7 +37,7 @@
             "chromaEvening": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "얼룩 색 고르기. 얼굴 폭 2.5% 흐림의 화면 값 Cb·Cr이 12% 피부 평균에서 벗어난 만큼을 되돌리고 휘도는 그대로 둔다." },
             "redness": { "type": "number", "default": 0, "minimum": -1, "maximum": 1, "description": "음수는 맑게(붉은 반점 줄임), 양수는 혈색." },
             "shine": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "번들거림(밝은 반사 영역을 피부 평균 쪽으로)." },
-            "spots": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "점 지우기(모공보다 크고 얼굴 폭 2.4%보다 작은 어두운·밝은 점 채움). 강도는 깊이 문턱을 움직인다." }
+            "spots": { "type": "number", "default": 0, "minimum": 0, "maximum": 1, "description": "점 지우기(모공보다 크고 얼굴 폭 2.4%보다 작은 어두운 점 채움, 밝은 점 빼기는 기본 꺼짐). 강도는 깊이 문턱을 움직인다." }
           }
         },
         "face": {
@@ -254,7 +254,7 @@
             "chromaEvening": { "type": "number", "minimum": 0, "maximum": 1, "description": "얼룩 색 고르기. 얼굴 폭 2.5% 흐림의 화면 값 Cb·Cr이 12% 피부 평균에서 벗어난 만큼을 되돌리고 휘도는 그대로 둔다." },
             "redness": { "type": "number", "minimum": -1, "maximum": 1 },
             "shine": { "type": "number", "minimum": 0, "maximum": 1 },
-            "spots": { "type": "number", "minimum": 0, "maximum": 1, "description": "점 지우기(모공보다 크고 얼굴 폭 2.4%보다 작은 어두운·밝은 점 채움). 강도는 깊이 문턱을 움직인다." }
+            "spots": { "type": "number", "minimum": 0, "maximum": 1, "description": "점 지우기(모공보다 크고 얼굴 폭 2.4%보다 작은 어두운 점 채움, 밝은 점 빼기는 기본 꺼짐). 강도는 깊이 문턱을 움직인다." }
           }
         },
         "face": {

@@ -13,7 +13,8 @@ public enum SkinRefinementKey: String, CaseIterable, Codable, Sendable {
     case spots
 }
 
-/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 9종(G·G5). redness만 −1…1이고 나머지는 0…1이다.
+/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 9종(G·G5).
+/// redness만 −1…1이고 나머지는 0…1이다.
 public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var smoothing: Double
     public var autoBlemish: Bool
@@ -28,7 +29,7 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var redness: Double
     public var shine: Double
     /// 점 지우기(G5).
-    /// 모공보다 큰 어두운·밝은 점을 채운다.
+    /// 모공보다 큰 어두운 점을 채운다(밝은 점 빼기는 렌더 기본값에서 꺼져 있다).
     public var spots: Double
 
     public init(
