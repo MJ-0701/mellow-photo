@@ -422,6 +422,54 @@ final class ShapeAcceptanceTests: XCTestCase {
         }
     }
 
+    /// 단언 없이 원본 해상도(48MP) 한 장의 렌더 시간을 남긴다(내보내기에서 묶음마다 드는 마스크 흐림 비용 확인용).
+    /// torso-01 미리보기를 Timing.fullExtent로 늘리고 같은 정규화 분석을 그 extent에 쓴다(내보내기와 같은 방식).
+    func testFullResolutionRenderTimeIsRecorded() async throws {
+        let torso = try await photo(Self.torso)
+        let source = torso.extent
+        let stretch = CGAffineTransform(
+            scaleX: Timing.fullExtent.width / source.width, y: Timing.fullExtent.height / source.height)
+        let input = torso.image.transformed(by: stretch)
+        var recipe = EditRecipe()
+        recipe.body[.waist] = -1
+        recipe.portrait.face.doubleChin = 1
+        let full = RenderContext(extent: input.extent, recipe: recipe, analysis: torso.analysis, tuning: torso.tuning)
+        let groups = ShapeWarpStage().groups(in: full)
+        record(
+            "torso-01", "fullResolutionRender", "protectedGroups", CGFloat(groups.filter { $0.ownMask != nil }.count))
+        let largest = groups.flatMap(\.primitives).map(\.maxDisplacement).max() ?? 0
+        record("torso-01", "fullResolutionRender", "largestShiftPixels", largest)
+        for pass in ["fieldCold", "fieldWarm"] {
+            let start = Date()
+            let field = try XCTUnwrap(
+                DisplacementWarp.shared.field(
+                    groups: groups, extent: input.extent, limit: torso.tuning.shapeDisplacementLimit,
+                    tuning: torso.tuning))
+            // 보호 가중치를 곱한 지도만 그린다(값은 8비트로 잘려도 시간만 본다).
+            let image = try RenderingTestSupport.renderer.makeCGImage(field)
+            XCTAssertNotNil(image.dataProvider?.data)
+            record("torso-01", "fullResolutionRender", "\(pass)Seconds", CGFloat(Date().timeIntervalSince(start)))
+        }
+        let neutral = EditRecipe()
+        for (name, edit) in [("neutral", neutral), ("cold", recipe), ("warm", recipe)] {
+            let context = RenderContext(
+                extent: input.extent, recipe: edit, analysis: torso.analysis, tuning: torso.tuning)
+            let start = Date()
+            let output = try RenderPipeline.standard.render(input, context: context)
+            let image = try RenderingTestSupport.renderer.makeCGImage(output)
+            // createCGImage는 픽셀을 늦게 그릴 수 있어 바이트를 읽어 렌더를 끝낸다.
+            let rendered = try XCTUnwrap(image.dataProvider?.data) as Data
+            XCTAssertFalse(rendered.isEmpty)
+            record("torso-01", "fullResolutionRender", "\(name)Seconds", CGFloat(Date().timeIntervalSince(start)))
+        }
+    }
+
+    /// 원본 해상도 시간 기록의 크기.
+    private enum Timing {
+        /// 48MP 내보내기 크기(가로 × 세로 픽셀).
+        static let fullExtent = CGSize(width: 8000, height: 6000)
+    }
+
     // MARK: 도우미
 
     private func bytes(_ image: CGImage) throws -> [UInt8] {

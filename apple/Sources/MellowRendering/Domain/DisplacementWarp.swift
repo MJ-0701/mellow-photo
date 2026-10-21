@@ -23,8 +23,6 @@ final class DisplacementWarp: @unchecked Sendable {
     private static let emptyFieldSize = CGSize(width: 1, height: 1)
     /// 보호 가중치 커널이 받는 묶음당 팔 캡슐 수.
     static let maximumGuards = 4
-    /// 사람 마스크 흐림을 이 배수의 표준편차만큼 넓게 잘라 한다. 그 밖의 가우스 몫은 0.2% 아래다.
-    private static let blurReach: CGFloat = 3
     /// 캡슐이 없는 자리에 넘기는 선분과 (반지름, feather). 반지름 0이라 막지 않는다.
     private static let absentSegment = CIVector(x: 0, y: 0, z: 0, w: 0)
     private static let absentSize = CIVector(x: 0, y: 0)
@@ -181,8 +179,8 @@ final class DisplacementWarp: @unchecked Sendable {
     }
 
     /// 묶음 하나의 지도에 배경·이웃·팔 보호 가중치를 곱한다. ownMask가 nil이면 가중치 1이다.
-    /// 사람 마스크는 extent로 늘린 뒤 지도 경계 + 3σ로 잘라 흐린다.
-    /// σ = max(묶음 최대 이동 × shapeBackgroundSigmaRatio, 짧은 변 × shapeBackgroundSigmaMinimum)이다.
+    /// σ = max(묶음 최대 이동 × shapeBackgroundSigmaRatio, 짧은 변 × shapeBackgroundSigmaMinimum)이고 extent 픽셀이다.
+    /// 사람 마스크는 분석기 해상도 근처에서 흐린 뒤 extent로 늘린다(nativeBlurred).
     /// 다른 사람 마스크는 같은 배치로 늘려 흐리지 않고 최댓값으로 합친다.
     private func protectedField(_ group: ShapeGroup, extent: CGRect, tuning: RenderTuning) throws -> CIImage? {
         let mapped = group.primitives.filter { !$0.isBand }
@@ -196,12 +194,8 @@ final class DisplacementWarp: @unchecked Sendable {
         let shortSide = min(extent.width, extent.height)
         let shiftSigma = largest * CGFloat(tuning.shapeBackgroundSigmaRatio)
         let sigma = max(shiftSigma, shortSide * CGFloat(tuning.shapeBackgroundSigmaMinimum))
-        let reach = sigma * Self.blurReach
-        let padded = rect.insetBy(dx: -reach, dy: -reach).intersection(extent)
-        let ownWeight = BackgroundStage.personMask(own, extent: extent, feather: 0)
-            .cropped(to: padded).clampedToExtent()
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: sigma])
-            .cropped(to: rect)
+        let blurred = Self.nativeBlurred(own, sigma: sigma, extent: extent)
+        let ownWeight = BackgroundStage.personMask(blurred, extent: extent, feather: 0).cropped(to: rect)
         var arguments: [Any] = [field, ownWeight, Self.combinedOthers(group.otherMasks, extent: extent)]
         arguments.append(tuning.shapeBackgroundGain)
         for index in 0..<Self.maximumGuards {
@@ -211,6 +205,23 @@ final class DisplacementWarp: @unchecked Sendable {
             throw MellowError.renderFailed
         }
         return output
+    }
+
+    /// 사람 마스크를 분석기 해상도 근처에서 흐린다. sigma는 extent 픽셀이고 마스크 픽셀로 바꿔 쓴다.
+    /// 48MP 내보내기에서 늘린 마스크를 큰 σ로 흐리는 비용을 마스크 크기 비용으로 줄인다.
+    /// 분석기 마스크는 사진과 가로세로 비가 다를 수 있다(Vision 인물 마스크 512×384를 세로 사진에 쓰면 두 축 배율이 1.8배 차이).
+    /// CIGaussianBlur는 등방성이라 먼저 두 축 배율을 큰 쪽(sharedScale)에 맞춰 덜 촘촘한 축만 늘린 뒤 sigma × sharedScale로 흐린다.
+    /// 그래서 extent에서 두 축 모두 정확히 sigma다. 늘리는 축은 마스크 해상도를 넘지 않는 만큼만 커진다.
+    /// 결과는 그 크기 그대로라 BackgroundStage.personMask가 extent로 늘린다.
+    private static func nativeBlurred(_ mask: CIImage, sigma: CGFloat, extent: CGRect) -> CIImage {
+        let source = mask.extent
+        let scaleX = source.width / extent.width
+        let scaleY = source.height / extent.height
+        let sharedScale = max(scaleX, scaleY)
+        let uniform = mask.transformed(by: CGAffineTransform(scaleX: sharedScale / scaleX, y: sharedScale / scaleY))
+        return uniform.clampedToExtent()
+            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: sigma * sharedScale])
+            .cropped(to: uniform.extent)
     }
 
     /// 다른 사람 마스크들을 extent에 늘려 최댓값으로 합친다. 없으면 검정(이웃 없음)이다.

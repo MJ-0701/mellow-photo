@@ -408,4 +408,47 @@ final class DisplacementWarpTests: XCTestCase {
             XCTAssertEqual(actual.dy, expected.dy, accuracy: 0.01)
         }
     }
+
+    /// 분석기 마스크는 사진보다 작고 가로세로 비가 다를 수 있다(Vision 인물 마스크 512×384).
+    /// 작은 마스크를 그 해상도 근처에서 흐려 늘린 지도가 같은 사람을 extent 크기 마스크로 그린 지도와 같다.
+    func testLowResolutionMaskMatchesFullResolutionMask() throws {
+        let push = edgePush(-1)
+        let full = try groupField([ShapeGroup(primitives: [push], ownMask: personMask(Self.personRect))])
+        // 한 픽셀만 그리면 늘리는 변환의 쌍선형 이웃이 ROI에서 빠져 계단처럼 읽혀 영역 전체를 한 번에 읽는다.
+        let fullPatch = FloatPatch(full, in: Self.guardExtent)
+        for smallSize in Self.lowResolutionSizes {
+            let scaleX = smallSize.width / Self.guardExtent.width
+            let scaleY = smallSize.height / Self.guardExtent.height
+            let smallPerson = CGRect(
+                x: Self.personRect.minX * scaleX, y: Self.personRect.minY * scaleY,
+                width: Self.personRect.width * scaleX, height: Self.personRect.height * scaleY)
+            let small = Support.personMask(size: smallSize, person: smallPerson)
+            let low = try groupField([ShapeGroup(primitives: [push], ownMask: small)])
+            let lowPatch = FloatPatch(low, in: Self.guardExtent)
+            for point in Self.edgeProbePoints {
+                let expected = fullPatch.vector(at: point)
+                let actual = lowPatch.vector(at: point)
+                XCTAssertEqual(
+                    hypot(actual.dx, actual.dy), hypot(expected.dx, expected.dy), accuracy: Self.lowResolutionTolerance,
+                    "마스크 해상도·비율과 무관하게 같은 가중치다 \(smallSize) \(point)")
+            }
+        }
+    }
+
+    /// 작은 마스크 크기. 같은 비율(4배 작음)과 다른 비율(가로 4배·세로 16/3배 작음, 512×384를 정사각 사진에 쓴 것과 같은 비).
+    private static let lowResolutionSizes = [CGSize(width: 64, height: 64), CGSize(width: 64, height: 48)]
+    /// 작은 마스크 지도와 extent 크기 마스크 지도의 이동 차이 허용(픽셀).
+    private static let lowResolutionTolerance: CGFloat = 0.25
+
+    /// 오른쪽 변 가로 주변(안쪽 2v부터 바깥 5v까지 v/2 간격)과 변 위아래(세로 흐림 확인)의 점.
+    private static var edgeProbePoints: [CGPoint] {
+        var points: [CGPoint] = []
+        for offset in stride(from: -2 * edgeShift, through: 5 * edgeShift, by: edgeShift / 2) {
+            points.append(CGPoint(x: personRect.maxX + offset, y: personRect.midY))
+        }
+        for offset in stride(from: -edgeShift, through: 3 * edgeShift, by: edgeShift / 2) {
+            points.append(CGPoint(x: personRect.maxX - edgeShift, y: personRect.maxY + offset))
+        }
+        return points
+    }
 }
