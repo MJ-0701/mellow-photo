@@ -233,8 +233,9 @@ public struct RenderTuning: Sendable {
     public var bodyWaistMaxShift: Double = 0.06
     /// 몸 전체. 가슴·골반·허벅지 바깥 세 곳을 각각 어깨 폭의 3.5%(약 1.4cm).
     public var bodyOverallMaxShift: Double = 0.035
-    /// 팔. 위팔 양옆을 각각 어깨 폭의 2%(약 0.8cm, 위팔 폭 약 9.6cm의 17%). 아래팔은 그 75%.
-    public var bodyArmMaxShift: Double = 0.02
+    /// 팔. 위팔 양옆을 각각 어깨 폭의 3%(약 1.2cm, 위팔 폭 약 9.6cm의 25%). 아래팔은 그 75%.
+    /// I3 수용 테스트에서 2%는 배경 쪽 아래팔 원소 중심이 배경 보호로 0.9 폰 px만 움직여 하한(2 폰 px)에 못 미쳐 올렸다.
+    public var bodyArmMaxShift: Double = 0.03
     /// 허벅지. 양옆을 각각 어깨 폭의 3.5%(약 1.4cm, 허벅지 폭 약 16cm의 17%).
     public var bodyThighMaxShift: Double = 0.035
     /// 어깨. 각 어깨 관절을 어깨 폭의 4%(약 1.6cm)라 어깨 폭이 ±8% 바뀐다.
