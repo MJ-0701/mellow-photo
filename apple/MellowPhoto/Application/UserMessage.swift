@@ -213,6 +213,7 @@ enum UserMessage {
         case .smile: return "미소"
         case .forehead: return "이마"
         case .chinLength: return "턱 길이"
+        case .doubleChin: return "이중턱"
         }
     }
 
@@ -323,6 +324,7 @@ enum UserMessage {
         case .thighs: return "허벅지"
         case .shoulders: return "어깨"
         case .neck: return "목"
+        case .sideChest: return "부유방"
         }
     }
 

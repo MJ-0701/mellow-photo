@@ -123,6 +123,8 @@ public struct RenderTuning: Sendable {
     public var faceForeheadMaxShift: Double = 0.05
     /// 턱 길이. 턱 끝을 아래·위로 얼굴 폭의 5%.
     public var faceChinLengthMaxShift: Double = 0.05
+    /// 이중턱. 턱 아래 살을 턱선 쪽으로 얼굴 폭의 3.5% 올린다.
+    public var faceDoubleChinMaxShift: Double = 0.035
 
     /// 얼굴형 항목별 최대 이동. eyeSize·mouthSize는 scale 배율, 나머지는 얼굴 폭 비율.
     public func faceShapeMaxShift(_ key: FaceShapeKey) -> Double {
@@ -137,6 +139,7 @@ public struct RenderTuning: Sendable {
         case .smile: return faceSmileMaxShift
         case .forehead: return faceForeheadMaxShift
         case .chinLength: return faceChinLengthMaxShift
+        case .doubleChin: return faceDoubleChinMaxShift
         }
     }
 
@@ -240,6 +243,8 @@ public struct RenderTuning: Sendable {
     public var bodyNeckMaxShift: Double = 0.03
     /// 다리 길게 1의 띠 늘림 비율(스펙 0.08). 골반~발목이 8% 길어지고 발 아래는 그만큼 사진 밖으로 밀린다.
     public var legLengthMaxStretch: Double = 0.08
+    /// 부유방. 겨드랑이 앞 살을 몸 안쪽으로 어깨 폭의 3%(약 1.2cm) 민다.
+    public var bodySideChestMaxShift: Double = 0.03
 
     /// 체형 항목별 최대. legLength는 띠 늘림 비율, 나머지는 어깨 폭 비율의 push 이동이다.
     public func bodyItemMaxShift(_ key: BodyShapeKey) -> Double {
@@ -251,6 +256,7 @@ public struct RenderTuning: Sendable {
         case .thighs: return bodyThighMaxShift
         case .shoulders: return bodyShoulderMaxShift
         case .neck: return bodyNeckMaxShift
+        case .sideChest: return bodySideChestMaxShift
         }
     }
 

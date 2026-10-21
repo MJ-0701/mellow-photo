@@ -94,6 +94,8 @@ enum FaceShapeRig {
         case .smile: return smile(frame, shift: shift)
         case .forehead: return forehead(frame, shift: shift)
         case .chinLength: return chinLength(frame, shift: shift)
+        // I2 Task 4에서 채움.
+        case .doubleChin: return []
         }
     }
 

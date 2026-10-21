@@ -109,6 +109,8 @@ enum BodyShapeRig {
         case .thighs: return limbs(rig, thighLimbs, shift: shift, radius: thighRadius)
         case .shoulders: return shoulders(rig, shift: shift)
         case .neck: return neck(rig, shift: shift)
+        // I2 Task 4에서 채움.
+        case .sideChest: return []
         }
     }
 

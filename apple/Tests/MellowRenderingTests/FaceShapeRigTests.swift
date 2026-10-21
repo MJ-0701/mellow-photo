@@ -31,7 +31,7 @@ final class FaceShapeRigTests: XCTestCase {
         FaceShapeRig.primitives(face: face, adjustments: adjustments, extent: extent, tuning: tuning)
     }
 
-    /// 열 항목 모두 0.6(미소 포함).
+    /// 모든 항목 0.6(미소 포함).
     private var allKeys: FaceShapeAdjustments {
         var adjustments = FaceShapeAdjustments()
         for key in FaceShapeKey.allCases {
@@ -273,7 +273,8 @@ final class FaceShapeRigTests: XCTestCase {
             Bundle.module.url(forResource: "demo-portrait", withExtension: "png", subdirectory: "Fixtures"))
         let image = try ImageLoader().load(url: url, maxDimension: 1200)
         let face = try XCTUnwrap(try VisionFaceAnalyzer().analyze(image).first)
-        for key in FaceShapeKey.allCases {
+        // 이중턱 원소는 I2 Task 4에서 채운다.
+        for key in FaceShapeKey.allCases where key != .doubleChin {
             var adjustments = FaceShapeAdjustments()
             adjustments[key] = 1
             let list = FaceShapeRig.primitives(
@@ -299,7 +300,7 @@ final class FaceShapeRigTests: XCTestCase {
         var clamped = FaceShapeAdjustments()
         for key in FaceShapeKey.allCases {
             wild[key] = -4
-            clamped[key] = key == .smile ? 0 : -1
+            clamped[key] = AdjustmentRange.faceShape(key).lowerBound
         }
         XCTAssertEqual(primitives(wild), primitives(clamped))
     }
