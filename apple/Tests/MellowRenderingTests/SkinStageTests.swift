@@ -528,14 +528,62 @@ final class SkinStageTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(1 - remaining.cb / planted.cb, Self.chromaRemovalMinimum, "Cb 절반 이상")
         XCTAssertGreaterThanOrEqual(1 - remaining.cr / planted.cr, Self.chromaRemovalMinimum, "Cr 절반 이상")
         XCTAssertLessThanOrEqual(
-            abs(DisplayScale.lumaDelta(before, after, weight: disc).mean), Self.chromaLumaTolerance, "휘도는 그대로")
+            DisplayScale.lumaDelta(before, after, weight: disc).meanAbsolute, Self.chromaLumaTolerance, "휘도는 그대로")
     }
+
+    /// G5-2의 피부·얼룩·번들거림 경로를 각각 독립 비교한다.
+    private static let legacyToneMixCases = [
+        SkinAdjustments(toneEvening: 0.5),
+        SkinAdjustments(shine: 0.5),
+        SkinAdjustments(smoothing: 0.7, toneEvening: 0.5, shine: 0.5),
+    ]
+
+    /// G5-2 최종 ee1aa28의 toneMix 원문을 고정한 회귀 기준이다.
+    /// 새 커널 구현을 이 문자열에 반영하지 않는다.
+    private static let g5TwoToneMixSource = """
+        kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample wideNumerator,
+                            __sample wideDenominator, __sample reference, float keep, float even,
+                            float shine, float shineOffset, float shineRamp) {
+            vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+            vec3 wide = wideNumerator.rgb / max(wideDenominator.r, 0.001);
+            float gloss = clamp((dot(image.rgb, luma) - dot(reference.rgb, luma) - shineOffset) / shineRamp,
+                                0.0, 1.0);
+            float pull = max(even, shine * gloss);
+            vec3 low = mix(midBlur.rgb, wide, pull);
+            vec3 mid = (fineBlur.rgb - midBlur.rgb) * (1.0 - shine * gloss);
+            vec3 fine = image.rgb - fineBlur.rgb;
+            return vec4(low + mid * keep + fine, image.a);
+        }
+        """
 
     func testZeroChromaEveningKeepsTheToneMixBytes() throws {
         let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let tuning = RenderTuning()
+        let faceWidth = FaceRegions.faceWidth(base.face, extent: extent)
+        let bounds = FaceRegions.maskBounds(face: base.face, extent: extent, tuning: tuning)
+        let mask = try FaceRegions.skinMask(face: base.face, image: base.image, extent: extent, tuning: tuning)
+        let reference = try XCTUnwrap(SkinStage.cheekReference(of: base.image, face: base.face, extent: extent))
+        let radii = FrequencySeparation.radii(faceWidth: faceWidth, tuning: tuning)
+        let fine = FrequencySeparation.blurred(base.image, radius: radii.fine)
+        let mid = FrequencySeparation.blurred(base.image, radius: radii.mid)
+        let wide = FrequencySeparation.maskedMean(
+            base.image, mask: mask, radius: max(radii.mid, Double(faceWidth) * tuning.toneBandFraction))
+        let samples: [Any] = [base.image, fine, mid, wide.numerator, wide.denominator, reference]
+        let legacyKernel = try XCTUnwrap(CIColorKernel(source: Self.g5TwoToneMixSource))
+        for skin in Self.legacyToneMixCases {
+            let scalars: [Any] = [
+                1 - skin.smoothing * tuning.midReductionMax, skin.toneEvening * tuning.toneEveningMax,
+                skin.shine * tuning.shineReductionMax, tuning.shineLumaOffset, tuning.shineLumaRamp,
+            ]
+            let legacy = try XCTUnwrap(legacyKernel.apply(extent: bounds, arguments: samples + scalars))
+            let current = try FrequencySeparation.refined(
+                base.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference,
+                smoothing: skin.smoothing, toneEvening: skin.toneEvening, chromaEvening: 0, shine: skin.shine,
+                tuning: tuning)
+            XCTAssertEqual(try Support.bytes(current), try Support.bytes(legacy), "G5-2 커널과 같은 바이트")
+        }
         let withEven = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5)))
-        let withZeroChroma = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5, chromaEvening: 0)))
-        XCTAssertEqual(withEven, withZeroChroma)
         let withChroma = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5, chromaEvening: 1)))
         XCTAssertNotEqual(withEven, withChroma, "0이 아니면 경로가 실제로 바뀐다")
     }

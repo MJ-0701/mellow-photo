@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 레시피 키 `portrait.skin.chromaEvening`과 휘도를 지키는 얼룩 색 고르기(얼굴 폭 6% 흐림의 Cb·Cr을 12% 피부 평균 쪽으로)를 대역 합성 커널에 더한다. 원터치 표에 0.5/0.5/0.35를 넣고 심은 보라 얼룩으로 단언한다. Evoto 하네스를 돌려 결과 표를 VALIDATION에 옮기고 G5 전체의 문서(모듈 지도·G4 스펙 3.2·README)를 마무리한다.
+**Goal:** 레시피 키 `portrait.skin.chromaEvening`과 휘도를 지키는 얼룩 색 고르기(얼굴 폭 2.5% 흐림의 Cb·Cr을 12% 피부 평균 쪽으로)를 대역 합성 커널에 더한다. 원터치 표에 0.5/0.5/0.35를 넣고 심은 보라 얼룩으로 단언한다. Evoto 하네스를 돌려 결과 표를 VALIDATION에 옮기고 G5 전체의 문서(모듈 지도·G4 스펙 3.2·README)를 마무리한다.
 
-**Architecture:** 키는 `SkinRefinementKey.chromaEvening`(`toneEvening` 뒤). 렌더는 `FrequencySeparation.refined`의 `toneMix` 커널 확장(입력 `blotchBlur` 하나, 인자 `evenChroma` 하나)이라 새 단계·마스크·캐시가 없다. 선형 RGB에서 BT.601 역변환의 Cb·Cr 열만 쓰므로 Y가 정확히 보존된다.
+**Architecture:** 키는 `SkinRefinementKey.chromaEvening`(`toneEvening` 뒤). 렌더는 `FrequencySeparation.refined`의 `toneMix` 커널 확장(입력 `blotchBlur` 하나, 인자 `evenChroma` 하나)이라 새 단계·마스크·캐시가 없다. 화면 값(sRGB 감마)에서 BT.601 역변환의 Cb·Cr 열만 써 화면 Y를 보존하고 선형 RGB로 되돌린다.
 
 **Tech Stack:** Swift 5.9 tools / Swift 5 언어 모드, Core Image(CIKL 색 커널), Vision(테스트), XCTest.
 
@@ -45,7 +45,7 @@ G5-1 계획의 Global Constraints를 그대로 따른다(브랜치·`DEVELOPER_D
 ## Review Focus
 
 1. **휘도 보존.** 심은 보라 얼룩에 `chromaEvening = 1`을 걸면 Cb·Cr은 절반 이상 줄고 같은 픽셀의 Y는 바이트 1 이내. → Task 2 `testChromaEveningPullsBlotchChromaAndKeepsLuma`.
-2. **0이면 같은 바이트.** `chromaEvening = 0`은 G5-2 결과와 같은 바이트(대역 합성 경로 불변). → Task 2 `testZeroChromaEveningKeepsTheToneMixBytes`.
+2. **0이면 같은 바이트.** `chromaEvening = 0`은 G5-2 `ee1aa28`에서 고정한 독립 `toneMix` 커널과 피부·얼룩·번들거림 조합별로 같은 바이트(대역 합성 경로 불변). → Task 2 `testZeroChromaEveningKeepsTheToneMixBytes`.
 3. **데모 사진 자연 홍조.** 원터치 0.6에서 Cr 표준편차 비 ≥ 0.80. → Task 3(기존 `testOneTouchStaysNaturalAtDefaultAndMaximum`의 `crSigmaRatio`).
 4. **하네스 표.** 1.4.0 표(legacy) / G5 표 / Evoto 세 줄이 스펙 1.1 경계와 나란히 있고, 미달 항목이 "미달"로 적혀 있다. → Task 4 VALIDATION.
 5. **문서 정합.** `modules.md`·G4 스펙 3.2·README 표의 값이 `OneTouchBundle.Table`과 같다. → Task 4.
@@ -98,7 +98,7 @@ Run: `cd apple && swift test --filter "OneTouchBundleTests|EditRecipeCodingTests
 
 - [ ] **Step 3: 구현**
 
-G5-2 Task 1과 같은 방식으로 `case chromaEvening`(`toneEvening` 뒤), `SkinAdjustments.chromaEvening`(init 인자는 `toneEvening` 뒤, decode `?? 0`, subscript), `OneTouchBundle.Values.chromaEvening`(`refinements`에 포함), `Table` 0.5/0.5/0.35, 스키마 두 곳(`description`: "얼룩 색 고르기. 얼굴 폭 6% 흐림의 Cb·Cr이 12% 피부 평균에서 벗어난 만큼을 되돌리고 휘도는 그대로 둔다."), README(`portrait` 설명 줄·원터치 표·규칙 절 G5 문장은 G5-2가 썼으니 값만), `UserMessage.skinRefinementTitle` `case .chromaEvening: return "얼룩 색 고르기"`.
+G5-2 Task 1과 같은 방식으로 `case chromaEvening`(`toneEvening` 뒤), `SkinAdjustments.chromaEvening`(init 인자는 `toneEvening` 뒤, decode `?? 0`, subscript), `OneTouchBundle.Values.chromaEvening`(`refinements`에 포함), `Table` 0.5/0.5/0.35, 스키마 두 곳(`description`: "얼룩 색 고르기. 얼굴 폭 2.5% 흐림의 Cb·Cr이 12% 피부 평균에서 벗어난 만큼을 되돌리고 휘도는 그대로 둔다."), README(`portrait` 설명 줄·원터치 표·규칙 절 G5 문장은 G5-2가 썼으니 값만), `UserMessage.skinRefinementTitle` `case .chromaEvening: return "얼룩 색 고르기"`.
 
 - [ ] **Step 4: 실행·커밋**
 
@@ -142,7 +142,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         let remaining = DisplayScale.chromaDelta(clean, after, weight: disc)
         XCTAssertGreaterThanOrEqual(1 - remaining.cb / planted.cb, 0.5, "Cb 절반 이상")
         XCTAssertGreaterThanOrEqual(1 - remaining.cr / planted.cr, 0.5, "Cr 절반 이상")
-        XCTAssertLessThanOrEqual(abs(DisplayScale.lumaDelta(before, after, weight: disc).mean), 1.0, "휘도는 그대로")
+        XCTAssertLessThanOrEqual(DisplayScale.lumaDelta(before, after, weight: disc).meanAbsolute, 1.0, "휘도는 그대로")
     }
 
     func testZeroChromaEveningKeepsTheToneMixBytes() throws {
@@ -173,19 +173,22 @@ Run: `cd apple && swift test --filter SkinStageTests/testChromaEvening` → 첫 
 `toneMix` 커널에 `__sample blotchBlur`와 `float evenChroma` 인자, 본문 끝에:
 
 ```
-    // cbv·crv는 BT.601 Cb·Cr 계수, invCb·invCr는 Y 성분이 0인 역변환 열이다(선형 값에 그대로 써 Y를 지킨다).
+    // cbv·crv는 BT.601 Cb·Cr 계수, invCb·invCr는 Y 성분이 0인 역변환 열이다.
+    // encodeSRGB·decodeSRGB는 SkinKernels의 sRGB 변환 함수를 쓴다.
     vec3 cbv = vec3(-0.168736, -0.331264, 0.5);
     vec3 crv = vec3(0.5, -0.418688, -0.081312);
     vec3 invCb = vec3(0.0, -0.344136, 1.772);
     vec3 invCr = vec3(1.402, -0.714136, 0.0);
-    vec3 blotch = blotchBlur.rgb - wide;
+    vec3 mixed = low + mid * keep + fine;
+    vec3 blotch = encodeSRGB(blotchBlur.rgb) - encodeSRGB(wide);
     vec3 shift = evenChroma * (dot(blotch, cbv) * invCb + dot(blotch, crv) * invCr);
-    return vec4(low + mid * keep + fine - shift, image.a);
+    vec3 evened = decodeSRGB(encodeSRGB(mixed) - shift) - mixed;
+    return vec4(mixed + evened * step(0.000001, evenChroma), image.a);
 ```
 
 `FrequencySeparation.refined`에 `chromaEvening: Double` 인자: `let chroma = min(1, max(0, chromaEvening)) * tuning.chromaEveningMax`, guard를 `even > 0 || gloss > 0 || chroma > 0`로, `blotchBlur = blurred(image, radius: max(bandRadii.fine, Double(faceWidth) * tuning.chromaBlotchFraction))`를 커널에 넘긴다(G5-3 구현 중 변경: 하한 mid → fine, 색 이동은 감마 값에서, 스펙 6절). `SkinStage.refine`: `bandMix = skin.smoothing > 0 || skin.toneEvening > 0 || skin.chromaEvening > 0 || skin.shine > 0`, 호출에 `chromaEvening: skin.chromaEvening`.
 
-`modules.md`의 "대역 합성(피부 보정·얼룩 고르기·번들거림을 한 번에 …)" 문장에 "얼룩 색 고르기(얼굴 폭 6% 흐림의 Cb·Cr을 12% 평균 쪽으로, Y 유지)"를 더하고 "세 값이 모두 0이면" → "네 값이 모두 0이면"(Task 4에서 함께 커밋해도 된다).
+`modules.md`의 "대역 합성(피부 보정·얼룩 고르기·번들거림을 한 번에 …)" 문장에 "얼룩 색 고르기(얼굴 폭 2.5% 흐림의 Cb·Cr을 12% 평균 쪽으로, Y 유지)"를 더하고 "세 값이 모두 0이면" → "네 값이 모두 0이면"(Task 4에서 함께 커밋해도 된다).
 
 - [ ] **Step 4: 실행·커밋**
 
@@ -193,7 +196,7 @@ Run: `cd apple && swift test --filter "SkinStageTests|FrequencySeparationTests|R
 
 ```bash
 git add apple/Sources/MellowRendering/Domain/SkinKernels.swift apple/Sources/MellowRendering/Domain/FrequencySeparation.swift apple/Sources/MellowRendering/Domain/SkinStage.swift apple/Sources/MellowRendering/API/RenderTuning.swift apple/Tests/MellowRenderingTests/RenderingTestSupport.swift apple/Tests/MellowRenderingTests/SkinStageTests.swift
-git commit -m "feat(rendering): 얼룩 색 고르기 — 얼굴 폭 6% 흐림의 Cb·Cr을 피부 평균 쪽으로 당기고 휘도는 지킴
+git commit -m "feat(rendering): 얼룩 색 고르기 — 얼굴 폭 2.5% 흐림의 Cb·Cr을 피부 평균 쪽으로 당기고 휘도는 지킴
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
@@ -233,7 +236,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
         let remaining = DisplayScale.chromaDelta(original, repaired, weight: disc)
         XCTAssertGreaterThanOrEqual(record("chromaEvening", "cbRemoval", 1 - remaining.cb / planted.cb), ChromaBounds.removal)
         XCTAssertGreaterThanOrEqual(record("chromaEvening", "crRemoval", 1 - remaining.cr / planted.cr), ChromaBounds.removal)
-        XCTAssertLessThanOrEqual(record("chromaEvening", "lumaMeanAbs", abs(DisplayScale.lumaDelta(defective, repaired, weight: disc).mean)), ChromaBounds.lumaMeanAbsolute)
+        XCTAssertLessThanOrEqual(record("chromaEvening", "lumaMeanAbs", DisplayScale.lumaDelta(defective, repaired, weight: disc).meanAbsolute), ChromaBounds.lumaMeanAbsolute)
         var recipe = EditRecipe()
         recipe.portrait.skin.chromaEvening = 1
         XCTAssertGreaterThanOrEqual(record("chromaEvening", "fineRatio", try skinFineVarianceRatio(recipe)), ChromaBounds.fineRatio)

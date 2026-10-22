@@ -741,7 +741,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
             record("chromaEvening", "cbRemoval", 1 - remaining.cb / planted.cb), ChromaBounds.removal, "Cb 절반 이상")
         XCTAssertGreaterThanOrEqual(
             record("chromaEvening", "crRemoval", 1 - remaining.cr / planted.cr), ChromaBounds.removal, "Cr 절반 이상")
-        let lumaShift = abs(DisplayScale.lumaDelta(defective, repaired, weight: disc).mean)
+        let lumaShift = DisplayScale.lumaDelta(defective, repaired, weight: disc).meanAbsolute
         XCTAssertLessThanOrEqual(
             record("chromaEvening", "lumaMeanAbs", lumaShift), ChromaBounds.lumaMeanAbsolute, "휘도는 그대로")
         var recipe = EditRecipe()
