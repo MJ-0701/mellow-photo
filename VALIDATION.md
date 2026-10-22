@@ -1401,3 +1401,24 @@ Evoto 이미지와 이전 출력이 있던 스크래치패드가 세션 중에 �
 - 통합 코드의 CI와 iOS 및 실기기 검증은 이 실행에 포함되지 않는다.
 - Evoto 원본 입력이 없어 최종 코드의 외부 사진 쌍 하네스는 다시 실행하지 못했다.
 - 위 G5와 I 절의 실사진·기기 확인 항목과 알려진 간극을 그대로 승계한다.
+
+
+## G5·I 통합 CI 검증 (2026-10-22)
+
+- GitHub Actions `Apple checks` 실행 [39701215480](https://github.com/MJ-0701/mellow-photo/actions/runs/39701215480)은 **success**로 끝났다.
+- 검증 커밋은 `codex/g5-integration`의 `2f9dd16be6f76acf6c4ecf8e7e5f1ba283067da1`이다.
+- 실행 환경은 `macos-15-arm64`와 Xcode **26.3**이다.
+- 모듈 의존성과 형식 검사 및 XcodeGen 프로젝트 일치 검사 통과.
+- 패키지 **569개**, 실패 **0개**, 건너뜀 **3개**.
+- 건너뜀은 Evoto 입력 이미지 부재와 다문 입 데모 사진의 치아 미백 측정 및 이 CI 기계의 Vision 인스턴스 마스크 미지원이다.
+- iPhone 시뮬레이터 앱 **110개**, 실패 **0개**, `TEST SUCCEEDED`.
+- iPad 시뮬레이터 앱 **110개**, 실패 **0개**, `TEST SUCCEEDED`.
+- Mac 앱 **111개**, 실패 **0개**, `TEST SUCCEEDED`.
+- iPhone UI **2개**, 실패 **0개**, `TEST SUCCEEDED`.
+- iPhone·iPad arm64 서명 없는 Release 앱과 에셋 및 개인정보 보호 매니페스트 검증 통과.
+- Mac 서명 없는 Release 앱 빌드 통과.
+- 확인한 CI 로그는 `/tmp/mellow-g5-ci.log`다.
+- 위 시뮬레이터 검증은 GitHub Actions에서 수행했고 로컬에서는 실행하지 않았다.
+- 이후 병합과 1.4.1 준비는 이 CI 커밋의 제품·테스트 코드를 그대로 유지하고 검증 문서와 버전만 바꾼다.
+- 실제 배포와 TestFlight 처리 완료는 이 CI 결과가 보장하지 않는다.
+- 앞 절의 실기기·실사진 확인과 Evoto 하네스 재실행 항목은 그대로 남는다.
