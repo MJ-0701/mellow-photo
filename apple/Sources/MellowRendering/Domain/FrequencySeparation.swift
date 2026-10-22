@@ -35,27 +35,30 @@ enum FrequencySeparation {
             keep: 1 - amount * tuning.midReductionMax, extent: bounds)
     }
 
-    /// 얼룩 고르기·번들거림이 들어간 대역 합성. mask는 세기 1 피부 마스크(넓은 평균의 가중치), reference는 볼 평균(선형, 무한 확장).
-    /// toneEvening·shine이 모두 0이면 smoothed와 같은 경로·같은 바이트다.
+    /// 얼룩 고르기·얼룩 색 고르기·번들거림이 들어간 대역 합성.
+    /// mask는 세기 1 피부 마스크(넓은 평균의 가중치), reference는 볼 평균(선형, 무한 확장).
+    /// toneEvening·chromaEvening·shine이 모두 0이면 smoothed와 같은 경로·같은 바이트다.
     static func refined(
         _ image: CIImage, bounds: CGRect, faceWidth: CGFloat, mask: CIImage, reference: CIImage, smoothing: Double,
-        toneEvening: Double, shine: Double, tuning: RenderTuning
+        toneEvening: Double, chromaEvening: Double, shine: Double, tuning: RenderTuning
     ) throws -> CIImage {
         let even = min(1, max(0, toneEvening)) * tuning.toneEveningMax
+        let chroma = min(1, max(0, chromaEvening)) * tuning.chromaEveningMax
         let gloss = min(1, max(0, shine)) * tuning.shineReductionMax
-        guard even > 0 || gloss > 0 else {
+        guard even > 0 || gloss > 0 || chroma > 0 else {
             return try smoothed(image, bounds: bounds, faceWidth: faceWidth, smoothing: smoothing, tuning: tuning)
         }
         guard !bounds.isEmpty else { return image }
         let bandRadii = Self.radii(faceWidth: faceWidth, tuning: tuning)
         let wideRadius = max(bandRadii.mid, Double(faceWidth) * tuning.toneBandFraction)
         let wide = maskedMean(image, mask: mask, radius: wideRadius)
+        let blotchRadius = max(bandRadii.fine, Double(faceWidth) * tuning.chromaBlotchFraction)
         return try SkinKernels.shared.toneMix(
             image: image, fineBlur: blurred(image, radius: bandRadii.fine),
-            midBlur: blurred(image, radius: bandRadii.mid),
+            midBlur: blurred(image, radius: bandRadii.mid), blotchBlur: blurred(image, radius: blotchRadius),
             wideNumerator: wide.numerator, wideDenominator: wide.denominator, reference: reference,
-            keep: 1 - min(1, max(0, smoothing)) * tuning.midReductionMax, even: even, shine: gloss,
-            shineOffset: tuning.shineLumaOffset, shineRamp: tuning.shineLumaRamp, extent: bounds)
+            keep: 1 - min(1, max(0, smoothing)) * tuning.midReductionMax, even: even, evenChroma: chroma,
+            shine: gloss, shineOffset: tuning.shineLumaOffset, shineRamp: tuning.shineLumaRamp, extent: bounds)
     }
 
     /// 마스크 가중 평균의 분자 blur(image × mask)와 분모 blur(mask). 나눗셈은 커널이 한다. 경계 밖 색이 평균에 섞이지 않는다.

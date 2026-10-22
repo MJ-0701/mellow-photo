@@ -7,13 +7,13 @@ import XCTest
 final class RegionMaskCacheTests: XCTestCase {
     typealias Support = RenderingTestSupport
 
-    /// 얼굴당 해상도마다 10(G4: 주름용 피부 비트맵).
+    /// 얼굴당 해상도마다 11(G4: 주름용 피부 비트맵, G5: 점 지우기 제외 비트맵).
     func testCapacityGrowsWithFaceCount() {
         XCTAssertEqual(RegionMaskCache.capacity(forFaces: 0), RegionMaskCache.minimumEntries)
-        XCTAssertEqual(RegionMaskCache.capacity(forFaces: 2), 40)
-        XCTAssertEqual(RegionMaskCache.capacity(forFaces: 3), 60)
+        XCTAssertEqual(RegionMaskCache.capacity(forFaces: 2), 44)
+        XCTAssertEqual(RegionMaskCache.capacity(forFaces: 3), 66)
         let face = SyntheticFace.make().face
-        XCTAssertEqual(PhotoAnalysis(faces: [face, face, face]).regionMasks.maximumEntries, 60)
+        XCTAssertEqual(PhotoAnalysis(faces: [face, face, face]).regionMasks.maximumEntries, 66)
         XCTAssertEqual(PhotoAnalysis().regionMasks.maximumEntries, 32)
     }
 

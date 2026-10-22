@@ -486,11 +486,106 @@ final class SkinStageTests: XCTestCase {
             synthetic.image, bounds: bounds, faceWidth: faceWidth, smoothing: 0.7, tuning: tuning)
         let refined = try FrequencySeparation.refined(
             synthetic.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference, smoothing: 0.7,
-            toneEvening: 0, shine: 0, tuning: tuning)
+            toneEvening: 0, chromaEvening: 0, shine: 0, tuning: tuning)
         XCTAssertTrue(try Support.bytes(refined) == Support.bytes(legacy), "얼룩·번들거림 0이면 기존 경로와 같은 바이트")
         let combined = try render(synthetic, skin: SkinAdjustments(smoothing: 0.7, toneEvening: 0.5))
         XCTAssertFalse(
             try Support.bytes(combined) == Support.bytes(render(synthetic, skin: SkinAdjustments(smoothing: 0.7))))
+    }
+
+    /// 얼룩 색 고르기 테스트의 보라 얼룩 자리. 왼볼이고 눈·입·분산 측정 패치에서 떨어져 있다.
+    private static let chromaBlotchCenter = CGPoint(x: 200, y: 220)
+    /// 보라 얼룩의 감마 Cb·Cr 이동(스펙 G5 1.2).
+    private static let plantedCb = 0.04
+    private static let plantedCr = 0.03
+    /// 얼룩 반지름(얼굴 폭 비율)과 측정 원반 비율(가장자리 흐림을 뺀 안쪽).
+    private static let chromaBlotchFraction: CGFloat = 0.06
+    private static let chromaDiscFraction: CGFloat = 0.65
+    /// 얼룩 색 고르기 1의 최소 제거율.
+    private static let chromaRemovalMinimum = 0.5
+    /// 같은 픽셀의 평균 ΔY 상한(8비트).
+    private static let chromaLumaTolerance = 1.0
+
+    func testChromaEveningPullsBlotchChromaAndKeepsLuma() throws {
+        let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let center = Self.chromaBlotchCenter
+        let radius = FaceRegions.faceWidth(base.face, extent: extent) * Self.chromaBlotchFraction
+        let tinted = SyntheticDefect.tinted(
+            base.image, center: center, radius: radius, cb: Self.plantedCb, cr: Self.plantedCr, extent: extent)
+        let blotchy = CIImage(cgImage: try Support.renderer.makeCGImage(tinted))
+        let skin = SkinAdjustments(chromaEvening: 1)
+        let before = try Support.grid(blotchy)
+        let after = try Support.grid(render(SyntheticFace(image: blotchy, face: base.face), skin: skin))
+        let clean = try Support.grid(base.image)
+        // 남은 색은 깨끗한 얼굴을 같은 값으로 렌더한 결과와 비교한다(피부 결의 색 고르기는 빼고 얼룩만 본다).
+        let cleanAfter = try Support.grid(render(base, skin: skin))
+        let discRadius = radius * Self.chromaDiscFraction
+        let disc = try Support.grid(
+            Support.hardEllipse(center: center, radii: CGSize(width: discRadius, height: discRadius), extent: extent))
+        let planted = DisplayScale.chromaDelta(clean, before, weight: disc)
+        let remaining = DisplayScale.chromaDelta(cleanAfter, after, weight: disc)
+        XCTAssertGreaterThanOrEqual(1 - remaining.cb / planted.cb, Self.chromaRemovalMinimum, "Cb 절반 이상")
+        XCTAssertGreaterThanOrEqual(1 - remaining.cr / planted.cr, Self.chromaRemovalMinimum, "Cr 절반 이상")
+        XCTAssertLessThanOrEqual(
+            DisplayScale.lumaDelta(before, after, weight: disc).meanAbsolute, Self.chromaLumaTolerance, "휘도는 그대로")
+    }
+
+    /// G5-2의 피부·얼룩·번들거림 경로를 각각 독립 비교한다.
+    private static let legacyToneMixCases = [
+        SkinAdjustments(toneEvening: 0.5),
+        SkinAdjustments(shine: 0.5),
+        SkinAdjustments(smoothing: 0.7, toneEvening: 0.5, shine: 0.5),
+    ]
+
+    /// G5-2 최종 ee1aa28의 toneMix 원문을 고정한 회귀 기준이다.
+    /// 새 커널 구현을 이 문자열에 반영하지 않는다.
+    private static let g5TwoToneMixSource = """
+        kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample wideNumerator,
+                            __sample wideDenominator, __sample reference, float keep, float even,
+                            float shine, float shineOffset, float shineRamp) {
+            vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+            vec3 wide = wideNumerator.rgb / max(wideDenominator.r, 0.001);
+            float gloss = clamp((dot(image.rgb, luma) - dot(reference.rgb, luma) - shineOffset) / shineRamp,
+                                0.0, 1.0);
+            float pull = max(even, shine * gloss);
+            vec3 low = mix(midBlur.rgb, wide, pull);
+            vec3 mid = (fineBlur.rgb - midBlur.rgb) * (1.0 - shine * gloss);
+            vec3 fine = image.rgb - fineBlur.rgb;
+            return vec4(low + mid * keep + fine, image.a);
+        }
+        """
+
+    func testZeroChromaEveningKeepsTheToneMixBytes() throws {
+        let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let tuning = RenderTuning()
+        let faceWidth = FaceRegions.faceWidth(base.face, extent: extent)
+        let bounds = FaceRegions.maskBounds(face: base.face, extent: extent, tuning: tuning)
+        let mask = try FaceRegions.skinMask(face: base.face, image: base.image, extent: extent, tuning: tuning)
+        let reference = try XCTUnwrap(SkinStage.cheekReference(of: base.image, face: base.face, extent: extent))
+        let radii = FrequencySeparation.radii(faceWidth: faceWidth, tuning: tuning)
+        let fine = FrequencySeparation.blurred(base.image, radius: radii.fine)
+        let mid = FrequencySeparation.blurred(base.image, radius: radii.mid)
+        let wide = FrequencySeparation.maskedMean(
+            base.image, mask: mask, radius: max(radii.mid, Double(faceWidth) * tuning.toneBandFraction))
+        let samples: [Any] = [base.image, fine, mid, wide.numerator, wide.denominator, reference]
+        let legacyKernel = try XCTUnwrap(CIColorKernel(source: Self.g5TwoToneMixSource))
+        for skin in Self.legacyToneMixCases {
+            let scalars: [Any] = [
+                1 - skin.smoothing * tuning.midReductionMax, skin.toneEvening * tuning.toneEveningMax,
+                skin.shine * tuning.shineReductionMax, tuning.shineLumaOffset, tuning.shineLumaRamp,
+            ]
+            let legacy = try XCTUnwrap(legacyKernel.apply(extent: bounds, arguments: samples + scalars))
+            let current = try FrequencySeparation.refined(
+                base.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference,
+                smoothing: skin.smoothing, toneEvening: skin.toneEvening, chromaEvening: 0, shine: skin.shine,
+                tuning: tuning)
+            XCTAssertEqual(try Support.bytes(current), try Support.bytes(legacy), "G5-2 커널과 같은 바이트")
+        }
+        let withEven = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5)))
+        let withChroma = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5, chromaEvening: 1)))
+        XCTAssertNotEqual(withEven, withChroma, "0이 아니면 경로가 실제로 바뀐다")
     }
 
     /// 붉은기 테스트의 반점 색. 피부보다 감마 Cr이 0.037 높고 피부색 가중치 안이다.
@@ -636,6 +731,13 @@ final class SkinStageTests: XCTestCase {
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+        var spotted = recipe
+        spotted.portrait.skin.spots = 1
+        let spotContext = RenderContext(
+            extent: synthetic.image.extent, recipe: spotted, analysis: analysis, tuning: RenderTuning())
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        XCTAssertEqual(analysis.regionMasks.count, 3, "점 지우기는 제외 비트맵 하나를 더한다(G5)")
     }
 
     /// 띠 둘레 피부 가중치 합이 SkinKernels.foldMinimumCoverage보다 작으면 기준이 없어 배율 1이어야 한다.
