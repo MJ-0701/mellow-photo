@@ -156,20 +156,6 @@ final class RealPhotoAcceptanceTests: XCTestCase {
 
     // MARK: 주름
 
-    private func foldMask(_ key: SkinRefinementKey) throws -> FaceRegions.RegionMask? {
-        let portrait = try self.portrait()
-        let extent = portrait.extent
-        let tuning = portrait.tuning
-        let face = portrait.face
-        switch key {
-        case .darkCircles: return FaceRegions.darkCircleMask(face: face, extent: extent, tuning: tuning)
-        case .nasolabial: return FaceRegions.nasolabialMask(face: face, extent: extent, tuning: tuning)
-        case .marionette: return FaceRegions.marionetteMask(face: face, extent: extent, tuning: tuning)
-        case .glabella: return FaceRegions.glabellaMask(face: face, extent: extent, tuning: tuning)
-        default: return nil
-        }
-    }
-
     /// 자연 사진에서의 상한 + 합성 그늘 회복률.
     /// 하한은 호출자가 더한다.
     private func assertFoldIsNaturalAndRecoversShadow(
@@ -178,7 +164,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         throws
     {
         let portrait = try self.portrait()
-        let region = try XCTUnwrap(foldMask(key), "\(key) 띠", file: file, line: line)
+        let region = try XCTUnwrap(portrait.foldBandMask(key), "\(key) 띠", file: file, line: line)
         let weight = try portrait.mask(region)
         let before = try base().grid
         let natural = try grid({ $0.portrait.skin[key] = 1 }, stage: SkinStage())
@@ -219,7 +205,7 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(
             record("darkCircles", "changed", DisplayScale.changedFraction(before, after, in: try faceRect)),
             Visibility.darkCirclesChangedFraction)
-        let weight = try self.portrait().mask(foldMask(.darkCircles))
+        let weight = try self.portrait().mask(self.portrait().foldBandMask(.darkCircles))
         XCTAssertGreaterThanOrEqual(
             DisplayScale.lumaDelta(before, after, weight: weight).mean, Visibility.darkCirclesMeanLift, "눈 아래가 밝아진다")
         try assertFoldIsNaturalAndRecoversShadow(.darkCircles)
@@ -420,12 +406,14 @@ final class RealPhotoAcceptanceTests: XCTestCase {
 
     // MARK: 원터치
 
-    /// 원터치 하한(스펙 G4 1.2 원터치 행).
+    /// 원터치 하한(스펙 G4 1.2 원터치 행, G5 1.2에서 재조정).
     /// 화면 배율 얼굴 상자 changedFraction.
+    /// 실측이 옛 문턱을 넘는 항목은 옛 문턱을 유지하고 미달 항목만 G5 새 문턱으로 내린다(VALIDATION G5-1).
     enum OneTouchVisibility {
         static let femaleDefaultChangedFraction = 0.05
         /// 남성·공통 기본 0.6도 같은 하한(스펙 G4 1.2, G4-2 구현 중 추가).
-        static let maleDefaultChangedFraction = 0.05
+        /// 남성은 G5 표 인하 뒤 실측 0.047이라 G5 새 문턱 0.03으로 내렸다(스펙 G5 1.2).
+        static let maleDefaultChangedFraction = 0.03
         static let commonDefaultChangedFraction = 0.05
         static let femaleMaximumChangedFraction = 0.10
         static let maleMaximumChangedFraction = 0.06
@@ -433,11 +421,32 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let coupleMinimumChangedFraction = 0.03
     }
 
-    /// 원터치 상한(스펙 G4 1.4 원터치 행).
+    /// 원터치 상한·밝기 하한(스펙 G4 1.4 원터치 행, G5 1.2에서 재조정).
     enum OneTouchNaturalness {
-        static let skinMeanLiftRange = (0.005 * 255)...(0.05 * 255)
+        /// 기본 0.6 얼굴 피부 평균 ΔY(/255).
+        /// Evoto 원클릭 +1.9, 75분위 +3.0(스펙 G5 1.2).
+        static let skinMeanLiftRange = 0.5...3.0
+        /// 강도 1 얼굴 피부 평균 ΔY 상한.
+        static let maximumSkinMeanLift = 4.0
         static let defaultFineVarianceRatio = 0.9
         static let maximumFineVarianceRatio = 0.85
+        static let defaultMidVarianceRatio = 0.80
+        static let maximumMidVarianceRatio = 0.70
+        static let defaultLowVarianceRatio = 0.85
+        static let maximumLowVarianceRatio = 0.80
+        /// 중간 대역 바깥 경계·넓은 대역 바깥 경계(얼굴 폭 비율).
+        /// 하네스 Calibration과 같다.
+        static let midOuterFraction = 0.03
+        static let lowOuterFraction = 0.12
+        /// 강도 1 띠 가중 평균 ΔY 상한(Evoto 전용 도구 × 1.3).
+        static let darkCircleBandMaximumLift = 10.5
+        static let nasolabialBandMaximumLift = 6.7
+        static let defaultChromaDeviationRatio = 0.80
+        static let maximumChromaDeviationRatio = 0.70
+        /// 몸 피부(얼굴 다각형 밖) 평균 ΔY 상한.
+        /// Evoto +0.3(스펙 G5 1.1).
+        static let defaultBodyMeanLift = 1.5
+        static let maximumBodyMeanLift = 2.5
         static let percentileAbsoluteLuma = 60.0
         static let percentile = 0.99
         static let skinChroma = 0.015
@@ -445,6 +454,20 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         static let femaleLipChroma = 0.03
         static let browChangedFraction = 0.05
         static let outsideFaceChangedFraction = 0.002
+    }
+
+    /// 자동 잡티 복구 원반 잔차(스펙 G5 1.2 "자동 잡티 복구").
+    enum HealBounds {
+        /// 심는 어두운 원의 반지름(얼굴 폭 비율)과 선형 휘도 배율.
+        static let plantedRadiusFraction: CGFloat = 0.012
+        static let plantedFactor = 0.80
+        /// 복구 원 안 평균 Y와 고리 평균 Y의 차 상한(8비트).
+        static let discResidual = 3.0
+        /// 잡티 반지름 → 복구 원 반지름 배수가 blemishHealRadiusScale이다.
+        /// 원반 평균은 복구 원의 0.65배(MaskBuilder 타원이 완전히 덮는 범위) 안에서 잰다.
+        static let discFraction: CGFloat = 0.65
+        /// 고리는 복구 원 반지름의 1~1.5배다.
+        static let ringOuterFraction: CGFloat = 1.5
     }
 
     /// 전체 대상 원터치와 같은 층(전체 층 공통 표, 그룹 층 성별 표)에 faces[i]를 genders[i]로 지정한 레시피.
@@ -563,11 +586,22 @@ final class RealPhotoAcceptanceTests: XCTestCase {
         for item in cases {
             let result = try oneTouchRender(strength: item.strength, gender: item.gender, withBodySkin: true)
             let name = label(item.gender, item.strength)
-            if item.strength == OneTouchBundle.defaultStrength {
-                let lift = DisplayScale.lumaDelta(before, result.grid, weight: skin).mean
-                XCTAssertTrue(
-                    OneTouchNaturalness.skinMeanLiftRange.contains(record(name, "skinMeanLuma", lift)),
-                    "\(name) 피부 평균 ΔY \(lift)")
+            let isDefault = item.strength == OneTouchBundle.defaultStrength
+            let lift = record(name, "skinMeanLuma", DisplayScale.lumaDelta(before, result.grid, weight: skin).mean)
+            if isDefault {
+                XCTAssertTrue(OneTouchNaturalness.skinMeanLiftRange.contains(lift), "\(name) 피부 평균 ΔY \(lift)")
+            } else {
+                XCTAssertLessThanOrEqual(lift, OneTouchNaturalness.maximumSkinMeanLift, "\(name) 밝기 상한")
+            }
+            try assertBandsAndChromaStayNatural(name: name, isDefault: isDefault, output: result.output)
+            let crRatio = DisplayScale.chromaStandardDeviationRatio(before, result.grid, weight: skin)
+            XCTAssertGreaterThanOrEqual(
+                record(name, "crSigmaRatio", crRatio),
+                isDefault
+                    ? OneTouchNaturalness.defaultChromaDeviationRatio : OneTouchNaturalness.maximumChromaDeviationRatio,
+                "\(name) 붉은기 분산")
+            if !isDefault {
+                try assertFoldBandsStayBelowEvoto(name: name, before: before, after: result.grid)
             }
             let fineRatio = try Support.fineVarianceRatio(
                 before: portrait.image, after: result.output, weight: portrait.skinMask(), in: skinBounds,
@@ -607,6 +641,384 @@ final class RealPhotoAcceptanceTests: XCTestCase {
                 item.gender == .female ? OneTouchNaturalness.femaleLipChroma : OneTouchNaturalness.maleLipChroma,
                 "\(name) 입술")
         }
+    }
+
+    /// 피부 안쪽 중간·넓은 대역 분산 비(스펙 G5 1.2).
+    /// Evoto는 두 대역을 거의 그대로 둔다.
+    private func assertBandsAndChromaStayNatural(name: String, isDefault: Bool, output: CIImage) throws {
+        let portrait = try self.portrait()
+        let interior = try portrait.interiorSkinMask()
+        let bounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let faceWidth = Double(portrait.faceWidth)
+        let midOuter = faceWidth * OneTouchNaturalness.midOuterFraction
+        let lowOuter = faceWidth * OneTouchNaturalness.lowOuterFraction
+        let midRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: bounds, innerRadius: fineRadius(),
+            outerRadius: midOuter)
+        XCTAssertGreaterThanOrEqual(
+            record(name, "midRatio", midRatio),
+            isDefault ? OneTouchNaturalness.defaultMidVarianceRatio : OneTouchNaturalness.maximumMidVarianceRatio,
+            "\(name) 중간 대역")
+        let lowRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: bounds, innerRadius: midOuter,
+            outerRadius: lowOuter)
+        XCTAssertGreaterThanOrEqual(
+            record(name, "lowRatio", lowRatio),
+            isDefault ? OneTouchNaturalness.defaultLowVarianceRatio : OneTouchNaturalness.maximumLowVarianceRatio,
+            "\(name) 넓은 대역")
+    }
+
+    /// 강도 1 다크서클·팔자 띠 평균 ΔY ≤ Evoto 전용 도구 × 1.3(스펙 G5 판정 5).
+    private func assertFoldBandsStayBelowEvoto(name: String, before: PixelGrid, after: PixelGrid) throws {
+        let portrait = try self.portrait()
+        let darkCircle = try portrait.mask(portrait.foldBandMask(.darkCircles))
+        XCTAssertLessThanOrEqual(
+            record(name, "darkCircleBand", DisplayScale.lumaDelta(before, after, weight: darkCircle).mean),
+            OneTouchNaturalness.darkCircleBandMaximumLift, "\(name) 다크서클 ≤ Evoto × 1.3")
+        let nasolabial = try portrait.mask(portrait.foldBandMask(.nasolabial))
+        XCTAssertLessThanOrEqual(
+            record(name, "nasolabialBand", DisplayScale.lumaDelta(before, after, weight: nasolabial).mean),
+            OneTouchNaturalness.nasolabialBandMaximumLift, "\(name) 팔자 ≤ Evoto × 1.3")
+    }
+
+    /// 전체 대상 원터치의 몸 피부(얼굴 다각형 밖) 평균 ΔY(스펙 G5 1.1 몸 피부 행).
+    func testOneTouchKeepsBodyLiftWithinEvotoBounds() throws {
+        let portrait = try self.portrait()
+        let before = try base().grid
+        let body = try DisplayScale.grid(portrait.bodyOnlySkinArea())
+        XCTAssertGreaterThan(DisplayScale.maskedPixelCount(body), 0, "몸 피부 영역이 비어 있지 않다")
+        let cases: [(strength: Double, maximum: Double)] = [
+            (OneTouchBundle.defaultStrength, OneTouchNaturalness.defaultBodyMeanLift),
+            (OneTouchBundle.maximumStrength, OneTouchNaturalness.maximumBodyMeanLift),
+        ]
+        for item in cases {
+            let result = try oneTouchRender(strength: item.strength, gender: nil, withBodySkin: true)
+            let name = label(nil, item.strength)
+            XCTAssertLessThanOrEqual(
+                record(name, "bodyMeanLuma", DisplayScale.lumaDelta(before, result.grid, weight: body).mean),
+                item.maximum, "\(name) 몸 피부 밝기")
+        }
+    }
+
+    // MARK: 얼룩 색 고르기
+
+    /// 얼룩 색 고르기 심은 보라 얼룩 경계(스펙 G5 1.2 "얼룩 색 고르기 1" 행).
+    enum ChromaBounds {
+        static let radiusFraction: CGFloat = 0.06
+        static let plantedCb = 0.04
+        static let plantedCr = 0.03
+        static let removal = 0.5
+        static let lumaMeanAbsolute = 1.5
+        static let fineRatio = 0.9
+        static let midLumaRatio = 0.95
+        /// 제거율은 원 반지름 × 이 값 안에서 잰다(심은 원 가장자리 계단 제외).
+        static let discFraction: CGFloat = 0.65
+    }
+
+    /// 얼룩 색 고르기 1이 볼의 보라 얼룩 색을 절반 이상 되돌리고 휘도 입체감은 둔다(스펙 G5 1.2).
+    /// 남은 색은 깨끗한 사진을 같은 레시피로 렌더한 결과와 비교한다(점 지우기 회복률과 같은 방식).
+    func testChromaEveningClearsAPlantedPurpleBlotchAndKeepsLumaRelief() throws {
+        let portrait = try self.portrait()
+        let cheek = try XCTUnwrap(FaceRegions.cheekRects(face: portrait.face, extent: portrait.extent).first)
+        let center = CGPoint(x: cheek.midX, y: cheek.midY)
+        let radius = portrait.faceWidth * ChromaBounds.radiusFraction
+        let tinted = SyntheticDefect.tinted(
+            portrait.image, center: center, radius: radius, cb: ChromaBounds.plantedCb, cr: ChromaBounds.plantedCr,
+            extent: portrait.extent)
+        let blotchy = try portrait.baked(tinted)
+        let discRadius = radius * ChromaBounds.discFraction
+        let disc = try DisplayScale.grid(
+            Support.hardEllipse(
+                center: center, radii: CGSize(width: discRadius, height: discRadius), extent: portrait.extent))
+        let original = try base().grid
+        let defective = try DisplayScale.grid(blotchy)
+        let evened: (inout EditRecipe) -> Void = { $0.portrait.skin.chromaEvening = 1 }
+        let repaired = try grid(evened, stage: SkinStage(), input: blotchy)
+        let cleanRepaired = try grid(evened, stage: SkinStage())
+        let planted = DisplayScale.chromaDelta(original, defective, weight: disc)
+        let remaining = DisplayScale.chromaDelta(cleanRepaired, repaired, weight: disc)
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "cbRemoval", 1 - remaining.cb / planted.cb), ChromaBounds.removal, "Cb 절반 이상")
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "crRemoval", 1 - remaining.cr / planted.cr), ChromaBounds.removal, "Cr 절반 이상")
+        let lumaShift = abs(DisplayScale.lumaDelta(defective, repaired, weight: disc).mean)
+        XCTAssertLessThanOrEqual(
+            record("chromaEvening", "lumaMeanAbs", lumaShift), ChromaBounds.lumaMeanAbsolute, "휘도는 그대로")
+        var recipe = EditRecipe()
+        recipe.portrait.skin.chromaEvening = 1
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "fineRatio", try skinFineVarianceRatio(recipe)), ChromaBounds.fineRatio, "모공 질감")
+        let interior = try portrait.interiorSkinMask()
+        let output = try SkinStage().apply(portrait.image, in: portrait.context(recipe))
+        let skinBounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let midOuter = Double(portrait.faceWidth) * OneTouchNaturalness.midOuterFraction
+        let midRatio = try Support.bandVarianceRatio(
+            before: portrait.image, after: output, weight: interior, in: skinBounds, innerRadius: fineRadius(),
+            outerRadius: midOuter)
+        XCTAssertGreaterThanOrEqual(
+            record("chromaEvening", "midLumaRatio", midRatio), ChromaBounds.midLumaRatio, "휘도 입체감은 둔다")
+    }
+
+    // MARK: 점 지우기
+
+    /// 점 지우기 심은 점 경계(스펙 G5 1.2 "점 지우기 1"·"원터치 0.6" 행).
+    enum SpotBounds {
+        static let darkCount = 6
+        static let brightCount = 3
+        static let darkRadiusFraction: CGFloat = 0.009
+        static let brightRadiusFraction: CGFloat = 0.007
+        static let darkFactor = 0.85
+        static let brightFactor = 1.10
+        static let spacingFraction: CGFloat = 0.08
+        static let darkRecovery = 0.7
+        static let fineRatio = 0.9
+        static let poreRatio = 0.9
+        /// 콧구멍 띠·눈꼬리·입꼬리 원 안 평균 |ΔY| 상한(8비트).
+        static let exclusionMeanAbsolute = 1.0
+        /// 콧구멍 띠 다각형 안 |ΔY| 99분위 상한(8비트).
+        /// 데모 기본 6.7, 제외를 끄면 9.4다(스펙 G5 1.2, G5-3 구현 중 변경).
+        static let nostrilPercentileAbsolute = 8.0
+        static let nostrilPercentile = 0.99
+        /// 얼굴 마스크 영역 밖 채널 차이 상한(바이트).
+        static let outsideByteDelta = 1
+        static let defaultDarkRecovery = 0.6
+        static let maleDefaultDarkRecovery = 0.4
+        /// 원터치 0.6 남성 회복률이 여성보다 이만큼 이상 낮다.
+        static let maleMargin = 0.05
+        /// 회복률은 원 반지름 × 이 값 안에서 잰다(심은 원 가장자리 계단 제외).
+        static let discFraction: CGFloat = 0.65
+        /// fine 비에서 뺄 원 둘레(심은 반지름 배수).
+        static let fineExclusionScale: CGFloat = 2
+        /// 렌더 시간 표본 수(첫 렌더는 커널 컴파일이라 뺀다).
+        static let timingRuns = 3
+    }
+
+    /// 데모 사진의 어두운 점 6개·밝은 점 3개(격자 순서대로 어두운 점 먼저).
+    private func plantedSpots() throws -> (dark: [CGPoint], bright: [CGPoint], image: CIImage) {
+        let portrait = try self.portrait()
+        let total = SpotBounds.darkCount + SpotBounds.brightCount
+        let points = try portrait.spotGrid(
+            count: total, radiusFraction: SpotBounds.darkRadiusFraction, spacingFraction: SpotBounds.spacingFraction)
+        let dark = Array(points.prefix(SpotBounds.darkCount))
+        let bright = Array(points.suffix(SpotBounds.brightCount))
+        let width = portrait.faceWidth
+        let darkened = SyntheticDefect.spotted(
+            portrait.image, centers: dark, radius: width * SpotBounds.darkRadiusFraction,
+            factor: SpotBounds.darkFactor, extent: portrait.extent)
+        let both = SyntheticDefect.spotted(
+            darkened, centers: bright, radius: width * SpotBounds.brightRadiusFraction,
+            factor: SpotBounds.brightFactor, extent: portrait.extent)
+        return (dark, bright, try portrait.baked(both))
+    }
+
+    /// 1 − (렌더 뒤 결함 ÷ 심은 결함).
+    /// 렌더 뒤 결함은 깨끗한 사진을 같은 레시피로 렌더한 결과와 비교한다(스펙 G5 4.4와 같은 방식).
+    private func spotRecovery(
+        clean: PixelGrid, cleanAfter: PixelGrid, before: PixelGrid, after: PixelGrid, at center: CGPoint,
+        radius: CGFloat
+    ) -> Double {
+        let planted =
+            Support.discLuma(before, at: center, radius: radius) - Support.discLuma(clean, at: center, radius: radius)
+        let left =
+            Support.discLuma(after, at: center, radius: radius)
+            - Support.discLuma(cleanAfter, at: center, radius: radius)
+        guard abs(planted) > 0 else { return 0 }
+        return 1 - left / planted
+    }
+
+    /// 점 지우기 1이 심은 점을 채우고 모공·제외 영역·얼굴 밖은 남긴다(스펙 G5 1.2).
+    func testSpotRemovalFillsPlantedSpotsAndKeepsPores() throws {
+        let portrait = try self.portrait()
+        let planted = try plantedSpots()
+        var recipe = EditRecipe()
+        recipe.portrait.skin.spots = 1
+        let stage = SkinStage()
+        let output = try stage.apply(planted.image, in: portrait.context(recipe, image: planted.image))
+        let cleanOutput = try stage.apply(portrait.image, in: portrait.context(recipe))
+        let clean = try Support.grid(portrait.image)
+        let cleanAfter = try Support.grid(cleanOutput)
+        let before = try Support.grid(planted.image)
+        let after = try Support.grid(output)
+        let width = portrait.faceWidth
+        func meanRecovery(_ centers: [CGPoint], radiusFraction: CGFloat, name: String) -> Double {
+            let radius = width * radiusFraction * SpotBounds.discFraction
+            var total = 0.0
+            for (index, center) in centers.enumerated() {
+                let recovered = spotRecovery(
+                    clean: clean, cleanAfter: cleanAfter, before: before, after: after, at: center, radius: radius)
+                total += record("\(name)-\(index)", "recovery", recovered)
+            }
+            return record(name, "meanRecovery", total / Double(centers.count))
+        }
+        // 한 점 회복률은 둘레 결(밝은 얼룩)에 따라 흩어져 평균으로 단언한다(스펙 G5 1.2·4.4, G5-2 구현 중 변경).
+        let dark = meanRecovery(planted.dark, radiusFraction: SpotBounds.darkRadiusFraction, name: "spots-dark")
+        XCTAssertGreaterThanOrEqual(dark, SpotBounds.darkRecovery, "어두운 점 평균 회복률")
+        // 밝은 점 빼기는 꺼져 있어 기록만 한다(스펙 G5 1.2, G5-2 구현 중 변경, VALIDATION 남은 간극).
+        _ = meanRecovery(planted.bright, radiusFraction: SpotBounds.brightRadiusFraction, name: "spots-bright")
+        // 심은 원 둘레를 뺀 피부 가중치로 질감·모공을 잰다.
+        let black = CIImage(color: .black).cropped(to: portrait.extent)
+        let reach = width * SpotBounds.darkRadiusFraction * SpotBounds.fineExclusionScale
+        let circles = (planted.dark + planted.bright).reduce(black) { union, center in
+            Support.hardEllipse(center: center, radii: CGSize(width: reach, height: reach), extent: portrait.extent)
+                .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: union])
+        }
+        let weight = try portrait.skinMask()
+            .applyingFilter(
+                "CIMultiplyCompositing",
+                parameters: [
+                    kCIInputBackgroundImageKey: circles.cropped(to: portrait.extent).applyingFilter("CIColorInvert")
+                ]
+            ).cropped(to: portrait.extent)
+        let bounds = FaceRegions.maskBounds(face: portrait.face, extent: portrait.extent, tuning: portrait.tuning)
+        let fine = try Support.fineVarianceRatio(
+            before: planted.image, after: output, weight: weight, in: bounds, fineRadius: fineRadius())
+        XCTAssertGreaterThanOrEqual(record("spots", "fineRatio", fine), SpotBounds.fineRatio, "원 밖 피부 질감")
+        let poreRadius = max(
+            portrait.tuning.skinBlurMinimumRadius, Double(width) * portrait.tuning.spotPoreRadiusFraction)
+        let poreBefore = try Support.closingDarkMean(planted.image, weight: weight, in: bounds, radius: poreRadius)
+        let poreAfter = try Support.closingDarkMean(output, weight: weight, in: bounds, radius: poreRadius)
+        let poreRatio = poreBefore > 0 ? poreAfter / poreBefore : 1
+        XCTAssertGreaterThanOrEqual(record("spots", "poreRatio", poreRatio), SpotBounds.poreRatio, "모공 크기 점")
+        let exclusion = try portrait.spotExclusionMask()
+        let excluded = DisplayScale.lumaDelta(before, after, weight: exclusion).meanAbsolute
+        XCTAssertLessThanOrEqual(
+            record("spots", "exclusionMeanAbs", excluded), SpotBounds.exclusionMeanAbsolute, "콧구멍 띠·눈꼬리·입꼬리")
+        let nostril = try XCTUnwrap(try portrait.nostrilBandMask(), "데모 사진은 코 특징점이 있다")
+        let nostrilShift = DisplayScale.percentileAbsoluteLumaDelta(
+            before, after, weight: nostril, percentile: SpotBounds.nostrilPercentile)
+        XCTAssertLessThanOrEqual(
+            record("spots", "nostrilP99Abs", nostrilShift), SpotBounds.nostrilPercentileAbsolute, "콧구멍 띠 안 99분위")
+        var outsideMax = 0
+        for y in 0..<before.height {
+            for x in 0..<before.width {
+                let point = CGPoint(x: x, y: y)
+                guard !bounds.contains(point) else { continue }
+                let a = before.rgba(point)
+                let b = after.rgba(point)
+                for channel in 0..<3 {
+                    outsideMax = max(outsideMax, abs(Int(a[channel]) - Int(b[channel])))
+                }
+            }
+        }
+        XCTAssertLessThanOrEqual(
+            Int(record("spots", "outsideMaxByte", Double(outsideMax))), SpotBounds.outsideByteDelta, "얼굴 마스크 영역 밖")
+    }
+
+    /// 원터치 0.6에서 심은 어두운 점 회복: 여성·공통 ≥ 0.6, 남성 ≥ 0.4이고 여성보다 작다.
+    /// 렌더 시간(원터치 0.6, 점 지우기 있음·없음)도 VALIDATION용으로 찍는다(단언 없음).
+    func testOneTouchDefaultRemovesPlantedSpotsLessForMen() throws {
+        let portrait = try self.portrait()
+        let planted = try plantedSpots()
+        let strength = OneTouchBundle.defaultStrength
+        try recordOneTouchRenderTime(strength: strength)
+        let clean = try Support.grid(portrait.image)
+        let before = try Support.grid(planted.image)
+        var recoveries: [String: Double] = [:]
+        for gender in [Gender?.none, .female, .male] {
+            let recipe = Self.oneTouchRecipe(strength: strength, faces: [portrait.face], genders: [gender])
+            let cleanAfter = try Support.grid(oneTouchOutput(recipe, input: portrait.image))
+            let after = try Support.grid(oneTouchOutput(recipe, input: planted.image))
+            let radius = portrait.faceWidth * SpotBounds.darkRadiusFraction * SpotBounds.discFraction
+            let values = planted.dark.map {
+                spotRecovery(clean: clean, cleanAfter: cleanAfter, before: before, after: after, at: $0, radius: radius)
+            }
+            let mean = values.reduce(0, +) / Double(values.count)
+            let name = label(gender, strength)
+            recoveries[name] = record(name, "darkSpotRecovery", mean)
+        }
+        let female = try XCTUnwrap(recoveries[label(.female, strength)])
+        let common = try XCTUnwrap(recoveries[label(nil, strength)])
+        let male = try XCTUnwrap(recoveries[label(.male, strength)])
+        XCTAssertGreaterThanOrEqual(female, SpotBounds.defaultDarkRecovery, "여성 0.6")
+        XCTAssertGreaterThanOrEqual(common, SpotBounds.defaultDarkRecovery, "공통 0.6")
+        XCTAssertGreaterThanOrEqual(male, SpotBounds.maleDefaultDarkRecovery, "남성 0.6")
+        XCTAssertLessThanOrEqual(male, female - SpotBounds.maleMargin, "남성은 점을 더 남긴다")
+    }
+
+    /// 원터치 레시피는 복제 원을 하나도 만들지 않는다(자동 잡티 false 덮어쓰기).
+    func testOneTouchMakesNoCloneHeals() throws {
+        let portrait = try self.portrait()
+        let blemish = BlemishSpot(x: 0.5, y: 0.5, radius: 0.01, faceIndex: 0)
+        let analysis = PhotoAnalysis(faces: portrait.analysis.faces, blemishes: [blemish], personMask: nil, bodies: [])
+        for strength in [OneTouchBundle.defaultStrength, OneTouchBundle.maximumStrength] {
+            var recipe = Self.oneTouchRecipe(strength: strength, faces: [portrait.face], genders: [.female])
+            // 1.4.0 세션에 남은 전체 층 값.
+            recipe.portrait.skin.autoBlemish = true
+            for group in Gender.allCases {
+                recipe.people.groups[group] = OneTouchBundle.layer(for: group, strength: strength)
+            }
+            let context = RenderContext(
+                extent: portrait.extent, recipe: recipe, analysis: analysis, tuning: portrait.tuning)
+            XCTAssertTrue(SkinStage.healSpots(in: context).isEmpty, "그룹 층 false가 전체 층 true를 덮는다(\(strength))")
+        }
+    }
+
+    /// 원터치 전체 파이프라인 결과(입력 지정).
+    private func oneTouchOutput(_ recipe: EditRecipe, input: CIImage) throws -> CIImage {
+        let portrait = try self.portrait()
+        let context = RenderContext(
+            extent: input.extent, recipe: recipe, analysis: portrait.analysis, tuning: portrait.tuning,
+            makeupCatalog: try Support.sharedMakeupCatalog())
+        return try RenderPipeline.standard.render(input, context: context)
+    }
+
+    /// 데모 미리보기 원터치 렌더 시간(초, 8비트 비트맵까지).
+    /// 점 지우기를 뺀 같은 레시피와 비교한다.
+    private func recordOneTouchRenderTime(strength: Double) throws {
+        let portrait = try self.portrait()
+        let recipe = Self.oneTouchRecipe(
+            strength: strength, faces: [portrait.face], genders: [.female], withBodySkin: true)
+        var withoutSpots = recipe
+        withoutSpots.portrait.skin.spots = 0
+        for group in Gender.allCases {
+            withoutSpots.people.groups[group]?.skinRefinement[.spots] = 0
+        }
+        for (name, item) in [("withSpots", recipe), ("withoutSpots", withoutSpots)] {
+            _ = try Support.renderer.makeCGImage(oneTouchOutput(item, input: portrait.image))
+            let start = CFAbsoluteTimeGetCurrent()
+            for _ in 0..<SpotBounds.timingRuns {
+                _ = try Support.renderer.makeCGImage(oneTouchOutput(item, input: portrait.image))
+            }
+            let seconds = (CFAbsoluteTimeGetCurrent() - start) / Double(SpotBounds.timingRuns)
+            record("oneTouch-\(strength)-\(name)", "renderSeconds", seconds)
+        }
+    }
+
+    /// 자동 잡티 복구가 데모 사진의 경사면에서 원반을 남기지 않는다(스펙 G5 1.2 "자동 잡티 복구").
+    func testAutoBlemishHealLeavesNoDiscOnTheDemoCheek() throws {
+        let portrait = try self.portrait()
+        let extent = portrait.extent
+        let cheek = try XCTUnwrap(FaceRegions.cheekRects(face: portrait.face, extent: extent).first)
+        // 볼 상자 아래 턱 쪽(상자 높이만큼 아래)의 경사면.
+        let center = CGPoint(x: cheek.midX, y: cheek.minY - cheek.height)
+        let radius = portrait.faceWidth * HealBounds.plantedRadiusFraction
+        let spotted = try portrait.baked(
+            SyntheticDefect.spotted(
+                portrait.image, centers: [center], radius: radius, factor: HealBounds.plantedFactor, extent: extent))
+        let shortSide = min(extent.width, extent.height)
+        let blemish = BlemishSpot(
+            x: Double((center.x - extent.minX) / extent.width), y: Double((center.y - extent.minY) / extent.height),
+            radius: Double(radius / shortSide), faceIndex: 0)
+        var recipe = EditRecipe()
+        recipe.portrait.skin.autoBlemish = true
+        let analysis = PhotoAnalysis(
+            faces: portrait.analysis.faces, blemishes: [blemish], personMask: nil, bodies: [])
+        let context = RenderContext(extent: extent, recipe: recipe, analysis: analysis, tuning: portrait.tuning)
+        let healed = try DisplayScale.grid(SkinStage().apply(spotted, in: context))
+        // 복구 원은 잡티 반지름 × blemishHealRadiusScale이다.
+        let healRadius = radius * CGFloat(portrait.tuning.blemishHealRadiusScale)
+        let discRadius = healRadius * HealBounds.discFraction
+        let disc = try DisplayScale.grid(
+            Support.hardEllipse(center: center, radii: CGSize(width: discRadius, height: discRadius), extent: extent))
+        let ring = try DisplayScale.grid(
+            portrait.annulus(center: center, inner: healRadius, outer: healRadius * HealBounds.ringOuterFraction))
+        let residual = abs(DisplayScale.luma(healed, weight: disc) - DisplayScale.luma(healed, weight: ring))
+        XCTAssertLessThanOrEqual(record("heal", "discResidual", residual), HealBounds.discResidual, "원반 잔차 없음")
+        let defective = try DisplayScale.grid(spotted)
+        let defectDisc = DisplayScale.luma(defective, weight: disc)
+        let defectResidual = abs(defectDisc - DisplayScale.luma(defective, weight: ring))
+        record("heal", "plantedResidual", defectResidual)
+        XCTAssertGreaterThan(defectResidual, HealBounds.discResidual, "심은 원이 복구 전에는 보인다")
     }
 
     /// 변형은 묶음 밖이다(스펙 G4 1.4 마지막 행).

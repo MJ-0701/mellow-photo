@@ -50,6 +50,15 @@ struct BlemishDetector {
             FrequencySeparation.blurred(encoded, radius: surroundRadius).cropped(to: small))
         let maskImage = try FaceRegions.skinMask(face: face, image: image, extent: extent, tuning: tuning)
         let mask = try renderer.readPixels(maskImage.transformed(by: toSmall).cropped(to: small))
+        // 중심 검사는 볼 색 가중치 없는 피부 다각형 마스크로 한다(스펙 G5 5.2, G5-1 검토 뒤 변경).
+        // 색 가중 마스크는 붉은 잡티 자신의 중심 값을 낮춰 둥근 염증 여드름까지 거절한다.
+        let geometry = FaceRegions.skinPolygonRaster(face: face, extent: extent, tuning: tuning, cache: nil)
+            .clampedToExtent()
+            .applyingFilter(
+                "CIGaussianBlur", parameters: [kCIInputRadiusKey: FaceRegions.featherRadius(face, extent, tuning)]
+            )
+            .cropped(to: extent)
+        let geometryMask = try renderer.readPixels(geometry.transformed(by: toSmall).cropped(to: small))
         var candidate = [Bool](repeating: false, count: width * height)
         var drop = [Double](repeating: 0, count: width * height)
         for index in candidate.indices {
@@ -71,6 +80,7 @@ struct BlemishDetector {
         let maxRadius = faceWidth * CGFloat(tuning.blemishMaxRadiusFraction)
         var found: [Candidate] = []
         for members in Self.components(of: candidate, width: width, height: height) {
+            guard Self.isCompact(members: members, width: width, tuning: tuning) else { continue }
             var sumX = 0.0
             var sumY = 0.0
             var score = 0.0
@@ -81,6 +91,12 @@ struct BlemishDetector {
                 score += drop[index]
             }
             let count = Double(members.count)
+            // 중심 픽셀의 피부 다각형 마스크. readPixels는 맨 위 행부터라 행을 뒤집는다.
+            let centerX = Int(sumX / count)
+            let centerRow = height - 1 - Int(sumY / count)
+            guard centerX >= 0, centerX < width, centerRow >= 0, centerRow < height else { continue }
+            let centerOffset = (centerRow * width + centerX) * 4
+            guard Double(geometryMask[centerOffset]) >= tuning.blemishCenterMaskMinimum else { continue }
             let radius = CGFloat((count / Double.pi).squareRoot()) / scale
             guard radius >= minRadius, radius <= maxRadius else { continue }
             let point = CGPoint(
@@ -95,6 +111,27 @@ struct BlemishDetector {
                 y: Double((candidate.center.y - extent.minY) / extent.height),
                 radius: Double(candidate.radius / shortSide), faceIndex: faceIndex)
         }
+    }
+
+    /// 상자 종횡비 ≤ blemishMaxAspect이고 채움 비 ≥ blemishMinFill이면 원에 가깝다.
+    /// members는 components의 픽셀 인덱스(행 우선)다.
+    static func isCompact(members: [Int], width: Int, tuning: RenderTuning) -> Bool {
+        guard let first = members.first, width > 0 else { return false }
+        var minX = first % width
+        var maxX = minX
+        var minY = first / width
+        var maxY = minY
+        for index in members {
+            minX = min(minX, index % width)
+            maxX = max(maxX, index % width)
+            minY = min(minY, index / width)
+            maxY = max(maxY, index / width)
+        }
+        let boxWidth = Double(maxX - minX + 1)
+        let boxHeight = Double(maxY - minY + 1)
+        let aspect = max(boxWidth, boxHeight) / min(boxWidth, boxHeight)
+        let fill = Double(members.count) / (boxWidth * boxHeight)
+        return aspect <= tuning.blemishMaxAspect && fill >= tuning.blemishMinFill
     }
 
     private static func weighted(_ pixels: [Float], _ offset: Int, _ weights: [Double]) -> Double {

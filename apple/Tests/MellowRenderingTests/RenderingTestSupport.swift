@@ -367,6 +367,7 @@ struct SyntheticFace {
     /// 눈 바로 아래(보호 영역 안)의 잡티. 검출되면 안 된다.
     static let blemishNearEye = CGPoint(x: 200, y: 278)
     static let blemishRadius: CGFloat = 3.5
+    static let blemishColor = CIColor(red: 0.56, green: 0.32, blue: 0.27)
     static let cheek = CGPoint(x: 180, y: 200)
     static let forehead = CGPoint(x: 256, y: 380)
     static let backgroundInsideContour = CGPoint(x: 96, y: 240)
@@ -401,15 +402,20 @@ struct SyntheticFace {
         let lipColor = CIImage(color: CIColor(red: 0.72, green: 0.28, blue: 0.32))
         image = paint(lipColor, center: mouth, radii: mouthRadii, over: image)
         if withBlemishes {
-            // 피부보다 휘도 40% 낮고 Cr이 0.026 높다. 피부색 가중치(σ 0.04) 안이라 마스크에 남는다.
-            let spotColor = CIImage(color: CIColor(red: 0.56, green: 0.32, blue: 0.27))
             let radii = CGSize(width: blemishRadius, height: blemishRadius)
             for center in blemishes + [blemishNearEye] {
-                image = paint(spotColor, center: center, radii: radii, over: image)
+                image = painted(image, center: center, radii: radii)
             }
         }
         let face = landmarks ? geometry() : FaceGeometry(boundingBox: normalized(box))
         return SyntheticFace(image: image.cropped(to: extent), face: face)
+    }
+
+    /// 잡티 색(붉고 어두운 피부)으로 칠한 단단한 타원.
+    /// 피부보다 휘도 40% 낮고 Cr이 0.026 높다.
+    /// 피부색 가중치(σ 0.04) 안이라 마스크에 남는다.
+    static func painted(_ image: CIImage, center: CGPoint, radii: CGSize) -> CIImage {
+        paint(CIImage(color: blemishColor), center: center, radii: radii, over: image)
     }
 
     private static func paint(_ color: CIImage, center: CGPoint, radii: CGSize, over image: CIImage) -> CIImage {
@@ -797,6 +803,30 @@ enum DisplayScale {
         return (cb / total, cr / total)
     }
 
+    /// weight 가중 Cr 표준편차의 후/전 비(0…1 Cr).
+    /// 1이면 붉은기 분포가 그대로이고 작으면 붉은 얼룩이 고르게 된 것이다.
+    /// 전 표준편차가 0이면 1이다.
+    static func chromaStandardDeviationRatio(_ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid) -> Double {
+        func deviation(_ grid: PixelGrid) -> Double {
+            var total = 0.0
+            var sum = 0.0
+            var squares = 0.0
+            for point in points(grid, in: nil) {
+                let w = weightValue(weight, point)
+                guard w > 0 else { continue }
+                let cr = chroma(grid.rgba(point)).cr
+                total += w
+                sum += w * cr
+                squares += w * cr * cr
+            }
+            guard total > 0 else { return 0 }
+            let mean = sum / total
+            return max(0, squares / total - mean * mean).squareRoot()
+        }
+        let first = deviation(before)
+        return first > 0 ? deviation(after) / first : 1
+    }
+
     /// 가중 평균 채널 Δ(8비트, 부호 있음).
     /// channel 0 = R, 2 = B.
     static func channelDelta(_ before: PixelGrid, _ after: PixelGrid, channel: Int, weight: PixelGrid?) -> Double {
@@ -820,6 +850,17 @@ enum DisplayScale {
         _ before: PixelGrid, _ after: PixelGrid, in rect: CGRect, percentile: Double
     ) -> Double {
         let deltas = points(before, in: rect).map { abs(luma(after.rgba($0)) - luma(before.rgba($0))) }.sorted()
+        guard !deltas.isEmpty else { return 0 }
+        let index = min(deltas.count - 1, Int(Double(deltas.count - 1) * percentile))
+        return deltas[index]
+    }
+
+    /// weight가 절반을 넘는 픽셀의 |ΔY| 분위수(8비트).
+    static func percentileAbsoluteLumaDelta(
+        _ before: PixelGrid, _ after: PixelGrid, weight: PixelGrid, percentile: Double
+    ) -> Double {
+        let inside = points(before, in: nil).filter { weight.red($0) > maskHalf }
+        let deltas = inside.map { abs(luma(after.rgba($0)) - luma(before.rgba($0))) }.sorted()
         guard !deltas.isEmpty else { return 0 }
         let index = min(deltas.count - 1, Int(Double(deltas.count - 1) * percentile))
         return deltas[index]
@@ -881,6 +922,35 @@ enum SyntheticDefect {
             .cropped(to: extent)
     }
 
+    /// 색 얼룩.
+    /// 감마 공간에서 Cb·Cr만 cb·cr만큼 옮긴 단단한 원이다.
+    /// RGB 편향은 BT.601 역변환(ΔR = 1.402·cr, ΔG = −0.344136·cb − 0.714136·cr, ΔB = 1.772·cb)이라 감마 Y는 그대로다.
+    static func tinted(_ image: CIImage, center: CGPoint, radius: CGFloat, cb: Double, cr: Double, extent: CGRect)
+        -> CIImage
+    {
+        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        let redShift = BT601.crToRed * cr
+        let greenShift = BT601.cbToGreen * cb + BT601.crToGreen * cr
+        let blueShift = BT601.cbToBlue * cb
+        let shifted = encoded.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputBiasVector": CIVector(x: CGFloat(redShift), y: CGFloat(greenShift), z: CGFloat(blueShift), w: 0)
+            ])
+        let mask = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: radius, height: radius), extent: extent)
+        return MaskBuilder.blend(shifted, over: encoded, mask: mask).applyingFilter("CISRGBToneCurveToLinear")
+            .cropped(to: extent)
+    }
+
+    /// BT.601 역변환 계수(Cb·Cr → RGB).
+    private enum BT601 {
+        static let crToRed = 1.402
+        static let cbToGreen = -0.344136
+        static let crToGreen = -0.714136
+        static let cbToBlue = 1.772
+    }
+
     /// 반사광.
     /// 선형 휘도를 가우시안 봉우리(중심에서 약 lift)만큼 더한다.
     /// lift를 더한 사본을 봉우리 마스크로 섞어 image + lift × 봉우리가 된다.
@@ -893,6 +963,27 @@ enum SyntheticDefect {
         let lifted = image.applyingFilter(
             "CIColorMatrix", parameters: ["inputBiasVector": CIVector(x: lift, y: lift, z: lift, w: 0)])
         return MaskBuilder.blend(lifted, over: image, mask: blob).cropped(to: extent)
+    }
+
+    /// 단단한 원(반지름 radius) 여러 개의 휘도를 선형 공간에서 factor배로 바꾼다.
+    /// factor < 1은 어두운 점, > 1은 밝은 점이다.
+    static func spotted(_ image: CIImage, centers: [CGPoint], radius: CGFloat, factor: Double, extent: CGRect)
+        -> CIImage
+    {
+        let radii = CGSize(width: radius, height: radius)
+        let black = CIImage(color: .black).cropped(to: extent)
+        let mask = centers.reduce(black) { union, center in
+            RenderingTestSupport.hardEllipse(center: center, radii: radii, extent: extent)
+                .applyingFilter("CIMaximumCompositing", parameters: [kCIInputBackgroundImageKey: union])
+        }
+        let scaled = image.applyingFilter(
+            "CIColorMatrix",
+            parameters: [
+                "inputRVector": CIVector(x: factor, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: factor, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: factor, w: 0),
+            ])
+        return MaskBuilder.blend(scaled, over: image, mask: mask.cropped(to: extent)).cropped(to: extent)
     }
 }
 
@@ -1021,9 +1112,194 @@ final class RealPortrait: @unchecked Sendable {
             .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: chroma])
             .cropped(to: extent)
     }
+
+    /// 주름 띠 마스크(다크서클·팔자·마리오네트·미간).
+    /// 다른 키는 nil이다.
+    func foldBandMask(_ key: SkinRefinementKey) -> FaceRegions.RegionMask? {
+        switch key {
+        case .darkCircles: return FaceRegions.darkCircleMask(face: face, extent: extent, tuning: tuning)
+        case .nasolabial: return FaceRegions.nasolabialMask(face: face, extent: extent, tuning: tuning)
+        case .marionette: return FaceRegions.marionetteMask(face: face, extent: extent, tuning: tuning)
+        case .glabella: return FaceRegions.glabellaMask(face: face, extent: extent, tuning: tuning)
+        default: return nil
+        }
+    }
+
+    /// 피부 안쪽 가중치.
+    /// 피부 마스크가 interiorSkinWeight 이상인 곳만 그 값을 남기고 나머지는 0이다(하네스 interiorWeight와 같다).
+    func interiorSkinMask() throws -> CIImage {
+        let mask = try skinMask()
+        let inside = mask.applyingFilter("CIColorThreshold", parameters: ["inputThreshold": Self.interiorSkinWeight])
+        return mask.applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: inside])
+            .cropped(to: extent)
+    }
+
+    /// 대역 분산을 재는 피부 안쪽 가중치 문턱.
+    static let interiorSkinWeight = 0.8
+
+    /// inner ≤ 거리 < outer인 단단한 고리 마스크.
+    func annulus(center: CGPoint, inner: CGFloat, outer: CGFloat) throws -> CIImage {
+        let outerDisc = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: outer, height: outer), extent: extent)
+        let innerHole = RenderingTestSupport.hardEllipse(
+            center: center, radii: CGSize(width: inner, height: inner), extent: extent
+        ).applyingFilter("CIColorInvert")
+        let black = CIImage(color: .black).cropped(to: extent)
+        return outerDisc.composited(over: black)
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: innerHole])
+            .cropped(to: extent)
+    }
+
+    /// 점 지우기 제외 비트맵(콧구멍 띠·눈꼬리·입꼬리, 흐리기 전, 원본 배율).
+    func spotExclusionMask() throws -> PixelGrid {
+        let raster = FaceRegions.spotExclusionRaster(face: face, extent: extent, tuning: tuning, cache: nil)
+        return try RenderingTestSupport.grid(raster.cropped(to: extent))
+    }
+
+    /// 점 지우기 제외 영역 중 콧구멍 띠(첫 다각형) 비트맵.
+    /// 코 특징점이 없으면 nil이다.
+    func nostrilBandMask() throws -> PixelGrid? {
+        guard face.landmarks[.nose] != nil,
+            let band = FaceRegions.spotExclusionPolygons(face: face, extent: extent, tuning: tuning).first
+        else { return nil }
+        let raster = FaceRegions.polygonMask(
+            fill: [band], cut: [], cutWidth: 0, extent: extent, tuning: tuning, cache: nil)
+        return try RenderingTestSupport.grid(raster.cropped(to: extent))
+    }
+
+    /// 점을 심을 격자 점(원본 배율 픽셀).
+    /// 얼굴 상자 안을 얼굴 폭 × spacingFraction 간격으로 위에서 아래, 왼쪽에서 오른쪽으로 훑는다.
+    /// 피부 마스크(세기 1)가 spotGridMaskMinimum 이상이고, 둘레에 제외 영역이 없고, 둘레 결이 고른(머리카락이 아닌) 점을 count개 모은다.
+    /// 격자 간격이라 서로 spacingFraction 이상 떨어진다.
+    /// 모자라면 실패한다.
+    func spotGrid(count: Int, radiusFraction: CGFloat, spacingFraction: CGFloat) throws -> [CGPoint] {
+        let skin = try RenderingTestSupport.grid(skinMask().cropped(to: extent))
+        let original = try RenderingTestSupport.grid(image)
+        let exclusion = try spotExclusionMask()
+        let step = faceWidth * spacingFraction
+        let radius = faceWidth * radiusFraction
+        let box = FaceRegions.pixelRect(face.boundingBox, in: extent).intersection(extent.insetBy(dx: step, dy: step))
+        let threshold = UInt8(Self.spotGridMaskMinimum * Double(UInt8.max))
+        var points: [CGPoint] = []
+        var y = box.maxY - step / 2
+        while y >= box.minY, points.count < count {
+            var x = box.minX + step / 2
+            while x <= box.maxX, points.count < count {
+                let center = CGPoint(x: x.rounded(), y: y.rounded())
+                if skin.red(center) >= threshold, exclusionFree(exclusion, center: center, radius: radius * 2),
+                    RenderingTestSupport.discLumaDeviation(original, at: center, radius: radius * 2)
+                        <= Self.spotGridMaximumDeviation
+                {
+                    points.append(center)
+                }
+                x += step
+            }
+            y -= step
+        }
+        guard points.count == count else { throw MellowError.renderFailed }
+        return points
+    }
+
+    /// 점 격자의 피부 마스크 하한.
+    static let spotGridMaskMinimum = 0.9
+    /// 점 둘레(심는 반지름 2배) 휘도 표준편차 상한(8비트).
+    /// 데모 사진 이마의 밝은 갈색 머리카락은 피부색 가중치를 넘어 마스크가 0.9 이상이라 결로 거른다.
+    static let spotGridMaximumDeviation = 4.0
+
+    /// 원 안 픽셀에 제외 영역이 하나도 없는지.
+    private func exclusionFree(_ exclusion: PixelGrid, center: CGPoint, radius: CGFloat) -> Bool {
+        let reach = Int(radius.rounded(.up))
+        for dy in -reach...reach {
+            for dx in -reach...reach where CGFloat(dx * dx + dy * dy) <= radius * radius {
+                let point = CGPoint(x: Int(center.x) + dx, y: Int(center.y) + dy)
+                guard extent.contains(point) else { continue }
+                if exclusion.red(point) > 0 {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    /// 얼굴 다각형을 뺀 몸 피부 영역(하네스 body 가중치와 같다).
+    func bodyOnlySkinArea() throws -> CIImage {
+        let black = CIImage(color: .black).cropped(to: extent)
+        let wholeFace =
+            FaceRegions.wholeFaceMask(faces: analysis.faces, extent: extent, tuning: tuning)?.image
+            .composited(over: black) ?? black
+        let outsideFace = wholeFace.applyingFilter("CIColorInvert").cropped(to: extent)
+        return try bodySkinArea()
+            .applyingFilter("CIMultiplyCompositing", parameters: [kCIInputBackgroundImageKey: outsideFace])
+            .cropped(to: extent)
+    }
 }
 
 extension RenderingTestSupport {
+    /// BT.601 휘도 계수(감마 바이트).
+    private static let discLumaWeights: (r: Double, g: Double, b: Double) = (0.299, 0.587, 0.114)
+
+    /// 원(중심 center, 반지름 radius) 안에 픽셀 중심이 든 픽셀의 평균 휘도(감마 바이트).
+    /// 원을 둘러싼 상자만 훑는다(사진 전체를 훑으면 점마다 수백만 픽셀이다).
+    static func discLuma(_ grid: PixelGrid, at center: CGPoint, radius: CGFloat) -> Double {
+        var total = 0.0
+        var count = 0
+        let reach = Int(radius.rounded(.up))
+        for y in Int(center.y) - reach...Int(center.y) + reach {
+            for x in Int(center.x) - reach...Int(center.x) + reach {
+                guard x >= 0, y >= 0, x < grid.width, y < grid.height else { continue }
+                let dx = CGFloat(x) + 0.5 - center.x
+                let dy = CGFloat(y) + 0.5 - center.y
+                guard dx * dx + dy * dy <= radius * radius else { continue }
+                let rgba = grid.rgba(CGPoint(x: x, y: y))
+                let red = Double(rgba[0]) * discLumaWeights.r
+                let green = Double(rgba[1]) * discLumaWeights.g
+                let blue = Double(rgba[2]) * discLumaWeights.b
+                total += red + green + blue
+                count += 1
+            }
+        }
+        return count > 0 ? total / Double(count) : 0
+    }
+
+    /// 원 안 휘도(감마 바이트) 표준편차.
+    static func discLumaDeviation(_ grid: PixelGrid, at center: CGPoint, radius: CGFloat) -> Double {
+        var values: [Double] = []
+        let reach = Int(radius.rounded(.up))
+        for y in Int(center.y) - reach...Int(center.y) + reach {
+            for x in Int(center.x) - reach...Int(center.x) + reach {
+                guard x >= 0, y >= 0, x < grid.width, y < grid.height else { continue }
+                let dx = CGFloat(x) + 0.5 - center.x
+                let dy = CGFloat(y) + 0.5 - center.y
+                guard dx * dx + dy * dy <= radius * radius else { continue }
+                let rgba = grid.rgba(CGPoint(x: x, y: y))
+                let red = Double(rgba[0]) * discLumaWeights.r
+                let green = Double(rgba[1]) * discLumaWeights.g
+                let blue = Double(rgba[2]) * discLumaWeights.b
+                values.append(red + green + blue)
+            }
+        }
+        return variance(values).squareRoot()
+    }
+
+    /// weight 가중 평균 (닫힘(radius) − 원본) 선형 휘도.
+    /// 반지름 radius보다 작은 어두운 점(모공)의 양이다.
+    /// 원본 배율에서 잰다.
+    static func closingDarkMean(_ image: CIImage, weight: CIImage, in rect: CGRect, radius: Double) throws -> Double {
+        let closed = image.clampedToExtent()
+            .applyingFilter("CIMorphologyMaximum", parameters: [kCIInputRadiusKey: radius])
+            .applyingFilter("CIMorphologyMinimum", parameters: [kCIInputRadiusKey: radius])
+        let weights = try luma(weight.cropped(to: rect))
+        let original = try luma(image.cropped(to: rect))
+        let filled = try luma(closed.cropped(to: rect))
+        let total = weights.reduce(0, +)
+        guard total > 0, weights.count == original.count else { throw MellowError.renderFailed }
+        var sum = 0.0
+        for index in weights.indices {
+            sum += weights[index] * (filled[index] - original[index])
+        }
+        return sum / total
+    }
+
     /// rect 안 fine 대역(원본 − blur(fineRadius)) 휘도 분산의 후/전 비를 weight(회색 마스크) 가중으로 잰다.
     /// 1이면 질감 그대로이고 작으면 뭉갠 것이다.
     /// 원본 배율에서 잰다.
@@ -1035,6 +1311,26 @@ extension RenderingTestSupport {
         let first = try weightedFineVariance(before, weights: weights, in: rect, fineRadius: fineRadius)
         let second = try weightedFineVariance(after, weights: weights, in: rect, fineRadius: fineRadius)
         return first > 0 ? second / first : 1
+    }
+
+    /// weight 가중 대역(blur(inner) − blur(outer)) 휘도 분산의 후/전 비.
+    /// 원본 배율에서 잰다.
+    static func bandVarianceRatio(
+        before: CIImage, after: CIImage, weight: CIImage, in rect: CGRect, innerRadius: Double, outerRadius: Double
+    ) throws -> Double {
+        let weights = try luma(weight.cropped(to: rect))
+        func variance(_ image: CIImage) throws -> Double {
+            let inner = try luma(FrequencySeparation.blurred(image, radius: innerRadius).cropped(to: rect))
+            let outer = try luma(FrequencySeparation.blurred(image, radius: outerRadius).cropped(to: rect))
+            let band = zip(inner, outer).map { $0 - $1 }
+            let total = weights.reduce(0, +)
+            // 마스크가 비었거나 크기가 어긋나면 비가 1로 조용히 통과하지 않게 실패한다.
+            guard total > 0, band.count == weights.count else { throw MellowError.renderFailed }
+            let mean = zip(band, weights).reduce(0) { $0 + $1.0 * $1.1 } / total
+            return zip(band, weights).reduce(0) { $0 + $1.1 * ($1.0 - mean) * ($1.0 - mean) } / total
+        }
+        let first = try variance(before)
+        return first > 0 ? try variance(after) / first : 1
     }
 
     private static func weightedFineVariance(_ image: CIImage, weights: [Double], in rect: CGRect, fineRadius: Double)

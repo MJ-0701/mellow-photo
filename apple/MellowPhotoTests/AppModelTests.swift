@@ -560,18 +560,22 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(
             model.currentRecipe.portrait.skin,
             SkinAdjustments(
-                darkCircles: 0.6, nasolabial: 0.6, marionette: 0.6, glabella: 0.6, toneEvening: 0.6, redness: -0.5,
-                shine: 0.6))
+                darkCircles: 0.6, nasolabial: 0.6, marionette: 0.6, glabella: 0.6, toneEvening: 0.6, chromaEvening: 0.6,
+                redness: -0.5, shine: 0.6, spots: 0.6))
         try await waitUntil { !model.isRendering }
         XCTAssertNil(model.presentedError)
         model.undo()
-        XCTAssertEqual(model.currentRecipe.portrait.skin.shine, 0)
+        XCTAssertEqual(model.currentRecipe.portrait.skin.spots, 0)
+        XCTAssertEqual(model.currentRecipe.portrait.skin.shine, 0.6)
         XCTAssertEqual(
             SkinRefinementKey.allCases.map(UserMessage.skinRefinementTitle),
-            ["다크서클", "팔자주름", "마리오네트 주름", "미간 주름", "피부 얼룩 고르기", "붉은기", "번들거림"])
+            [
+                "다크서클", "팔자주름", "마리오네트 주름", "미간 주름", "피부 얼룩 고르기", "얼룩 색 고르기", "붉은기", "번들거림",
+                "점 지우기",
+            ])
     }
 
-    func testAutoEnhanceWithFaceTurnsOnAutoBlemishAndKeepsFaceWidth() async throws {
+    func testAutoEnhanceWithFaceAppliesOneTouchSkinAndKeepsFaceWidth() async throws {
         let staged = try TestSupport.solidPNG(in: root)
         let face = FaceGeometry(boundingBox: NormalizedRect(x: 0.2, y: 0.2, width: 0.6, height: 0.6))
         let model = TestSupport.makeModel(
@@ -583,7 +587,8 @@ final class AppModelTests: XCTestCase {
         // 자동은 원터치를 포함하므로(Policy.autoIncludesOneTouch) 인물 값은 공통 표 × 기본 강도다.
         let common = OneTouchBundle.layer(for: nil, strength: EditingPolicy.oneTouchDefaultStrength)
         XCTAssertEqual(model.currentRecipe.portrait.skin.smoothing, common.skinSmoothing)
-        XCTAssertTrue(model.currentRecipe.portrait.skin.autoBlemish)
+        XCTAssertFalse(model.currentRecipe.portrait.skin.autoBlemish, "원터치는 복제 원 대신 점 지우기를 쓴다(스펙 G5 판정 4b)")
+        XCTAssertEqual(model.currentRecipe.portrait.skin.spots, common.skinRefinement[.spots])
         XCTAssertEqual(model.currentRecipe.portrait.face.width, -0.4, "자동 보정은 얼굴형을 건드리지 않는다")
         XCTAssertEqual(
             model.currentRecipe.portrait.features.eyeBrighten, common.features[.eyeBrighten], "자동 보정은 눈 또렷하게를 켠다")

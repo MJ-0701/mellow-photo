@@ -42,6 +42,15 @@ public struct RenderTuning: Sendable {
     public var blemishMaskThreshold: Double = 0.5
     /// 얼굴당 잡티 수 상한(스펙).
     public var blemishMaxPerFace: Int = 40
+    /// 잡티 중심의 피부 마스크 하한.
+    /// 피부 다각형 가장자리와 손·턱 경계의 그늘을 거절한다(스펙 G5 5.2).
+    public var blemishCenterMaskMinimum: Double = 0.9
+    /// 연결 영역 상자의 긴 변 ÷ 짧은 변 상한.
+    /// 선·주름은 길쭉하다.
+    public var blemishMaxAspect: Double = 2.0
+    /// 연결 영역의 픽셀 수 ÷ 상자 넓이 하한.
+    /// 원은 0.785다.
+    public var blemishMinFill: Double = 0.4
     /// 잡티를 덮는 복제 원의 반지름 배수. applySpot 마스크는 반지름 65%까지만 완전히 복사하므로 1/0.65보다 커야 한다.
     public var blemishHealRadiusScale: Double = 1.8
     /// 복제 원본을 복제 반지름의 이 배수만큼 얼굴 가운데 쪽 옆 피부에서 가져온다. 2 이상이면 원이 겹치지 않는다.
@@ -72,6 +81,13 @@ public struct RenderTuning: Sendable {
     public var toneBandFraction: Double = 0.12
     /// 얼룩 고르기 1에서 저주파를 넓은 평균 쪽으로 당기는 비율.
     public var toneEveningMax: Double = 0.8
+    /// 얼룩 색 고르기가 보는 얼룩 크기 흐림 반지름.
+    /// 얼굴 폭 비율이다.
+    /// 볼의 보라·붉은 얼룩(얼굴 폭 5~10%)의 색을 대부분 담으려면 흐림이 얼룩 반지름의 절반 아래여야 한다.
+    /// G5-3에서 0.06 → 0.025(6%는 반지름 6% 얼룩 색의 약 40%만 담았다, 스펙 G5 6절).
+    public var chromaBlotchFraction: Double = 0.025
+    /// 얼룩 색 고르기 1에서 Cb·Cr 편차를 되돌리는 비율.
+    public var chromaEveningMax: Double = 1.0
     /// 선형 휘도가 볼 기준보다 이만큼 밝으면 번들거림으로 보기 시작한다. 피부 질감 잡음(±10%)은 걸리지 않는다.
     /// G4: 0.12에서 내려 부드러운 조명의 번들거림도 잡는다.
     public var shineLumaOffset: Double = 0.08
@@ -289,6 +305,61 @@ public struct RenderTuning: Sendable {
     public var chinShadeMaxLift: Double = 12.0 / 255.0
 
     public var spotMaxRadiusFraction: Double = 0.3
+    /// 색 맞춤 복구(스펙 G5 5.1)가 원본 패치의 저주파를 재는 흐림 반지름.
+    /// 복구 반지름 배수.
+    /// 이보다 큰 원본 명암은 고리 평균으로 바뀐다.
+    /// 0.6이면 원본 얼룩이 원반 평균을 2/255 넘게 흔들어 0.3으로 내렸다(G5-1 구현 중 변경).
+    public var healLowBandScale: Double = 0.3
+    /// 대상 둘레 고리의 안쪽 반지름.
+    /// 복구 반지름 배수.
+    public var healRingInnerScale: Double = 1.0
+    /// 고리 평균을 재는 흐림 반지름.
+    /// 복구 반지름 배수.
+    /// 바로 둘레 피부에 맞추도록 1.5에서 0.5로 내렸다(G5-1 구현 중 변경).
+    public var healRingRadiusScale: Double = 0.5
+    /// 채널별 배율의 상한(하한은 역수).
+    public var healMaxGain: Double = 2.0
+    /// 배율 분모 하한(선형).
+    public var healLumaFloor: Double = 0.01
+    /// 점 지우기(스펙 G5 4.1) 닫힘·열림 반지름.
+    /// 얼굴 폭 비율.
+    /// 지름 2.4%까지의 점을 채운다.
+    public var spotRadiusFraction: Double = 0.012
+    /// 모공 닫힘·열림 반지름.
+    /// 얼굴 폭 비율(하한 skinBlurMinimumRadius).
+    /// 이 크기의 명암은 차이에서 빠져 남는다.
+    public var spotPoreRadiusFraction: Double = 0.003
+    /// 보정 지도 흐림 반지름.
+    /// 모공 반지름 배수.
+    /// 닫힘의 평평한 계단을 지운다.
+    public var spotCorrectionBlurInPores: Double = 1.0
+    /// 강도 1의 상대 깊이 시작 문턱.
+    public var spotDepthStart: Double = 0.008
+    /// 강도 0의 상대 깊이 시작 문턱(강도로 선형 보간).
+    public var spotDepthStartWeak: Double = 0.020
+    /// 끝 문턱 = 시작 문턱 + 이 값.
+    public var spotDepthRamp: Double = 0.032
+    /// 밝은 점(땀 반사점·좁쌀) 빼기 배율.
+    /// 0이면 어두운 점만 채운다(G5-2 구현 중 변경).
+    /// 밝은 점 빼기는 데모 원터치 0.6에서 피부 밝기를 +0.5/255 아래로 내리고 중간 대역 비를 0.80 아래로 내렸다.
+    public var spotBrightAmount: Double = 0
+    /// 상대 깊이가 이보다 깊으면 점이 아니라 구조(콧구멍·눈꼬리)라 가중치가 줄기 시작한다.
+    public var spotDepthCapStart: Double = 0.25
+    /// 이 상대 깊이에서 가중치 0.
+    public var spotDepthCapEnd: Double = 0.40
+    /// 상대 깊이 분모 하한(선형 휘도).
+    public var spotLumaFloor: Double = 0.01
+    /// 이 강도부터 채움 비율 1.
+    /// 아래는 강도 ÷ 이 값이다.
+    public var spotFullFillStrength: Double = 0.3
+    /// 형태 필터 입력 여유.
+    /// 점 반지름 배수.
+    public var spotMorphologyPaddingInSpots: Double = 3.0
+    /// 점 지우기(스펙 G5 4.2)에서 뺄 눈꼬리·입꼬리 원의 반지름.
+    /// 얼굴 폭 비율.
+    public var spotExclusionRadiusFraction: Double = 0.03
+    /// 코 다각형 아래쪽 이 비율 높이를 콧구멍 띠로 점 지우기에서 뺀다.
+    public var spotNostrilBandFraction: Double = 0.4
     public var warmthKelvinRange: Double = 2000
     public var neutralKelvin: Double = 6500
 

@@ -98,7 +98,7 @@ public enum PortraitKey: Hashable, Sendable {
         }
     }
 
-    /// 피부 보정·자동 잡티·정밀 7종.
+    /// 피부 보정·자동 잡티·정밀 키 전부(SkinRefinementKey.allCases).
     public static let skin: Set<PortraitKey> = {
         var keys: [PortraitKey] = [.skinSmoothing, .autoBlemish]
         keys += SkinRefinementKey.allCases.map(PortraitKey.skinRefinement)

@@ -486,11 +486,58 @@ final class SkinStageTests: XCTestCase {
             synthetic.image, bounds: bounds, faceWidth: faceWidth, smoothing: 0.7, tuning: tuning)
         let refined = try FrequencySeparation.refined(
             synthetic.image, bounds: bounds, faceWidth: faceWidth, mask: mask, reference: reference, smoothing: 0.7,
-            toneEvening: 0, shine: 0, tuning: tuning)
+            toneEvening: 0, chromaEvening: 0, shine: 0, tuning: tuning)
         XCTAssertTrue(try Support.bytes(refined) == Support.bytes(legacy), "얼룩·번들거림 0이면 기존 경로와 같은 바이트")
         let combined = try render(synthetic, skin: SkinAdjustments(smoothing: 0.7, toneEvening: 0.5))
         XCTAssertFalse(
             try Support.bytes(combined) == Support.bytes(render(synthetic, skin: SkinAdjustments(smoothing: 0.7))))
+    }
+
+    /// 얼룩 색 고르기 테스트의 보라 얼룩 자리. 왼볼이고 눈·입·분산 측정 패치에서 떨어져 있다.
+    private static let chromaBlotchCenter = CGPoint(x: 200, y: 220)
+    /// 보라 얼룩의 감마 Cb·Cr 이동(스펙 G5 1.2).
+    private static let plantedCb = 0.04
+    private static let plantedCr = 0.03
+    /// 얼룩 반지름(얼굴 폭 비율)과 측정 원반 비율(가장자리 흐림을 뺀 안쪽).
+    private static let chromaBlotchFraction: CGFloat = 0.06
+    private static let chromaDiscFraction: CGFloat = 0.65
+    /// 얼룩 색 고르기 1의 최소 제거율.
+    private static let chromaRemovalMinimum = 0.5
+    /// 같은 픽셀의 평균 ΔY 상한(8비트).
+    private static let chromaLumaTolerance = 1.0
+
+    func testChromaEveningPullsBlotchChromaAndKeepsLuma() throws {
+        let base = SyntheticFace.make()
+        let extent = base.image.extent
+        let center = Self.chromaBlotchCenter
+        let radius = FaceRegions.faceWidth(base.face, extent: extent) * Self.chromaBlotchFraction
+        let tinted = SyntheticDefect.tinted(
+            base.image, center: center, radius: radius, cb: Self.plantedCb, cr: Self.plantedCr, extent: extent)
+        let blotchy = CIImage(cgImage: try Support.renderer.makeCGImage(tinted))
+        let skin = SkinAdjustments(chromaEvening: 1)
+        let before = try Support.grid(blotchy)
+        let after = try Support.grid(render(SyntheticFace(image: blotchy, face: base.face), skin: skin))
+        let clean = try Support.grid(base.image)
+        // 남은 색은 깨끗한 얼굴을 같은 값으로 렌더한 결과와 비교한다(피부 결의 색 고르기는 빼고 얼룩만 본다).
+        let cleanAfter = try Support.grid(render(base, skin: skin))
+        let discRadius = radius * Self.chromaDiscFraction
+        let disc = try Support.grid(
+            Support.hardEllipse(center: center, radii: CGSize(width: discRadius, height: discRadius), extent: extent))
+        let planted = DisplayScale.chromaDelta(clean, before, weight: disc)
+        let remaining = DisplayScale.chromaDelta(cleanAfter, after, weight: disc)
+        XCTAssertGreaterThanOrEqual(1 - remaining.cb / planted.cb, Self.chromaRemovalMinimum, "Cb 절반 이상")
+        XCTAssertGreaterThanOrEqual(1 - remaining.cr / planted.cr, Self.chromaRemovalMinimum, "Cr 절반 이상")
+        XCTAssertLessThanOrEqual(
+            abs(DisplayScale.lumaDelta(before, after, weight: disc).mean), Self.chromaLumaTolerance, "휘도는 그대로")
+    }
+
+    func testZeroChromaEveningKeepsTheToneMixBytes() throws {
+        let base = SyntheticFace.make()
+        let withEven = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5)))
+        let withZeroChroma = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5, chromaEvening: 0)))
+        XCTAssertEqual(withEven, withZeroChroma)
+        let withChroma = try Support.bytes(render(base, skin: SkinAdjustments(toneEvening: 0.5, chromaEvening: 1)))
+        XCTAssertNotEqual(withEven, withChroma, "0이 아니면 경로가 실제로 바뀐다")
     }
 
     /// 붉은기 테스트의 반점 색. 피부보다 감마 Cr이 0.037 높고 피부색 가중치 안이다.
@@ -636,6 +683,13 @@ final class SkinStageTests: XCTestCase {
         let second = try Support.bytes(SkinStage().apply(synthetic.image, in: context))
         XCTAssertEqual(analysis.regionMasks.count, 2, "피부 다각형 비트맵 하나와 주름용 비트맵 하나")
         XCTAssertTrue(first == second, "같은 입력은 같은 바이트")
+        var spotted = recipe
+        spotted.portrait.skin.spots = 1
+        let spotContext = RenderContext(
+            extent: synthetic.image.extent, recipe: spotted, analysis: analysis, tuning: RenderTuning())
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        _ = try Support.bytes(SkinStage().apply(synthetic.image, in: spotContext))
+        XCTAssertEqual(analysis.regionMasks.count, 3, "점 지우기는 제외 비트맵 하나를 더한다(G5)")
     }
 
     /// 띠 둘레 피부 가중치 합이 SkinKernels.foldMinimumCoverage보다 작으면 기준이 없어 배율 1이어야 한다.

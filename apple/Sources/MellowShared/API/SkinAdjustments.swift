@@ -7,11 +7,14 @@ public enum SkinRefinementKey: String, CaseIterable, Codable, Sendable {
     case marionette
     case glabella
     case toneEvening
+    case chromaEvening
     case redness
     case shine
+    case spots
 }
 
-/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 7종(G). redness만 −1…1이고 나머지는 0…1이다.
+/// 피부 보정 강도 0…1, 자동 잡티 스위치, 피부 정밀 9종(G·G5).
+/// redness만 −1…1이고 나머지는 0…1이다.
 public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var smoothing: Double
     public var autoBlemish: Bool
@@ -20,12 +23,19 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
     public var marionette: Double
     public var glabella: Double
     public var toneEvening: Double
+    /// 얼룩 색 고르기(G5).
+    /// 얼룩 크기 Cb·Cr만 피부 평균 쪽으로 당기고 휘도는 그대로 둔다.
+    public var chromaEvening: Double
     public var redness: Double
     public var shine: Double
+    /// 점 지우기(G5).
+    /// 모공보다 큰 어두운 점을 채운다(밝은 점 빼기는 렌더 기본값에서 꺼져 있다).
+    public var spots: Double
 
     public init(
         smoothing: Double = 0, autoBlemish: Bool = false, darkCircles: Double = 0, nasolabial: Double = 0,
-        marionette: Double = 0, glabella: Double = 0, toneEvening: Double = 0, redness: Double = 0, shine: Double = 0
+        marionette: Double = 0, glabella: Double = 0, toneEvening: Double = 0, chromaEvening: Double = 0,
+        redness: Double = 0, shine: Double = 0, spots: Double = 0
     ) {
         self.smoothing = smoothing
         self.autoBlemish = autoBlemish
@@ -34,8 +44,10 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
         self.marionette = marionette
         self.glabella = glabella
         self.toneEvening = toneEvening
+        self.chromaEvening = chromaEvening
         self.redness = redness
         self.shine = shine
+        self.spots = spots
     }
 
     public init(from decoder: Decoder) throws {
@@ -47,8 +59,10 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
         marionette = try container.decodeIfPresent(Double.self, forKey: .marionette) ?? 0
         glabella = try container.decodeIfPresent(Double.self, forKey: .glabella) ?? 0
         toneEvening = try container.decodeIfPresent(Double.self, forKey: .toneEvening) ?? 0
+        chromaEvening = try container.decodeIfPresent(Double.self, forKey: .chromaEvening) ?? 0
         redness = try container.decodeIfPresent(Double.self, forKey: .redness) ?? 0
         shine = try container.decodeIfPresent(Double.self, forKey: .shine) ?? 0
+        spots = try container.decodeIfPresent(Double.self, forKey: .spots) ?? 0
     }
 
     public subscript(key: SkinRefinementKey) -> Double {
@@ -59,8 +73,10 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
             case .marionette: return marionette
             case .glabella: return glabella
             case .toneEvening: return toneEvening
+            case .chromaEvening: return chromaEvening
             case .redness: return redness
             case .shine: return shine
+            case .spots: return spots
             }
         }
         set {
@@ -70,8 +86,10 @@ public struct SkinAdjustments: Codable, Equatable, Sendable {
             case .marionette: marionette = newValue
             case .glabella: glabella = newValue
             case .toneEvening: toneEvening = newValue
+            case .chromaEvening: chromaEvening = newValue
             case .redness: redness = newValue
             case .shine: shine = newValue
+            case .spots: spots = newValue
             }
         }
     }

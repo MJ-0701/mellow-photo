@@ -10,6 +10,9 @@ final class SkinKernels: @unchecked Sendable {
     private let fold: CIColorKernel?
     private let tone: CIColorKernel?
     private let blush: CIColorKernel?
+    private let healing: CIColorKernel?
+    private let spotCorrection: CIColorKernel?
+    private let spotBlend: CIColorKernel?
 
     /// Cb·Cr 계수는 BT.601(sRGB 감마 값 기준)이다. 거리 t = d²/σ², 가중치 = clamp((4 − t)/3)이라 d ≤ σ면 1, d = 2σ면 0.
     private init() {
@@ -53,11 +56,26 @@ final class SkinKernels: @unchecked Sendable {
                 """)
         // luma는 BT.709 선형 휘도 계수다. 분모 하한 0.001은 마스크 밖(가중치 0)에서 0으로 나누지 않게 한다.
         // 작은 반사광은 대부분 중간 대역에 있어 번들거림 가중치만큼 중간 대역도 줄인다. 모공 대역은 그대로다.
+        // 얼룩 색 고르기는 얼룩 크기 흐림(blotchBlur)이 넓은 평균에서 벗어난 Cb·Cr만큼을 뺀다.
+        // 화면 값(sRGB 감마)에서 BT.601로 재고 빼야 화면 Y가 그대로다(선형에서 빼면 화면 Y가 1바이트 넘게 바뀐다).
+        // cbv·crv는 BT.601 Cb·Cr 계수, invCb·invCr는 Y 성분이 0인 역변환 열이다.
+        // evenChroma가 0이면 step이 0이라 감마 왕복 오차도 더하지 않는다(같은 바이트).
         tone = CIColorKernel(
             source: """
-                kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample wideNumerator,
-                                    __sample wideDenominator, __sample reference, float keep, float even,
-                                    float shine, float shineOffset, float shineRamp) {
+                vec3 encodeSRGB(vec3 linear) {
+                    vec3 positive = max(linear, vec3(0.0));
+                    vec3 curve = 1.055 * pow(positive, vec3(1.0 / 2.4)) - 0.055;
+                    return mix(12.92 * positive, curve, step(vec3(0.0031308), positive));
+                }
+                vec3 decodeSRGB(vec3 encoded) {
+                    vec3 positive = max(encoded, vec3(0.0));
+                    vec3 curve = pow((positive + 0.055) / 1.055, vec3(2.4));
+                    return mix(positive / 12.92, curve, step(vec3(0.04045), positive));
+                }
+                kernel vec4 toneMix(__sample image, __sample fineBlur, __sample midBlur, __sample blotchBlur,
+                                    __sample wideNumerator, __sample wideDenominator, __sample reference,
+                                    float keep, float even, float evenChroma, float shine, float shineOffset,
+                                    float shineRamp) {
                     vec3 luma = vec3(0.2126, 0.7152, 0.0722);
                     vec3 wide = wideNumerator.rgb / max(wideDenominator.r, 0.001);
                     float gloss = clamp((dot(image.rgb, luma) - dot(reference.rgb, luma) - shineOffset) / shineRamp,
@@ -66,7 +84,15 @@ final class SkinKernels: @unchecked Sendable {
                     vec3 low = mix(midBlur.rgb, wide, pull);
                     vec3 mid = (fineBlur.rgb - midBlur.rgb) * (1.0 - shine * gloss);
                     vec3 fine = image.rgb - fineBlur.rgb;
-                    return vec4(low + mid * keep + fine, image.a);
+                    vec3 mixed = low + mid * keep + fine;
+                    vec3 cbv = vec3(-0.168736, -0.331264, 0.5);
+                    vec3 crv = vec3(0.5, -0.418688, -0.081312);
+                    vec3 invCb = vec3(0.0, -0.344136, 1.772);
+                    vec3 invCr = vec3(1.402, -0.714136, 0.0);
+                    vec3 blotch = encodeSRGB(blotchBlur.rgb) - encodeSRGB(wide);
+                    vec3 shift = evenChroma * (dot(blotch, cbv) * invCb + dot(blotch, crv) * invCr);
+                    vec3 evened = decodeSRGB(encodeSRGB(mixed) - shift) - mixed;
+                    return vec4(mixed + evened * step(0.000001, evenChroma), image.a);
                 }
                 """)
         // Y·Cb·Cr 계수와 역변환 계수는 BT.601(sRGB 감마 값 기준)이다.
@@ -84,6 +110,43 @@ final class SkinKernels: @unchecked Sendable {
                     cr = cr - excess * clear + flush;
                     vec3 rgb = vec3(y + 1.402 * cr, y - 0.344136 * cb - 0.714136 * cr, y + 1.772 * cb);
                     return vec4(clamp(rgb, 0.0, 1.0), pixel.a);
+                }
+                """)
+        // 채널별 배율 = 고리 평균 ÷ 원본 저주파.
+        // 분모 하한 0.001은 고리 가중치가 0인 곳(extent 밖)에서 0으로 나누지 않게 한다.
+        healing = CIColorKernel(
+            source: """
+                kernel vec4 healTone(__sample source, __sample sourceLow, __sample ringNumerator,
+                                     __sample ringDenominator, float floorValue, float maxGain) {
+                    vec3 ring = ringNumerator.rgb / max(ringDenominator.r, 0.001);
+                    vec3 gain = clamp(ring / max(sourceLow.rgb, vec3(floorValue)), vec3(1.0 / maxGain), vec3(maxGain));
+                    return vec4(source.rgb * gain, source.a);
+                }
+                """)
+        // luma는 BT.709 선형 휘도 계수다.
+        // dark = 닫힘(점) − 닫힘(모공), bright = 열림(모공) − 열림(점)이라 모공 크기 명암은 빠진다.
+        // 상대 깊이 = 휘도 차이 ÷ max(닫힘(모공) 휘도, floorLuma).
+        // 가중치는 start…end에서 0 → 1로 오르고 capStart…capEnd에서 1 → 0으로 내린다(깊은 구조는 점이 아니다).
+        spotCorrection = CIColorKernel(
+            source: """
+                kernel vec4 spotCorrection(__sample darkFill, __sample darkPore, __sample brightCut,
+                                           __sample brightPore, float start, float end, float capStart,
+                                           float capEnd, float floorLuma, float brightAmount) {
+                    vec3 luma = vec3(0.2126, 0.7152, 0.0722);
+                    vec3 dark = max(darkFill.rgb - darkPore.rgb, vec3(0.0));
+                    vec3 bright = max(brightPore.rgb - brightCut.rgb, vec3(0.0));
+                    float base = max(dot(darkPore.rgb, luma), floorLuma);
+                    float depth = dot(dark, luma) / base;
+                    float height = dot(bright, luma) / base;
+                    float wd = smoothstep(start, end, depth) * (1.0 - smoothstep(capStart, capEnd, depth));
+                    float wb = smoothstep(start, end, height) * (1.0 - smoothstep(capStart, capEnd, height));
+                    return vec4(dark * wd - bright * wb * brightAmount, 1.0);
+                }
+                """)
+        spotBlend = CIColorKernel(
+            source: """
+                kernel vec4 spotApply(__sample image, __sample correction, __sample mask, float amount) {
+                    return vec4(image.rgb + correction.rgb * mask.r * amount, image.a);
                 }
                 """)
     }
@@ -129,16 +192,17 @@ final class SkinKernels: @unchecked Sendable {
     /// low = mix(midBlur, 마스크 가중 넓은 평균, max(even, shine × 번들거림 가중치)). mid는 (1 − shine × 가중치)배다.
     /// 번들거림 가중치는 선형 휘도(BT.709)가 reference보다 shineOffset 이상 밝은 곳에서 shineRamp에 걸쳐 0 → 1.
     /// shine이 0이면 mid는 bandMix와 같고 fine(모공)은 언제나 그대로다.
+    /// evenChroma는 blotchBlur − 넓은 평균의 감마 Cb·Cr을 되돌리는 비율이다.
+    /// 감마 값에서 Y 성분이 0인 역변환 열만 빼므로 화면 BT.601 Y는 바뀌지 않는다.
     func toneMix(
-        image: CIImage, fineBlur: CIImage, midBlur: CIImage, wideNumerator: CIImage, wideDenominator: CIImage,
-        reference: CIImage, keep: Double, even: Double, shine: Double, shineOffset: Double, shineRamp: Double,
-        extent: CGRect
+        image: CIImage, fineBlur: CIImage, midBlur: CIImage, blotchBlur: CIImage, wideNumerator: CIImage,
+        wideDenominator: CIImage, reference: CIImage, keep: Double, even: Double, evenChroma: Double, shine: Double,
+        shineOffset: Double, shineRamp: Double, extent: CGRect
     ) throws -> CIImage {
         guard let tone, shineRamp > 0 else { throw MellowError.renderFailed }
-        let arguments: [Any] = [
-            image, fineBlur, midBlur, wideNumerator, wideDenominator, reference, keep, even, shine, shineOffset,
-            shineRamp,
-        ]
+        let samples: [Any] = [image, fineBlur, midBlur, blotchBlur, wideNumerator, wideDenominator, reference]
+        let scalars: [Any] = [keep, even, evenChroma, shine, shineOffset, shineRamp]
+        let arguments: [Any] = samples + scalars
         guard let mixed = tone.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return mixed
     }
@@ -152,5 +216,48 @@ final class SkinKernels: @unchecked Sendable {
         let arguments: [Any] = [encoded, reference, clear, flush, referenceOffset]
         guard let shifted = blush.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
         return shifted
+    }
+
+    /// 원본 패치 S × (고리 평균 ÷ S 저주파), 채널별, 배율 1/maxGain…maxGain.
+    /// 원본의 고주파(질감)는 비율로 옮겨지고 저주파(밝기·색)는 대상 둘레 고리 평균이 된다.
+    /// lumaFloor가 0 이하이거나 maxGain이 1보다 작으면 렌더 실패다.
+    func heal(
+        source: CIImage, sourceLow: CIImage, ringNumerator: CIImage, ringDenominator: CIImage, lumaFloor: Double,
+        maxGain: Double, extent: CGRect
+    ) throws -> CIImage {
+        guard let healing, lumaFloor > 0, maxGain >= 1 else { throw MellowError.renderFailed }
+        let arguments: [Any] = [source, sourceLow, ringNumerator, ringDenominator, lumaFloor, maxGain]
+        guard let healed = healing.apply(extent: extent, arguments: arguments) else { throw MellowError.renderFailed }
+        return healed
+    }
+
+    /// 점 지우기 보정 지도(스펙 G5 4.3).
+    /// 어두운 점은 더하고 밝은 점은 brightAmount배로 빼는 선형 RGB 차이다(음수 가능).
+    /// brightAmount 0이면 어두운 점만 채운다.
+    /// start < end, capStart < capEnd, lumaFloor > 0이 아니면 렌더 실패다.
+    func spot(
+        darkFill: CIImage, darkPore: CIImage, brightCut: CIImage, brightPore: CIImage, start: Double, end: Double,
+        capStart: Double, capEnd: Double, lumaFloor: Double, brightAmount: Double, extent: CGRect
+    ) throws -> CIImage {
+        guard let spotCorrection, start < end, capStart < capEnd, lumaFloor > 0 else { throw MellowError.renderFailed }
+        let images: [Any] = [darkFill, darkPore, brightCut, brightPore]
+        let limits: [Any] = [start, end, capStart, capEnd, lumaFloor, brightAmount]
+        guard let correction = spotCorrection.apply(extent: extent, arguments: images + limits) else {
+            throw MellowError.renderFailed
+        }
+        return correction
+    }
+
+    /// image.rgb + correction.rgb × mask.r × amount.
+    /// 알파는 image 그대로다.
+    func spotApply(image: CIImage, correction: CIImage, mask: CIImage, amount: Double, extent: CGRect) throws
+        -> CIImage
+    {
+        guard let spotBlend else { throw MellowError.renderFailed }
+        let arguments: [Any] = [image, correction, mask, amount]
+        guard let applied = spotBlend.apply(extent: extent, arguments: arguments) else {
+            throw MellowError.renderFailed
+        }
+        return applied
     }
 }
