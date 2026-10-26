@@ -142,9 +142,12 @@ enum TestSupport {
     }
 
     /// 단색 PNG를 임시 폴더에 쓴다. 가져오기 테스트의 "선택된 사진" 역할.
-    static func solidPNG(in directory: URL, name: String = UUID().uuidString, size: Int = 128) throws -> URL {
+    static func solidPNG(
+        in directory: URL, name: String = UUID().uuidString, size: Int = 128,
+        color: CIColor = CIColor(red: 0.5, green: 0.4, blue: 0.3)
+    ) throws -> URL {
         let url = directory.appendingPathComponent("\(name).png")
-        let image = CIImage(color: CIColor(red: 0.5, green: 0.4, blue: 0.3)).cropped(
+        let image = CIImage(color: color).cropped(
             to: CGRect(x: 0, y: 0, width: size, height: size))
         let cg = try Renderer().makeCGImage(image)
         let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)!

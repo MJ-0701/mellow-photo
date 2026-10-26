@@ -108,6 +108,7 @@ public actor PhotoPipeline {
     }
 
     public func prepare(_ id: PhotoID, at url: URL) throws -> PreparedPhoto {
+        guard !Task.isCancelled else { throw MellowError.renderFailed }
         let metadata = try loader.metadata(url: url)
         let preview = try loader.load(url: url, maxDimension: tuning.previewMaxDimension)
         var faces: [FaceGeometry] = []
@@ -174,6 +175,24 @@ public actor PhotoPipeline {
     public func autoEnhanceSuggestion(_ id: PhotoID, hasFaces: Bool) throws -> AutoEnhanceSuggestion {
         guard let image = cache.image(for: id) else { throw MellowError.cannotCreatePreview }
         return try AutoEnhancer(tuning: tuning, renderer: renderer).suggestion(for: image, hasFaces: hasFaces)
+    }
+
+    /// 원본 재분석과 해당 사진의 얼굴 여부를 같은 actor 작업 안에서 묶는다.
+    /// 분석 실패는 제안을 적용하지 않도록 호출자에게 그대로 전달한다.
+    public func autoEnhanceOriginal(_ id: PhotoID, at url: URL) throws
+        -> (photo: PreparedPhoto, suggestion: AutoEnhanceSuggestion?, failure: MellowError?)
+    {
+        guard !Task.isCancelled else { throw MellowError.renderFailed }
+        let photo = try prepare(id, at: url)
+        if let failure = photo.faceAnalysisFailure { return (photo, nil, failure) }
+        if Task.isCancelled { return (photo, nil, nil) }
+        do {
+            return (photo, try autoEnhanceSuggestion(id, hasFaces: !photo.faces.isEmpty), nil)
+        } catch let failure as MellowError {
+            return (photo, nil, failure)
+        } catch {
+            return (photo, nil, .renderFailed)
+        }
     }
 
     /// 미리보기가 캐시에서 밀려났으면 다시 준비하고 새 결과를 돌려준다. 캐시에 남아 있으면 nil.

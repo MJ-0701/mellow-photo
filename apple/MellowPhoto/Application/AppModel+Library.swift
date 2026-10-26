@@ -66,6 +66,7 @@ extension AppModel {
 
     /// 앱의 작업 사본만 지운다. 사진 앱·사용자 파일 원본은 건드리지 않는다.
     func removeSelectedPhoto() {
+        cancelQuickRetouch()
         guard canRemoveSelected, let entry = session.selected else { return }
         do {
             try session.remove(entry.id)

@@ -9,10 +9,11 @@ extension AppModel {
     /// 기록을 지우거나 옮기면 전역 짝짓기가 다른 기록을 다른 얼굴에 붙일 수 있어서다.
     /// 실행 취소·다시 실행·초기화는 저장된 상태로 돌아가는 것이라 검사하지 않는다.
     @discardableResult
-    private func mutateSelected(
+    func mutateSelected(
         checksPairing: Bool = true, _ body: (inout EditDocument) -> EditDocument.Rejection?
     ) -> Bool {
-        guard let id = session.selectedPhotoID, isReady, !isBusy else { return false }
+        cancelQuickRetouch()
+        guard let id = session.selectedPhotoID, isReady, !isImporting, !isExporting, !isRestoring else { return false }
         let rejection = session.edit(id) { document in
             guard checksPairing, document.isGeometryLocked else { return body(&document) }
             var proposal = document
@@ -322,7 +323,7 @@ extension AppModel {
                 .filter { boxes[$0].cgRect.contains(point) }
                 .min { boxes[$0].width * boxes[$0].height < boxes[$1].width * boxes[$1].height }
             setBeautyTarget(hit.map(BeautyTarget.face) ?? .all)
-        case .look, .crop, .adjust, .body, .background:
+        case .quick, .look, .crop, .adjust, .body, .background:
             return
         }
     }

@@ -1,4 +1,5 @@
 enum EditorTool: CaseIterable, Identifiable {
+    case quick
     case look
     case crop
     case adjust
@@ -14,6 +15,7 @@ enum EditorTool: CaseIterable, Identifiable {
     /// 화면에 보이는 도구 이름. 문구는 UserMessage에 둔다.
     var title: String {
         switch self {
+        case .quick: return UserMessage.toolQuick
         case .look: return UserMessage.toolLook
         case .crop: return UserMessage.toolCrop
         case .adjust: return UserMessage.toolAdjust
@@ -28,6 +30,7 @@ enum EditorTool: CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .quick: return "wand.and.stars"
         case .look: return "camera.filters"
         case .crop: return "crop.rotate"
         case .adjust: return "slider.horizontal.3"
@@ -45,7 +48,7 @@ enum EditorTool: CaseIterable, Identifiable {
     var usesCanvasTouch: Bool {
         switch self {
         case .retouch, .warp, .beauty, .makeup: return true
-        case .look, .crop, .adjust, .body, .background: return false
+        case .quick, .look, .crop, .adjust, .body, .background: return false
         }
     }
 

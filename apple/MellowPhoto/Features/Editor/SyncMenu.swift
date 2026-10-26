@@ -7,6 +7,7 @@ struct SyncMenu: View {
 
     var body: some View {
         Menu {
+            Text("선택한 사진의 값을 그대로 복사해요.")
             ForEach(SyncCategory.allCases) { category in
                 Toggle(
                     UserMessage.syncCategoryTitle(category),

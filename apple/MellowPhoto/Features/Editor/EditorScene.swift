@@ -98,9 +98,10 @@ struct EditorScene: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) { toolPanel }.padding(.vertical, 5)
             }
+            .accessibilityIdentifier("quick.controlsScroll")
             .frame(height: Theme.compactControlsHeight)
             HStack {
-                Button("전체 사진에 적용") { model.applyToAll() }.disabled(!model.canApplyToAll)
+                Button(UserMessage.quickCopySettings) { model.applyToAll() }.disabled(!model.canApplyToAll)
                 SyncMenu()
                 Spacer()
                 Button("초기화") { resetConfirmation = true }
@@ -128,13 +129,15 @@ struct EditorScene: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) { toolPanel }.padding(20)
                 }
+                .accessibilityIdentifier("quick.controlsScroll")
                 Divider()
                 VStack(spacing: 10) {
                     HStack {
                         Button {
                             model.applyToAll()
                         } label: {
-                            Label("이 설정을 전체 사진에", systemImage: "square.on.square").frame(maxWidth: .infinity)
+                            Label(UserMessage.quickCopySettings, systemImage: "square.on.square").frame(
+                                maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered).disabled(!model.canApplyToAll)
                         SyncMenu()
@@ -152,6 +155,7 @@ struct EditorScene: View {
     @ViewBuilder
     private var toolPanel: some View {
         switch model.tool {
+        case .quick: QuickRetouchPanel()
         case .look: LookPanel()
         case .crop: CropPanel()
         case .adjust: AdjustPanel(presetSheet: $presetSheet)

@@ -31,16 +31,6 @@ extension AppModel {
 
     /// 원본 분석으로 제안을 받아 체크포인트 한 번으로 적용한다.
     func autoEnhance() async {
-        guard let entry = session.selected, isReady, !isBusy else { return }
-        do {
-            try await reprepareIfEvicted(entry.id, at: copies.url(for: entry.filename))
-            let suggestion = try await pipeline.autoEnhanceSuggestion(entry.id, hasFaces: !faces.isEmpty)
-            guard session.selectedPhotoID == entry.id else { return }
-            if applyAutoSuggestion(suggestion) {
-                statusMessage = UserMessage.autoEnhanced
-            }
-        } catch {
-            present(error)
-        }
+        await runPhotoAuto(.automatic, allPhotos: false)
     }
 }

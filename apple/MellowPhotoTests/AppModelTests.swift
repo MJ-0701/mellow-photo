@@ -816,7 +816,7 @@ final class AppModelTests: XCTestCase {
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
         XCTAssertEqual(
-            EditorTool.allCases, [.look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
+            EditorTool.allCases, [.quick, .look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
         model.selectTool(.body)
         XCTAssertEqual(EditorTool.body.title, "체형")
         XCTAssertEqual(model.bodyAvailability, .ready)

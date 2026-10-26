@@ -320,6 +320,17 @@ public struct EditDocument: Equatable, Sendable {
         return true
     }
 
+    /// 카탈로그에서 확인한 기존 룩·강도를 한 단계로 적용한다.
+    /// 다른 조정·개인 층·수동 편집을 유지하고 같은 값이면 이력을 늘리지 않는다.
+    @discardableResult
+    public mutating func applyLook(_ selection: LookSelection) -> Bool {
+        var updated = recipe
+        updated.look = selection
+        guard updated != recipe else { return false }
+        _ = commit(updated)
+        return true
+    }
+
     /// 룩의 부위 값 다섯 개를 scope 층의 메이크업에 써 넣고 lookID를 기록한다(스펙 6).
     /// 전체 층에서 nil이면 메이크업을 모두 지운다(룩 "없음").
     /// 그룹·개인 층에서 nil은 다섯 부위를 0으로 덮어쓴다(상속으로 돌리는 것은 재설정).

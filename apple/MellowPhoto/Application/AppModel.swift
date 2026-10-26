@@ -141,6 +141,9 @@ final class AppModel {
         /// true면 자동 버튼이 색감·디테일 자동과 함께, 얼굴이 있으면 전체 대상 원터치 기본 강도를 한 단계로 적용한다.
         /// false면 자동은 지금처럼 피부 보정·자동 잡티·눈 또렷하게만 쓴다.
         static let autoIncludesOneTouch = true
+        static let quickBackgroundBlur = 0.35
+        static let quickNightIntensity = 0.6
+        static let quickNightLookID = "night"
         /// 뷰티·메이크업 캔버스 탭의 허용 이동 거리(캔버스 정규화).
         /// 누른 점과 뗀 점이 이보다 멀면 탭이 아니라 이동이라 대상을 바꾸지 않는다.
         static let targetTapTolerance = 0.02
@@ -186,7 +189,12 @@ final class AppModel {
     /// 렌더가 성공하거나 선택 사진이 바뀌면 지운다(다른 사진의 오류를 보이지 않는다).
     var lastRenderFailure: String?
 
-    var tool: EditorTool = .look
+    var tool: EditorTool = .quick
+    var quickRetouchRunID: UUID?
+    var quickRetouchCancellationRequested = false
+    var quickRetouchProgress: QuickRetouchProgress?
+    var isQuickRetouching: Bool { quickRetouchRunID != nil }
+    var isWorkStopped = false
     /// 뷰티 도구에서 마지막으로 본 탭. 도구를 바꿔도 유지한다.
     var beautyTab: BeautyTab = .skin
     /// 메이크업 도구에서 마지막으로 본 부위. 도구를 바꿔도 유지한다.
@@ -255,7 +263,7 @@ final class AppModel {
         renderOriginal = { id, recipe in try await pipeline.preview(id, recipe: recipe) }
     }
 
-    var isBusy: Bool { isImporting || isExporting || isRestoring }
+    var isBusy: Bool { isImporting || isExporting || isRestoring || isQuickRetouching }
     var currentRecipe: EditRecipe { session.selected?.document.recipe ?? EditRecipe() }
     var canUndo: Bool { session.selected?.document.canUndo ?? false }
     var canRedo: Bool { session.selected?.document.canRedo ?? false }
@@ -661,14 +669,16 @@ final class AppModel {
         }
     }
 
-    func remember(_ id: PhotoID, _ prepared: PreparedPhoto) {
+    func remember(_ id: PhotoID, _ prepared: PreparedPhoto, bindsLegacyPeople: Bool = true) {
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
             hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
             bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines)
-        bindLegacyPeople(id, faces: prepared.faces)
+        if bindsLegacyPeople {
+            bindLegacyPeople(id, faces: prepared.faces)
+        }
     }
 
     /// 옛 기록(legacyIndex)에 준비한 얼굴의 anchor를 채운다.
@@ -704,6 +714,7 @@ final class AppModel {
     }
 
     func select(_ id: PhotoID) {
+        cancelQuickRetouch()
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
         renderScheduler.cancel()
@@ -826,12 +837,15 @@ final class AppModel {
     }
 
     func stopWork() {
+        isWorkStopped = true
+        cancelQuickRetouch()
         cancelSelectionWork()
         exportTask?.cancel()
     }
 
     /// 앱이 다시 활성화되면 멈췄던 미리보기를 현재 레시피로 다시 그린다.
     func resumeWork() {
+        isWorkStopped = false
         guard isReady, session.selected != nil else { return }
         scheduleRender()
     }

@@ -8,6 +8,14 @@ extension AppModel {
     /// 실제 기기용 조립. 테스트는 TestSupport.makeModel을 쓴다.
     /// 경로는 출시된 iPhone 앱과 같아서 v1 세션 파일을 그대로 읽는다.
     static func live() -> AppModel {
+        #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--quick-retouch-ui-fixture") {
+                // 실패 시 사용자 세션으로 폴백하지 않는다.
+                do { return try quickRetouchDebugFixture() } catch {
+                    fatalError("Cannot create isolated quick retouch fixture: \(error)")
+                }
+            }
+        #endif
         let applicationSupport = URL.applicationSupportDirectory
         let root = applicationSupport.appendingPathComponent("MellowPhoto", isDirectory: true)
         let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library", isDirectory: true))
@@ -53,7 +61,7 @@ extension AppModel {
     }
 
     /// 번들 카탈로그를 읽는다. 파일이 없거나 형식이 틀리면(DecodingError 포함) nil이고, 호출자가 빈 카탈로그와 안내 문구로 바꾼다.
-    private static func bundledLookCatalog() -> LookCatalog? {
+    static func bundledLookCatalog() -> LookCatalog? {
         guard
             let url = Bundle.main.url(
                 forResource: Policy.bundledLookCatalogName, withExtension: Policy.bundledLookCatalogExtension)
