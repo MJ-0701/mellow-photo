@@ -54,6 +54,7 @@ struct QuickRetouchPanel: View {
             } label: {
                 Label(UserMessage.quickBatch, systemImage: "photo.stack")
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(Theme.canvas)
             }
             .buttonStyle(.borderedProminent)
             .disabled(model.session.photos.count < 2)
