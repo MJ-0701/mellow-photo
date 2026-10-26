@@ -69,6 +69,5 @@ struct QuickRetouchPanel: View {
                     .accessibilityIdentifier("quick.summary")
             }
         }
-        .accessibilityIdentifier("quick.panel")
     }
 }
