@@ -40,6 +40,9 @@ extension AppModel {
 
     var regionSelectionUnavailableReason: String? {
         guard isReady else { return "사진을 준비한 뒤 사용할 수 있어요." }
+        guard !isRendering, !isWorkStopped, lastRenderFailure == nil else {
+            return "보정 화면이 완성된 뒤 부위를 선택해 주세요. 기다리는 동안 아래 목록은 이용할 수 있어요."
+        }
         let recipe = currentRecipe
         let personalShape = recipe.people.individuals.contains {
             $0.layer.face.values.contains { $0 != 0 } || $0.layer.body.values.contains { $0 != 0 }

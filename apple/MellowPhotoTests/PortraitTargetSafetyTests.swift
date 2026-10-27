@@ -359,9 +359,10 @@ final class PortraitTargetSafetyTests: XCTestCase {
         let routes: [(NormalizedPoint, RetouchDestination)] = [
             (eye, .feature(.eyeBrighten)), (mouth, .feature(.lipVitality)), (cheek, .skin), (underChin, .doubleChin),
         ]
-        for turns in 0..<4 {
+        let combinations = (0..<4).flatMap { turns in [false, true].map { (turns, $0) } }
+        for (turns, flip) in combinations {
             model.edit(.quarterTurns(turns))
-            model.edit(.flipHorizontal(turns % 2 == 0))
+            model.edit(.flipHorizontal(flip))
             model.edit(.crop(NormalizedRect(x: 0.05, y: 0.05, width: 0.9, height: 0.9)))
             try await waitUntil { !model.isRendering }
             let transform = try XCTUnwrap(model.outputTransform)
@@ -405,6 +406,69 @@ final class PortraitTargetSafetyTests: XCTestCase {
         XCTAssertEqual(model.focusedRetouchDestination, .doubleChin, "위치 클릭이 막혀도 목록 진입은 유지한다")
         XCTAssertTrue(model.isGeometryLocked, "기존 수동 브러시 보호를 해제하지 않는다")
         XCTAssertEqual(model.session.selected!.document, before)
+    }
+
+    func testRegionSelectionRejectsPendingFailedAndStoppedPreview() async throws {
+        let (model, root, store) = try await modelWithUnassignedFace()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        model.selectTool(.region)
+        model.edit(.quarterTurns(1))
+        XCTAssertTrue(model.isRendering)
+        let point = NormalizedPoint(x: 0.5, y: 0.5)
+        model.focusedRetouchDestination = nil
+        let before = model.session.selected!.document
+        let saves = store.saveCount
+        model.touch(from: point, to: point)
+        XCTAssertNil(model.focusedRetouchDestination, "새 기하를 그리기 전의 화면 좌표로 대상을 선택하면 안 된다")
+        XCTAssertNotNil(model.regionSelectionUnavailableReason)
+        XCTAssertEqual(model.session.selected!.document, before)
+        XCTAssertEqual(store.saveCount, saves)
+        try await waitUntil { !model.isRendering }
+        model.focusedRetouchDestination = nil
+        model.lastRenderFailure = "검사용 렌더 실패"
+        model.selectRetouchRegion(at: point)
+        XCTAssertNil(model.focusedRetouchDestination, "렌더 실패 뒤 남아 있는 이전 화면도 거절한다")
+        XCTAssertNotNil(model.regionSelectionUnavailableReason)
+        model.lastRenderFailure = nil
+        model.stopWork()
+        model.selectRetouchRegion(at: point)
+        XCTAssertNil(model.focusedRetouchDestination, "중단된 미리보기에서 선택을 재개하지 않는다")
+        XCTAssertNotNil(model.regionSelectionUnavailableReason)
+        model.resumeWork()
+        XCTAssertTrue(model.isRendering)
+        model.selectRetouchRegion(at: point)
+        XCTAssertNil(model.focusedRetouchDestination, "재개 직후에도 이전 표시를 새 상태로 오인하지 않는다")
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.lastRenderFailure)
+        XCTAssertNil(model.regionSelectionUnavailableReason)
+        model.selectRetouchRegion(at: point)
+        XCTAssertNotNil(model.focusedRetouchDestination, "실제 최신 렌더 완료 뒤 선택을 다시 허용한다")
+    }
+
+    func testWarpUndoRejectsOldWarpedDisplayUntilRenderCompletes() async throws {
+        let (model, root, _) = try await modelWithUnassignedFace()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        model.selectTool(.warp)
+        model.touch(from: NormalizedPoint(x: 0.5, y: 0.5), to: NormalizedPoint(x: 0.55, y: 0.5))
+        try await waitUntil { !model.isRendering }
+        XCTAssertFalse(model.currentRecipe.warps.isEmpty)
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.warps.isEmpty)
+        XCTAssertTrue(model.isRendering)
+        model.selectTool(.region)
+        model.focusedRetouchDestination = nil
+        let point = NormalizedPoint(x: 0.5, y: 0.5)
+        model.touch(from: point, to: point)
+        XCTAssertNil(model.focusedRetouchDestination)
+        try await waitUntil { !model.isRendering }
+        model.touch(from: point, to: point)
+        XCTAssertNotNil(model.focusedRetouchDestination)
     }
 
 }
