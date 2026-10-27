@@ -432,7 +432,12 @@ final class PortraitTargetSafetyTests: XCTestCase {
         model.selectRetouchRegion(at: point)
         XCTAssertNil(model.focusedRetouchDestination, "렌더 실패 뒤 남아 있는 이전 화면도 거절한다")
         XCTAssertNotNil(model.regionSelectionUnavailableReason)
-        model.lastRenderFailure = nil
+        model.scheduleRender()
+        XCTAssertNotNil(model.lastRenderFailure, "요청만으로 이전 실패 표시를 지우지 않는다")
+        model.selectRetouchRegion(at: point)
+        XCTAssertNil(model.focusedRetouchDestination)
+        try await waitUntil { !model.isRendering }
+        XCTAssertNil(model.lastRenderFailure, "실제 성공 completion만 실패 표시를 지운다")
         model.stopWork()
         model.selectRetouchRegion(at: point)
         XCTAssertNil(model.focusedRetouchDestination, "중단된 미리보기에서 선택을 재개하지 않는다")
