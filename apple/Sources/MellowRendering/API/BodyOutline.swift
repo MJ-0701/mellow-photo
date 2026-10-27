@@ -27,6 +27,11 @@ public struct BodyOutline: Equatable, Sendable {
     /// 부유방 높이(어깨~엉덩이 27%)에 옆선 점이 한쪽이라도 있는지.
     /// 없으면 렌더가 부유방 원소를 만들지 않는다(팔이 붙음).
     /// 앱 안내가 렌더와 같은 높이를 묻는다.
+    public var sideChestPoints: [NormalizedPoint] {
+        points.filter { $0.key.level == BodyShapeRig.sideChestOutlineLevel }
+            .sorted { $0.key.side < $1.key.side }.map(\.value)
+    }
+
     public var hasSideChestPoint: Bool {
         points.keys.contains { $0.level == BodyShapeRig.sideChestOutlineLevel }
     }

@@ -1,5 +1,6 @@
-enum EditorTool: CaseIterable, Identifiable {
+enum EditorTool: CaseIterable, Identifiable, Hashable {
     case quick
+    case region
     case look
     case crop
     case adjust
@@ -16,6 +17,7 @@ enum EditorTool: CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .quick: return UserMessage.toolQuick
+        case .region: return "부위 선택"
         case .look: return UserMessage.toolLook
         case .crop: return UserMessage.toolCrop
         case .adjust: return UserMessage.toolAdjust
@@ -31,6 +33,7 @@ enum EditorTool: CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .quick: return "wand.and.stars"
+        case .region: return "hand.point.up.left"
         case .look: return "camera.filters"
         case .crop: return "crop.rotate"
         case .adjust: return "slider.horizontal.3"
@@ -47,7 +50,7 @@ enum EditorTool: CaseIterable, Identifiable {
     /// 뷰티·메이크업은 얼굴을 탭해 대상을 고른다.
     var usesCanvasTouch: Bool {
         switch self {
-        case .retouch, .warp, .beauty, .makeup: return true
+        case .region, .retouch, .warp, .beauty, .makeup: return true
         case .quick, .look, .crop, .adjust, .body, .background: return false
         }
     }
@@ -55,6 +58,6 @@ enum EditorTool: CaseIterable, Identifiable {
     /// 캔버스에서 탭만 받는 도구(대상 고르기).
     /// 드래그는 확대한 사진 이동에 남긴다.
     var selectsTargetByTap: Bool {
-        self == .beauty || self == .makeup
+        self == .region || self == .beauty || self == .makeup
     }
 }

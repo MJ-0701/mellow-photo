@@ -19,16 +19,27 @@ struct QuickRetouchPanel: View {
             ForEach(QuickRetouchAction.allCases) { action in
                 let reason = model.quickUnavailableReason(action)
                 VStack(alignment: .leading, spacing: 5) {
-                    Button {
-                        Task { await model.applyQuickAction(action) }
-                    } label: {
-                        Text(action.title).font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 5)
+                    if action == .portrait {
+                        OneTouchRow(fixedTarget: .all, buttonIdentifier: "quick.portrait")
+                            .disabled(reason != nil)
+                        if !model.currentRecipe.people.individuals.isEmpty {
+                            Text("개인별 수동 설정은 전체 원터치보다 우선해요. 아래에서 사람을 골라 그 사람의 원터치를 적용할 수 있어요.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Button("사람별 원터치 조절") { model.selectTool(.beauty) }
+                                .font(.caption)
+                        }
+                    } else {
+                        Button {
+                            Task { await model.applyQuickAction(action) }
+                        } label: {
+                            Text(action.title).font(.headline)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 5)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(reason != nil)
+                        .accessibilityIdentifier("quick.\(action.rawValue)")
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(reason != nil)
-                    .accessibilityIdentifier("quick.\(action.rawValue)")
                     Text(action.detail).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("강도 조절") {
@@ -48,6 +59,16 @@ struct QuickRetouchPanel: View {
                     }
                 }
             }
+            Divider()
+            Button("부위를 눌러 보정 도구 찾기") { model.selectTool(.region) }
+                .accessibilityIdentifier("quick.region")
+            Button("이중턱 조절") { model.openRetouchDestination(.doubleChin) }
+                .accessibilityIdentifier("quick.doubleChin")
+            Button("부유방 조절") { model.openRetouchDestination(.sideChest) }
+                .accessibilityIdentifier("quick.sideChest")
+            Button("모든 보정 도구 찾기") { model.selectTool(.region) }
+            Text("이중턱·체형은 인물 원터치에 포함되지 않아요. 부위를 고른 뒤 직접 강도를 조절해요.")
+                .font(.caption).foregroundStyle(.secondary)
             Divider()
             Button {
                 Task { await model.autoEnhanceAll() }

@@ -38,6 +38,7 @@ final class AppModel {
         /// 몸 인덱스 → 준비 때 사람 마스크에서 찾은 몸통 옆선(렌더와 같다).
         /// 사람 마스크가 없거나 두 엉덩이가 없는 몸은 키가 없다.
         var bodyOutlines: [Int: BodyOutline] = [:]
+        var bodyRegions: [Int: BodyGeometry] = [:]
     }
 
     /// 뷰티·메이크업 패널이 편집하는 대상.
@@ -189,6 +190,8 @@ final class AppModel {
     /// 렌더가 성공하거나 선택 사진이 바뀌면 지운다(다른 사진의 오류를 보이지 않는다).
     var lastRenderFailure: String?
 
+    var focusedRetouchDestination: RetouchDestination?
+    var retouchNavigationID = UUID()
     var tool: EditorTool = .quick
     var quickRetouchRunID: UUID?
     var quickRetouchCancellationRequested = false
@@ -424,9 +427,11 @@ final class AppModel {
     /// 현재 대상 층의 원터치 표시(강도 슬라이더 값).
     /// 전체는 전체 층, 그룹·개인은 그 층의 표시이고 기록이 없는 얼굴은 nil이다.
     /// 손상 파일의 값도 0…maximumStrength로 잘라 넘긴다.
-    var oneTouchStrength: Double? {
+    var oneTouchStrength: Double? { oneTouchStrength(for: beautyTarget) }
+
+    func oneTouchStrength(for target: BeautyTarget) -> Double? {
         let marker: Double?
-        switch scope(for: beautyTarget) {
+        switch scope(for: target) {
         case .all: marker = currentRecipe.portrait.oneTouch
         case .some(let scope): marker = PortraitResolver.layer(currentRecipe, scope: scope)?.oneTouch
         case nil: marker = nil
@@ -597,6 +602,7 @@ final class AppModel {
     /// 메이크업 룩·색·강도를 바꿀 수 있는지. 얼굴 분석이 실패한 사진에 메이크업을 넣으면 저장이 실패하므로 끈다.
     /// 이미 들어온 메이크업은 줄이거나 지울 수 있게 켜고, 드래그 중에는 0에 닿아도 끄지 않는다. 얼굴이 없을 뿐이면 저장은 되므로 켠다.
     var canAdjustMakeup: Bool {
+        if hasEmptyPortraitGroup { return false }
         guard case .unavailable = faceAvailability else { return true }
         return isSliderEditActive || currentRecipe.makeup.hasEffect
     }
@@ -675,7 +681,8 @@ final class AppModel {
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
             hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
-            bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines)
+            bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines,
+            bodyRegions: prepared.bodyRegions)
         if bindsLegacyPeople {
             bindLegacyPeople(id, faces: prepared.faces)
         }

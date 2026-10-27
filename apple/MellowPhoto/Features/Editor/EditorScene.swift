@@ -95,11 +95,8 @@ struct EditorScene: View {
     private var compactControls: some View {
         VStack(spacing: 12) {
             ToolStrip()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) { toolPanel }.padding(.vertical, 5)
-            }
-            .accessibilityIdentifier("quick.controlsScroll")
-            .frame(height: Theme.compactControlsHeight)
+            controlsScroll(padding: 5)
+                .frame(height: Theme.compactControlsHeight)
             HStack {
                 Button(UserMessage.quickCopySettings) { model.applyToAll() }.disabled(!model.canApplyToAll)
                 SyncMenu()
@@ -126,10 +123,7 @@ struct EditorScene: View {
             Divider()
             VStack(spacing: 0) {
                 ToolStrip().padding(.vertical, 10)
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) { toolPanel }.padding(20)
-                }
-                .accessibilityIdentifier("quick.controlsScroll")
+                controlsScroll(padding: 20)
                 Divider()
                 VStack(spacing: 10) {
                     HStack {
@@ -152,10 +146,26 @@ struct EditorScene: View {
         }
     }
 
+    private func controlsScroll(padding: CGFloat) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) { toolPanel }.padding(padding)
+            }
+            .accessibilityIdentifier("quick.controlsScroll")
+            .task(id: model.retouchNavigationID) {
+                // 새 도구와 펼친 세부 조정이 배치된 뒤 선택한 항목을 보여 준다.
+                await Task.yield()
+                guard let destination = model.focusedRetouchDestination else { return }
+                withAnimation { proxy.scrollTo(destination, anchor: .top) }
+            }
+        }
+    }
+
     @ViewBuilder
     private var toolPanel: some View {
         switch model.tool {
         case .quick: QuickRetouchPanel()
+        case .region: RetouchDirectoryPanel()
         case .look: LookPanel()
         case .crop: CropPanel()
         case .adjust: AdjustPanel(presetSheet: $presetSheet)

@@ -39,9 +39,9 @@ struct BeautyPanel: View {
                         }
                         .pickerStyle(.segmented)
                         switch model.beautyTab {
-                        case .skin: skinControls(portrait.skin)
-                        case .face: faceControls(portrait.face)
-                        case .features: featureControls(portrait.features)
+                        case .skin: skinControls(portrait.skin).disabled(model.hasEmptyPortraitGroup)
+                        case .face: faceControls(portrait.face).disabled(model.hasEmptyPortraitGroup)
+                        case .features: featureControls(portrait.features).disabled(model.hasEmptyPortraitGroup)
                         case .skinTone: skinToneControls(recipe.bodySkin)
                         }
                     }
@@ -65,6 +65,7 @@ struct BeautyPanel: View {
             isOverridden: overridden.contains(.skinSmoothing), onReset: reset(.skinSmoothing),
             tag: tag(.skinSmoothing)
         ) { .skinSmoothing($0) }
+        .id(RetouchDestination.skin)
         Toggle(isOn: Binding(get: { skin.autoBlemish }, set: { model.edit(.autoBlemish($0)) })) {
             HStack(spacing: 4) {
                 if overridden.contains(.autoBlemish) {
@@ -88,6 +89,7 @@ struct BeautyPanel: View {
                 snapsToZero: range.lowerBound < 0, isOverridden: overridden.contains(.skinRefinement(key)),
                 onReset: reset(.skinRefinement(key)), tag: tag(.skinRefinement(key))
             ) { .skinRefinement(key, $0) }
+            .id(RetouchDestination.skinRefinement(key))
         }
         Text(UserMessage.skinRefinementHint).font(.caption).foregroundStyle(.secondary)
     }
@@ -103,6 +105,7 @@ struct BeautyPanel: View {
                 snapsToZero: range.lowerBound < 0, isOverridden: overridden.contains(.faceShape(key)),
                 onReset: reset(.faceShape(key))
             ) { .faceShape(key, $0) }
+            .id(RetouchDestination.faceShape(key))
             .disabled(model.isGeometryLocked)
         }
         Text(model.isGeometryLocked ? UserMessage.geometryLocked : UserMessage.faceHint)
@@ -119,6 +122,7 @@ struct BeautyPanel: View {
                 isOverridden: overridden.contains(.feature(key)), onReset: reset(.feature(key)),
                 tag: tag(.feature(key))
             ) { .feature(key, $0) }
+            .id(RetouchDestination.feature(key))
         }
         Text(UserMessage.featureHint).font(.caption).foregroundStyle(.secondary)
     }
@@ -136,6 +140,7 @@ struct BeautyPanel: View {
                 snapsToZero: range.lowerBound < 0,
                 tag: model.isOneTouchTagged(key) ? UserMessage.oneTouchTag : nil
             ) { .bodySkin(key, $0) }
+            .id(RetouchDestination.bodySkin(key))
             .disabled(!model.canAdjustBodySkin(key))
         }
         Text(UserMessage.bodySkinHint).font(.caption).foregroundStyle(.secondary)

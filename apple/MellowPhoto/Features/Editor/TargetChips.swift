@@ -21,7 +21,9 @@ struct TargetChips: View {
                     chip(title: UserMessage.targetAll, symbol: "person.3", target: .all)
                     ForEach(Gender.allCases, id: \.self) { gender in
                         chip(
-                            title: UserMessage.groupTitle(gender), symbol: Self.groupSymbol(gender),
+                            title:
+                                "\(UserMessage.groupTitle(gender)) · \(model.portraitFaceCount(for: .gender(gender)))명",
+                            symbol: Self.groupSymbol(gender),
                             target: .gender(gender))
                     }
                     ForEach(chips) { person in
@@ -38,6 +40,18 @@ struct TargetChips: View {
             .scrollIndicators(.hidden)
             .accessibilityElement(children: .contain)
             .accessibilityLabel(UserMessage.targetLabel)
+            if model.hasEmptyPortraitGroup {
+                Text(UserMessage.emptyPortraitGroup).font(.caption2).foregroundStyle(.secondary)
+                Button("전체 \(model.faces.count)명 보정하기") { model.setBeautyTarget(.all) }
+                    .font(.caption)
+                ForEach(chips.filter { $0.faceIndex != nil }) { person in
+                    Button("사람 \((person.faceIndex ?? 0) + 1) 직접 고르기") { model.setBeautyTarget(person.target) }
+                        .font(.caption)
+                }
+                if !model.overriddenKeys.isEmpty {
+                    Button("이 그룹에 저장된 조정 초기화") { model.resetOverrides() }.font(.caption)
+                }
+            }
             if let selected = chips.first(where: { $0.target == target }) {
                 HStack {
                     Text(Self.statusLine(for: selected)).lineLimit(1).foregroundStyle(.secondary)

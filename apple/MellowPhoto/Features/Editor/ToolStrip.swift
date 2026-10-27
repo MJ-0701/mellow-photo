@@ -8,6 +8,7 @@ struct ToolStrip: View {
         ScrollView(.horizontal) {
             HStack(spacing: 4) {
                 toolButton(.quick)
+                toolButton(.region)
                 toolButton(.look)
                 Button {
                     Task { await model.autoEnhance() }

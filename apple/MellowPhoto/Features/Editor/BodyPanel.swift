@@ -41,6 +41,7 @@ struct BodyPanel: View {
                 snapsToZero: range.lowerBound < 0, isOverridden: overridden.contains(.bodyShape(key)),
                 onReset: reset(key)
             ) { .bodyShape(key, $0) }
+            .id(RetouchDestination.bodyShape(key))
             .disabled(!model.canAdjustBodyShape(key))
             if key == .sideChest, model.showsSideChestArmTouching {
                 Text(UserMessage.sideChestArmTouching).font(.caption).foregroundStyle(.secondary)

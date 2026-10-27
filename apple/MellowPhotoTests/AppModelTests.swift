@@ -208,6 +208,8 @@ final class AppModelTests: XCTestCase {
             root: root, analyzer: StubFaceAnalyzer(result: .success([face])),
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
+        model.setBeautyTarget(.face(0))
+        model.setGender(.female)
         model.setBeautyTarget(.gender(.female))
         model.edit(.skinSmoothing(0.5))
         model.setBeautyTarget(.face(0))
@@ -816,7 +818,8 @@ final class AppModelTests: XCTestCase {
             importer: FakeImporter(staged: [.success(StagedPhoto(url: staged, displayName: nil))]))
         try await importOne(model, staged)
         XCTAssertEqual(
-            EditorTool.allCases, [.quick, .look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
+            EditorTool.allCases,
+            [.quick, .region, .look, .crop, .adjust, .beauty, .makeup, .body, .background, .retouch, .warp])
         model.selectTool(.body)
         XCTAssertEqual(EditorTool.body.title, "체형")
         XCTAssertEqual(model.bodyAvailability, .ready)
@@ -1375,13 +1378,16 @@ final class AppModelTests: XCTestCase {
         model.setGender(.female)
         XCTAssertTrue(model.currentRecipe.people.individuals.isEmpty, "전체·그룹 대상에서는 성별 지정이 없다")
         XCTAssertFalse(model.canUndo)
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
+        let setupSteps = model.session.selected!.document.undoStack.count
         model.setBeautyTarget(.gender(.female))
         model.edit(.skinSmoothing(0.5))
         model.edit(.feature(.eyeBrighten, 0.4))
         XCTAssertEqual(model.overriddenKeys, [.skinSmoothing, .feature(.eyeBrighten)])
         model.resetOverrides([.skinSmoothing])
         XCTAssertEqual(model.overriddenKeys, [.feature(.eyeBrighten)])
-        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3)
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, setupSteps + 3)
         model.resetOverrides()
         XCTAssertEqual(model.overriddenKeys, [])
         XCTAssertNil(model.currentRecipe.people.groups[.female])
@@ -1389,7 +1395,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.overriddenKeys, [.feature(.eyeBrighten)])
         model.setBeautyTarget(.face(0))
         model.resetOverrides()
-        XCTAssertEqual(model.session.selected?.document.undoStack.count, 3, "기록이 없는 얼굴의 초기화는 아무것도 안 한다")
+        XCTAssertEqual(model.session.selected?.document.undoStack.count, setupSteps + 3, "기록이 없는 얼굴의 초기화는 아무것도 안 한다")
         model.edit(.faceShape(.width, -0.2))
         try await lockWithRetouch(model)
         model.setGender(.male)
@@ -1853,6 +1859,8 @@ final class AppModelTests: XCTestCase {
 
     func testBodySliderWritesToTheTargetLayer() async throws {
         let model = try await coupleBodyModel()
+        model.setBeautyTarget(.face(1))
+        model.setGender(.female)
         model.setBeautyTarget(.gender(.female))
         model.edit(.bodyShape(.waist, -0.5))
         XCTAssertEqual(model.currentRecipe.people.groups[.female]?.body[.waist], -0.5)
@@ -1906,7 +1914,13 @@ final class AppModelTests: XCTestCase {
         model.setBeautyTarget(.gender(.female))
         XCTAssertEqual(model.bodyAvailability, .noBodyForTarget, "성별이 정해진 얼굴이 없으면 여성 그룹이 바꿀 몸이 없다")
         XCTAssertFalse(model.canAdjustBodyShape(.waist))
+        let before = model.currentRecipe
         model.edit(.bodyShape(.waist, -0.3))
+        XCTAssertEqual(model.currentRecipe, before, "적용할 사람이 없으면 새 조정을 만들지 않는다")
+        // 이전 세션에서 저장된 비영 값은 초기화할 수 있어야 한다.
+        model.session.edit(model.session.selectedPhotoID!) { document in
+            document.set(.bodyShape(.waist, -0.3), in: .gender(.female))
+        }
         XCTAssertEqual(model.currentRecipe.people.groups[.female]?.body[.waist], -0.3, "값은 그룹 층에 저장된다")
         XCTAssertTrue(model.canAdjustBodyShape(.waist), "그룹 층의 0이 아닌 값은 0으로 되돌릴 수 있다")
         XCTAssertFalse(model.canAdjustBodyShape(.arms), "0인 항목은 계속 끈다")

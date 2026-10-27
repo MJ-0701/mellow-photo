@@ -50,6 +50,8 @@ extension AppModel {
 
     /// 드래그하는 동안은 세션 파일을 쓰지 않고 끝날 때 한 번 저장한다.
     func beginSliderEdit() {
+        let editsScopedPortrait = tool == .makeup || tool == .body || (tool == .beauty && beautyTab != .skinTone)
+        if editsScopedPortrait, rejectEmptyPortraitGroup(beautyTarget) { return }
         guard let id = session.selectedPhotoID else { return }
         session.beginDeferredPersistence()
         session.edit(id) { document in
@@ -59,6 +61,7 @@ extension AppModel {
     }
 
     func endSliderEdit() {
+        guard session.isPersistenceDeferred else { return }
         if let id = session.selectedPhotoID {
             session.endContinuousChange(id)
         }
@@ -79,6 +82,19 @@ extension AppModel {
     /// 찾은 얼굴을 처음 만지면 기록이 만들어진다.
     func edit(_ change: EditChange) {
         let target = beautyTarget
+        if change.portraitKey != nil, isEmptyGenderGroup(target) {
+            guard permitsNeutralResetInEmptyGroup(change) else {
+                rejectEmptyPortraitGroup(target)
+                return
+            }
+            if let scope = scope(for: target), var probe = session.selected?.document {
+                _ = probe.set(change, in: scope)
+                guard probe.recipe != currentRecipe else {
+                    statusMessage = UserMessage.quickNoChange
+                    return
+                }
+            }
+        }
         guard change.portraitKey != nil || isGenderChange(change) else {
             mutateSelected { $0.set(change) }
             return
@@ -135,17 +151,28 @@ extension AppModel {
     /// 강도 슬라이더는 드래그 안에서 값을 넘겨 연속 변경 한 단계가 된다.
     /// 전체는 세 층과 몸 피부 밝기, 그룹은 그 그룹 층, 사람은 그 사람 층(수동 성별 표)에 쓴다.
     /// 찾은 얼굴을 처음 만지면 기록이 생긴다.
-    func applyOneTouch(strength: Double? = nil) {
+    func applyOneTouch(strength: Double? = nil, target: BeautyTarget? = nil) {
         if strength == nil {
             endSliderEditIfActive()
         }
-        let value = strength ?? oneTouchStrength ?? EditingPolicy.oneTouchDefaultStrength
-        if case .face(let index) = beautyTarget {
+        let target = target ?? beautyTarget
+        let value = strength ?? oneTouchStrength(for: target) ?? EditingPolicy.oneTouchDefaultStrength
+        if value != 0, rejectEmptyPortraitGroup(target) { return }
+        if value == 0, isEmptyGenderGroup(target), let scope = scope(for: target) {
+            let layer = PortraitResolver.layer(currentRecipe, scope: scope)
+            let hasSavedKeys =
+                layer.map { !OneTouchBundle.keys.isDisjoint(with: $0.overriddenKeys) || $0.oneTouch != nil } ?? false
+            guard hasSavedKeys else {
+                statusMessage = UserMessage.quickNoChange
+                return
+            }
+        }
+        if case .face(let index) = target {
             let boxes = faces.map(\.boundingBox)
             mutateSelected { $0.applyOneTouch(strength: value, forFace: index, of: boxes) }
             return
         }
-        guard let scope = scope(for: beautyTarget) else { return }
+        guard let scope = scope(for: target) else { return }
         mutateSelected { $0.applyOneTouch(strength: value, in: scope) }
     }
 
@@ -154,6 +181,18 @@ extension AppModel {
     /// 모르는 id는 무시한다.
     /// 기록이 없는 얼굴이면 기록을 만들며 적용한다.
     func applyMakeupLook(id: String?) {
+        if id != nil, rejectEmptyPortraitGroup(beautyTarget) { return }
+        if id == nil, hasEmptyPortraitGroup, let scope = scope(for: beautyTarget) {
+            let layer = PortraitResolver.layer(currentRecipe, scope: scope)
+            let hasSavedMakeup =
+                layer.map {
+                    $0.makeupLookID != nil || $0.makeup.values.contains { $0.intensity != 0 || $0.colorID != nil }
+                } ?? false
+            guard hasSavedMakeup else {
+                statusMessage = UserMessage.quickNoChange
+                return
+            }
+        }
         let look = makeupCatalog.look(id: id)
         guard id == nil || look != nil else { return }
         endSliderEditIfActive()
@@ -312,6 +351,9 @@ extension AppModel {
                 document.appendLocalEdit(.warp(stroke))
                 return nil
             }
+        case .region:
+            guard hypot(to.x - from.x, to.y - from.y) <= Policy.targetTapTolerance else { return }
+            selectRetouchRegion(at: toOriginal)
         case .beauty, .makeup:
             // 누른 점에서 멀리 뗀 것은 사진 이동이라 대상을 바꾸지 않는다.
             guard hypot(to.x - from.x, to.y - from.y) <= Policy.targetTapTolerance else { return }

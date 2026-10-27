@@ -9,13 +9,24 @@ import SwiftUI
 /// 폭에 따라 배치를 바꾸면 값 글자가 바뀌는 드래그 중에 슬라이더가 다시 만들어져 드래그가 끊길 수 있다.
 struct OneTouchRow: View {
     @Environment(AppModel.self) private var model
+    var fixedTarget: AppModel.BeautyTarget? = nil
+    var buttonIdentifier = "oneTouch.apply"
 
     var body: some View {
-        let target = model.beautyTarget
+        let target = fixedTarget ?? model.beautyTarget
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .bottom, spacing: 12) {
                 button
                 slider
+            }
+            Text(UserMessage.portraitCount(model.portraitFaceCount(for: target)))
+                .font(.caption).foregroundStyle(.secondary)
+            if model.isEmptyGenderGroup(target) {
+                Text(UserMessage.emptyPortraitGroup).font(.caption2).foregroundStyle(.secondary)
+                if (model.oneTouchStrength(for: target) ?? 0) > 0 {
+                    Button("이 그룹 원터치 지우기") { model.applyOneTouch(strength: 0, target: target) }
+                        .font(.caption)
+                }
             }
             Text(Self.hint(for: target)).font(.caption2).foregroundStyle(.secondary)
             if let person = model.personChips.first(where: { $0.target == target }), person.gender == nil {
@@ -26,7 +37,7 @@ struct OneTouchRow: View {
 
     private var button: some View {
         Button {
-            model.applyOneTouch()
+            model.applyOneTouch(target: fixedTarget)
         } label: {
             Label(UserMessage.oneTouch, systemImage: Self.buttonSymbol)
                 .frame(minWidth: Theme.oneTouchButtonMinWidth)
@@ -35,10 +46,12 @@ struct OneTouchRow: View {
         .tint(Theme.accent)
         .foregroundStyle(Theme.canvas)
         .fixedSize()
+        .accessibilityIdentifier(buttonIdentifier)
+        .disabled(model.isEmptyGenderGroup(fixedTarget ?? model.beautyTarget))
     }
 
     private var slider: some View {
-        let strength = model.oneTouchStrength
+        let strength = model.oneTouchStrength(for: fixedTarget ?? model.beautyTarget)
         return VStack(spacing: 5) {
             HStack {
                 Text(UserMessage.oneTouchStrength)
@@ -47,7 +60,7 @@ struct OneTouchRow: View {
             }
             .font(.caption)
             Slider(
-                value: Binding(get: { strength ?? 0 }, set: { model.applyOneTouch(strength: $0) }),
+                value: Binding(get: { strength ?? 0 }, set: { model.applyOneTouch(strength: $0, target: fixedTarget) }),
                 in: 0...OneTouchBundle.maximumStrength
             ) { editing in
                 if editing {
@@ -56,6 +69,7 @@ struct OneTouchRow: View {
                     model.endSliderEdit()
                 }
             }
+            .disabled(model.isEmptyGenderGroup(fixedTarget ?? model.beautyTarget))
             .accessibilityLabel(UserMessage.oneTouchStrength)
             .accessibilityValue(Self.strengthText(for: strength))
         }

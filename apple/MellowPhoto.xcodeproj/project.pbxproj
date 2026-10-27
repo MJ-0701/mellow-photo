@@ -13,6 +13,7 @@
 		0A92F1EF8F2E281B8793D3CE /* PhotoStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */; };
 		0CD761468E304A218D226C61 /* ExportPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505F21DC7A15D7DBC745704E /* ExportPhotos.swift */; };
 		0E6ADDFED40162806D835BA1 /* AppModel+Looks.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBA079D5E1B02E1A5D01910B /* AppModel+Looks.swift */; };
+		0EFC197B2F5B35EDB09F41B0 /* UserMessage+PortraitTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F6AA47ECDDACE1D495F5F9 /* UserMessage+PortraitTargets.swift */; };
 		0FA73B0DF5725C84F333FF05 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 898E1FD227433ABB414F380E /* AppModelTests.swift */; };
 		102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */; };
 		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
@@ -32,6 +33,7 @@
 		3C9482158142CD05F4A1734C /* PhotoPickerButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB5D6348D5F67025AEB8B612 /* PhotoPickerButton.swift */; };
 		3EAEE253F8A952E0C254714F /* MellowRendering in Frameworks */ = {isa = PBXBuildFile; productRef = 213FE2825489D6DA1E427B12 /* MellowRendering */; };
 		48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0604580F74993079C348EBA /* MellowPhotoApp.swift */; };
+		496748629DE0B16F562E1A70 /* RetouchDirectoryPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC00193A31EA2341DA76E6B4 /* RetouchDirectoryPanel.swift */; };
 		49B20AB81051BD90E81F403A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 8DF29257D9BD106E259622CE /* PrivacyInfo.xcprivacy */; };
 		49E4D5B8DAE722E0F58D95AC /* FolderDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39F25010AC7BB2432F264435 /* FolderDestination.swift */; };
 		4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D630A842DBDB0FFBAB08678 /* UserMessage.swift */; };
@@ -62,6 +64,7 @@
 		9BFE9D9D1461BFBB2C679E09 /* BundledLooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7AB210EC391D3CEA37D6954 /* BundledLooksTests.swift */; };
 		9CCACC56A441C098938B6042 /* TargetChips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */; };
 		A6638DE9800F8B3C5FA0B8B6 /* makeup.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 9D32CC590745242241C9A2F3 /* makeup.v1.json */; };
+		BBA4C9BE0BC2A380BBC9EA01 /* AppModel+PortraitTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */; };
@@ -72,6 +75,8 @@
 		CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */; };
 		CF26FC52CE99423A4017446D /* PhotoCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */; };
 		D02081D49122EB40B5C8E7DA /* AppModel+Export.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAFA055C56E92FA7765E19D8 /* AppModel+Export.swift */; };
+		D1C3777D198F9B6E648DECA9 /* RetouchDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77C31B5BA539C2E97EA0F86A /* RetouchDestination.swift */; };
+		D3FD25AF2F233E1410B8C874 /* PortraitTargetSafetyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 169CF4B35A0B7FFFD7974955 /* PortraitTargetSafetyTests.swift */; };
 		D7785F99F50B89FFF24DB692 /* StatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADD5E80F3B80B364E7019C06 /* StatusBar.swift */; };
 		DA86D342ABA7F0FAC91E72AA /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D95F60595DABD5907632705B /* WelcomeView.swift */; };
 		DD0689E1788B77A8E4BCE98C /* ImportPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4711AEF3097752E578444CB /* ImportPhotos.swift */; };
@@ -81,6 +86,7 @@
 		E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */; };
 		EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */; };
 		EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541985795F5FEE15374903C /* BeautyTab.swift */; };
+		EF81D1F4E43A0FEEA921FED6 /* AppModel+RetouchDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101BD09FD9200EBB2996D97A /* AppModel+RetouchDestinations.swift */; };
 		F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7451F7A8E9DE87961267F974 /* Theme.swift */; };
 		F22DF85B40A680AA4826507F /* AppModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C733819968D67C3621CC407 /* AppModel+Diagnostics.swift */; };
 		F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119D17BD418BDE81F1E2622E /* MakeupPanel.swift */; };
@@ -115,10 +121,13 @@
 		0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportPhotosTests.swift; sourceTree = "<group>"; };
 		0D9139D4C642B3B57F110390 /* CropPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropPanel.swift; sourceTree = "<group>"; };
 		0EEDB91C707D116DBB571A5D /* MellowPhoto-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "MellowPhoto-macOS.entitlements"; sourceTree = "<group>"; };
+		101BD09FD9200EBB2996D97A /* AppModel+RetouchDestinations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+RetouchDestinations.swift"; sourceTree = "<group>"; };
 		119D17BD418BDE81F1E2622E /* MakeupPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MakeupPanel.swift; sourceTree = "<group>"; };
 		14D913AA29EA31E0F2BF7016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		169CF4B35A0B7FFFD7974955 /* PortraitTargetSafetyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortraitTargetSafetyTests.swift; sourceTree = "<group>"; };
 		205D153168A529D037BF40EE /* ThumbnailCell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCell.swift; sourceTree = "<group>"; };
 		22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresets.swift; sourceTree = "<group>"; };
+		2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PortraitTargets.swift"; sourceTree = "<group>"; };
 		2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetChipsTests.swift; sourceTree = "<group>"; };
 		2F0DE03B3D7090AE3713F35C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		370CF7443944DB02164CF8DD /* RenderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderScheduler.swift; sourceTree = "<group>"; };
@@ -127,6 +136,7 @@
 		3C733819968D67C3621CC407 /* AppModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Diagnostics.swift"; sourceTree = "<group>"; };
 		3D630A842DBDB0FFBAB08678 /* UserMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserMessage.swift; sourceTree = "<group>"; };
 		3FB3268705F4B92286899B4B /* LookPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LookPanel.swift; sourceTree = "<group>"; };
+		46F6AA47ECDDACE1D495F5F9 /* UserMessage+PortraitTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserMessage+PortraitTargets.swift"; sourceTree = "<group>"; };
 		4D53E298C4C308D207780CD5 /* QuickRetouchPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRetouchPanel.swift; sourceTree = "<group>"; };
 		505F21DC7A15D7DBC745704E /* ExportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPhotos.swift; sourceTree = "<group>"; };
 		540B90F0C598F262D4039570 /* InfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoSheet.swift; sourceTree = "<group>"; };
@@ -140,6 +150,7 @@
 		6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderSchedulerTests.swift; sourceTree = "<group>"; };
 		73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Library.swift"; sourceTree = "<group>"; };
 		7451F7A8E9DE87961267F974 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		77C31B5BA539C2E97EA0F86A /* RetouchDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetouchDestination.swift; sourceTree = "<group>"; };
 		83CBCF07C95A8CA66A73434E /* BodyPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPanel.swift; sourceTree = "<group>"; };
 		8610E11E70A395E3B9504730 /* CropOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CropOverlay.swift; sourceTree = "<group>"; };
 		881AF94D0F9479A2C4B31435 /* PhotoStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoStripView.swift; sourceTree = "<group>"; };
@@ -182,6 +193,7 @@
 		E87CE2394E0C5D2CCF9B5FEA /* CompareDivider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareDivider.swift; sourceTree = "<group>"; };
 		E9F9836BC15896ABBD95ED97 /* UserMessage+QuickRetouch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserMessage+QuickRetouch.swift"; sourceTree = "<group>"; };
 		EA1FE7AA1267A55B90D3A984 /* MellowPhotoUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC00193A31EA2341DA76E6B4 /* RetouchDirectoryPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetouchDirectoryPanel.swift; sourceTree = "<group>"; };
 		EDD787C9C66B2AEE44C60043 /* CompareDividerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompareDividerTests.swift; sourceTree = "<group>"; };
 		F465BA3A1339352022E907AA /* AppModel+Live.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Live.swift"; sourceTree = "<group>"; };
 		F649B7478C80A4F0F34E92F7 /* MellowPhotoTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MellowPhotoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -295,6 +307,7 @@
 				0784C6D7B02AF5FD15B2F869 /* OneTouchRow.swift */,
 				022D7F5AD6CB820623804FBF /* PhotoCanvasView.swift */,
 				4D53E298C4C308D207780CD5 /* QuickRetouchPanel.swift */,
+				EC00193A31EA2341DA76E6B4 /* RetouchDirectoryPanel.swift */,
 				C329A06E195C3E422C0EFF76 /* SyncMenu.swift */,
 				BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */,
 				0AFA6571D26629D5ED075E50 /* ToolStrip.swift */,
@@ -337,6 +350,7 @@
 				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
 				FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */,
 				CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */,
+				169CF4B35A0B7FFFD7974955 /* PortraitTargetSafetyTests.swift */,
 				D2260E6AE00866F4378108EC /* QuickRetouchTests.swift */,
 				6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */,
 				BB7D2AB7D851DAC4A8EEC0AD /* SystemPhotoImporterTests.swift */,
@@ -394,14 +408,18 @@
 				62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */,
 				73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */,
 				DBA079D5E1B02E1A5D01910B /* AppModel+Looks.swift */,
+				2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */,
 				5AE17FFF52E19BB8012D6FA3 /* AppModel+QuickRetouch.swift */,
+				101BD09FD9200EBB2996D97A /* AppModel+RetouchDestinations.swift */,
 				A541985795F5FEE15374903C /* BeautyTab.swift */,
 				D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */,
 				505F21DC7A15D7DBC745704E /* ExportPhotos.swift */,
 				C4711AEF3097752E578444CB /* ImportPhotos.swift */,
 				F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */,
 				370CF7443944DB02164CF8DD /* RenderScheduler.swift */,
+				77C31B5BA539C2E97EA0F86A /* RetouchDestination.swift */,
 				3D630A842DBDB0FFBAB08678 /* UserMessage.swift */,
+				46F6AA47ECDDACE1D495F5F9 /* UserMessage+PortraitTargets.swift */,
 				E9F9836BC15896ABBD95ED97 /* UserMessage+QuickRetouch.swift */,
 			);
 			path = Application;
@@ -581,6 +599,7 @@
 				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
 				5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */,
 				25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */,
+				D3FD25AF2F233E1410B8C874 /* PortraitTargetSafetyTests.swift in Sources */,
 				DE193955347FE647E9B25434 /* QuickRetouchTests.swift in Sources */,
 				102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */,
 				865DD46860E65C891D8D186C /* SystemPhotoImporterTests.swift in Sources */,
@@ -604,7 +623,9 @@
 				CBABC284D0016097315F4B49 /* AppModel+Library.swift in Sources */,
 				1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */,
 				0E6ADDFED40162806D835BA1 /* AppModel+Looks.swift in Sources */,
+				BBA4C9BE0BC2A380BBC9EA01 /* AppModel+PortraitTargets.swift in Sources */,
 				FAA927D7BD18D2429FA4B542 /* AppModel+QuickRetouch.swift in Sources */,
+				EF81D1F4E43A0FEEA921FED6 /* AppModel+RetouchDestinations.swift in Sources */,
 				88C5204A87D34339E9B51A39 /* AppModel.swift in Sources */,
 				C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */,
 				505B12210B3B0B3403966121 /* BeautyPanel.swift in Sources */,
@@ -636,6 +657,8 @@
 				8AB5F982B3B0E51F2ECC5598 /* QuickRetouchDebugFixture.swift in Sources */,
 				52748E8505EB74FA3F8B7F67 /* QuickRetouchPanel.swift in Sources */,
 				E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */,
+				D1C3777D198F9B6E648DECA9 /* RetouchDestination.swift in Sources */,
+				496748629DE0B16F562E1A70 /* RetouchDirectoryPanel.swift in Sources */,
 				D7785F99F50B89FFF24DB692 /* StatusBar.swift in Sources */,
 				F45D6414E50067A97D199532 /* SyncMenu.swift in Sources */,
 				3A5C777496AD36279C11814F /* SystemPhotoImporter.swift in Sources */,
@@ -643,6 +666,7 @@
 				F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */,
 				FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */,
 				3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */,
+				0EFC197B2F5B35EDB09F41B0 /* UserMessage+PortraitTargets.swift in Sources */,
 				E78B9D3A1FDB7D2220DDE399 /* UserMessage+QuickRetouch.swift in Sources */,
 				4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */,
 				DA86D342ABA7F0FAC91E72AA /* WelcomeView.swift in Sources */,
