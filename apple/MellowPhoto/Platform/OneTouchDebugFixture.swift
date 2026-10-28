@@ -68,6 +68,10 @@
             let value: [String: Any] = [
                 "fixture": "synthetic-one-touch-overrides", "photo": session.selectedPhotoID?.rawValue.uuidString ?? "",
                 "recipeSHA": sha(recipe), "previewSHA": preview.map { sha($0.dataProvider!.data! as Data) } ?? "",
+                "sourceSHA": session.selected.flatMap { try? Data(contentsOf: copies.url(for: $0.filename)) }.map(sha)
+                    ?? "",
+                "requestCurrent": requestedOneTouchStrength(for: beautyTarget),
+                "bodyBrightness": currentRecipe.bodySkin.brightness,
                 "context": portraitPurposeContext.uuidString,
                 "ready": isReady && !isBusy && !isRendering && lastRenderFailure == nil,
                 "target": String(describing: beautyTarget), "requestAll": requestedOneTouchStrength(for: .all),

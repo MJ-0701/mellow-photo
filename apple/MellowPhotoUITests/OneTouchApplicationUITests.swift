@@ -78,7 +78,10 @@ final class OneTouchApplicationUITests: XCTestCase {
             let to = origin.withOffset(CGVector(dx: viewport.minX + 2, dy: viewport.midY + (up ? -distance : distance)))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.3)
             let after = try state(app)
-            for key in ["recipeSHA", "undo", "saves"] {
+            for key in [
+                "recipeSHA", "undo", "saves", "requestAll", "requestCurrent", "target", "photo", "sourceSHA",
+                "feedbackAll",
+            ] {
                 XCTAssertEqual(String(describing: before[key]), String(describing: after[key]), "탐색은 조정을 바꾸지 않는다")
             }
         }
@@ -158,7 +161,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         try capture(app, name: "one-touch-quick-all-with-empty-beauty-target")
     }
 
-    func testNativeRequestDragToZeroCommitsOnlyAtEndAsOneUndo() throws {
+    func testNativeDraftZeroThenExplicitNeutralUndoAndSeparateDefaultClear() throws {
         let app = try launchFixture()
         let slider = app.sliders["quick.portrait.request"]
         try reveal(slider, app: app)
@@ -169,11 +172,36 @@ final class OneTouchApplicationUITests: XCTestCase {
             forDuration: 0.1,
             thenDragTo: origin.withOffset(CGVector(dx: max(2, frame.minX - 30), dy: frame.midY)),
             withVelocity: .slow, thenHoldForDuration: 0.3)
-        let after = try waitState(app) { $0["ready"] as? Bool == true && $0["requestAll"] as? Double == 0 }
-        XCTAssertEqual(after["undo"] as? Int, 1)
-        XCTAssertEqual(after["saves"] as? Int, (before["saves"] as! Int) + 1)
-        XCTAssertEqual(try XCTUnwrap(after["resolvedSmoothing"] as? Double), 0.04, accuracy: 1e-12)
-        XCTAssertEqual(after["bodyBrightness"] as? Double, 0)
-        try capture(app, name: "one-touch-native-zero-request")
+        let draft = try waitState(app) { $0["ready"] as? Bool == true && $0["requestAll"] as? Double == 0 }
+        XCTAssertEqual(draft["recipeSHA"] as? String, before["recipeSHA"] as? String)
+        XCTAssertEqual(draft["undo"] as? Int, before["undo"] as? Int)
+        XCTAssertEqual(draft["saves"] as? Int, before["saves"] as? Int)
+        XCTAssertEqual(draft["bodyBrightness"] as? Double, before["bodyBrightness"] as? Double)
+        try capture(app, name: "one-touch-zero-draft-unapplied")
+        let replace = app.buttons["quick.portrait.replace"]
+        try reveal(replace, app: app)
+        replace.tap()
+        let neutral = try waitState(app) { $0["ready"] as? Bool == true && $0["feedbackAll"] as? String == "visible" }
+        XCTAssertEqual(neutral["resolvedSmoothing"] as? Double, 0)
+        XCTAssertEqual(neutral["bodyBrightness"] as? Double, before["bodyBrightness"] as? Double)
+        XCTAssertEqual(neutral["undo"] as? Int, 1)
+        XCTAssertEqual(neutral["saves"] as? Int, (before["saves"] as! Int) + 1)
+        try capture(app, name: "one-touch-explicit-zero-keeps-other-settings")
+        let undo = app.buttons["quick.undo"]
+        try reveal(undo, app: app)
+        undo.tap()
+        let undone = try waitState(app) { $0["ready"] as? Bool == true && $0["undo"] as? Int == 0 }
+        XCTAssertEqual(undone["recipeSHA"] as? String, before["recipeSHA"] as? String)
+        XCTAssertEqual(undone["previewSHA"] as? String, before["previewSHA"] as? String)
+        let apply = app.buttons["quick.portrait"]
+        try reveal(apply, app: app)
+        apply.tap()
+        let cleared = try waitState(app) { $0["ready"] as? Bool == true && $0["feedbackAll"] as? String == "visible" }
+        XCTAssertEqual(cleared["requestAll"] as? Double, 0)
+        XCTAssertEqual(cleared["bodyBrightness"] as? Double, 0)
+        XCTAssertEqual(try XCTUnwrap(cleared["resolvedSmoothing"] as? Double), 0.04, accuracy: 1e-12)
+        XCTAssertEqual(cleared["undo"] as? Int, 1)
+        XCTAssertEqual(cleared["saves"] as? Int, (undone["saves"] as! Int) + 1)
+        try capture(app, name: "one-touch-default-zero-clear-is-separate")
     }
 }

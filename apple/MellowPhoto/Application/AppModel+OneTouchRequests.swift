@@ -59,11 +59,10 @@ extension AppModel {
         clearOneTouchAttempt()
     }
 
-    /// 드래그 중에는 요청값만 바꾼다. 진행 중인 다른 편집은 먼저 끝내 Undo를 분리한다.
+    /// 드래그는 요청값만 고른다. 진행 중인 다른 편집도 여기서 저장하지 않는다.
     @discardableResult
     func beginOneTouchRequestEditing(for target: BeautyTarget, expectedContext: UUID? = nil) -> UUID? {
         guard expectedContext == nil || expectedContext == portraitPurposeContext else { return nil }
-        endSliderEditIfActive()
         guard let key = oneTouchInputKey(for: target), let document = session.selected?.document,
             !isEmptyGenderGroup(target)
         else { return nil }
@@ -77,13 +76,10 @@ extension AppModel {
         if oneTouchRequestDrag?.id == id { oneTouchRequestDrag = nil }
     }
 
-    func endOneTouchRequestEditing(for target: BeautyTarget, id: UUID) {
-        guard let drag = oneTouchRequestDrag, drag.id == id else { return }
+    /// 종료도 입력 정리만 한다. 기본/개인 교체 버튼이 별도 한 트랜잭션을 만든다.
+    func endOneTouchRequestEditing(for _: BeautyTarget, id: UUID) {
+        guard oneTouchRequestDrag?.id == id else { return }
         oneTouchRequestDrag = nil
-        guard drag.key == oneTouchInputKey(for: target), drag.context == portraitPurposeContext,
-            session.selected?.document == drag.document
-        else { return }
-        submitOneTouchRequest(for: target)
     }
 
     private func clearOneTouchAttempt() {

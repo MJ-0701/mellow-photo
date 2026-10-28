@@ -3,6 +3,7 @@ import MellowShared
 
 extension UserMessage {
     static let oneTouchRequestStrength = "요청 강도"
+    static let oneTouchRequestInstruction = "강도를 고른 뒤 적용 버튼을 눌러주세요."
     static let oneTouchReplacePersonal = "개인 조정도 이 강도로 적용"
     static let oneTouchRequestHint = "요청값이에요. 개인별 실제 적용값과 다를 수 있어요."
     static let oneTouchNeutralHint = "기본 적용의 0은 이 대상의 원터치 조정을 지워요. 개인 조정도 0으로 적용하면 이 사진에서 적용 가능한 항목을 꺼요. 다른 설정은 유지돼요."

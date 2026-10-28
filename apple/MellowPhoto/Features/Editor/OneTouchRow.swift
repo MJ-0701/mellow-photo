@@ -2,7 +2,7 @@ import MellowEditing
 import MellowShared
 import SwiftUI
 
-/// 요청 강도와 실제 해석 결과를 분리한다. 드래그는 요청값만 바꾸고 종료 때 한 번 적용한다.
+/// 요청 강도와 실제 해석 결과를 분리한다. 드래그 종료도 입력만 바꾸며 버튼에서 적용한다.
 struct OneTouchRow: View {
     @Environment(AppModel.self) private var model
     @State private var requestDrag: UUID?
@@ -29,6 +29,8 @@ struct OneTouchRow: View {
                 button(target)
                 slider(target, strength: strength, context: model.portraitPurposeContext)
             }
+            Text(UserMessage.oneTouchRequestInstruction).font(.caption2).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(UserMessage.portraitCount(model.portraitFaceCount(for: target)))
                 .font(.caption).foregroundStyle(.secondary)
             if let proposal, let protection = UserMessage.oneTouchProtected(proposal) {
@@ -122,7 +124,7 @@ struct OneTouchRow: View {
             .disabled(model.isEmptyGenderGroup(target))
             .accessibilityLabel("원터치 요청 강도")
             .accessibilityValue(Self.strengthText(for: strength))
-            .accessibilityHint("강도를 고른 뒤 원터치 보정으로 적용할 수도 있어요.")
+            .accessibilityHint("강도를 고른 뒤 적용 버튼을 눌러주세요.")
             .accessibilityIdentifier(buttonIdentifier + ".request")
         }
     }

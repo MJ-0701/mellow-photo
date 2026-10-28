@@ -1,3 +1,4 @@
+import CryptoKit
 import MellowEditing
 import MellowLibrary
 import MellowRendering
@@ -21,7 +22,7 @@ final class OneTouchRequestTests: XCTestCase {
         return (model, root, store)
     }
 
-    func testSliderRequestsDoNotEditUntilEndAndMakeOneUndo() async throws {
+    func testSliderOnlyEditsRequestsAndButtonMakesOneUndo() async throws {
         let (model, root, store) = try await makeModel()
         defer {
             model.stopWork()
@@ -35,8 +36,16 @@ final class OneTouchRequestTests: XCTestCase {
             model.setRequestedOneTouchStrength(value, for: .all, expectedContext: context, dragID: drag)
             XCTAssertEqual(model.session.selected!.document, before)
             XCTAssertEqual(store.saveCount, saves)
+            XCTAssertFalse(model.isRendering)
+            XCTAssertEqual(model.portraitPurposeContext, context)
         }
         model.endOneTouchRequestEditing(for: .all, id: drag)
+        XCTAssertEqual(store.saveCount, saves)
+        XCTAssertEqual(model.session.selected!.document, before)
+        XCTAssertNil(model.oneTouchFeedback(for: .all))
+        XCTAssertFalse(model.isRendering)
+        XCTAssertEqual(model.portraitPurposeContext, context)
+        XCTAssertTrue(model.submitOneTouchRequest(for: .all))
         XCTAssertEqual(store.saveCount, saves + 1)
         XCTAssertEqual(model.session.selected!.document.undoStack.count, before.undoStack.count + 1)
         XCTAssertEqual(model.oneTouchFeedback(for: .all)?.phase, .rendering)
@@ -240,6 +249,29 @@ final class OneTouchRequestTests: XCTestCase {
             let staged = await model.importer.stage(fileURLs: [root.appendingPathComponent("not-a-photo")])
             XCTAssertTrue(staged.isEmpty)
         }
+        func testChoosingNeutralForExplicitReplacementDoesNotClearGlobalBeforeReplacement() async throws {
+            let model = try AppModel.oneTouchDebugFixture()
+            let root = model.copies.directory.deletingLastPathComponent()
+            defer {
+                model.stopWork()
+                try? FileManager.default.removeItem(at: root)
+            }
+            await model.restore()
+            try await waitUntil { model.isReady && !model.isRendering }
+            let before = model.currentRecipe
+            let beforeUndo = model.session.selected!.document.undoStack.count
+            let drag = try XCTUnwrap(model.beginOneTouchRequestEditing(for: .all))
+            model.setRequestedOneTouchStrength(0, for: .all, dragID: drag)
+            model.endOneTouchRequestEditing(for: .all, id: drag)
+            try await waitUntil { !model.isRendering }
+            XCTAssertEqual(model.currentRecipe, before, "교체용 강도 선택만으로 기본 적용/삭제를 선행하지 않는다")
+            XCTAssertTrue(model.submitOneTouchRequest(for: .all, replacingPersonal: true))
+            try await waitUntil { !model.isRendering }
+            XCTAssertEqual(model.currentRecipe.portrait, before.portrait)
+            XCTAssertEqual(model.currentRecipe.people.groups, before.people.groups)
+            XCTAssertEqual(model.currentRecipe.bodySkin, before.bodySkin)
+            XCTAssertEqual(model.session.selected!.document.undoStack.count, beforeUndo + 1)
+        }
     #endif
 
     func testBodyOnlyChangeIsNotReportedAsFaceCompletion() async throws {
@@ -262,6 +294,90 @@ final class OneTouchRequestTests: XCTestCase {
         XCTAssertEqual(feedback.result?.bodySkinChanged, true)
         XCTAssertEqual(model.currentRecipe.people.individuals, individual)
         XCTAssertEqual(UserMessage.oneTouchOutcome(feedback), "몸 피부 밝기 값만 적용됐어요. 얼굴 보정 완료를 뜻하지 않아요.")
+    }
+
+    #if DEBUG
+        func testNativeMeterRequiredFieldsReflectOwnedSourceAndActualActionScope() async throws {
+            let model = try AppModel.oneTouchDebugFixture()
+            let root = model.copies.directory.deletingLastPathComponent()
+            defer {
+                model.stopWork()
+                try? FileManager.default.removeItem(at: root)
+            }
+            await model.restore()
+            try await waitUntil { model.isReady && !model.isRendering }
+            func meter() throws -> [String: Any] {
+                try XCTUnwrap(
+                    try JSONSerialization.jsonObject(with: Data(model.oneTouchFixtureSnapshot.utf8)) as? [String: Any])
+            }
+            let entry = model.session.selected!
+            let bytes = try Data(contentsOf: model.copies.url(for: entry.filename))
+            let actualSHA = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            let first = try meter()
+            XCTAssertEqual(first["sourceSHA"] as? String, actualSHA)
+            XCTAssertEqual(first["bodyBrightness"] as? Double, model.currentRecipe.bodySkin.brightness)
+            XCTAssertEqual(first["requestCurrent"] as? Double, 1)
+            let document = model.session.selected!.document
+            model.setBeautyTarget(.gender(.male))
+            model.setRequestedOneTouchStrength(0.3, for: .gender(.male))
+            let second = try meter()
+            XCTAssertEqual(second["sourceSHA"] as? String, actualSHA)
+            XCTAssertEqual(try XCTUnwrap(second["requestCurrent"] as? Double), 0.3, accuracy: 1e-12)
+            XCTAssertEqual(second["requestAll"] as? Double, 1)
+            XCTAssertEqual(second["bodyBrightness"] as? Double, document.recipe.bodySkin.brightness)
+            XCTAssertEqual(model.session.selected!.document, document)
+        }
+    #endif
+
+    func testDraftDoesNotDrainAnotherOpenSliderAndApplyKeepsUndoSeparate() async throws {
+        let (model, root, store) = try await makeModel()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        model.selectTool(.adjust)
+        model.beginSliderEdit()
+        model.edit(.exposure(0.3))
+        let before = model.session.selected!.document
+        let saves = store.saveCount
+        let drag = try XCTUnwrap(model.beginOneTouchRequestEditing(for: .all))
+        model.setRequestedOneTouchStrength(0.8, for: .all, dragID: drag)
+        model.endOneTouchRequestEditing(for: .all, id: drag)
+        XCTAssertTrue(model.session.isPersistenceDeferred)
+        XCTAssertEqual(store.saveCount, saves)
+        XCTAssertEqual(model.session.selected!.document, before)
+        XCTAssertTrue(model.submitOneTouchRequest(for: .all))
+        XCTAssertFalse(model.session.isPersistenceDeferred)
+        XCTAssertEqual(store.saveCount, saves + 2)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe.color.exposure, 0.3)
+        XCTAssertNil(model.currentRecipe.portrait.oneTouch)
+        model.undo()
+        XCTAssertTrue(model.currentRecipe.isDefault)
+    }
+
+    func testPositiveDraftThenExplicitKeepsGlobalGroupAndBodyValues() async throws {
+        let (model, root, store) = try await makeModel()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        model.applyOneTouch(strength: 0.6, target: .all)
+        model.applyOneTouch(strength: 0.2, target: .face(0))
+        try await waitUntil { !model.isRendering }
+        let before = model.session.selected!.document
+        let saves = store.saveCount
+        let drag = try XCTUnwrap(model.beginOneTouchRequestEditing(for: .all))
+        model.setRequestedOneTouchStrength(1, for: .all, dragID: drag)
+        model.endOneTouchRequestEditing(for: .all, id: drag)
+        XCTAssertEqual(model.session.selected!.document, before)
+        XCTAssertEqual(store.saveCount, saves)
+        XCTAssertTrue(model.submitOneTouchRequest(for: .all, replacingPersonal: true))
+        XCTAssertEqual(model.currentRecipe.portrait, before.recipe.portrait)
+        XCTAssertEqual(model.currentRecipe.people.groups, before.recipe.people.groups)
+        XCTAssertEqual(model.currentRecipe.bodySkin, before.recipe.bodySkin)
+        XCTAssertEqual(store.saveCount, saves + 1)
+        XCTAssertEqual(model.session.selected!.document.undoStack.count, before.undoStack.count + 1)
     }
 
 }
