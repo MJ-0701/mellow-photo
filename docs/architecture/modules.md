@@ -78,6 +78,8 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 
 얼굴 분석 실패는 오류가 아니라 `PreparedPhoto.faceAnalysisFailure`로 전달합니다. 색감·수동 편집은 계속할 수 있습니다. 오류 사유는 영어 식별자(예: `PhotoPipeline.unpreparedReason` = `photo-not-prepared`)이며 사용자 문구는 앱의 `UserMessage`가 정합니다.
 
+부위 선택을 위해 `PreparedPhoto.bodyRegions`는 렌더의 `BodySkeleton` 유효성 검사를 통과한 몸만 원래 분석 인덱스로 제공합니다. `BodyOutline.sideChestPoints`는 기존 부유방 렌더 높이의 옆선 점을 읽습니다. 앱은 이 읽기 전용 정보와 기존 `bodyFaceMatches`로 부위를 선택하며, 렌더 분석이나 보정 강도를 변경하지 않습니다.
+
 ### MellowExport
 | 항목 | 내용 |
 |---|---|
@@ -92,6 +94,10 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 ## 앱 타깃
 
 `apple/MellowPhoto/`는 다섯 모듈을 모두 import하는 유일한 곳입니다. 정의는 `apple/project.yml`(XcodeGen)이고 생성된 `apple/MellowPhoto.xcodeproj`를 커밋합니다.
+
+`EditorTool.region`은 사진의 부위를 눌러 기존 조절 항목을 찾거나 `RetouchDirectoryPanel`에서 도구를 검색하는 진입점입니다. `RetouchDestination`은 도구·탭·슬라이더 위치만 고르고 레시피를 바꾸지 않습니다. 유효한 얼굴·몸 연결을 사용하며, 겹침이나 비선형 형태 변형으로 위치를 보장하지 못하면 명시적 사람·도구 선택으로 안내합니다. 빠른 보정에는 전체 원터치 강도와 이중턱·부유방 직접 진입을 제공합니다.
+
+`AppModel+PortraitTargets`는 현재 사진에 매칭된 얼굴과 렌더러의 유효 성별로 그룹 인원을 셉니다. 빈 그룹의 인물 값 쓰기는 UI와 AppModel 양쪽에서 거절하며, 기존 저장값의 명시적 초기화와 전역 몸 피부·색 조정은 유지합니다. 그룹 선택만으로 성별을 지정하지 않고, 대상 전환은 진행 중 드래그를 마무리한 뒤 화면 상태만 바꿉니다. 전체 원터치는 상세 화면에서 고른 그룹과 별개로 전체 층을 대상으로 합니다.
 
 | 폴더 | 역할 |
 |---|---|
