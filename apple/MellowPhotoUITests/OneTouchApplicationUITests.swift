@@ -62,14 +62,29 @@ final class OneTouchApplicationUITests: XCTestCase {
         add(meter)
     }
 
-    private func safeViewport(_ app: XCUIApplication) -> CGRect {
-        let panel = app.scrollViews["quick.controlsScroll"].frame.intersection(app.frame)
+    /// 계산만 한다. 누락/비정상 좌표는 nil이며 관측/실패 판정은 호출자가 담당한다.
+    private func safeViewport(_ app: XCUIApplication) -> CGRect? {
+        let controls = app.scrollViews["quick.controlsScroll"]
         let footer = app.buttons["이 설정 복사"]
-        let bottom = footer.exists ? min(panel.maxY, footer.frame.minY) : panel.maxY
-        return CGRect(
+        guard controls.exists, footer.exists else { return nil }
+        let screen = app.frame
+        let controlFrame = controls.frame
+        let footerFrame = footer.frame
+        func valid(_ frame: CGRect) -> Bool {
+            [frame.minX, frame.minY, frame.width, frame.height, frame.maxX, frame.maxY].allSatisfy(\.isFinite)
+                && frame.width > 0 && frame.height > 0
+        }
+        guard valid(screen), valid(controlFrame), valid(footerFrame) else { return nil }
+        let panel = controlFrame.intersection(screen)
+        guard valid(panel), screen.contains(footerFrame), footerFrame.minY >= panel.midY,
+            footerFrame.maxX > panel.minX, footerFrame.minX < panel.maxX
+        else { return nil }
+        let bottom = min(panel.maxY, footerFrame.minY)
+        let safe = CGRect(
             x: panel.minX, y: panel.minY, width: panel.width,
-            height: max(0, bottom - panel.minY)
+            height: bottom - panel.minY
         ).insetBy(dx: 0, dy: 8)
+        return valid(safe) ? safe : nil
     }
 
     private func frameRecord(_ element: XCUIElement?) -> [String: Any] {
@@ -90,7 +105,7 @@ final class OneTouchApplicationUITests: XCTestCase {
                 "state": actual, "target": frameRecord(target),
                 "controls": frameRecord(app.scrollViews["quick.controlsScroll"]),
                 "footer": frameRecord(app.buttons["이 설정 복사"]),
-                "safeViewport": NSCoder.string(for: safeViewport(app)), "gesture": extra,
+                "safeViewport": safeViewport(app).map { NSCoder.string(for: $0) } ?? "unavailable", "gesture": extra,
             ], options: [.sortedKeys])
         let metadata = XCTAttachment(data: data, uniformTypeIdentifier: "public.json")
         metadata.name = name + "-geometry-state"
@@ -117,8 +132,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         var up = true
         for step in 0..<30 {
             let before = try state(app)
-            let viewport = safeViewport(app)
-            guard viewport.width > 0, viewport.height > 0 else {
+            guard let viewport = safeViewport(app) else {
                 try observation(app, target: target, name: "one-touch-invalid-viewport")
                 XCTFail("보정 패널의 실제 표시 영역을 확인할 수 없다")
                 return
@@ -180,7 +194,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         XCTAssertTrue(target.exists)
         XCTAssertTrue(target.isEnabled)
         XCTAssertTrue(target.isHittable)
-        XCTAssertTrue(safeViewport(app).contains(target.frame), "조작할 항목 전체가 고정 바 위에 보여야 한다")
+        XCTAssertEqual(safeViewport(app)?.contains(target.frame), true, "조작할 항목 전체가 고정 바 위에 보여야 한다")
     }
 
     func testQuickProtectionExplicitReplacementCompareAndSingleUndo() throws {
@@ -269,7 +283,11 @@ final class OneTouchApplicationUITests: XCTestCase {
         try reveal(slider, app: app)
         let before = try state(app)
         let frame = slider.frame
-        let viewport = safeViewport(app)
+        guard let viewport = safeViewport(app) else {
+            try observation(app, target: slider, name: "one-touch-zero-invalid-viewport")
+            XCTFail("조절기와 고정 하단 바의 위치를 확인할 수 없다")
+            return
+        }
         let start = CGPoint(x: frame.maxX - frame.height / 2, y: frame.midY)
         let end = CGPoint(x: frame.minX + 1, y: frame.midY)
         let gesture: [String: Any] = [
