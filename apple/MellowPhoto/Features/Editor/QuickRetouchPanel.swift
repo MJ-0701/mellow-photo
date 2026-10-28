@@ -22,12 +22,7 @@ struct QuickRetouchPanel: View {
                     if action == .portrait {
                         OneTouchRow(fixedTarget: .all, buttonIdentifier: "quick.portrait")
                             .disabled(reason != nil)
-                        if !model.currentRecipe.people.individuals.isEmpty {
-                            Text("개인별 수동 설정은 전체 원터치보다 우선해요. 아래에서 사람을 골라 그 사람의 원터치를 적용할 수 있어요.")
-                                .font(.caption).foregroundStyle(.secondary)
-                            Button("사람별 원터치 조절") { model.selectTool(.beauty) }
-                                .font(.caption)
-                        }
+
                     } else {
                         Button {
                             Task { await model.applyQuickAction(action) }

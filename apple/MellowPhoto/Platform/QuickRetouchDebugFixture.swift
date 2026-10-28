@@ -10,6 +10,9 @@
     /// UI 테스트 전용. 출시 빌드에는 없으며 사용자 세션·사진 경로에 접근하지 않는다.
     extension AppModel {
         static func quickRetouchDebugFixture() throws -> AppModel {
+            if ProcessInfo.processInfo.arguments.contains("--portrait-overrides") {
+                return try oneTouchDebugFixture()
+            }
             let root = FileManager.default.temporaryDirectory
                 .appendingPathComponent("MellowQuickRetouch-\(UUID().uuidString)", isDirectory: true)
             let copies = WorkingCopyStore(directory: root.appendingPathComponent("Library", isDirectory: true))

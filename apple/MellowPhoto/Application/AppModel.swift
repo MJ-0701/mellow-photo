@@ -180,6 +180,13 @@ final class AppModel {
     var original: CGImage?
     var portraitPurposeContext = UUID()
     var portraitPurposeApplication: PortraitPurposeApplication?
+    var oneTouchRequests: [OneTouchInputKey: Double] = [:]
+    var oneTouchRequestDrag: OneTouchRequestDrag?
+    var oneTouchAttempt: OneTouchAttempt?
+    #if DEBUG
+        var isOneTouchUIFixture = false
+        @ObservationIgnored var oneTouchFixtureSaveCount: (() -> Int)?
+    #endif
     var isReady = false
     var isRendering = false
     var isImporting = false

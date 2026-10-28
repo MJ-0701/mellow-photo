@@ -787,7 +787,7 @@ public struct EditDocument: Equatable, Sendable {
 }
 
 extension EditDocument {
-    /// 새 계획 경로. positive 기본 적용은 개인값을 보호하며 실제 준비된 키만 쓴다.
+    /// 새 계획 경로. 기본 적용은 legacy 제안을 보고하고, 명시 교체만 준비된 개인 키에 한정한다.
     /// 명시 교체의 0은 개인 neutral 값이다. 기존 applyOneTouch(0)의 상속 복귀와 별개다.
     @discardableResult
     public mutating func applyOneTouchReporting(

@@ -18,6 +18,7 @@
 		102AA1A0480CA5D2E888D354 /* RenderSchedulerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */; };
 		17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */; };
 		1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */ = {isa = PBXBuildFile; fileRef = F465BA3A1339352022E907AA /* AppModel+Live.swift */; };
+		1FF790420351600C6BCED12B /* OneTouchDebugFixture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF05094D47EFC0A4D8F609A /* OneTouchDebugFixture.swift */; };
 		23C0722E7B6702010764195B /* MellowExport in Frameworks */ = {isa = PBXBuildFile; productRef = 0896D57D2160F72010B89781 /* MellowExport */; };
 		25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */; };
 		281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */; };
@@ -67,10 +68,13 @@
 		9CCACC56A441C098938B6042 /* TargetChips.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB45ECE429C3E15A34ECF4C8 /* TargetChips.swift */; };
 		9D74E0D80B86E1B43BA9B2F3 /* OneTouchApplicationActionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 643BAE4B1337B7B182A90D98 /* OneTouchApplicationActionTests.swift */; };
 		A6638DE9800F8B3C5FA0B8B6 /* makeup.v1.json in Resources */ = {isa = PBXBuildFile; fileRef = 9D32CC590745242241C9A2F3 /* makeup.v1.json */; };
+		B211F86BFD32FB751C84CA5F /* OneTouchRequestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F321734D3D26ECCED9B6645 /* OneTouchRequestTests.swift */; };
+		B97A38399C4AEB15E726C5A8 /* OneTouchApplicationUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D9B29F2AAF9958A4F19D5A1 /* OneTouchApplicationUITests.swift */; };
 		BBA4C9BE0BC2A380BBC9EA01 /* AppModel+PortraitTargets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */; };
 		BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */; };
 		BF4553F91F480ACCB9995368 /* MellowShared in Frameworks */ = {isa = PBXBuildFile; productRef = D9E6C184CF7571E2417C70A8 /* MellowShared */; };
 		C00186F01987B7FF94362F08 /* BackgroundPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63DF1EBC36685BFF5F7FF29 /* BackgroundPanel.swift */; };
+		C28CEB3E87DFB54BEC94F87A /* AppModel+OneTouchRequests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA60A992CBCC8A01BDB5AAF8 /* AppModel+OneTouchRequests.swift */; };
 		C32E30AA9490534A74C0ABA2 /* ActionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AB2B7D8A7970F1FACC394E /* ActionBar.swift */; };
 		C51CAABDED6649C066D63C91 /* BodyPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83CBCF07C95A8CA66A73434E /* BodyPanel.swift */; };
 		C7A2DB8966AC4F7121E25EBC /* container-migration.plist in Resources */ = {isa = PBXBuildFile; fileRef = DD25AA90F8D05216BCD544F0 /* container-migration.plist */; };
@@ -87,6 +91,7 @@
 		E78B9D3A1FDB7D2220DDE399 /* UserMessage+QuickRetouch.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F9836BC15896ABBD95ED97 /* UserMessage+QuickRetouch.swift */; };
 		E8197A3DF2C7A0CBE8F1F0C7 /* RenderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 370CF7443944DB02164CF8DD /* RenderScheduler.swift */; };
 		E8931E3E9F33DE4ECB57631C /* FolderDestinationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */; };
+		EA71FB253ADDC55A89A639F0 /* UserMessage+OneTouchApplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5399DEC9C7897EB3231DFF52 /* UserMessage+OneTouchApplication.swift */; };
 		EB707F701E1D5197AE98A27E /* EditorTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36320C45E8AF6FDB30E90D1 /* EditorTool.swift */; };
 		EDFDF0C5D8799767D8009F53 /* BeautyTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = A541985795F5FEE15374903C /* BeautyTab.swift */; };
 		EF81D1F4E43A0FEEA921FED6 /* AppModel+RetouchDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 101BD09FD9200EBB2996D97A /* AppModel+RetouchDestinations.swift */; };
@@ -134,6 +139,7 @@
 		22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresets.swift; sourceTree = "<group>"; };
 		2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+PortraitTargets.swift"; sourceTree = "<group>"; };
 		2C153CB5A51F515C6439BAB1 /* TargetChipsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TargetChipsTests.swift; sourceTree = "<group>"; };
+		2D9B29F2AAF9958A4F19D5A1 /* OneTouchApplicationUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchApplicationUITests.swift; sourceTree = "<group>"; };
 		2F0DE03B3D7090AE3713F35C /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		370CF7443944DB02164CF8DD /* RenderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderScheduler.swift; sourceTree = "<group>"; };
 		39A51E7E5ED431D27897013E /* EditorScenarioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditorScenarioTests.swift; sourceTree = "<group>"; };
@@ -144,8 +150,10 @@
 		46F6AA47ECDDACE1D495F5F9 /* UserMessage+PortraitTargets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserMessage+PortraitTargets.swift"; sourceTree = "<group>"; };
 		4D53E298C4C308D207780CD5 /* QuickRetouchPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRetouchPanel.swift; sourceTree = "<group>"; };
 		505F21DC7A15D7DBC745704E /* ExportPhotos.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportPhotos.swift; sourceTree = "<group>"; };
+		5399DEC9C7897EB3231DFF52 /* UserMessage+OneTouchApplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UserMessage+OneTouchApplication.swift"; sourceTree = "<group>"; };
 		540B90F0C598F262D4039570 /* InfoSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfoSheet.swift; sourceTree = "<group>"; };
 		5AE17FFF52E19BB8012D6FA3 /* AppModel+QuickRetouch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+QuickRetouch.swift"; sourceTree = "<group>"; };
+		5DF05094D47EFC0A4D8F609A /* OneTouchDebugFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchDebugFixture.swift; sourceTree = "<group>"; };
 		5E34F8E486BC07B68EC6F628 /* FolderDestinationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FolderDestinationTests.swift; sourceTree = "<group>"; };
 		62339CA9C371ED495F9A74D4 /* AppModel+Geometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Geometry.swift"; sourceTree = "<group>"; };
 		643BAE4B1337B7B182A90D98 /* OneTouchApplicationActionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchApplicationActionTests.swift; sourceTree = "<group>"; };
@@ -154,6 +162,7 @@
 		67F0A297FD9A7B7329F61D6B /* BrushPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrushPanel.swift; sourceTree = "<group>"; };
 		6A9A92EBAB68B9CD3E3F78C3 /* QuickRetouchDebugFixture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRetouchDebugFixture.swift; sourceTree = "<group>"; };
 		6C185ADC9CEA8A109C65B716 /* RenderSchedulerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderSchedulerTests.swift; sourceTree = "<group>"; };
+		6F321734D3D26ECCED9B6645 /* OneTouchRequestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneTouchRequestTests.swift; sourceTree = "<group>"; };
 		73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+Library.swift"; sourceTree = "<group>"; };
 		7451F7A8E9DE87961267F974 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		77C31B5BA539C2E97EA0F86A /* RetouchDestination.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RetouchDestination.swift; sourceTree = "<group>"; };
@@ -208,6 +217,7 @@
 		F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportMenuUITests.swift; sourceTree = "<group>"; };
 		F9E1EDE84BC92D4DC9B96BE4 /* Ports.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Ports.swift; sourceTree = "<group>"; };
 		FA07672648D544B650764001 /* MellowPhoto.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MellowPhoto.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FA60A992CBCC8A01BDB5AAF8 /* AppModel+OneTouchRequests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppModel+OneTouchRequests.swift"; sourceTree = "<group>"; };
 		FC78A7C603F5FC9D47E5B0CE /* QuickRetouchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickRetouchUITests.swift; sourceTree = "<group>"; };
 		FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMacPresetsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -240,6 +250,7 @@
 			isa = PBXGroup;
 			children = (
 				F723B31EF0DC41F6172CA7A2 /* ImportMenuUITests.swift */,
+				2D9B29F2AAF9958A4F19D5A1 /* OneTouchApplicationUITests.swift */,
 				FC78A7C603F5FC9D47E5B0CE /* QuickRetouchUITests.swift */,
 			);
 			path = MellowPhotoUITests;
@@ -358,6 +369,7 @@
 				0CC7B2127253399C3BB4C706 /* ImportPhotosTests.swift */,
 				FEDA283A0B8B6DCC93DB73CA /* LegacyMacPresetsTests.swift */,
 				643BAE4B1337B7B182A90D98 /* OneTouchApplicationActionTests.swift */,
+				6F321734D3D26ECCED9B6645 /* OneTouchRequestTests.swift */,
 				CE7F0C4882288DA3B37E92D7 /* OneTouchRowTests.swift */,
 				0119543B943C7F69A15E37CE /* PortraitPurposeActionTests.swift */,
 				169CF4B35A0B7FFFD7974955 /* PortraitTargetSafetyTests.swift */,
@@ -393,6 +405,7 @@
 				F465BA3A1339352022E907AA /* AppModel+Live.swift */,
 				39F25010AC7BB2432F264435 /* FolderDestination.swift */,
 				22B84699785347DA8ED7C9BE /* LegacyMacPresets.swift */,
+				5DF05094D47EFC0A4D8F609A /* OneTouchDebugFixture.swift */,
 				66C5369E9DAAD2955DB9932C /* PhotoLibraryDestination.swift */,
 				6A9A92EBAB68B9CD3E3F78C3 /* QuickRetouchDebugFixture.swift */,
 				BB0A29FE9870180574F22357 /* SystemPhotoImporter.swift */,
@@ -419,6 +432,7 @@
 				73C0F70A54BFC25180F0FAD7 /* AppModel+Library.swift */,
 				DBA079D5E1B02E1A5D01910B /* AppModel+Looks.swift */,
 				820E7A87BCDCCCBB3CED661C /* AppModel+OneTouchApplication.swift */,
+				FA60A992CBCC8A01BDB5AAF8 /* AppModel+OneTouchRequests.swift */,
 				88317A3E6DB6088CAA2818E3 /* AppModel+PortraitPurpose.swift */,
 				2965FFBB4726C71FA43EE00C /* AppModel+PortraitTargets.swift */,
 				5AE17FFF52E19BB8012D6FA3 /* AppModel+QuickRetouch.swift */,
@@ -431,6 +445,7 @@
 				370CF7443944DB02164CF8DD /* RenderScheduler.swift */,
 				77C31B5BA539C2E97EA0F86A /* RetouchDestination.swift */,
 				3D630A842DBDB0FFBAB08678 /* UserMessage.swift */,
+				5399DEC9C7897EB3231DFF52 /* UserMessage+OneTouchApplication.swift */,
 				46F6AA47ECDDACE1D495F5F9 /* UserMessage+PortraitTargets.swift */,
 				E9F9836BC15896ABBD95ED97 /* UserMessage+QuickRetouch.swift */,
 			);
@@ -593,6 +608,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				281E31DFD217EF0FC4CCC7AC /* ImportMenuUITests.swift in Sources */,
+				B97A38399C4AEB15E726C5A8 /* OneTouchApplicationUITests.swift in Sources */,
 				01330CBE87E2620390DB4C97 /* QuickRetouchUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -611,6 +627,7 @@
 				17FC03D03E4C7606EE943B7A /* ImportPhotosTests.swift in Sources */,
 				5B65FD76F9662CAFA6E2C432 /* LegacyMacPresetsTests.swift in Sources */,
 				9D74E0D80B86E1B43BA9B2F3 /* OneTouchApplicationActionTests.swift in Sources */,
+				B211F86BFD32FB751C84CA5F /* OneTouchRequestTests.swift in Sources */,
 				25319B86D0778FAC3BD4C9A9 /* OneTouchRowTests.swift in Sources */,
 				6AB018D5EC7E29B3A25E860F /* PortraitPurposeActionTests.swift in Sources */,
 				D3FD25AF2F233E1410B8C874 /* PortraitTargetSafetyTests.swift in Sources */,
@@ -638,6 +655,7 @@
 				1D40D19D2489EA07AD851400 /* AppModel+Live.swift in Sources */,
 				0E6ADDFED40162806D835BA1 /* AppModel+Looks.swift in Sources */,
 				F2A5688CA40C9E2E52FCA19D /* AppModel+OneTouchApplication.swift in Sources */,
+				C28CEB3E87DFB54BEC94F87A /* AppModel+OneTouchRequests.swift in Sources */,
 				82C3AD3CBBD90DD35C283FF5 /* AppModel+PortraitPurpose.swift in Sources */,
 				BBA4C9BE0BC2A380BBC9EA01 /* AppModel+PortraitTargets.swift in Sources */,
 				FAA927D7BD18D2429FA4B542 /* AppModel+QuickRetouch.swift in Sources */,
@@ -663,6 +681,7 @@
 				61873CD9B42105AA437C882A /* LookPanel.swift in Sources */,
 				F2AC44EE34B8E919A0B7549B /* MakeupPanel.swift in Sources */,
 				48FB8A5B5C390920D0F9DB70 /* MellowPhotoApp.swift in Sources */,
+				1FF790420351600C6BCED12B /* OneTouchDebugFixture.swift in Sources */,
 				3BF956860D2433E83A0582EB /* OneTouchRow.swift in Sources */,
 				CF26FC52CE99423A4017446D /* PhotoCanvasView.swift in Sources */,
 				BD6209B205E23860CE2101F6 /* PhotoLibraryDestination.swift in Sources */,
@@ -682,6 +701,7 @@
 				F1066A80DCABA00D2F35E7E3 /* Theme.swift in Sources */,
 				FE7D788384F98019BAC54F04 /* ThumbnailCell.swift in Sources */,
 				3B712708D13FF51257DC9E02 /* ToolStrip.swift in Sources */,
+				EA71FB253ADDC55A89A639F0 /* UserMessage+OneTouchApplication.swift in Sources */,
 				0EFC197B2F5B35EDB09F41B0 /* UserMessage+PortraitTargets.swift in Sources */,
 				E78B9D3A1FDB7D2220DDE399 /* UserMessage+QuickRetouch.swift in Sources */,
 				4B5F5338490EF15C7D3030BC /* UserMessage.swift in Sources */,

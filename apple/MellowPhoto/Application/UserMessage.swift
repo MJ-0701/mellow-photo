@@ -100,8 +100,8 @@ enum UserMessage {
     /// 원터치 줄 아래 안내(G4 스펙 4절).
     /// iPhone 조절 영역에 맞게 전체는 두 줄, 그룹·사람은 한 줄이다.
     static let oneTouchHintAll = "성별을 지정한 사람은 성별 표, 나머지는 공통 표로 보정돼요. 그룹 값(립·블러셔 포함)이 전체보다 앞서요."
-    static let oneTouchHintGroup = "이 그룹 표만 다시 써요. 다른 층과 몸 피부는 그대로예요."
-    static let oneTouchHintPerson = "이 사람의 성별 표로 보정해요. 몸 피부는 그대로예요."
+    static let oneTouchHintGroup = "이 그룹의 원터치 항목만 다시 적용해요. 개인 조정과 몸 피부는 유지돼요."
+    static let oneTouchHintPerson = "이 사람의 원터치 항목을 성별 표로 다시 써요. 몸 피부는 그대로예요."
     static let autoEnhanced = "자동 보정을 적용했어요. 실행 취소로 되돌릴 수 있어요."
     static let lookCatalogUnavailable = "필터 목록을 읽지 못해 필터를 쓸 수 없습니다."
 

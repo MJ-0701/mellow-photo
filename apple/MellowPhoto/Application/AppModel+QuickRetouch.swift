@@ -64,13 +64,17 @@ extension AppModel {
             await runPhotoAuto(action, allPhotos: false)
             return
         }
+        if action == .portrait {
+            submitOneTouchRequest(for: .all)
+            return
+        }
         endSliderEditIfActive()
         var changed = false
         mutateSelected { document in
             let before = document.recipe
             switch action {
             case .portrait:
-                _ = document.applyOneTouch(strength: EditingPolicy.oneTouchDefaultStrength, in: .all)
+                break
             case .background:
                 _ = document.set(.backgroundBlur(Policy.quickBackgroundBlur))
             case .night:
