@@ -681,6 +681,9 @@ final class AppModel {
 
     func remember(_ id: PhotoID, _ prepared: PreparedPhoto, bindsLegacyPeople: Bool = true) {
         portraitPurposeContext = UUID()
+        if portraitPurposeApplication?.photoID == id {
+            invalidatePortraitPurposeApplication()
+        }
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,

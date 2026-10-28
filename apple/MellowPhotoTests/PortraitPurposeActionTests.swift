@@ -206,4 +206,54 @@ final class PortraitPurposeActionTests: XCTestCase {
         XCTAssertTrue(model.currentRecipe.isDefault)
     }
 
+    func testReanalysisCannotRetainCurrentPurposeReceipt() async throws {
+        let (model, root, _) = try await makeModel()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        XCTAssertTrue(model.applyPortraitPurpose(.skin, strength: 1, replacingExisting: false))
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.portraitPurposeApplication?.phase, .visible)
+        let id = model.session.selectedPhotoID!
+        let info = model.selectedInfo!
+        model.remember(
+            id,
+            PreparedPhoto(
+                pixelSize: info.pixelSize, thumbnail: model.thumbnails[id]!, faces: info.faces,
+                faceAnalysisFailure: nil, portraitPurposeKeys: [:]), bindsLegacyPeople: false)
+        XCTAssertEqual(
+            model.portraitPurposeApplication?.phase, .cancelled,
+            "분석/준비 상태가 갱신되면 이전 완료 상태는 무효다")
+        model.scheduleRender()
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(
+            model.portraitPurposeApplication?.phase, .cancelled,
+            "새 분석의 렌더 완료가 옛 적용 상태를 부활시키면 안 된다")
+    }
+
+    func testPendingPurposeIsCancelledByReanalysisWithoutAnotherEditOrSave() async throws {
+        let (model, root, store) = try await makeModel()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        XCTAssertTrue(model.applyPortraitPurpose(.skin, strength: 1, replacingExisting: false))
+        XCTAssertEqual(model.portraitPurposeApplication?.phase, .rendering)
+        let id = model.session.selectedPhotoID!
+        let info = model.selectedInfo!
+        let before = model.session.selected!.document
+        let saves = store.saveCount
+        model.remember(
+            id,
+            PreparedPhoto(
+                pixelSize: info.pixelSize, thumbnail: model.thumbnails[id]!, faces: info.faces,
+                faceAnalysisFailure: nil, portraitPurposeKeys: [:]), bindsLegacyPeople: false)
+        XCTAssertEqual(model.portraitPurposeApplication?.phase, .cancelled)
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.portraitPurposeApplication?.phase, .cancelled)
+        XCTAssertEqual(model.session.selected!.document, before)
+        XCTAssertEqual(store.saveCount, saves)
+    }
+
 }
