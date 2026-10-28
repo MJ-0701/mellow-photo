@@ -41,7 +41,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 | 항목 | 내용 |
 |---|---|
 | 책임 | 사진 한 장의 편집 상태와 규칙 |
-| 공개 API | `EditDocument`(H에서 `set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides(_:in:)`·`rebindPerson(_:to:)`·`removePerson(_:)`·`bindLegacyPeople(faces:)`·`applyMakeupLook(_:in:)`·`applyMakeupLook(_:forFace:of:)`·`Rejection.unknownPerson`, I에서 `Rejection.scopeNotAllowed`, G4에서 `applyOneTouch(strength:in:)`·`applyOneTouch(strength:forFace:of:)`·`applyAuto(_:oneTouchStrength:)`, 목적별 적용 `applyPortraitPurpose(_:strength:faces:targets:replacingExisting:)`), `PortraitPurpose`, `PortraitPurposeFace`, `PortraitPurposeResult`, `EditChange`(H에서 `gender(Gender?)`·`portraitKey`), `EditingPolicy`(G4에서 `oneTouchDefaultStrength`), `SyncCategory`(H에서 `portraitKeys`, G4에서 `oneTouchCategories`, I에서 `body`가 얼굴 의존 항목) |
+| 공개 API | `EditDocument`(H에서 `set(_:in:)`·`set(_:forFace:of:)`·`resetOverrides(_:in:)`·`rebindPerson(_:to:)`·`removePerson(_:)`·`bindLegacyPeople(faces:)`·`applyMakeupLook(_:in:)`·`applyMakeupLook(_:forFace:of:)`·`Rejection.unknownPerson`, I에서 `Rejection.scopeNotAllowed`, G4에서 `applyOneTouch(strength:in:)`·`applyOneTouch(strength:forFace:of:)`·`applyAuto(_:oneTouchStrength:)`, 목적별 적용 `applyPortraitPurpose(_:strength:faces:targets:replacingExisting:)`), `PortraitPurpose`, `PortraitPurposeFace`, `PortraitPurposeResult`, `OneTouchApplicationScope`, `OneTouchApplicationResult`, `EditChange`(H에서 `gender(Gender?)`·`portraitKey`), `EditingPolicy`(G4에서 `oneTouchDefaultStrength`), `SyncCategory`(H에서 `portraitKeys`, G4에서 `oneTouchCategories`, I에서 `body`가 얼굴 의존 항목) |
 | 의존 | MellowShared |
 | 포트 | 없음 |
 | 규칙 | 변경 전 체크포인트, 수동 편집 시 얼굴형(`faceShape`)·체형(`bodyShape`)·성별 지정 잠금, 프리셋·일괄 적용 시 잠긴 얼굴형·체형 보존, 자동 보정은 색·디테일·피부·눈입만 바꿈, 자동 보정(`applyAuto`)은 체크포인트 한 번이고 값이 같으면 아무것도 바꾸지 않음, `applyAuto`는 피부 그룹 중 `smoothing`·`autoBlemish`만 바꾸고 피부 정밀 7종은 보존, `EditChange.skinRefinement`·`bodySkin`·`effect`는 `EditingPolicy` 범위로 자르고 잠기지 않음, 일괄 적용은 `applyFromBatch(_:categories:)`가 고른 동기화 항목(`SyncCategory` 9종, 기본 전부)만 복사하고 빈 선택은 아무것도 하지 않음, 얼굴 의존 변경(`portraitKey`가 있는 것과 `.gender`)은 `set(_:in:)`(`PortraitScope` `.all`·`.gender`·`.person`)·`set(_:forFace:of:)`로 층을 가리키고(얼굴의 사람은 렌더와 같은 전역 짝짓기, 짝이 없으면 그 얼굴 anchor로 기록을 만듦, 같은 클램프, 모르는 사람·범위 밖 얼굴은 `.unknownPerson`) 그 밖의 변경은 scope와 무관하게 전체 층에 씀, 변경 뒤 빈 기록·빈 그룹 층은 지우고 그 뒤 값이 같으면 체크포인트 없음, 성별 변경·실제로 바뀌는 얼굴형 키의 재설정(전체 층은 0이 아닌 값을 되돌릴 때)·얼굴형이 걸린 기록(기록 층이나 기록의 수동 성별 그룹 층)의 연결·삭제는 수동 편집 잠금 대상, `resetOverrides(_:in:)`는 그 층의 키를 상속으로 되돌림(전체 층은 기본값, nil이면 층 전체이고 개인은 성별 유지), `bindLegacyPeople(faces:)`는 지금 짝짓기에서 그 인덱스로 짝이 된 legacy 기록에만 anchor를 채우고 체크포인트를 만들지 않음, 프리셋·동기화는 전체 층과 성별 그룹 층만 나르고(개인 층·성별 지정은 그대로) 동기화한 얼굴 의존 항목의 개인 키를 받는 사진에서 지움, 메이크업 룩은 `applyMakeupLook(_:in:)`·`applyMakeupLook(_:forFace:of:)`(기록이 없는 얼굴이면 기록을 만들며 적용, 체크포인트 한 번), 프리셋·일괄 적용은 바뀌는 값이 없으면 체크포인트를 만들지 않음, `quarterTurns`·`flipHorizontal` 변경은 `GeometryAdjustments`의 회전·반전 함수를 거침, 룩·기하 변경은 잠금과 무관, `EditChange.feature`·`backgroundBlur`는 0…1로 자르고 잠기지 않음, 메이크업 룩은 `applyMakeupLook`이 체크포인트 한 번으로 부위 값을 채우고 부위 값이 바뀌면 `lookID`를 비움, 색을 처음 고를 때 강도 0이면 `makeupDefaultIntensity`, 메이크업은 수동 편집 잠금 대상 아님, 값 범위는 `EditingPolicy`(unitRange·bipolarRange·faceShapeRange·bodyShapeRange, 값은 MellowShared `AdjustmentRange`를 그대로 내보냄), 원터치는 `applyOneTouch(strength:in:)`·`applyOneTouch(strength:forFace:of:)`이고 전체 대상이면 전체 층(공통 표)·남성·여성 그룹 층(각 성별 표)·몸 피부 밝기를 체크포인트 하나로 쓰며(몸 피부 톤은 표 값이 0인 동안 쓰지 않음) 그룹 대상은 그 그룹 층만, 사람 대상은 그 기록 층에 수동 성별 표(미지정은 공통)를 쓰고, 강도 0은 묶인 키를 지움(전체 층은 기본값, 그 외 상속), 얼굴형을 쓰지 않아 잠긴 사진에서도 허용, 묶인 키(`OneTouchBundle.keys`, 전체 층은 몸 피부 밝기 포함)를 손으로 실제로 바꾸면 그 층의 표시만 지움(같은 값이면 유지, 사람의 수동 성별 변경·층 전체 재설정도 표시를 지움), 원터치가 쓰는 층의 룩 이름은 블러셔·립이 실제로 바뀔 때만 지움, 프리셋은 표시를 나르고 동기화는 피부·눈입·메이크업·몸 피부(`SyncCategory.oneTouchCategories`)를 모두 복사할 때만 표시를 복사하며 일부만 복사하면 받는 사진의 전체·그룹 표시를 지움, 자동 보정 `applyAuto(_:oneTouchStrength:)`는 강도가 있으면 색·디테일과 전체 대상 원터치를 체크포인트 하나로 쓰고 제안의 인물 값은 쓰지 않음(강도 nil이면 예전 규칙), 기본 강도 `EditingPolicy.oneTouchDefaultStrength`는 `OneTouchBundle.defaultStrength`를 내보냄, I에서 체형(`EditChange.bodyShape`)도 `portraitKey`를 가져 `set(_:in:)`·`set(_:forFace:of:)`가 대상 층에 쓰고(같은 `bodyShapeRange` 클램프), `set(_:in:)`은 잠금 검사 뒤 `PortraitScope.allows(_:)`가 false인 키(전체 층·남성 그룹의 부유방)를 `.scopeNotAllowed`로 거절하며 아무것도 바꾸지 않음(개인 층은 늘 허용), 잠금·재설정·연결·삭제의 기하 키 판정은 `PortraitKey.isShape`(얼굴형·체형), `SyncCategory.body`는 얼굴 의존 항목이라 동기화가 전체 층·그룹 층 체형을 복사하고 받는 사진의 개인 층 체형 키만 지움, 원터치는 체형 키를 쓰지도 지우지도 않음, 히스토리 40 |
@@ -56,6 +56,14 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 기존 명시값(0 포함)과 유효 비영 값은 기본 보존하고 명시적 교체만 선택한 키를 바꿉니다.
 강도 0·적용 불가·실효값 동일은 새 기록이나 이력을 만들지 않으며, 실제 변경은 한 단계의 실행 취소로 묶습니다.
 새 기록이 다른 사람의 연결을 바꾸면 적용 전체를 거절합니다.
+
+`EditDocument.applyOneTouchReporting(strength:in:faces:targets:replacingPersonal:bodySkinAvailable:)`는 실제 대상의 원터치 적용 보고 API입니다.
+`OneTouchApplicationResult`는 요청 강도와 얼굴별 해석값의 전후를 구분하며, 해석값 차이와 현재 준비된 키의 차이도 따로 셉니다.
+기본 보호 적용은 기존 proposal을 쓰되 실제 준비된 얼굴 값이나 유효 몸 피부 변화가 없으면 저장·이력·marker를 만들지 않습니다.
+일부 효과로 기본 proposal이 저장될 때 다른 미준비 키의 값도 저장될 수 있으므로 준비 불가를 미저장으로 표현하지 않습니다.
+명시적 교체는 선택한 실제 인물의 준비된 원터치 키만 바꾸고 전역·그룹·몸 피부와 다른 인물의 설정을 유지합니다.
+명시적 교체 0은 개인 중립값을 기록해 상속을 차단하며, 기존 `applyOneTouch(0)`의 삭제·상속 복귀는 별도 동작입니다.
+이미 같은 해석값이면 새 개인 기록이나 marker만 추가하지 않고, 여러 인물의 변경도 실행 취소 한 번으로 묶습니다.
 
 ### MellowLibrary
 | 항목 | 내용 |
@@ -91,6 +99,11 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 내부 `PortraitPurposeReadiness`가 계산하며 결함 발견이나 품질 통과를 의미하지 않습니다.
 얼굴 상자만 있는 분석은 피부·턱밑 준비로 간주하지 않고 옆선은 한 얼굴에 유일하게 연결된 몸·유효 옆선 점·실제 형태 처리 조건을 요구합니다.
 
+`PreparedPhoto.oneTouchKeys`와 `oneTouchBodySkinAvailable`은 별도 `OneTouchReadiness`가 실제 피부·눈·치아·입·블러셔 마스크, 카탈로그, 몸 피부 마스크로 계산합니다.
+기존 목적별 키를 눈입·메이크업의 준비 증거로 재사용하지 않습니다.
+이 값은 원 준비 입력에서의 조건부 처리 가능성이며, 앞 단계의 색 변화와 최종 가시 효과·품질을 인증하지 않습니다.
+얼굴 상자만으로 얼굴 키를 준비됐다고 처리하지 않지만, 기존 몸 피부 단계가 실제 양의 fallback 마스크를 만들 수 있는 경우에는 사진 단위 몸 피부 준비를 별도로 보고합니다.
+
 ### MellowExport
 | 항목 | 내용 |
 |---|---|
@@ -114,7 +127,7 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 |---|---|
 | `App/` | `MellowPhotoApp`, 창, 명령(⌘Z·⇧⌘Z). 장면 전환 시 내보내기 취소와 작업 중단·재개 |
 | `Application/` | `AppModel`(composition root, `@Observable`·`@MainActor`)과 기능별 extension(`+Editing`, `+Library`, `+Export`, `+Geometry`(자르기 비율·회전), `+Looks`(룩 썸네일·자동 보정)), 도구 목록 `EditorTool`(`look, crop, adjust, beauty, makeup, body, background, retouch, warp`), 뷰티 패널 탭 `BeautyTab`(피부·얼굴·눈·입·피부톤), 비교 모드 `AppModel.CompareMode`(`off`·`full`·`split`, 기존 `isComparing`은 `full`을 뜻하는 계산 속성, 분할 모드는 들고 있는 원본의 기하가 미리보기의 기하와 같을 때만 원본을 겹침), 동기화 항목 선택 `AppModel.syncCategories`(세션 상태, 기본 전부), 뷰티·메이크업 대상 `AppModel.BeautyTarget`(`all`·`gender`·`face`·`person`, 사진별 세션 상태이고 저장 안 함, 사라진 사람·범위 밖 얼굴은 전체로 읽음)과 칩 모델 `AppModel.PersonChip`·`personChips`(찾은 얼굴 왼쪽부터, 그 뒤 짝 없는 기록, 성별 출처 `GenderSource` 지정·추정·없음), `PhotoInfo.genders`(받아들인 추정), `scopedValues`·`overriddenKeys`(대상 층까지 겹친 값과 덮어쓴 키), `setGender`·`resetOverrides`·`rebindPerson(_:toFace:)`·`removePerson`, 사진 준비 뒤 legacy 기록 연결(체크포인트 없음), 잠긴 사진에서 짝이 바뀌어 얼굴형이 다른 얼굴로 옮겨 가는 편집 거절, 뷰티·메이크업 캔버스 탭은 탭 위치가 든 가장 작은 얼굴 상자를 대상으로 고르고 얼굴 밖은 전체(`EditorTool.selectsTargetByTap`, 누른 점과 뗀 점이 `AppModel.Policy.targetTapTolerance`보다 멀면 무시, 렌더 중에도 고름), 유스케이스 `ImportPhotos`·`ExportPhotos`, `RenderScheduler`(디바운스와 세대 토큰으로 마지막 요청만 렌더), 포트 `PhotoImporter`(`Ports.swift`), 피부톤 탭 상태 줄 `AppModel.BodySkinStatus`(`bodySkinStatus`·`canAdjustBodySkin`, 사람 영역이 없거나 사람 분석이 실패해도 얼굴이 있으면 대체 영역이라 슬라이더를 켬), 정보 시트 진단 절 `AppModel+Diagnostics`(`diagnosticLines`·`RecipeSummary`·`DeviceModel`, 마지막 렌더 오류 `lastRenderFailure`는 사진을 바꾸면 지움), 원터치(`applyOneTouch(strength:)`는 현재 대상으로 라우팅하고 강도 nil은 버튼이라 열린 드래그를 먼저 끝냄, `oneTouchStrength`는 현재 대상 층의 표시를 0…1로 자른 값, `isOneTouchTagged(_:)`는 세부 슬라이더의 "원터치" 꼬리표, `showsDetailAdjustments`는 "세부 조정" 접기 상태로 세션 상태이고 저장 안 함), 자동 버튼 `applyAutoSuggestion(_:)`은 `AppModel.Policy.autoIncludesOneTouch`(true)이고 얼굴이 있으면 원터치 기본 강도를 같은 단계에 넘김(G4 질문 2 판정), 모든 한국어 문구 `UserMessage` |
-| `Features/` | SwiftUI 화면. `Library`, `Editor`(전체 적용 옆 동기화 항목 메뉴 `SyncMenu`, 분할 비교 분할선 `CompareDivider`, 대상 칩 `TargetChips`(전체 · 남성 그룹 · 여성 그룹 · 사람 1…n · 찾지 못한 기록, 칩 줄만 가로 스크롤, 선택된 사람 칩 아래 상태 줄과 "성별: … ⌄" 글자 단추)와 성별·초기화·연결·삭제 메뉴 `PersonGenderMenu`(사람 칩 컨텍스트 메뉴와 글자 단추), 덮어쓴 슬라이더의 점과 "재설정"(`AdjustmentSlider`의 `isOverridden`·`onReset`, Mac은 x 단추, 보조 기술 동작), 원터치 줄 `OneTouchRow`(버튼 + 강도 슬라이더, 표시가 없으면 "—", 드래그 중 배치가 바뀌지 않게 늘 한 줄) 포함, 뷰티 패널은 위에서부터 얼굴 없음·분석 실패 안내 → 대상 칩 → 원터치 줄과 안내 → "세부 조정" 접기(그 안에 대상 안내·탭 피커·네 탭) → 특징점 없음 안내, 체형 패널 `BodyPanel`은 얼굴이 있으면 맨 위에 같은 대상 칩을 두고 대상 층까지 겹친 체형 값을 보이며 변경은 대상 층으로 감, 부유방 슬라이더는 그 키를 둘 수 있는 대상(여성 그룹·사람)에서만 보이고 다른 대상에는 "부유방은 여성 그룹이나 사람을 골라 조정해요."(얼굴이 없는 사진은 숨김, `AppModel.showsSideChestScopeHint`), 대상 몸(사람 대상은 짝 몸, 성별 그룹은 짝 얼굴의 유효 성별이 그 그룹인 몸, 전체는 안내 없음) 중 옆선을 찾은 몸이 모두 부유방 높이 옆선 점이 없으면(`AppModel.showsSideChestArmTouching`) 부유방 슬라이더 아래에 "팔이 몸에 붙어 있으면 부유방은 바뀌지 않아요.", 대상 사람의 얼굴과 짝인 몸이 없거나 성별 그룹 대상에 짝 얼굴의 유효 성별이 그 그룹인 몸이 없으면 "이 사람의 몸을 찾지 못했어요"와 꺼진 슬라이더(대상 층 자기 값이 0이 아니면 되돌릴 수 있게 켬), 다리 길게는 가장 큰 몸과 짝인 대상에서만 켜고 아니면 "다리 길게는 사진에서 가장 큰 사람에게만 걸려요.", 잠긴 사진은 모든 체형 슬라이더를 끔), `Export`, `Presets`, `Info`, `Shared`. compact(iPhone 세로)는 세로 스택, regular(iPad·Mac)는 라이브러리·캔버스·인스펙터 3단 |
+| `Features/` | SwiftUI 화면. `Library`, `Editor`(전체 적용 옆 동기화 항목 메뉴 `SyncMenu`, 분할 비교 분할선 `CompareDivider`, 대상 칩 `TargetChips`(전체 · 남성 그룹 · 여성 그룹 · 사람 1…n · 찾지 못한 기록, 칩 줄만 가로 스크롤, 선택된 사람 칩 아래 상태 줄과 "성별: … ⌄" 글자 단추)와 성별·초기화·연결·삭제 메뉴 `PersonGenderMenu`(사람 칩 컨텍스트 메뉴와 글자 단추), 덮어쓴 슬라이더의 점과 "재설정"(`AdjustmentSlider`의 `isOverridden`·`onReset`, Mac은 x 단추, 보조 기술 동작), 원터치 줄 `OneTouchRow`(기본 버튼 + 요청 강도 슬라이더, 저장 표시가 없으면 기본 강도로 시작, 드래그 중에는 요청값만 바꾸고 종료 때 한 번 적용, 실제 개인 보호와 명시적 교체·처리 결과를 표시) 포함, 뷰티 패널은 위에서부터 얼굴 없음·분석 실패 안내 → 대상 칩 → 원터치 줄과 안내 → "세부 조정" 접기(그 안에 대상 안내·탭 피커·네 탭) → 특징점 없음 안내, 체형 패널 `BodyPanel`은 얼굴이 있으면 맨 위에 같은 대상 칩을 두고 대상 층까지 겹친 체형 값을 보이며 변경은 대상 층으로 감, 부유방 슬라이더는 그 키를 둘 수 있는 대상(여성 그룹·사람)에서만 보이고 다른 대상에는 "부유방은 여성 그룹이나 사람을 골라 조정해요."(얼굴이 없는 사진은 숨김, `AppModel.showsSideChestScopeHint`), 대상 몸(사람 대상은 짝 몸, 성별 그룹은 짝 얼굴의 유효 성별이 그 그룹인 몸, 전체는 안내 없음) 중 옆선을 찾은 몸이 모두 부유방 높이 옆선 점이 없으면(`AppModel.showsSideChestArmTouching`) 부유방 슬라이더 아래에 "팔이 몸에 붙어 있으면 부유방은 바뀌지 않아요.", 대상 사람의 얼굴과 짝인 몸이 없거나 성별 그룹 대상에 짝 얼굴의 유효 성별이 그 그룹인 몸이 없으면 "이 사람의 몸을 찾지 못했어요"와 꺼진 슬라이더(대상 층 자기 값이 0이 아니면 되돌릴 수 있게 켬), 다리 길게는 가장 큰 몸과 짝인 대상에서만 켜고 아니면 "다리 길게는 사진에서 가장 큰 사람에게만 걸려요.", 잠긴 사진은 모든 체형 슬라이더를 끔), `Export`, `Presets`, `Info`, `Shared`. compact(iPhone 세로)는 세로 스택, regular(iPad·Mac)는 라이브러리·캔버스·인스펙터 3단 |
 | `Platform/` | 포트 어댑터와 실기기 조립 |
 | `Resources/` | 에셋, `Localizable.xcstrings`, Info.plist(iOS·macOS), `PrivacyInfo.xcprivacy`, Mac 엔타이틀먼트(App Sandbox), `container-migration.plist` |
 
@@ -131,6 +144,20 @@ MellowShared ◄── MellowEditing ◄── MellowLibrary
 적용 기록은 사진·레시피·렌더 요청에 연결하며 저장 실패·렌더 실패·취소와 일치하는 미리보기 완료를 구분합니다.
 같은 사진에 새 분석을 기억하면 진행 중이거나 완료된 이전 적용 기록을 취소하고, 이전 완료 콜백으로 되살리지 않습니다.
 이 연결 검사는 실제 사용자 사진의 인물 보정 품질 수용을 대신하지 않습니다.
+
+`AppModel+OneTouchApplication`은 원터치 계획의 행동 대상과 현재 UI 대상, 사진·분석·문서·처리 세대를 고정합니다.
+적용은 목적별 처리와 같은 저장·렌더·취소 기록 수명을 공유하며 `oneTouchResult`와 목적별 `result`를 구분합니다.
+요청 강도와 실제 인물 값의 차이를 계획에서 읽을 수 있으며, 완료 미리보기나 사진 품질 확인과는 구분합니다.
+
+`AppModel+OneTouchRequests`는 원터치 화면의 요청값과 시도 결과를 관리합니다.
+`OneTouchInputKey`는 사진·행동 대상·분석 세대를 묶으며 요청값은 영속 레시피의 마지막 강도와 구분됩니다.
+`requestedOneTouchStrength(for:)`와 `setRequestedOneTouchStrength(_:for:)`는 입력만 다루고 `beginOneTouchRequestEditing(for:)`·`endOneTouchRequestEditing(for:)`는 드래그 종료 때 한 번 적용합니다.
+`submitOneTouchRequest(for:replacingPersonal:)`는 기본 적용과 준비된 개인 키의 명시적 교체를 구분합니다.
+전체·그룹 기본 적용은 개인 값을 보호하며 개인 직접 대상의 기본 적용은 그 개인 묶음을 다시 씁니다.
+`clearOneTouchInheritance(for:)`는 기존 강도 0의 삭제·상속 복귀이며 빈 그룹에 남은 설정도 지울 수 있습니다.
+`oneTouchFeedback(for:)`는 새 시도와 일치하는 저장·렌더 기록만 완료로 표현하고 변경 없음·취소·처리 및 저장 실패를 구분합니다.
+빠른 보정의 고정 전체 대상과 뷰티 선택 대상은 같은 `OneTouchRow`를 사용하지만 각 행동 대상의 입력·결과를 읽습니다.
+얼굴의 준비된 변경 수와 사진 단위 몸 피부 밝기 변경을 섞지 않으며 분석 가능성이나 설정 변화 수를 화질 개선 점수로 표시하지 않습니다.
 
 `Platform/` 어댑터:
 
