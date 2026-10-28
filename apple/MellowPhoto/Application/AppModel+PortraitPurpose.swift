@@ -18,7 +18,8 @@ extension AppModel {
         enum Phase { case rendering, visible, cancelled, renderFailed, saveFailed }
         let photoID: PhotoID
         let recipe: EditRecipe
-        let result: PortraitPurposeResult
+        let result: PortraitPurposeResult?
+        var oneTouchResult: OneTouchApplicationResult? = nil
         var phase: Phase
         var renderRequest: UUID?
     }

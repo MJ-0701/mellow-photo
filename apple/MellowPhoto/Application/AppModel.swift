@@ -40,6 +40,8 @@ final class AppModel {
         var bodyOutlines: [Int: BodyOutline] = [:]
         var bodyRegions: [Int: BodyGeometry] = [:]
         var portraitPurposeKeys: [Int: Set<PortraitKey>] = [:]
+        var oneTouchKeys: [Int: Set<PortraitKey>] = [:]
+        var oneTouchBodySkinAvailable = false
         var generation = UUID()
     }
 
@@ -690,7 +692,8 @@ final class AppModel {
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
             hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
             bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines,
-            bodyRegions: prepared.bodyRegions, portraitPurposeKeys: prepared.portraitPurposeKeys)
+            bodyRegions: prepared.bodyRegions, portraitPurposeKeys: prepared.portraitPurposeKeys,
+            oneTouchKeys: prepared.oneTouchKeys, oneTouchBodySkinAvailable: prepared.oneTouchBodySkinAvailable)
         if bindsLegacyPeople {
             bindLegacyPeople(id, faces: prepared.faces)
         }

@@ -12,28 +12,13 @@ struct BodySkinStage: RenderStage {
 
     func apply(_ image: CIImage, in context: RenderContext) throws -> CIImage {
         let values = Self.clamped(context.recipe.bodySkin)
-        guard values.hasEffect, let reference = Self.referenceFace(context.faces) else { return image }
+        guard values.hasEffect,
+            let toneMask = try Self.toneMask(
+                image, faces: context.faces, personMask: context.personMask,
+                extent: context.extent, tuning: context.tuning, regionMasks: context.regionMasks)
+        else { return image }
         let extent = context.extent
         let tuning = context.tuning
-        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
-        // 기준색은 skin 단계 뒤 입력에서 잰다. 마스크를 거는 얼굴 픽셀과 같은 이미지라야 얼굴 피부 가중치가 1에 머문다.
-        guard let cheeks = FaceRegions.cheekAverages(of: encoded, face: reference, extent: extent) else { return image }
-        let area: CIImage
-        if let person = context.personMask, !person.extent.isEmpty, !person.extent.isInfinite {
-            let feather = max(
-                CGFloat(tuning.skinBlurMinimumRadius), context.shortSide * CGFloat(tuning.bodySkinMaskFeather))
-            area = BackgroundStage.personMask(person, extent: extent, feather: feather)
-        } else {
-            area = Self.fallbackPersonRegion(face: reference, extent: extent, tuning: tuning)
-        }
-        let chroma = try SkinKernels.shared.chromaWeight(
-            of: encoded, left: cheeks.left, right: cheeks.right, sigma: tuning.bodySkinChromaSigma, extent: extent)
-        var toneMask = Self.product(area, chroma, extent: extent)
-        if let features = FaceRegions.featureMask(
-            faces: context.faces, extent: extent, tuning: tuning, cache: context.regionMasks)
-        {
-            toneMask = Self.product(toneMask, Self.inverted(features.image, extent: extent), extent: extent)
-        }
         // 밝기 뒤에 매끄럽게 하면 밝기 경계가 번지므로 매끄럽게가 먼저다.
         var result = image
         if values.smoothing > 0 {
@@ -56,6 +41,35 @@ struct BodySkinStage: RenderStage {
             result = MaskBuilder.blend(shifted, over: result, mask: toneMask).cropped(to: extent)
         }
         return result
+    }
+
+    /// 실제 단계와 준비 계측이 공유하는 원래 밝기/톤 마스크. 결함이나 개선량은 판정하지 않는다.
+    static func toneMask(
+        _ image: CIImage, faces: [FaceGeometry], personMask: CIImage?, extent: CGRect,
+        tuning: RenderTuning, regionMasks: RegionMaskCache?
+    ) throws -> CIImage? {
+        guard let reference = Self.referenceFace(faces) else { return nil }
+        let encoded = image.applyingFilter("CILinearToSRGBToneCurve")
+        // 기준색은 skin 단계 뒤 입력에서 잰다. 마스크를 거는 얼굴 픽셀과 같은 이미지라야 얼굴 피부 가중치가 1에 머문다.
+        guard let cheeks = FaceRegions.cheekAverages(of: encoded, face: reference, extent: extent) else { return nil }
+        let area: CIImage
+        if let person = personMask, !person.extent.isEmpty, !person.extent.isInfinite {
+            let feather = max(
+                CGFloat(tuning.skinBlurMinimumRadius),
+                min(extent.width, extent.height) * CGFloat(tuning.bodySkinMaskFeather))
+            area = BackgroundStage.personMask(person, extent: extent, feather: feather)
+        } else {
+            area = Self.fallbackPersonRegion(face: reference, extent: extent, tuning: tuning)
+        }
+        let chroma = try SkinKernels.shared.chromaWeight(
+            of: encoded, left: cheeks.left, right: cheeks.right, sigma: tuning.bodySkinChromaSigma, extent: extent)
+        var toneMask = Self.product(area, chroma, extent: extent)
+        if let features = FaceRegions.featureMask(
+            faces: faces, extent: extent, tuning: tuning, cache: regionMasks)
+        {
+            toneMask = Self.product(toneMask, Self.inverted(features.image, extent: extent), extent: extent)
+        }
+        return toneMask
     }
 
     /// 밝기·매끄럽게 0…1, 톤 −1…1. 유한하지 않은 값은 RenderPipeline이 먼저 거절한다.

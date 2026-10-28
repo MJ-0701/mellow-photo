@@ -785,3 +785,163 @@ public struct EditDocument: Equatable, Sendable {
         redoStack.removeAll()
     }
 }
+
+extension EditDocument {
+    /// 새 계획 경로. positive 기본 적용은 개인값을 보호하며 실제 준비된 키만 쓴다.
+    /// 명시 교체의 0은 개인 neutral 값이다. 기존 applyOneTouch(0)의 상속 복귀와 별개다.
+    @discardableResult
+    public mutating func applyOneTouchReporting(
+        strength: Double, in scope: OneTouchApplicationScope = .all, faces: [NormalizedRect],
+        targets: [PortraitPurposeFace], replacingPersonal: Bool = false, bodySkinAvailable: Bool = false
+    ) -> OneTouchApplicationResult {
+        let scale = OneTouchBundle.clampedStrength(strength)
+        let before = recipe
+        let oldPeople = before.people.peopleByFace(faces)
+        let valid =
+            strength.isFinite && !targets.isEmpty
+            && Set(targets.map(\.index)).count == targets.count
+            && targets.allSatisfy { faces.indices.contains($0.index) }
+            && !faces.indices.contains { index in faces[..<index].contains(faces[index]) }
+        guard valid, replacingPersonal || scale > 0 else {
+            return OneTouchApplicationResult(requestedStrength: scale, items: [], bodySkinChanged: false)
+        }
+        // scope와 대상의 불일치를 추측으로 보완하지 않는다.
+        let scoped = targets.filter { target in
+            switch scope {
+            case .all: return true
+            case .gender(let gender):
+                return PortraitResolver.effectiveGender(person: oldPeople[target.index], estimate: target.gender)
+                    == gender
+            case .person(let id): return oldPeople[target.index]?.id == id
+            case .face(let index): return target.index == index
+            }
+        }
+        let completeScope: Bool
+        if !replacingPersonal, scope == .all {
+            completeScope = Set(scoped.map(\.index)) == Set(faces.indices)
+        } else {
+            completeScope = true
+        }
+        guard scoped.count == targets.count, completeScope else {
+            return OneTouchApplicationResult(requestedStrength: scale, items: [], bodySkinChanged: false)
+        }
+        var updated = before
+        var createdPeople: [Int: PersonID] = [:]
+        if replacingPersonal {
+            for target in scoped {
+                let person = oldPeople[target.index]
+                let gender = PortraitResolver.effectiveGender(person: person, estimate: target.gender)
+                let resolved = PortraitResolver.resolve(before, person: person, gender: gender)
+                let source = Self.oneTouchNeutralOrTable(gender: gender, strength: scale)
+                var desiredPortrait = resolved.portrait
+                var desiredMakeup = resolved.makeup
+                source.applied(to: &desiredPortrait, makeup: &desiredMakeup)
+                let desired = PortraitResolver.Resolved(
+                    portrait: desiredPortrait, makeup: desiredMakeup, body: resolved.body)
+                let keys = target.availableKeys.intersection(OneTouchBundle.keys).filter {
+                    OneTouchApplicationResult.value($0, in: resolved)
+                        != OneTouchApplicationResult.value($0, in: desired)
+                }
+                guard !keys.isEmpty else { continue }
+                let id = person?.id ?? Self.appendPerson(at: PersonAnchor(faceBox: faces[target.index]), to: &updated)
+                if person == nil { createdPeople[target.index] = id }
+                guard let index = updated.people.individuals.firstIndex(where: { $0.id == id }) else { continue }
+                let writeKeys = target.availableKeys.intersection(OneTouchBundle.keys).filter { key in
+                    if case .makeupPart = key {
+                        return OneTouchApplicationResult.value(key, in: resolved)
+                            != OneTouchApplicationResult.value(key, in: desired)
+                    }
+                    return true
+                }
+                Self.copy(Set(writeKeys), from: source, into: &updated.people.individuals[index].layer)
+                if keys.contains(where: {
+                    if case .makeupPart = $0 { return true }
+                    return false
+                }) {
+                    updated.people.individuals[index].layer.makeupLookID = nil
+                }
+                // 부분 적용을 전체 묶음 강도로 표시하지 않는다.
+                updated.people.individuals[index].layer.oneTouch =
+                    target.availableKeys.isSuperset(of: OneTouchBundle.keys) ? scale : nil
+            }
+        } else {
+            // 기본 동작은 기존 proposal 그대로다. 미준비 키의 저장과 현재 렌더 준비를 보고에서 구분한다.
+            var legacy = self
+            switch scope {
+            case .all: _ = legacy.applyOneTouch(strength: scale)
+            case .gender(let gender): _ = legacy.applyOneTouch(strength: scale, in: .gender(gender))
+            case .person(let id): _ = legacy.applyOneTouch(strength: scale, in: .person(id))
+            case .face(let index): _ = legacy.applyOneTouch(strength: scale, forFace: index, of: faces)
+            }
+            updated = legacy.recipe
+        }
+        let newPeople = updated.people.peopleByFace(faces)
+        let pairingValid =
+            oldPeople.allSatisfy { newPeople[$0.key]?.id == $0.value.id }
+            && scoped.allSatisfy { target in
+                guard let new = newPeople[target.index] else {
+                    return oldPeople[target.index] == nil && createdPeople[target.index] == nil
+                }
+                if let created = createdPeople[target.index] { return new.id == created }
+                return oldPeople[target.index]?.id == new.id
+            }
+        let items = scoped.flatMap { target in
+            OneTouchBundle.keys.sorted { String(describing: $0) < String(describing: $1) }.map { key in
+                let person = oldPeople[target.index]
+                let gender = PortraitResolver.effectiveGender(person: person, estimate: target.gender)
+                let previous = OneTouchApplicationResult.value(
+                    key, in: PortraitResolver.resolve(before, person: person, gender: gender))
+                let next =
+                    pairingValid
+                    ? OneTouchApplicationResult.value(
+                        key, in: PortraitResolver.resolve(updated, person: newPeople[target.index], gender: gender))
+                    : previous
+                let reason: OneTouchApplicationResult.Reason
+                if !pairingValid {
+                    reason = .invalidTargets
+                } else if !target.availableKeys.contains(key) {
+                    reason = .unavailable
+                } else if !replacingPersonal && previous == next && person?.layer.overriddenKeys.contains(key) == true {
+                    reason = .protectedPersonal
+                } else {
+                    reason = previous == next ? .unchanged : .changed
+                }
+                return OneTouchApplicationResult.Item(
+                    faceIndex: target.index, key: key, before: previous, after: next, reason: reason,
+                    renderReady: target.availableKeys.contains(key))
+            }
+        }
+        var result = OneTouchApplicationResult(
+            requestedStrength: scale, items: items,
+            bodySkinChanged: pairingValid && bodySkinAvailable && before.bodySkin != updated.bodySkin)
+        result.bodySkinBefore = before.bodySkin
+        result.bodySkinAfter = updated.bodySkin
+        guard pairingValid, result.hasChanges else {
+            var noOp = OneTouchApplicationResult(
+                requestedStrength: scale,
+                items: items.map {
+                    .init(
+                        faceIndex: $0.faceIndex, key: $0.key, before: $0.before, after: $0.before,
+                        reason: $0.reason, renderReady: $0.renderReady)
+                }, bodySkinChanged: false)
+            noOp.bodySkinBefore = before.bodySkin
+            noOp.bodySkinAfter = before.bodySkin
+            return noOp
+        }
+        _ = commit(updated, clearsStaleMarks: false)
+        return result
+    }
+
+    private static func oneTouchNeutralOrTable(gender: Gender?, strength: Double) -> PortraitLayer {
+        guard strength == 0 else { return OneTouchBundle.layer(for: gender, strength: strength) }
+        var neutral = OneTouchBundle.layer(for: gender, strength: 1)
+        neutral.skinSmoothing = 0
+        neutral.autoBlemish = false
+        for key in SkinRefinementKey.allCases { neutral.skinRefinement[key] = 0 }
+        for key in FeatureKey.allCases { neutral.features[key] = 0 }
+        neutral.makeup[.blush] = MakeupTint(colorID: nil, intensity: 0)
+        neutral.makeup[.lip] = MakeupTint(colorID: nil, intensity: 0)
+        neutral.oneTouch = 0
+        return neutral
+    }
+}
