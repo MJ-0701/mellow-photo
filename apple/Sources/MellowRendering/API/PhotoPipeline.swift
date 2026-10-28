@@ -28,12 +28,15 @@ public struct PreparedPhoto: Sendable {
     public let bodyOutlines: [Int: BodyOutline]
     /// 렌더와 같은 관절 신뢰도·어깨 판정을 통과한 몸. 원 분석 인덱스를 유지한다.
     public let bodyRegions: [Int: BodyGeometry]
+    /// 원 미리보기 입력으로 실제 준비된 목적별 키. 결함 검출 결과가 아니다.
+    public let portraitPurposeKeys: [Int: Set<PortraitKey>]
 
     public init(
         pixelSize: CGSize, thumbnail: CGImage, faces: [FaceGeometry], faceAnalysisFailure: MellowError?,
         hasPerson: Bool = false, personAnalysisFailure: MellowError? = nil, hasBody: Bool = false,
         bodyAnalysisFailure: MellowError? = nil, genders: [Gender?] = [], bodyFaceMatches: [Int: Int] = [:],
-        bodyOutlines: [Int: BodyOutline] = [:], bodyRegions: [Int: BodyGeometry] = [:]
+        bodyOutlines: [Int: BodyOutline] = [:], bodyRegions: [Int: BodyGeometry] = [:],
+        portraitPurposeKeys: [Int: Set<PortraitKey>] = [:]
     ) {
         self.pixelSize = pixelSize
         self.thumbnail = thumbnail
@@ -47,6 +50,7 @@ public struct PreparedPhoto: Sendable {
         self.bodyFaceMatches = bodyFaceMatches
         self.bodyOutlines = bodyOutlines
         self.bodyRegions = bodyRegions
+        self.portraitPurposeKeys = portraitPurposeKeys
     }
 }
 
@@ -152,7 +156,9 @@ public actor PhotoPipeline {
             pixelSize: metadata.pixelSize, thumbnail: thumbnail, faces: faces, faceAnalysisFailure: failure,
             hasPerson: person.mask != nil, personAnalysisFailure: person.failure, hasBody: usable,
             bodyAnalysisFailure: body.failure, genders: genders.map { $0?.gender }, bodyFaceMatches: matches,
-            bodyOutlines: outlines, bodyRegions: regions)
+            bodyOutlines: outlines, bodyRegions: regions,
+            portraitPurposeKeys: PortraitPurposeReadiness.keys(
+                image: preview, analysis: analysis, tuning: tuning, renderer: renderer))
     }
 
     /// 캐시가 비었으면 cannotCreatePreview. 호출자가 prepare를 다시 한다.

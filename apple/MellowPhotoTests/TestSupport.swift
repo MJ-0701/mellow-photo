@@ -14,9 +14,11 @@ import XCTest
 final class MemorySessionStore: SessionStore, @unchecked Sendable {
     var saved: SessionSnapshot?
     var saveCount = 0
+    var saveFailure: MellowError?
     func load() throws -> SessionSnapshot? { saved }
     func save(_ snapshot: SessionSnapshot) throws {
         saveCount += 1
+        if let saveFailure { throw saveFailure }
         saved = snapshot
     }
 }

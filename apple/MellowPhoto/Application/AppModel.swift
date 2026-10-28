@@ -39,6 +39,8 @@ final class AppModel {
         /// 사람 마스크가 없거나 두 엉덩이가 없는 몸은 키가 없다.
         var bodyOutlines: [Int: BodyOutline] = [:]
         var bodyRegions: [Int: BodyGeometry] = [:]
+        var portraitPurposeKeys: [Int: Set<PortraitKey>] = [:]
+        var generation = UUID()
     }
 
     /// 뷰티·메이크업 패널이 편집하는 대상.
@@ -174,6 +176,8 @@ final class AppModel {
     var photoInfo: [PhotoID: PhotoInfo] = [:]
     var preview: CGImage?
     var original: CGImage?
+    var portraitPurposeContext = UUID()
+    var portraitPurposeApplication: PortraitPurposeApplication?
     var isReady = false
     var isRendering = false
     var isImporting = false
@@ -676,13 +680,14 @@ final class AppModel {
     }
 
     func remember(_ id: PhotoID, _ prepared: PreparedPhoto, bindsLegacyPeople: Bool = true) {
+        portraitPurposeContext = UUID()
         thumbnails[id] = prepared.thumbnail
         photoInfo[id] = PhotoInfo(
             pixelSize: prepared.pixelSize, faces: prepared.faces, faceAnalysisFailure: prepared.faceAnalysisFailure,
             hasPerson: prepared.hasPerson, personAnalysisFailure: prepared.personAnalysisFailure,
             hasBody: prepared.hasBody, bodyAnalysisFailure: prepared.bodyAnalysisFailure, genders: prepared.genders,
             bodyFaceMatches: prepared.bodyFaceMatches, bodyOutlines: prepared.bodyOutlines,
-            bodyRegions: prepared.bodyRegions)
+            bodyRegions: prepared.bodyRegions, portraitPurposeKeys: prepared.portraitPurposeKeys)
         if bindsLegacyPeople {
             bindLegacyPeople(id, faces: prepared.faces)
         }
@@ -721,6 +726,8 @@ final class AppModel {
     }
 
     func select(_ id: PhotoID) {
+        portraitPurposeContext = UUID()
+        invalidatePortraitPurposeApplication()
         cancelQuickRetouch()
         guard !isExporting, session.index(of: id) != nil else { return }
         selectionTask?.cancel()
@@ -785,7 +792,17 @@ final class AppModel {
     }
 
     func scheduleRender() {
+        portraitPurposeContext = UUID()
         guard let entry = session.selected, isReady else { return }
+        if portraitPurposeApplication?.photoID != entry.id
+            || portraitPurposeApplication?.recipe != entry.document.recipe
+        {
+            invalidatePortraitPurposeApplication()
+        }
+        let purposeRenderRequest = portraitPurposeContext
+        if portraitPurposeApplication?.phase == .rendering {
+            portraitPurposeApplication?.renderRequest = purposeRenderRequest
+        }
         isRendering = true
         let pipeline = self.pipeline
         let recipe = entry.document.recipe
@@ -809,8 +826,20 @@ final class AppModel {
                 preview = image
                 previewGeometry = shownGeometry
                 lastRenderFailure = nil
+                if portraitPurposeApplication?.photoID == id, portraitPurposeApplication?.recipe == recipe,
+                    currentRecipe == recipe, portraitPurposeApplication?.renderRequest == purposeRenderRequest,
+                    portraitPurposeApplication?.phase == .rendering
+                {
+                    portraitPurposeApplication?.phase = .visible
+                }
                 refreshOriginalIfNeeded(id: id, geometry: shownGeometry)
             case .failure(let error):
+                if portraitPurposeApplication?.photoID == id, portraitPurposeApplication?.recipe == recipe,
+                    portraitPurposeApplication?.renderRequest == purposeRenderRequest,
+                    portraitPurposeApplication?.phase == .rendering
+                {
+                    portraitPurposeApplication?.phase = .renderFailed
+                }
                 lastRenderFailure = UserMessage.text(for: error)
                 present(error)
             }
@@ -838,12 +867,16 @@ final class AppModel {
 
     /// 취소된 렌더는 완료 콜백을 부르지 않으므로 진행 표시를 여기서 내린다.
     func cancelSelectionWork() {
+        portraitPurposeContext = UUID()
+        invalidatePortraitPurposeApplication()
         selectionTask?.cancel()
         renderScheduler.cancel()
         isRendering = false
     }
 
     func stopWork() {
+        portraitPurposeContext = UUID()
+        invalidatePortraitPurposeApplication()
         isWorkStopped = true
         cancelQuickRetouch()
         cancelSelectionWork()

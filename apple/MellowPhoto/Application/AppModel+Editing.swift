@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import MellowEditing
 import MellowShared
 
@@ -118,6 +119,7 @@ extension AppModel {
 
     /// 대상 전환은 화면 상태라 레시피를 바꾸지 않는다.
     func setBeautyTarget(_ target: BeautyTarget) {
+        portraitPurposeContext = UUID()
         guard let id = session.selectedPhotoID else { return }
         endSliderEditIfActive()
         beautyTargets[id] = target
