@@ -82,8 +82,8 @@ final class OneTouchApplicationUITests: XCTestCase {
         let bottom = min(panel.maxY, footerFrame.minY)
         let safe = CGRect(
             x: panel.minX, y: panel.minY, width: panel.width,
-            height: bottom - panel.minY
-        ).insetBy(dx: 0, dy: 8)
+            height: bottom - panel.minY - 8
+        )
         return valid(safe) ? safe : nil
     }
 
@@ -289,7 +289,8 @@ final class OneTouchApplicationUITests: XCTestCase {
             return
         }
         let start = CGPoint(x: frame.maxX - frame.height / 2, y: frame.midY)
-        let end = CGPoint(x: frame.minX + 1, y: frame.midY)
+        // thumb를 잡은 연속 drag를 왼쪽 끝 너머까지 보내되 실제 패널 안에 남긴다.
+        let end = CGPoint(x: frame.minX - 30, y: frame.midY)
         let gesture: [String: Any] = [
             "from": NSCoder.string(for: start), "to": NSCoder.string(for: end),
             "initialRequest": before["requestAll"]!, "expectedRequest": 0,
