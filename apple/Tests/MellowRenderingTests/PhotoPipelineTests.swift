@@ -294,12 +294,18 @@ final class PhotoPipelineTests: XCTestCase {
         let pipeline = PhotoPipeline(analyzer: StubFaceAnalyzer(result: .success([synthetic.face])), tuning: tuning)
         let first = PhotoID()
         _ = try await pipeline.prepare(first, at: url)
+        let prepared = await pipeline.preparedAnalysis(first)
+        let analysis = try XCTUnwrap(prepared)
+        // 보정 가능 여부를 준비할 때도 마스크가 생기므로 고정 종류 수 대신 소유·재사용을 검사한다.
+        let preparedMaskCount = analysis.regionMasks.count
+        XCTAssertGreaterThan(preparedMaskCount, 0)
+        XCTAssertLessThanOrEqual(preparedMaskCount, analysis.regionMasks.maximumEntries)
         var recipe = EditRecipe()
         recipe.portrait.skin.smoothing = 0.5
         _ = try await pipeline.preview(first, recipe: recipe)
-        let prepared = await pipeline.preparedAnalysis(first)
-        let analysis = try XCTUnwrap(prepared)
-        XCTAssertEqual(analysis.regionMasks.count, 1)
+        let reused = await pipeline.preparedAnalysis(first)
+        XCTAssertTrue(analysis.regionMasks === reused?.regionMasks)
+        XCTAssertEqual(analysis.regionMasks.count, preparedMaskCount, "같은 해상도의 피부 마스크를 재사용한다")
         _ = try await pipeline.prepare(PhotoID(), at: try writeSolidPNG())
         XCTAssertEqual(analysis.regionMasks.count, 0, "미리보기가 캐시에서 밀려나면 마스크 비트맵도 놓는다")
     }
