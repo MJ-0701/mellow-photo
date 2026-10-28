@@ -179,4 +179,31 @@ final class OneTouchApplicationActionTests: XCTestCase {
         XCTAssertEqual(model.session.selected!.document.undoStack.count, failedUndo)
     }
 
+    func testFirstDirectFaceDefaultCreatesOneUndoAndMatchingPreview() async throws {
+        let (model, root, store) = try await makeModel()
+        defer {
+            model.stopWork()
+            try? FileManager.default.removeItem(at: root)
+        }
+        model.setBeautyTarget(.face(0))
+        let before = model.session.selected!.document
+        let saves = store.saveCount
+        let plan = try XCTUnwrap(model.planOneTouchApplication(strength: 1, replacingPersonal: false))
+        XCTAssertTrue(plan.result.hasChanges)
+        XCTAssertTrue(model.applyOneTouchApplication(plan))
+        XCTAssertEqual(model.currentRecipe.people.individuals.count, 1)
+        XCTAssertEqual(store.saveCount, saves + 1)
+        XCTAssertEqual(model.session.selected!.document.undoStack.count, before.undoStack.count + 1)
+        try await waitUntil { !model.isRendering }
+        XCTAssertEqual(model.portraitPurposeApplication?.phase, .visible)
+        let applied = model.currentRecipe
+        let noOpSaves = store.saveCount
+        XCTAssertFalse(model.applyOneTouchApplication(strength: 1, replacingPersonal: false))
+        XCTAssertEqual(store.saveCount, noOpSaves)
+        model.undo()
+        XCTAssertEqual(model.currentRecipe, before.recipe)
+        model.redo()
+        XCTAssertEqual(model.currentRecipe, applied)
+    }
+
 }

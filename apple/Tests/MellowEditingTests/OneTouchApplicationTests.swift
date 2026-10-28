@@ -142,4 +142,44 @@ final class OneTouchApplicationTests: XCTestCase {
         XCTAssertEqual(document.recipe, before.recipe)
     }
 
+    func testDefaultFaceScopeCreatesFirstMatchedPersonAndOneUndo() {
+        let faces = [NormalizedRect(x: 0.2, y: 0.2, width: 0.4, height: 0.5)]
+        let target = PortraitPurposeFace(index: 0, gender: nil, availableKeys: OneTouchBundle.keys)
+        var document = EditDocument()
+        let result = document.applyOneTouchReporting(strength: 1, in: .face(0), faces: faces, targets: [target])
+        XCTAssertTrue(result.hasChanges, "Default direct-face application must work before a personal record exists")
+        XCTAssertEqual(
+            document.recipe.people.peopleByFace(faces)[0]?.layer.skinSmoothing, OneTouchBundle.Table.common.smoothing)
+        XCTAssertEqual(document.undoStack.count, 1)
+        XCTAssertFalse(result.items.contains { $0.reason == .invalidTargets })
+    }
+
+    func testFirstDefaultFacePreservesOtherMatchedAndUnmatchedRecords() {
+        let two = faces + [NormalizedRect(x: 0.65, y: 0.2, width: 0.2, height: 0.35)]
+        let all = two + [NormalizedRect(x: 0.8, y: 0.85, width: 0.08, height: 0.1)]
+        var document = EditDocument()
+        document.set(.skinSmoothing(0.4), forFace: 1, of: all)
+        document.set(.feature(.eyeBrighten, 0.5), forFace: 2, of: all)
+        let before = document
+        let result = document.applyOneTouchReporting(strength: 1, in: .face(0), faces: two, targets: [target])
+        XCTAssertTrue(result.hasChanges)
+        let added = document.recipe.people.peopleByFace(two)[0]
+        XCTAssertNotNil(added)
+        for record in before.recipe.people.individuals {
+            XCTAssertEqual(document.recipe.people.person(record.id), record)
+        }
+        XCTAssertEqual(document.recipe.people.groups, before.recipe.people.groups)
+        XCTAssertEqual(document.recipe.portrait, before.recipe.portrait)
+        XCTAssertEqual(document.recipe.bodySkin, before.recipe.bodySkin)
+        XCTAssertEqual(document.undoStack.count, before.undoStack.count + 1)
+        let applied = document
+        let repeated = document.applyOneTouchReporting(strength: 1, in: .face(0), faces: two, targets: [target])
+        XCTAssertFalse(repeated.hasChanges)
+        XCTAssertEqual(document, applied)
+        document.undo()
+        XCTAssertEqual(document.recipe, before.recipe)
+        document.redo()
+        XCTAssertEqual(document.recipe, applied.recipe)
+    }
+
 }

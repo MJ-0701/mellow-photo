@@ -871,7 +871,17 @@ extension EditDocument {
             case .all: _ = legacy.applyOneTouch(strength: scale)
             case .gender(let gender): _ = legacy.applyOneTouch(strength: scale, in: .gender(gender))
             case .person(let id): _ = legacy.applyOneTouch(strength: scale, in: .person(id))
-            case .face(let index): _ = legacy.applyOneTouch(strength: scale, forFace: index, of: faces)
+            case .face(let index):
+                _ = legacy.applyOneTouch(strength: scale, forFace: index, of: faces)
+                if oldPeople[index] == nil {
+                    let existingIDs = Set(before.people.individuals.map(\.id))
+                    let added = legacy.recipe.people.individuals.filter { !existingIDs.contains($0.id) }
+                    // legacy가 의도한 얼굴 anchor로 만든 단일 기록만 허용한다.
+                    // 최종 짝짓기와 기존 기록 보존 검사는 아래에서 다시 확인한다.
+                    if added.count == 1, added[0].anchor == PersonAnchor(faceBox: faces[index]) {
+                        createdPeople[index] = added[0].id
+                    }
+                }
             }
             updated = legacy.recipe
         }
