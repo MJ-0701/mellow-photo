@@ -17,11 +17,42 @@ final class QuickRetouchUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in app: XCUIApplication, upward: Bool = true) {
-        for _ in 0..<12 {
+        let panel = app.scrollViews["quick.controlsScroll"]
+        var up = upward
+        var previous = CGRect.zero
+        var stationary = 0
+        capture(app, "quick-reveal-start-" + element.identifier)
+        for step in 0..<24 {
             if element.isHittable { return }
-            let panel = app.scrollViews["quick.controlsScroll"]
-            if upward { panel.swipeUp() } else { panel.swipeDown() }
+            let viewport = panel.frame
+            let target = element.exists ? element.frame : .zero
+            let oldDirection = up
+            if target.height > 0 { up = target.midY > viewport.midY }
+            if step > 0, abs(target.minY - previous.minY) < 1 { stationary += 1 } else { stationary = 0 }
+            if stationary >= 2 {
+                up.toggle()
+                stationary = 0
+            }
+            if up != oldDirection { capture(app, "quick-reveal-reverse-" + element.identifier) }
+            print(
+                "quick-reveal step=\(step) target=\(target) viewport=\(viewport) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) up=\(up)"
+            )
+            previous = target
+            let remaining = target.height > 0 ? abs(target.midY - viewport.midY) : viewport.height
+            let distance = min(viewport.height * 0.3, max(12, remaining))
+            // 슬라이더를 잡지 않는 왼쪽 여백. 끝에서 잠깐 멈춰 관성으로 목표를 지나치지 않는다.
+            let x = viewport.minX + 2
+            let startY = viewport.midY
+            let endY = startY + (up ? -distance : distance)
+            let origin = app.coordinate(withNormalizedOffset: .zero)
+            origin.withOffset(CGVector(dx: x, dy: startY)).press(
+                forDuration: 0.05, thenDragTo: origin.withOffset(CGVector(dx: x, dy: endY)),
+                withVelocity: .slow, thenHoldForDuration: 0.3)
         }
+        capture(app, "quick-reveal-failure-" + element.identifier)
+        print("quick-reveal-failure AX=" + app.debugDescription)
+        XCTAssertTrue(element.exists)
+        XCTAssertTrue(element.isEnabled)
         XCTAssertTrue(element.isHittable)
     }
 
