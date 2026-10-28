@@ -14,14 +14,37 @@ final class OneTouchApplicationUITests: XCTestCase {
         return app
     }
 
+    private enum FixtureReadError: Error { case unavailable, wrongFixture }
+
     private func state(_ app: XCUIApplication) throws -> [String: Any] {
-        let meter = app.staticTexts["oneTouch.fixture"].firstMatch
-        XCTAssertTrue(meter.exists)
-        let raw = try XCTUnwrap(meter.value as? String)
-        let result = try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any])
-        XCTAssertEqual(result["fixture"] as? String, "synthetic-one-touch-overrides")
-        XCTAssertEqual((result["sourceSHA"] as? String)?.count, 64)
+        let choice = app.staticTexts["oneTouch.choice.fixture"].firstMatch
+        let meter = choice.exists ? choice : app.staticTexts["oneTouch.fixture"].firstMatch
+        guard meter.exists, let raw = meter.value as? String,
+            let result = try JSONSerialization.jsonObject(with: Data(raw.utf8)) as? [String: Any]
+        else {
+            throw FixtureReadError.unavailable
+        }
+        guard result["fixture"] as? String == "synthetic-one-touch-overrides",
+            (result["sourceSHA"] as? String)?.count == 64
+        else { throw FixtureReadError.wrongFixture }
         return result
+    }
+
+    private func choose(
+        _ identifier: String, app: XCUIApplication, captureName: String
+    ) throws {
+        XCTAssertTrue(app.staticTexts["oneTouch.choice.title"].waitForExistence(timeout: 5))
+        let opened = try state(app)
+        XCTAssertFalse((opened["decisionID"] as? String ?? "").isEmpty)
+        try capture(app, name: captureName)
+        let button = app.buttons[identifier]
+        XCTAssertTrue(button.exists)
+        XCTAssertTrue(button.isEnabled)
+        XCTAssertTrue(button.isHittable)
+        button.tap()
+        _ = try waitState(app) {
+            $0["decisionID"] as? String == "" && !app.staticTexts["oneTouch.choice.title"].exists
+        }
     }
 
     @discardableResult
@@ -204,6 +227,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         XCTAssertEqual(before["undo"] as? Int, 0)
         try reveal(app.buttons["quick.portrait"], app: app)
         app.buttons["quick.portrait"].tap()
+        try choose("oneTouch.choice.keep", app: app, captureName: "one-touch-primary-quick-keep-choice")
         let protected = try waitState(app) { $0["feedbackAll"] as? String == "noChange" }
         XCTAssertEqual(protected["recipeSHA"] as? String, before["recipeSHA"] as? String)
         XCTAssertEqual(protected["saves"] as? Int, before["saves"] as? Int)
@@ -248,6 +272,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         XCTAssertTrue(apply.waitForExistence(timeout: 5))
         try reveal(apply, app: app)
         apply.tap()
+        try choose("oneTouch.choice.keep", app: app, captureName: "one-touch-primary-beauty-keep-choice")
         _ = try waitState(app) { $0["feedbackAll"] as? String == "noChange" }
         let replace = app.buttons["oneTouch.apply.replace"]
         try reveal(replace, app: app)
@@ -270,6 +295,7 @@ final class OneTouchApplicationUITests: XCTestCase {
         try reveal(app.buttons["quick.portrait"], app: app)
         let before = try state(app)
         app.buttons["quick.portrait"].tap()
+        try choose("oneTouch.choice.keep", app: app, captureName: "one-touch-primary-quick-fixed-all-choice")
         let after = try waitState(app) { $0["feedbackAll"] as? String == "noChange" }
         XCTAssertEqual(after["recipeSHA"] as? String, before["recipeSHA"] as? String)
         XCTAssertEqual(after["requestAll"] as? Double, 1)
@@ -338,4 +364,70 @@ final class OneTouchApplicationUITests: XCTestCase {
         XCTAssertEqual(cleared["saves"] as? Int, (undone["saves"] as! Int) + 1)
         try capture(app, name: "one-touch-default-zero-clear-is-separate")
     }
+    func testPrimaryQuickChoiceCancelsWithoutMutationAndReplacesWithOneUndo() throws {
+        let app = try launchFixture()
+        let button = app.buttons["quick.portrait"]
+        try reveal(button, app: app)
+        let before = try state(app)
+        button.tap()
+        XCTAssertTrue(app.staticTexts["oneTouch.choice.title"].waitForExistence(timeout: 5))
+        let opened = try state(app)
+        for key in ["recipeSHA", "previewSHA", "context", "undo", "saves"] {
+            XCTAssertEqual(String(describing: opened[key]), String(describing: before[key]))
+        }
+        XCTAssertTrue(app.staticTexts["이 사진의 모든 얼굴 · 요청 강도 1.00"].exists)
+        try choose("oneTouch.choice.cancel", app: app, captureName: "one-touch-primary-quick-cancel")
+        let cancelled = try state(app)
+        for key in ["recipeSHA", "previewSHA", "context", "undo", "saves"] {
+            XCTAssertEqual(String(describing: cancelled[key]), String(describing: before[key]))
+        }
+        button.tap()
+        try choose("oneTouch.choice.replace", app: app, captureName: "one-touch-primary-quick-replace-choice")
+        let replaced = try waitState(app) { $0["ready"] as? Bool == true && $0["feedbackAll"] as? String == "visible" }
+        XCTAssertEqual(replaced["resolvedSmoothing"] as? Double, 0.2)
+        XCTAssertEqual(replaced["bodyBrightness"] as? Double, before["bodyBrightness"] as? Double)
+        XCTAssertEqual(replaced["saves"] as? Int, (before["saves"] as! Int) + 1)
+        XCTAssertEqual(replaced["undo"] as? Int, 1)
+        try reveal(app.staticTexts["quick.portrait.result"], app: app)
+        try capture(app, name: "one-touch-primary-quick-replaced")
+        let undo = app.buttons["quick.undo"]
+        try reveal(undo, app: app)
+        undo.tap()
+        let undone = try waitState(app) { $0["ready"] as? Bool == true && $0["undo"] as? Int == 0 }
+        XCTAssertEqual(undone["recipeSHA"] as? String, before["recipeSHA"] as? String)
+        XCTAssertEqual(undone["previewSHA"] as? String, before["previewSHA"] as? String)
+    }
+
+    func testPrimaryBeautyChoiceSwipeDismissesAndReplacementUsesSameReport() throws {
+        let app = try launchFixture()
+        let details = app.buttons["quick.details.portrait"]
+        try reveal(details, app: app)
+        details.tap()
+        let button = app.buttons["oneTouch.apply"]
+        try reveal(button, app: app)
+        let before = try state(app)
+        button.tap()
+        let title = app.staticTexts["oneTouch.choice.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        try capture(app, name: "one-touch-primary-beauty-before-swipe")
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        origin.withOffset(CGVector(dx: app.frame.midX, dy: title.frame.minY - 10)).press(
+            forDuration: 0.1,
+            thenDragTo: origin.withOffset(CGVector(dx: app.frame.midX, dy: app.frame.maxY - 50)),
+            withVelocity: .slow, thenHoldForDuration: 0.3)
+        let dismissed = try waitState(app) { $0["decisionID"] as? String == "" && !title.exists }
+        for key in ["recipeSHA", "previewSHA", "context", "undo", "saves"] {
+            XCTAssertEqual(String(describing: dismissed[key]), String(describing: before[key]))
+        }
+        button.tap()
+        try choose("oneTouch.choice.replace", app: app, captureName: "one-touch-primary-beauty-replace-choice")
+        let after = try waitState(app) { $0["ready"] as? Bool == true && $0["feedbackAll"] as? String == "visible" }
+        XCTAssertEqual(after["resolvedSmoothing"] as? Double, 0.2)
+        XCTAssertEqual(after["bodyBrightness"] as? Double, before["bodyBrightness"] as? Double)
+        XCTAssertEqual(after["undo"] as? Int, 1)
+        XCTAssertEqual(after["saves"] as? Int, (before["saves"] as! Int) + 1)
+        try reveal(app.staticTexts["oneTouch.apply.result"], app: app)
+        try capture(app, name: "one-touch-primary-beauty-replaced")
+    }
+
 }

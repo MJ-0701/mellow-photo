@@ -17,6 +17,7 @@ struct OneTouchRow: View {
             strength: strength > 0 ? strength : OneTouchBundle.maximumStrength,
             replacingPersonal: false, target: target)?.result
         let feedback = model.oneTouchFeedback(for: target)
+        let decision = model.oneTouchDecision(for: target)
         VStack(alignment: .leading, spacing: 6) {
             #if DEBUG
                 if model.isOneTouchUIFixture {
@@ -68,7 +69,22 @@ struct OneTouchRow: View {
                 Text(UserMessage.assignGenderForOneTouch).font(.caption2).foregroundStyle(.secondary)
             }
         }
+        .sheet(
+            item: Binding(
+                get: { decision },
+                set: { value in
+                    if value == nil, let id = decision?.id { model.dismissOneTouchDecision(id: id) }
+                }
+            )
+        ) { request in
+            OneTouchDecisionSheet(
+                decision: request,
+                keep: { model.resolveOneTouchDecision(id: request.id, choice: .keepAdjustments) },
+                replace: { model.resolveOneTouchDecision(id: request.id, choice: .replacePersonal) },
+                cancel: { model.dismissOneTouchDecision(id: request.id) })
+        }
         .onDisappear {
+            if let id = decision?.id { model.dismissOneTouchDecision(id: id) }
             model.cancelOneTouchRequestEditing(requestDrag)
             requestDrag = nil
         }
@@ -87,7 +103,7 @@ struct OneTouchRow: View {
 
     private func button(_ target: AppModel.BeautyTarget) -> some View {
         Button {
-            model.submitOneTouchRequest(for: target)
+            model.beginOneTouchPrimaryAction(for: target)
         } label: {
             Label(UserMessage.oneTouch, systemImage: Self.buttonSymbol)
                 .frame(minWidth: Theme.oneTouchButtonMinWidth)

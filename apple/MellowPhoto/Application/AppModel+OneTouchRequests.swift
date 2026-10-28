@@ -55,6 +55,7 @@ extension AppModel {
             else { return }
         }
         oneTouchRequests = oneTouchRequests.filter { $0.key.photoID != key.photoID || $0.key.analysis == key.analysis }
+        oneTouchRequestGeneration = UUID()
         oneTouchRequests[key] = OneTouchBundle.clampedStrength(strength)
         clearOneTouchAttempt()
     }
@@ -82,7 +83,8 @@ extension AppModel {
         oneTouchRequestDrag = nil
     }
 
-    private func clearOneTouchAttempt() {
+    func clearOneTouchAttempt() {
+        pendingOneTouchDecision = nil
         let hadAttempt = oneTouchAttempt != nil
         oneTouchAttempt = nil
         if hadAttempt || portraitPurposeApplication?.oneTouchResult != nil { portraitPurposeApplication = nil }
@@ -94,12 +96,22 @@ extension AppModel {
         endSliderEditIfActive()
         oneTouchRequestDrag = nil
         clearOneTouchAttempt()
-        guard let key = oneTouchInputKey(for: target), isReady, !isWorkStopped,
+        guard oneTouchInputKey(for: target) != nil, isReady, !isWorkStopped,
             !isImporting, !isExporting, !isRestoring, quickRetouchRunID == nil
         else { return false }
         let strength = requestedOneTouchStrength(for: target)
         if strength == 0, !replacingPersonal { return clearOneTouchInheritance(for: target) }
         let plan = planOneTouchApplication(strength: strength, replacingPersonal: replacingPersonal, target: target)
+        return submitPreparedOneTouchPlan(plan, for: target, replacingPersonal: replacingPersonal)
+    }
+
+    /// 선택할 때 이미 고정한 계획만 쓴다. 확인 시 현재 사진으로 새 계획을 만들지 않는다.
+    @discardableResult
+    func submitPreparedOneTouchPlan(
+        _ plan: OneTouchPlan?, for target: BeautyTarget, replacingPersonal: Bool
+    ) -> Bool {
+        clearOneTouchAttempt()
+        guard let key = oneTouchInputKey(for: target) else { return false }
         let accepted = plan.map { applyOneTouchApplication($0) } ?? false
         oneTouchAttempt = OneTouchAttempt(
             key: key, context: portraitPurposeContext, recipe: currentRecipe,

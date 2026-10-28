@@ -298,10 +298,14 @@ final class QuickRetouchTests: XCTestCase {
         let people = model.currentRecipe.people.individuals
         let steps = model.session.selected!.document.undoStack.count
         await model.applyQuickAction(.portrait)
+        let choice = try XCTUnwrap(model.oneTouchDecision(for: .all))
+        _ = model.resolveOneTouchDecision(id: choice.id, choice: .keepAdjustments)
         XCTAssertEqual(model.currentRecipe.portrait.oneTouch, 0.6)
         XCTAssertEqual(model.currentRecipe.people.individuals, people)
         XCTAssertEqual(model.session.selected!.document.undoStack.count, steps + 1)
         await model.applyQuickAction(.portrait)
+        let repeatChoice = try XCTUnwrap(model.oneTouchDecision(for: .all))
+        _ = model.resolveOneTouchDecision(id: repeatChoice.id, choice: .keepAdjustments)
         XCTAssertEqual(model.session.selected!.document.undoStack.count, steps + 1)
         model.stopWork()
     }

@@ -178,11 +178,17 @@ final class AppModel {
     var photoInfo: [PhotoID: PhotoInfo] = [:]
     var preview: CGImage?
     var original: CGImage?
-    var portraitPurposeContext = UUID()
+    var portraitPurposeContext = UUID() {
+        didSet { invalidatePendingOneTouchDecision() }
+    }
     var portraitPurposeApplication: PortraitPurposeApplication?
     var oneTouchRequests: [OneTouchInputKey: Double] = [:]
     var oneTouchRequestDrag: OneTouchRequestDrag?
     var oneTouchAttempt: OneTouchAttempt?
+    var pendingOneTouchDecision: OneTouchDecision?
+    var oneTouchRequestGeneration = UUID() {
+        didSet { invalidatePendingOneTouchDecision() }
+    }
     #if DEBUG
         var isOneTouchUIFixture = false
         @ObservationIgnored var oneTouchFixtureSaveCount: (() -> Int)?

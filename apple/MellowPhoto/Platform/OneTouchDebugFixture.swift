@@ -72,6 +72,7 @@
                     ?? "",
                 "requestCurrent": requestedOneTouchStrength(for: beautyTarget),
                 "bodyBrightness": currentRecipe.bodySkin.brightness,
+                "decisionID": pendingOneTouchDecision.flatMap { oneTouchDecision(for: $0.target) }?.id.uuidString ?? "",
                 "context": portraitPurposeContext.uuidString,
                 "ready": isReady && !isBusy && !isRendering && lastRenderFailure == nil,
                 "target": String(describing: beautyTarget), "requestAll": requestedOneTouchStrength(for: .all),

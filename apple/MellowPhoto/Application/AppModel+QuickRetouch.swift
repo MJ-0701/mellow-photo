@@ -65,7 +65,7 @@ extension AppModel {
             return
         }
         if action == .portrait {
-            submitOneTouchRequest(for: .all)
+            beginOneTouchPrimaryAction(for: .all)
             return
         }
         endSliderEditIfActive()
